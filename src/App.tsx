@@ -18,9 +18,25 @@ class Ship implements ICameraState {
     public positionVelocity: Quaternion = Quaternion.ONE;
     public orientation: Quaternion = Quaternion.ONE;
     public orientationVelocity: Quaternion = Quaternion.ONE;
+    public cannonLoading?: Date = undefined;
+}
+
+class SmokeCloud implements ICameraState, IExpirable {
+    public id: string = "";
+    public color: string = "grey";
+    public position: Quaternion = Quaternion.ONE;
+    public positionVelocity: Quaternion = Quaternion.ONE;
+    public orientation: Quaternion = Quaternion.ONE;
+    public orientationVelocity: Quaternion = Quaternion.ONE;
+    public created: Date = new Date(Date.now());
+    public expires: Date = new Date(Date.now() + 10000);
 }
 
 interface ICameraState {
+    /**
+     * The id of the camera.
+     */
+    id: string;
     /**
      * Position, relative to north pole.
      */
@@ -37,6 +53,25 @@ interface ICameraState {
      * Orientation velocity, in north pole reference frame.
      */
     orientationVelocity: Quaternion;
+    /**
+     * The color of the camera object.
+     */
+    color: string;
+    /**
+     * The start of cannon loading.
+     */
+    cannonLoading?: Date;
+}
+
+interface IExpirable {
+    /**
+     * The date an expirable object was created.
+     */
+    created: Date;
+    /**
+     * The date an expirable object will be destroyed.
+     */
+    expires: Date;
 }
 
 interface IDrawable {
@@ -46,6 +81,7 @@ interface IDrawable {
     positionVelocity: Quaternion;
     orientation: Quaternion;
     orientationVelocity: Quaternion;
+    cannonLoading?: Date;
     projection: { x: number, y: number };
     reverseProjection: { x: number, y: number };
     rotatedPosition: [number, number, number];
@@ -62,6 +98,7 @@ interface IAppState {
     height: number;
     planets: Planet[];
     ships: Ship[];
+    smokeClouds: SmokeCloud[];
     zoom: number;
 }
 
@@ -72,6 +109,7 @@ class App extends React.Component<IAppProps, IAppState> {
         height: 500 as number,
         planets: [] as Planet[],
         ships: [] as Ship[],
+        smokeClouds: [] as SmokeCloud[],
         zoom: 4 as number,
     };
 
@@ -90,10 +128,13 @@ class App extends React.Component<IAppProps, IAppState> {
 
     private static GetCameraState(viewableObject: ICameraState): ICameraState {
         return {
+            id: viewableObject.id,
+            color: viewableObject.color,
             position: viewableObject.position.clone(),
             positionVelocity: viewableObject.positionVelocity.clone(),
             orientation: viewableObject.orientation.clone(),
             orientationVelocity: viewableObject.orientationVelocity.clone(),
+            cannonLoading: viewableObject.cannonLoading,
         };
     }
 
@@ -122,10 +163,10 @@ class App extends React.Component<IAppProps, IAppState> {
         };
     }
 
-    private convertToDrawable<T extends Planet | Ship>(layerPostfix: string, size: number, planet: T): IDrawable {
+    private convertToDrawable<T extends ICameraState>(layerPostfix: string, size: number, planet: T): IDrawable {
         const rotatedPosition = planet.position.rotateVector([0, 0, 1]);
-        const projection = this.stereographicProjection(planet, false, size);
-        const reverseProjection = this.stereographicProjection(planet, true, size);
+        const projection = this.stereographicProjection(planet, size);
+        const reverseProjection = this.stereographicProjection(planet, size);
         // const distance = 50 * Math.sqrt(
         //     Math.pow(rotatedPosition[0], 2) +
         //     Math.pow(rotatedPosition[1], 2) +
@@ -141,6 +182,7 @@ class App extends React.Component<IAppProps, IAppState> {
             positionVelocity: planet.positionVelocity,
             orientation: planet.orientation,
             orientationVelocity: planet.orientationVelocity,
+            cannonLoading: planet.cannonLoading,
             projection,
             reverseProjection,
             rotatedPosition,
@@ -149,36 +191,13 @@ class App extends React.Component<IAppProps, IAppState> {
         };
     }
 
-    private stereographicProjection(planet: Planet, reverse: boolean = false, size: number = 1): {x: number, y: number} {
+    private stereographicProjection(planet: ICameraState, size: number = 1): {x: number, y: number} {
         const zoom = this.state.zoom;
         const vector = planet.position.rotateVector([0, 0, 1]);
         return {
             x: vector[0] * zoom * size,
             y: vector[1] * zoom * size,
         };
-        if (!reverse && vector[2] === 1) {
-            return {
-                x: 0,
-                y: 0
-            };
-        }
-        else if (reverse && vector[2] === -1) {
-            return {
-                x: 0,
-                y: 0
-            };
-        }
-        if (reverse) {
-            return {
-                x: (vector[0] / (1 + vector[2])) * zoom,
-                y: (vector[1] / (1 + vector[2])) * zoom
-            };
-        } else {
-            return {
-                x: (vector[0] / (1 - vector[2])) * zoom,
-                y: (vector[1] / (1 - vector[2])) * zoom
-            };
-        }
     }
 
     private drawPlanet(planetDrawing: IDrawable) {
@@ -212,14 +231,7 @@ class App extends React.Component<IAppProps, IAppState> {
         let velocityY = 0;
         const isPlayerShip = planetDrawing.id === "ship-0-ships";
         if (isPlayerShip) {
-            const position = planetDrawing.position.clone().rotateVector([0, 0, 1]);
-            const forward = planetDrawing.position.clone()
-                .mul(planetDrawing.positionVelocity.clone())
-                .rotateVector([0, 1, 0]);
-            const rotation = planetDrawing.position.clone().mul(
-                Quaternion.fromBetweenVectors(position, forward).conjugate().pow(App.speed).conjugate()
-            );
-            const velocityPosition = rotation.rotateVector([0, 1, 0]);
+            const velocityPosition = [0, 0, 1];
             const velocityLength = Math.sqrt(velocityPosition.reduce((sum: number, value: number): number => {
                 return sum + Math.pow(value, 2);
             }, 0));
@@ -228,8 +240,30 @@ class App extends React.Component<IAppProps, IAppState> {
                 .mul(planetDrawing.orientation.clone().conjugate())
                 .rotateVector([1, 0, 0]);
             const orientationAngle = Math.atan2(orientationPosition[1], orientationPosition[0]);
-            velocityX = velocityLength * Math.cos(velocityAngle + orientationAngle);
-            velocityY = velocityLength * Math.sin(velocityAngle + orientationAngle);
+            if (velocityLength > 0) {
+                velocityX = velocityLength * Math.cos(velocityAngle + orientationAngle);
+                velocityY = velocityLength * Math.sin(velocityAngle + orientationAngle);
+            }
+        }
+        const rightCannonPointTop: [number, number] = [
+            Math.max(this.state.width / 2, this.state.height / 2) * Math.cos((10 / 180 * Math.PI)) * this.state.zoom,
+            Math.max(this.state.width / 2, this.state.height / 2) * Math.sin((10 / 180 * Math.PI)) * this.state.zoom,
+        ]
+        const rightCannonPointBottom: [number, number] = [
+            Math.max(this.state.width / 2, this.state.height / 2) * Math.cos(-(10 / 180 * Math.PI)) * this.state.zoom,
+            Math.max(this.state.width / 2, this.state.height / 2) * Math.sin(-(10 / 180 * Math.PI)) * this.state.zoom,
+        ];
+        const leftCannonPointTop: [number, number] = [
+            Math.max(this.state.width / 2, this.state.height / 2) * Math.cos(Math.PI - (10 / 180 * Math.PI)) * this.state.zoom,
+            Math.max(this.state.width / 2, this.state.height / 2) * Math.sin(Math.PI - (10 / 180 * Math.PI)) * this.state.zoom,
+        ]
+        const leftCannonPointBottom: [number, number] = [
+            Math.max(this.state.width / 2, this.state.height / 2) * Math.cos(Math.PI + (10 / 180 * Math.PI)) * this.state.zoom,
+            Math.max(this.state.width / 2, this.state.height / 2) * Math.sin(Math.PI + (10 / 180 * Math.PI)) * this.state.zoom,
+        ];
+        let cannonLoadingPercentage = 0;
+        if (isPlayerShip && planetDrawing.cannonLoading) {
+            cannonLoadingPercentage = (Date.now() - +planetDrawing.cannonLoading) / 3000;
         }
         return (
             <g key={planetDrawing.id} transform={`translate(${x * this.state.width},${(1 - y) * this.state.height})`}>
@@ -248,14 +282,64 @@ class App extends React.Component<IAppProps, IAppState> {
                 }
                 <g transform={`rotate(${planetDrawing.rotation}) scale(${scale})`}>
                     <polygon
-                        points="0,-30 10,-20 10,25 5,30 -5,30 -10,25 -10,-20"
+                        points="0,-30 10,-20 10,25 5,30 0,25 -5,30 -10,25 -10,-20"
                         fill={planetDrawing.color}
                         stroke="grey"
                         strokeWidth={0.05 * size * this.state.zoom}
                         style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
                     />
+                    {
+                        isPlayerShip && planetDrawing.cannonLoading && (
+                            <>
+                                <polygon
+                                    points={`10,-20 ${rightCannonPointBottom[0]},${rightCannonPointBottom[1]} ${rightCannonPointTop[0]},${rightCannonPointTop[1]} 10,20`}
+                                    fill="grey"
+                                    stroke="white"
+                                    strokeWidth={0.05 * size * this.state.zoom}
+                                    style={{opacity: 0.3}}
+                                />
+                                <polygon
+                                    points={`-10,-20 ${leftCannonPointBottom[0]},${leftCannonPointBottom[1]} ${leftCannonPointTop[0]},${leftCannonPointTop[1]} -10,20`}
+                                    fill="grey"
+                                    stroke="white"
+                                    strokeWidth={0.05 * size * this.state.zoom}
+                                    style={{opacity: 0.3}}
+                                />
+                                <polygon
+                                    points={`10,-20 ${rightCannonPointBottom[0] * cannonLoadingPercentage},${rightCannonPointBottom[1] * cannonLoadingPercentage} ${rightCannonPointTop[0] * cannonLoadingPercentage},${rightCannonPointTop[1] * cannonLoadingPercentage} 10,20`}
+                                    fill="white"
+                                    style={{opacity: 0.3}}
+                                />
+                                <polygon
+                                    points={`-10,-20 ${leftCannonPointBottom[0] * cannonLoadingPercentage},${leftCannonPointBottom[1] * cannonLoadingPercentage} ${leftCannonPointTop[0] * cannonLoadingPercentage},${leftCannonPointTop[1] * cannonLoadingPercentage} -10,20`}
+                                    fill="white"
+                                    style={{opacity: 0.3}}
+                                />
+                            </>
+                        )
+                    }
                 </g>
             </g>
+        );
+    }
+
+    private drawSmokeCloud(planetDrawing: IDrawable) {
+        const isReverseSide = planetDrawing.rotatedPosition[2] > 0;
+        const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
+        const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
+        const distance = planetDrawing.distance;
+        const size = 0.2 * 2 * Math.atan(10 / (2 * distance));
+        return (
+            <circle
+                key={planetDrawing.id}
+                cx={x * this.state.width}
+                cy={(1 - y) * this.state.height}
+                r={size * this.state.zoom}
+                fill={planetDrawing.color}
+                stroke="darkgray"
+                strokeWidth={0.02 * size * this.state.zoom}
+                style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
+            />
         );
     }
 
@@ -265,11 +349,19 @@ class App extends React.Component<IAppProps, IAppState> {
                 return state;
             }
             let {
+                id: cameraId,
                 position: cameraPosition,
                 positionVelocity: cameraPositionVelocity,
                 orientation: cameraOrientation,
-                orientationVelocity: cameraOrientationVelocity
+                orientationVelocity: cameraOrientationVelocity,
+                cannonLoading: cameraCannonLoading,
             } = this.getFirstShip(state);
+            const smokeClouds = [
+                ...state.smokeClouds.filter(smokeCloud => {
+                    return +smokeCloud.expires > Date.now();
+                }).slice(-20)
+            ];
+
             if (this.activeKeys.includes("a")) {
                 const rotation = Quaternion.fromAxisAngle([0, 0, 1], Math.PI).pow(1/300);
                 cameraOrientationVelocity = cameraOrientationVelocity.clone().mul(rotation);
@@ -282,11 +374,27 @@ class App extends React.Component<IAppProps, IAppState> {
                 const forward = cameraOrientation.clone().rotateVector([0, 1, 0]);
                 const rotation = Quaternion.fromBetweenVectors([0, 0, 1], forward).pow(App.speed);
                 cameraPositionVelocity = cameraPositionVelocity.clone().mul(rotation);
+                const smokeCloud = new SmokeCloud();
+                smokeCloud.id = `${cameraId}-${Math.floor(Math.random() * 100000000)}`;
+                smokeCloud.position = cameraPosition;
+                smokeCloud.positionVelocity = rotation.conjugate();
+                smokeClouds.push(smokeCloud);
             }
             if (this.activeKeys.includes("s")) {
                 const backward = cameraOrientation.clone().rotateVector([0, -1, 0]);
                 const rotation = Quaternion.fromBetweenVectors([0, 0, 1], backward).pow(App.speed);
                 cameraPositionVelocity = cameraPositionVelocity.clone().mul(rotation);
+            }
+            if (this.activeKeys.includes(" ") && !cameraCannonLoading) {
+                cameraCannonLoading = new Date(Date.now());
+            }
+            if (!this.activeKeys.includes(" ") && cameraCannonLoading) {
+                // cannon fire
+                cameraCannonLoading = undefined;
+            }
+            if (this.activeKeys.includes(" ") && cameraCannonLoading && Date.now() - +cameraCannonLoading > 3000) {
+                // cancel cannon fire
+                cameraCannonLoading = undefined;
             }
             if (cameraPositionVelocity !== Quaternion.ONE) {
                 cameraPosition = cameraPosition.clone().mul(cameraPositionVelocity.clone());
@@ -304,10 +412,12 @@ class App extends React.Component<IAppProps, IAppState> {
                 orientation: cameraOrientation,
                 positionVelocity: cameraPositionVelocity,
                 orientationVelocity: cameraOrientationVelocity,
+                cannonLoading: cameraCannonLoading,
             };
             return {
                 ...state,
                 ships: [ship, ...state.ships.slice(1, state.ships.length)],
+                smokeClouds,
             };
         });
     }
@@ -489,6 +599,11 @@ class App extends React.Component<IAppProps, IAppState> {
                         this.state.ships.map(this.rotatePlanet.bind(this))
                             .map(this.convertToDrawable.bind(this, "-ships", 1))
                             .map(this.drawShip.bind(this))
+                    }
+                    {
+                        this.state.smokeClouds.map(this.rotatePlanet.bind(this))
+                            .map(this.convertToDrawable.bind(this, "-smokeClouds", 1))
+                            .map(this.drawSmokeCloud.bind(this))
                     }
                 </svg>
             </div>
