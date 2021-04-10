@@ -39,25 +39,25 @@ class DelaunayGraph {
      * Initialize a basic graph, ready for incremental construction.
      */
     public initialize() {
-        const north: [number, number, number] = [0, 0, 1];
+        const north: [number, number, number] = DelaunayGraph.normalize([0, 0, 1]);
         this.vertices.push(north);
 
         const tetrahedronAngle = 120 / 180 * Math.PI;
-        const base1: [number, number, number] = [
+        const base1: [number, number, number] = DelaunayGraph.normalize([
             Math.cos(0) * Math.sin(tetrahedronAngle),
             Math.sin(0) * Math.sin(tetrahedronAngle),
             Math.cos(tetrahedronAngle)
-        ];
-        const base2: [number, number, number] = [
+        ]);
+        const base2: [number, number, number] = DelaunayGraph.normalize([
             Math.cos(tetrahedronAngle) * Math.sin(tetrahedronAngle),
             Math.sin(tetrahedronAngle) * Math.sin(tetrahedronAngle),
             Math.cos(tetrahedronAngle)
-        ];
-        const base3: [number, number, number] = [
+        ]);
+        const base3: [number, number, number] = DelaunayGraph.normalize([
             Math.cos(2 * tetrahedronAngle) * Math.sin(tetrahedronAngle),
             Math.sin(2 * tetrahedronAngle) * Math.sin(tetrahedronAngle),
             Math.cos(2 * tetrahedronAngle)
-        ];
+        ]);
         this.vertices.push(base1, base2, base3);
 
         this.edges.push([0, 1], [1, 2], [2, 0]);
@@ -74,22 +74,22 @@ class DelaunayGraph {
         }
     }
 
-    private randomInt(): number {
+    public static randomInt(): number {
         return (Math.random() * 2) - 1;
     }
 
-    private randomPoint(): [number, number, number] {
+    public static randomPoint(): [number, number, number] {
         // generate random vertex
-        const vertex: [number, number, number] = [this.randomInt(), this.randomInt(), this.randomInt()];
-        return this.normalize(vertex);
+        const vertex: [number, number, number] = [DelaunayGraph.randomInt(), DelaunayGraph.randomInt(), DelaunayGraph.randomInt()];
+        return DelaunayGraph.normalize(vertex);
     }
 
-    private distanceFormula(a: [number, number, number], b: [number, number, number]): number {
+    public static distanceFormula(a: [number, number, number], b: [number, number, number]): number {
         return Math.sqrt(Math.pow(b[0] - a[0], 2) + Math.pow(b[1] - a[1], 2) + Math.pow(b[2] - a[2], 2));
     }
 
-    private normalize(a: [number, number, number]): [number, number, number] {
-        const vertexLength = this.distanceFormula(a, [0, 0, 0]);
+    public static normalize(a: [number, number, number]): [number, number, number] {
+        const vertexLength = DelaunayGraph.distanceFormula(a, [0, 0, 0]);
         return [
             a[0] / vertexLength,
             a[1] / vertexLength,
@@ -124,6 +124,19 @@ class DelaunayGraph {
     }
 
     /**
+     * Compute the addition of two vectors.
+     * @param a The first vector.
+     * @param b The second vector.
+     */
+    public static add(a: [number, number, number], b: [number, number, number]): [number, number, number] {
+        return [
+            a[0] + b[0],
+            a[1] + b[1],
+            a[2] + b[2],
+        ];
+    }
+
+    /**
      * Compute the cross product of two vectors.
      * @param a The first vector.
      * @param b The second vector.
@@ -146,7 +159,7 @@ class DelaunayGraph {
                 const endIndex = this.edges[edgeIndex][1];
                 const start = this.vertices[startIndex];
                 const end = this.vertices[endIndex];
-                const normal = this.normalize(DelaunayGraph.crossProduct(start, end));
+                const normal = DelaunayGraph.normalize(DelaunayGraph.crossProduct(start, end));
                 // check to see if point is on the correct side of the half plane
                 if (vertex[0] * normal[0] + vertex[1] * normal[1] + vertex[2] * normal[2] < 0) {
                     // incorrect side, return false, try next triangle
@@ -182,18 +195,27 @@ class DelaunayGraph {
         this.triangles.push([threeEdgeIndices[1], this.edges.length - 7 + 4, this.edges.length - 7 + 3]);
         this.triangles.push([threeEdgeIndices[2], this.edges.length - 7 + 6, this.edges.length - 7 + 5]);
 
-        // for (let i = 0; i < 1; i++) {
-        //     const triangleIndex1 = this.triangles.length - 1 - i;
-        //     for (const edgeIndex of this.triangles[triangleIndex1]) {
-        //         const edge = this.edges[edgeIndex];
-        //         const firstVertexIndex = edge[0];
-        //         const secondVertexIndex = edge[1];
-        //         const firstVertex = this.vertices[firstVertexIndex];
-        //         const secondVertex = this.vertices[secondVertexIndex];
-        //         console.log("TRIANGLE", triangleIndex1, "EDGE", edgeIndex, "VERTEX", firstVertexIndex, firstVertex);
-        //         console.log("TRIANGLE", triangleIndex1, "EDGE", edgeIndex, "VERTEX", secondVertexIndex, secondVertex);
-        //     }
-        // }
+        for (let i = 0; i < 3; i++) {
+            const triangleIndex1 = this.triangles.length - 1 - i;
+            const points: Array<[number, number, number]> = [];
+            for (const edgeIndex of this.triangles[triangleIndex1]) {
+                const edge = this.edges[edgeIndex];
+                const firstVertexIndex = edge[0];
+                const secondVertexIndex = edge[1];
+                const firstVertex = this.vertices[firstVertexIndex];
+                const secondVertex = this.vertices[secondVertexIndex];
+                points.push(firstVertex);
+                console.log("TRIANGLE", triangleIndex1, "EDGE", edgeIndex, "VERTEX", firstVertexIndex, firstVertex);
+                console.log("TRIANGLE", triangleIndex1, "EDGE", edgeIndex, "VERTEX", secondVertexIndex, secondVertex);
+            }
+            const triangleNormal = DelaunayGraph.crossProduct(
+                DelaunayGraph.subtract(points[0], points[1]),
+                DelaunayGraph.subtract(points[2], points[1])
+            );
+            const triangleAveragePoint = App.getAveragePoint(points);
+            const triangleFacingInward = DelaunayGraph.dotProduct(triangleNormal, triangleAveragePoint) > 0;
+            console.log("TRIANGLE", triangleIndex1, "NORMAL", triangleNormal, triangleFacingInward ? "FACING INWARD" : "GOOD TRIANGLE");
+        }
     }
 
     /**
@@ -214,14 +236,14 @@ class DelaunayGraph {
                 vertexCount += 1;
             }
         }
-        return [
+        return DelaunayGraph.normalize([
             vertexSum[0] / vertexCount,
             vertexSum[1] / vertexCount,
             vertexSum[2] / vertexCount,
-        ];
+        ]);
     }
 
-    public orientTriangle(triangleIndex: number) {
+    private orientTriangle(triangleIndex: number) {
         // compute a reference frame around the north pole to the triangle
         const averagePoint = this.getAveragePointOfTriangle(triangleIndex);
         const averageQuaternionFrame = Quaternion.fromBetweenVectors([0, 0, 1], averagePoint);
@@ -284,24 +306,134 @@ class DelaunayGraph {
         this.triangles[triangleIndex] = sortOrder.map(sortIndex => this.triangles[triangleIndex][sortIndex]);
     }
 
+    private lawsonFlip(triangleIndex: number) {
+        // find complement triangle that's not newly created.
+        let complementTriangleIndex: number = -1;
+        let complementTriangleEdgeIndex: number = -1;
+        let triangleComplementEdgeIndex: number = -1;
+        for (let index = 0; index < this.triangles.length - 3; index++) {
+            const triangle = this.triangles[index];
+            for (const edgeIndex of triangle) {
+                let edgeIsReverseToTestTriangle = false;
+                for (let testTriangleEdgeIndex = 0; testTriangleEdgeIndex < triangle.length; testTriangleEdgeIndex++) {
+                    const testTriangleEdge = this.edges[triangle[testTriangleEdgeIndex]];
+                    const triangleEdge = this.edges[edgeIndex];
+                    const isComplementEdge = testTriangleEdge[0] === triangleEdge[1] && testTriangleEdge[1] === triangleEdge[0];
+                    if (isComplementEdge) {
+                        edgeIsReverseToTestTriangle = true;
+                        triangleComplementEdgeIndex = triangle[testTriangleEdgeIndex];
+                        break;
+                    }
+                }
+                if (edgeIsReverseToTestTriangle) {
+                    // found the complement triangle
+                    complementTriangleIndex = index;
+                    complementTriangleEdgeIndex = edgeIndex;
+                }
+            }
+        }
+
+        // detect if complement triangle was found
+        if (complementTriangleIndex >= 0 && complementTriangleEdgeIndex >= 0 && triangleComplementEdgeIndex >= 0) {
+            // try to sort the edges counter clockwise, starting with the complement edge
+            const triangle = this.triangles[triangleIndex];
+            const complementTriangle = this.triangles[complementTriangleIndex];
+            const sortedTriangleEdges: number[] = [];
+            const sortedComplementTriangleEdges: number[] = [];
+            /**
+             * Orient the triangle edges starting with complement edge, counter clockwise.
+             * @param triangle The triangle, list of edges to orient.
+             * @param sortedEdges The sorted list of edges.
+             */
+            const orientTriangleEdges = (triangle: number[], sortedEdges: number[]) => {
+                let startRecording: boolean = false;
+                for (let i = 0; i < triangle.length * 2; i++) {
+                    const edgeIndex = triangle[i % triangle.length];
+                    if (sortedEdges.length >= 3) {
+                        break;
+                    } else if (startRecording || edgeIndex === triangleComplementEdgeIndex) {
+                        if (!startRecording) {
+                            startRecording = true;
+                        }
+                        sortedEdges.push(edgeIndex);
+                    }
+                }
+            }
+            orientTriangleEdges(triangle, sortedTriangleEdges);
+            orientTriangleEdges(complementTriangle, sortedComplementTriangleEdges);
+
+            // get parallelogram vertex indices
+            const vertexIndices: number[] = [
+                this.edges[sortedTriangleEdges[0]][1],
+                this.edges[sortedTriangleEdges[1]][1],
+                this.edges[sortedComplementTriangleEdges[0]][1],
+                this.edges[sortedComplementTriangleEdges[1]][1],
+            ];
+
+            // determine if a flip is necessary based on the area ratio
+            const defaultAreaDiff = Math.abs(
+                DelaunayGraph.dotProduct(
+                    DelaunayGraph.subtract(this.vertices[vertexIndices[0]], this.vertices[vertexIndices[1]]),
+                    DelaunayGraph.subtract(this.vertices[vertexIndices[2]], this.vertices[vertexIndices[1]]),
+                ) -
+                DelaunayGraph.dotProduct(
+                    DelaunayGraph.subtract(this.vertices[vertexIndices[2]], this.vertices[vertexIndices[3]]),
+                    DelaunayGraph.subtract(this.vertices[vertexIndices[0]], this.vertices[vertexIndices[3]]),
+                )
+            );
+            const complementAreaDiff = Math.abs(
+                DelaunayGraph.dotProduct(
+                    DelaunayGraph.subtract(this.vertices[vertexIndices[1]], this.vertices[vertexIndices[2]]),
+                    DelaunayGraph.subtract(this.vertices[vertexIndices[3]], this.vertices[vertexIndices[2]]),
+                ) -
+                DelaunayGraph.dotProduct(
+                    DelaunayGraph.subtract(this.vertices[vertexIndices[3]], this.vertices[vertexIndices[0]]),
+                    DelaunayGraph.subtract(this.vertices[vertexIndices[1]], this.vertices[vertexIndices[0]]),
+                )
+            );
+            const shouldFlip = defaultAreaDiff > complementAreaDiff;
+
+            // perform lawson flip
+            if (shouldFlip) {
+                this.edges[triangleComplementEdgeIndex] = [vertexIndices[3], vertexIndices[1]];
+                this.triangles[triangleIndex] = [
+                    triangleComplementEdgeIndex,
+                    sortedTriangleEdges[2],
+                    sortedTriangleEdges[1]
+                ];
+                this.edges[complementTriangleEdgeIndex] = [vertexIndices[1], vertexIndices[3]];
+                this.triangles[complementTriangleIndex] = [
+                    complementTriangleEdgeIndex,
+                    sortedComplementTriangleEdges[2],
+                    sortedComplementTriangleEdges[1]
+                ];
+            }
+        }
+    }
+
     /**
      * Perform an incremental insert into the delaunay graph, add random data points and maintain the triangle mesh.
      */
     public incrementalInsert() {
-        const vertex = this.randomPoint();
-
-        // find triangle collision
-        const triangleIndex = this.findTriangleIntersection(vertex);
-        console.log("TRIANGLE MESH", triangleIndex);
+        let vertex: [number, number, number];
+        let triangleIndex: number;
+        vertex = DelaunayGraph.randomPoint();
+        triangleIndex = this.findTriangleIntersection(vertex);
 
         // add triangle incrementally
         this.buildInitialTriangleMeshForNewVertex(vertex, triangleIndex);
 
-        // orient triangles correctly
+        // perform lawson's flip to balance triangles
         for (let i = 0; i < 3; i++) {
             const triangleIndex = this.triangles.length - 1 - i;
-            this.orientTriangle(triangleIndex);
+            this.lawsonFlip(triangleIndex);
         }
+
+        // orient triangles correctly
+        // for (let i = 0; i < 3; i++) {
+        //     const triangleIndex = this.triangles.length - 1 - i;
+        //     this.orientTriangle(triangleIndex);
+        // }
     }
 
     /**
@@ -475,11 +607,11 @@ class App extends React.Component<IAppProps, IAppState> {
         } = this.getFirstShip();
         const vertices = triangle.vertices.reduce((acc: Quaternion[], v, index, arr): Quaternion[] => {
             // interpolate vertices to get more data points for round surfaces
-            const start = cameraOrientation.clone().conjugate()
-                .mul(cameraPosition.clone().conjugate())
+            const start = cameraOrientation.clone().inverse()
+                .mul(cameraPosition.clone().inverse())
                 .mul(Quaternion.fromBetweenVectors([0, 0, 1], v));
-            const end = cameraOrientation.clone().conjugate()
-                .mul(cameraPosition.clone().conjugate())
+            const end = cameraOrientation.clone().inverse()
+                .mul(cameraPosition.clone().inverse())
                 .mul(Quaternion.fromBetweenVectors([0, 0, 1], arr[(index + 1) % arr.length]));
             // number of sub steps for each edge of a spherical polygon
             const steps = 1;
@@ -707,10 +839,29 @@ class App extends React.Component<IAppProps, IAppState> {
         );
     }
 
+    public static getAveragePoint(points: Array<[number, number, number]>): [number, number, number] {
+        let sum: [number, number, number] = [0, 0, 0];
+        for (const point of points) {
+            sum = DelaunayGraph.add(sum, point);
+        }
+        return [
+            sum[0] / points.length,
+            sum[1] / points.length,
+            sum[2] / points.length,
+        ];
+    }
+
     private drawDelaunayTile(tile: DelaunayTile) {
         const rotatedPoints = tile.vertices.map((v: Quaternion): [number, number, number] => {
             return v.rotateVector([0, 0, 1]);
         });
+        for (const p of rotatedPoints) {
+            const pLength = DelaunayGraph.distanceFormula(p, [0, 0, 0]);
+            if (Math.abs(pLength - 1) > 0.01) {
+                console.log("BAD LENGTH", pLength);
+            }
+        }
+        const averagePoint = App.getAveragePoint(rotatedPoints);
         const points: Array<{x: number, y: number}> = rotatedPoints.map(point => {
             return {
                 x: point[0] * this.state.zoom,
@@ -722,6 +873,10 @@ class App extends React.Component<IAppProps, IAppState> {
                 y: (p.y + 1) * 0.5,
             };
         });
+        const averageDrawingPoint: {x: number, y: number} = {
+            x: (averagePoint[0] * this.state.zoom + 1) * 0.5,
+            y: (averagePoint[1] * this.state.zoom + 1) * 0.5,
+        };
 
         // determine if the triangle is facing the camera, do not draw triangles facing away from the camera
         const triangleNormal = DelaunayGraph.crossProduct(
@@ -732,14 +887,21 @@ class App extends React.Component<IAppProps, IAppState> {
 
         if (triangleFacingCamera) {
             return (
-                <polygon
-                    key={tile.id}
-                    points={points.map(p => `${p.x * this.state.width},${p.y * this.state.height}`).join(" ")}
-                    fill={tile.color}
-                    stroke="white"
-                    strokeDasharray="5,5"
-                    style={{opacity: 0.1}}
-                />
+                <g key={tile.id}>
+                    <polygon
+                        points={points.map(p => `${p.x * this.state.width},${p.y * this.state.height}`).join(" ")}
+                        fill={tile.color}
+                        stroke="white"
+                        strokeDasharray="5,5"
+                        style={{opacity: 0.1}}
+                    />
+                    <text
+                        x={averageDrawingPoint.x * this.state.width}
+                        y={averageDrawingPoint.y * this.state.height}
+                        stroke="white"
+                        style={{opacity: 0.1}}
+                    >{tile.id}</text>
+                </g>
             );
         } else {
             return null;
@@ -877,10 +1039,21 @@ class App extends React.Component<IAppProps, IAppState> {
         });
     }
 
+    /**
+     * Initialize random position and orientation for an entity.
+     * @param entity The entity to add random position and orientation to.
+     * @private
+     */
+    private static addRandomPositionAndOrientationToEntity(entity: ICameraState) {
+        entity.position = new Quaternion(0, App.randomRange(), App.randomRange(), App.randomRange());
+        entity.position = entity.position.normalize();
+        entity.orientation = Quaternion.fromAxisAngle([0, 0, 1], Math.random() * 2 * Math.PI);
+    }
+
     componentDidMount() {
         // initialize 3d terrain stuff
         this.delaunayGraph.initialize();
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 25; i++) {
             this.delaunayGraph.incrementalInsert();
         }
 
@@ -889,9 +1062,7 @@ class App extends React.Component<IAppProps, IAppState> {
         for (let i = 0; i < 150; i++) {
             const planet = new Planet();
             planet.id = `planet-${i}`;
-            planet.position = new Quaternion(0, App.randomRange(), App.randomRange(), App.randomRange());
-            planet.position = planet.position.normalize();
-            planet.orientation = Quaternion.fromAxisAngle([0, 0, 1], Math.random() * 2 * Math.PI);
+            App.addRandomPositionAndOrientationToEntity(planet);
             const colorValue = Math.random();
             if (colorValue > 0.75)
                 planet.color = "red";
@@ -907,9 +1078,7 @@ class App extends React.Component<IAppProps, IAppState> {
         for (let i = 0; i < 200; i++) {
             const ship = new Ship();
             ship.id = `ship-${i}`;
-            ship.position = new Quaternion(0, App.randomRange(), App.randomRange(), App.randomRange());
-            ship.position = ship.position.normalize();
-            ship.orientation = Quaternion.fromAxisAngle([0, 0, 1], Math.random() * 2 * Math.PI);
+            App.addRandomPositionAndOrientationToEntity(ship);
             if (i === 0) {
                 const colorValue = Math.random();
                 if (colorValue > 0.75)
