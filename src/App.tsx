@@ -106,9 +106,6 @@ class DelaunayGraph {
         this.triangles.push([3, 4, 5]);
         this.triangles.push([6, 7, 8]);
         this.triangles.push([9, 10, 11]);
-        for (let triangleIndex = 0; triangleIndex < this.triangles.length; triangleIndex++) {
-            this.orientTriangle(triangleIndex);
-        }
     }
 
     public static randomInt(): number {
@@ -256,68 +253,6 @@ class DelaunayGraph {
         ]);
     }
 
-    private orientTriangle(triangleIndex: number) {
-        // compute a reference frame around the north pole to the triangle
-        const averagePoint = this.getAveragePointOfTriangle(triangleIndex);
-        const averageQuaternionFrame = Quaternion.fromBetweenVectors([0, 0, 1], averagePoint);
-
-        // the theta angle counter clockwise of each edge
-        const edgeThetas: number[] = [];
-
-        // orient the vertices of each edge of the triangle
-        for (const edgeIndex of this.triangles[triangleIndex]) {
-            // determine rotation angle of start to end point
-            const edge = this.edges[edgeIndex];
-            const startIndex = edge[0];
-            const endIndex = edge[1];
-            const start = this.vertices[startIndex];
-            const end = this.vertices[endIndex];
-
-            // move two vertices from the triangle into reference around the north pole
-            const startRotatePoint = averageQuaternionFrame.clone().conjugate().mul(
-                Quaternion.fromBetweenVectors([0, 0, 1], start)
-            ).rotateVector([0, 0, 1]);
-            const endRotatePoint = averageQuaternionFrame.clone().conjugate().mul(
-                Quaternion.fromBetweenVectors([0, 0, 1], end)
-            ).rotateVector([0, 0, 1]);
-
-            // compute the rotation of the two points
-            const startToEndQuaternion = Quaternion.fromBetweenVectors(startRotatePoint, endRotatePoint);
-            const startToEndRotatePoint = startToEndQuaternion.rotateVector([1, 0, 0]);
-            const polarDiffAngle = Math.atan2(startToEndRotatePoint[1], startToEndRotatePoint[0]);
-
-            // found negative angle, swap points so the edge always has the same orientation, counter clockwise
-            if (polarDiffAngle < 0) {
-                const tmp = edge[0];
-                edge[0] = edge[1];
-                edge[1] = tmp;
-            }
-
-            // compute theta angle of the edge
-            const edgeThetaPoint = polarDiffAngle >= 0 ? startRotatePoint : endRotatePoint;
-            const edgeThetaAngle = Math.atan2(edgeThetaPoint[1], edgeThetaPoint[0]);
-            edgeThetas.push(edgeThetaAngle);
-        }
-
-        // sort edges by their theta angle
-        const sortOrder: number[] = [];
-        while (true) {
-            const lowestValue = edgeThetas.reduce((acc: number, value: number): number => {
-                return value === Number.MIN_VALUE ? acc : Math.min(acc, value);
-            }, Number.MAX_VALUE);
-            const lowestIndex = edgeThetas.findIndex(value => value === lowestValue);
-            if (lowestIndex >= 0) {
-                sortOrder.push(lowestIndex);
-                edgeThetas[lowestIndex] = Number.MIN_VALUE;
-            } else {
-                break;
-            }
-        }
-
-        // orient the triangles so edges are counter clockwise
-        this.triangles[triangleIndex] = sortOrder.map(sortIndex => this.triangles[triangleIndex][sortIndex]);
-    }
-
     private lawsonFlip(triangleIndex: number) {
         // find complement triangle that's not newly created.
         let complementTriangleIndex: number = -1;
@@ -440,12 +375,6 @@ class DelaunayGraph {
             const triangleIndex = this.triangles.length - 1 - i;
             this.lawsonFlip(triangleIndex);
         }
-
-        // orient triangles correctly
-        // for (let i = 0; i < 3; i++) {
-        //     const triangleIndex = this.triangles.length - 1 - i;
-        //     this.orientTriangle(triangleIndex);
-        // }
     }
 
     /**
@@ -467,70 +396,86 @@ class DelaunayGraph {
 
     public getVoronoiGraph(): VoronoiGraph {
         const graph = new VoronoiGraph();
-        for (const triangle of this.triangles) {
+        // for each vertex which becomes a voronoi cell
+        // get vertex, center of a voronoi cell
+        for (let vertexIndex = 0; vertexIndex < this.vertices.length; vertexIndex++) {
+            // find edges which connect to the vertex
             let points: Array<[number, number, number]> = [];
             let edges: Array<{
+                thetaAngle: number,
                 a: [number, number, number],
                 b: [number, number, number]
             }> = [];
 
             // build edge data for algebra
-            for (const edgeIndex of triangle) {
+            for (let edgeIndex = 0; edgeIndex < this.edges.length; edgeIndex++) {
                 const edge = this.edges[edgeIndex];
                 const aIndex = edge[0];
                 const bIndex = edge[1];
+                // skip edges which do not match the voronoi cell vertex/center
+                // we want edges starting at the vertex and leaving it
+                if (aIndex !== vertexIndex) {
+                    continue;
+                }
+
+                // get point
                 const aVertex = this.vertices[aIndex];
                 const bVertex = this.vertices[bIndex];
+
+                // compute the theta angle to orient the edges counter clockwise
+                const polarRotation = Quaternion.fromBetweenVectors([0, 0, 1], aVertex);
+                const delta = DelaunayGraph.subtract(
+                    polarRotation.conjugate().mul(Quaternion.fromBetweenVectors([0, 0, 1], bVertex)).rotateVector([0, 0, 1]),
+                    polarRotation.conjugate().mul(Quaternion.fromBetweenVectors([0, 0, 1], aVertex)).rotateVector([0, 0, 1])
+                );
+                const thetaAngle = Math.atan2(delta[1], delta[0]);
+
+                // compute the half plane to construct the dual graph, delaunay triangulation -> voronoi tessellation.
                 const averagePoint = DelaunayGraph.normalize(App.getAveragePoint([aVertex, bVertex]));
-                const orientation = Quaternion.fromAxisAngle([0, 0, 1], Math.PI / 2);
-                const position = Quaternion.fromBetweenVectors([0, 0, 1], averagePoint);
-                const a = orientation.clone().conjugate()
-                    .mul(position.clone().conjugate())
-                    .mul(Quaternion.fromBetweenVectors([0, 0, 1], aVertex))
-                    .mul(position.clone())
-                    .mul(orientation.clone())
-                    .rotateVector([0, 0, 1]);
-                const b = orientation.clone().conjugate()
-                    .mul(position.clone().conjugate())
-                    .mul(Quaternion.fromBetweenVectors([0, 0, 1], bVertex))
-                    .mul(position.clone())
-                    .mul(orientation.clone())
-                    .rotateVector([0, 0, 1]);
+                const rotation = Quaternion.fromAxisAngle(averagePoint, Math.PI / 2);
+                const a = rotation.rotateVector(aVertex);
+                const b = rotation.rotateVector(bVertex);
                 edges.push({
                     a,
-                    b
+                    b,
+                    thetaAngle
                 });
             }
 
-            // for each edge, compute a point of the voronoi cell
-            for (let i = 0; i < edges.length; i++) {
-                // get counter clockwise edge pair
-                const firstEdge = edges[i % edges.length];
-                const secondEdge = edges[(i + 1) % edges.length];
+            if (edges.length > 0) {
+                // sort counter clockwise, ascending order.
+                edges = edges.sort((a, b) => b.thetaAngle - a.thetaAngle);
 
-                // compute intersection point
-                const firstNormal = DelaunayGraph.normalize(
-                    DelaunayGraph.crossProduct(firstEdge.a, firstEdge.b)
-                );
-                const secondNormal = DelaunayGraph.normalize(
-                    DelaunayGraph.crossProduct(secondEdge.a, secondEdge.b)
-                );
-                const line = DelaunayGraph.normalize(
-                    DelaunayGraph.crossProduct(firstNormal, secondNormal)
-                );
-                const point1 = line;
-                const point2: [number, number, number] = [-line[0], -line[1], -line[2]];
-                if (DelaunayGraph.dotProduct(firstEdge.a, point1) > 0) {
-                    points.push(point1);
-                } else {
-                    points.push(point2);
+                // for each edge, compute a point of the voronoi cell
+                for (let i = 0; i < edges.length; i++) {
+                    // get counter clockwise edge pair
+                    const firstEdge = edges[i % edges.length];
+                    const secondEdge = edges[(i + 1) % edges.length];
+
+                    // compute intersection point
+                    const firstNormal = DelaunayGraph.normalize(
+                        DelaunayGraph.crossProduct(firstEdge.a, firstEdge.b)
+                    );
+                    const secondNormal = DelaunayGraph.normalize(
+                        DelaunayGraph.crossProduct(secondEdge.a, secondEdge.b)
+                    );
+                    const line = DelaunayGraph.normalize(
+                        DelaunayGraph.crossProduct(firstNormal, secondNormal)
+                    );
+                    const point1 = line;
+                    const point2: [number, number, number] = [-line[0], -line[1], -line[2]];
+                    if (DelaunayGraph.dotProduct(firstEdge.a, point1) < 0) {
+                        points.push(point1);
+                    } else {
+                        points.push(point2);
+                    }
                 }
-            }
 
-            // create voronoi cell
-            const cell = new VoronoiCell();
-            cell.vertices.push(...points);
-            graph.cells.push(cell);
+                // create voronoi cell
+                const cell = new VoronoiCell();
+                cell.vertices.push(...points);
+                graph.cells.push(cell);
+            }
         }
 
         // return graph data
@@ -637,6 +582,7 @@ interface IAppState {
     ships: Ship[];
     smokeClouds: SmokeCloud[];
     zoom: number;
+    showVoronoi: boolean;
 }
 
 class App extends React.Component<IAppProps, IAppState> {
@@ -648,9 +594,11 @@ class App extends React.Component<IAppProps, IAppState> {
         ships: [] as Ship[],
         smokeClouds: [] as SmokeCloud[],
         zoom: 4 as number,
+        showVoronoi: false as boolean,
     };
 
     private showNotesRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
+    private showVoronoiRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
     private rotateCameraInterval: any = null;
     private activeKeys: any[] = [];
     private keyDownHandlerInstance: any;
@@ -956,7 +904,11 @@ class App extends React.Component<IAppProps, IAppState> {
                 const b: Quaternion = vertices[(i + 1) % vertices.length].clone();
                 const midPoint = Quaternion.fromBetweenVectors(
                     [0, 0, 1],
-                    DelaunayGraph.normalize(App.lerp(a.rotateVector([0, 0, 1]), b.rotateVector([0, 0, 1]), 0.5))
+                    DelaunayGraph.normalize(App.lerp(
+                        a.rotateVector([0, 0, 1]),
+                        b.rotateVector([0, 0, 1]),
+                        0.5
+                    ))
                 );
                 midPoints.push(midPoint);
             }
@@ -1007,8 +959,8 @@ class App extends React.Component<IAppProps, IAppState> {
             };
         }).map(p => {
             return {
-                x: (p.x - 0.5) * this.state.zoom + 0.5,
-                y: (p.y - 0.5) * this.state.zoom + 0.5,
+                x: (p.x - 0.5) * this.state.zoom * 1.1 + 0.5,
+                y: (p.y - 0.5) * this.state.zoom * 1.1 + 0.5,
             };
         });
 
@@ -1185,6 +1137,15 @@ class App extends React.Component<IAppProps, IAppState> {
         }
     }
 
+    private handleShowVoronoi() {
+        if (this.showVoronoiRef.current) {
+            this.setState({
+                ...this.state,
+                showVoronoi: this.showVoronoiRef.current.checked,
+            });
+        }
+    }
+
     private handleKeyDown(event: KeyboardEvent) {
         if (!event.repeat) {
             this.activeKeys.push(event.key);
@@ -1294,9 +1255,15 @@ class App extends React.Component<IAppProps, IAppState> {
                 <h1>
                     Globular Marauders
                 </h1>
-                <div>
-                    <input type="checkbox" ref={this.showNotesRef} checked={this.state.showNotes} onChange={this.handleShowNotes.bind(this)}/>
-                    <span>Show Notes</span>
+                <div style={{display: "grid"}}>
+                    <div>
+                        <input type="checkbox" ref={this.showNotesRef} checked={this.state.showNotes} onChange={this.handleShowNotes.bind(this)}/>
+                        <span>Show Notes</span>
+                    </div>
+                    <div>
+                        <input type="checkbox" ref={this.showVoronoiRef} checked={this.state.showVoronoi} onChange={this.handleShowVoronoi.bind(this)}/>
+                        <span>Show Voronoi</span>
+                    </div>
                 </div>
                 {
                     this.state.showNotes && (
@@ -1343,43 +1310,58 @@ class App extends React.Component<IAppProps, IAppState> {
                     )
                 }
                 <svg width={this.state.width} height={this.state.height}>
-                    <circle
-                        cx={this.state.width * 0.5}
-                        cy={this.state.height * 0.5}
-                        r={Math.min(this.state.width, this.state.height) * 0.5}
-                        fill="black"
-                    />
-                    {
-                        [
-                            ...this.state.planets.map(this.rotatePlanet.bind(this))
-                                .map(this.convertToDrawable.bind(this, "-layer1", 1)),
-                            ...this.state.planets.map(this.rotatePlanet.bind(this))
-                                .map(this.convertToDrawable.bind(this, "-layer2", 0.5)),
-                            ...this.state.planets.map(this.rotatePlanet.bind(this))
-                                .map(this.convertToDrawable.bind(this, "-layer3", 0.25)),
-                            ...this.state.planets.map(this.rotatePlanet.bind(this))
-                                .map(this.convertToDrawable.bind(this, "-layer4", 0.125))
-                        ].sort((a: any, b: any) => b.distance - a.distance).map(this.drawPlanet.bind(this))
-                    }
-                    {
-                        this.delaunayData.map(this.rotateDelaunayTriangle.bind(this))
-                            .map(this.drawDelaunayTile.bind(this))
-                    }
-                    {/*{*/}
-                    {/*    Array.from(this.voronoiGraph.cells)*/}
-                    {/*        .map(this.rotateDelaunayTriangle.bind(this))*/}
-                    {/*        .map(this.drawDelaunayTile.bind(this))*/}
-                    {/*}*/}
-                    {
-                        this.state.smokeClouds.map(this.rotatePlanet.bind(this))
-                            .map(this.convertToDrawable.bind(this, "-smokeClouds", 1))
-                            .map(this.drawSmokeCloud.bind(this))
-                    }
-                    {
-                        this.state.ships.map(this.rotatePlanet.bind(this))
-                            .map(this.convertToDrawable.bind(this, "-ships", 1))
-                            .map(this.drawShip.bind(this))
-                    }
+                    <defs>
+                        <mask id="worldMask">
+                            <circle
+                                cx={this.state.width * 0.5}
+                                cy={this.state.height * 0.5}
+                                r={Math.min(this.state.width, this.state.height) * 0.5}
+                                fill="white"
+                            />
+                        </mask>
+                    </defs>
+                    <g mask="url(#worldMask)">
+                        <circle
+                            cx={this.state.width * 0.5}
+                            cy={this.state.height * 0.5}
+                            r={Math.min(this.state.width, this.state.height) * 0.5}
+                            fill="black"
+                        />
+                        {
+                            !this.state.showVoronoi ?
+                                this.delaunayData.map(this.rotateDelaunayTriangle.bind(this))
+                                    .map(this.drawDelaunayTile.bind(this)) :
+                                null
+                        }
+                        {
+                            this.state.showVoronoi ?
+                                this.voronoiGraph.cells.map(this.rotateDelaunayTriangle.bind(this))
+                                    .map(this.drawDelaunayTile.bind(this)) :
+                                null
+                        }
+                        {
+                            [
+                                ...this.state.planets.map(this.rotatePlanet.bind(this))
+                                    .map(this.convertToDrawable.bind(this, "-layer1", 1)),
+                                ...this.state.planets.map(this.rotatePlanet.bind(this))
+                                    .map(this.convertToDrawable.bind(this, "-layer2", 0.5)),
+                                ...this.state.planets.map(this.rotatePlanet.bind(this))
+                                    .map(this.convertToDrawable.bind(this, "-layer3", 0.25)),
+                                ...this.state.planets.map(this.rotatePlanet.bind(this))
+                                    .map(this.convertToDrawable.bind(this, "-layer4", 0.125))
+                            ].sort((a: any, b: any) => b.distance - a.distance).map(this.drawPlanet.bind(this))
+                        }
+                        {
+                            this.state.smokeClouds.map(this.rotatePlanet.bind(this))
+                                .map(this.convertToDrawable.bind(this, "-smokeClouds", 1))
+                                .map(this.drawSmokeCloud.bind(this))
+                        }
+                        {
+                            this.state.ships.map(this.rotatePlanet.bind(this))
+                                .map(this.convertToDrawable.bind(this, "-ships", 1))
+                                .map(this.drawShip.bind(this))
+                        }
+                    </g>
                     <g>
                         <text x="0" y="30" color="black">Zoom</text>
                         <rect x="0" y="45" width="20" height="20" fill="grey" onClick={this.decrementZoom.bind(this)}/>
