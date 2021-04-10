@@ -2,17 +2,54 @@ import React from 'react';
 import './App.css';
 import Quaternion from 'quaternion';
 
+interface ITessellatedTriangle {
+    vertices: Quaternion[];
+}
+
+interface IDrawableTile {
+    vertices: Quaternion[];
+    color: string;
+    id: string;
+}
+
+interface ICellData {
+    vertices: Array<[number, number, number]>;
+}
+
+/**
+ * A polygon shape on a VoronoiGraph.
+ */
+class VoronoiCell implements ICellData {
+    public vertices: [number, number, number][] = [];
+}
+
+/**
+ * A drawable VoronoiCell.
+ */
+class VoronoiTile implements IDrawableTile {
+    public vertices: Quaternion[] = [];
+    public color: string = "red";
+    public id: string = "";
+}
+
+/**
+ * A list of voronoi cells.
+ */
+class VoronoiGraph {
+    cells: VoronoiCell[] = [];
+}
+
 /**
  * A simple class storing some vertices to render on scene
  */
-class DelaunayTriangle {
+class DelaunayTriangle implements ICellData {
     public vertices: [number, number, number][] = [];
 }
 
 /**
  * A class used to render a delaunay triangle tile.
  */
-class DelaunayTile {
+class DelaunayTile implements IDrawableTile {
     public vertices: Quaternion[] = [];
     public color: string = "red";
     public id: string = "";
@@ -151,7 +188,7 @@ class DelaunayGraph {
      * @private
      */
     private findTriangleIntersection(vertex: [number, number, number]): number {
-        return this.triangles.findIndex((triangle, triangleIndex) => {
+        return this.triangles.findIndex((triangle) => {
             // for each edge of a spherical triangle
             for (const edgeIndex of triangle) {
                 // compute half plane of edge
@@ -163,13 +200,11 @@ class DelaunayGraph {
                 // check to see if point is on the correct side of the half plane
                 if (vertex[0] * normal[0] + vertex[1] * normal[1] + vertex[2] * normal[2] < 0) {
                     // incorrect side, return false, try next triangle
-                    console.log(triangleIndex, "Is incorrect, not inside triangle", edgeIndex, normal, vertex);
                     return false;
                 }
             }
             // return true, the point is inside the correct side of all edges of the triangle
             // safe to assume the point is inside the triangle
-            console.log(triangleIndex, "Is Correct, inside triangle");
             return true;
         });
     }
@@ -194,28 +229,6 @@ class DelaunayGraph {
         this.triangles.push([threeEdgeIndices[0], this.edges.length - 7 + 2, this.edges.length - 7 + 1]);
         this.triangles.push([threeEdgeIndices[1], this.edges.length - 7 + 4, this.edges.length - 7 + 3]);
         this.triangles.push([threeEdgeIndices[2], this.edges.length - 7 + 6, this.edges.length - 7 + 5]);
-
-        for (let i = 0; i < 3; i++) {
-            const triangleIndex1 = this.triangles.length - 1 - i;
-            const points: Array<[number, number, number]> = [];
-            for (const edgeIndex of this.triangles[triangleIndex1]) {
-                const edge = this.edges[edgeIndex];
-                const firstVertexIndex = edge[0];
-                const secondVertexIndex = edge[1];
-                const firstVertex = this.vertices[firstVertexIndex];
-                const secondVertex = this.vertices[secondVertexIndex];
-                points.push(firstVertex);
-                console.log("TRIANGLE", triangleIndex1, "EDGE", edgeIndex, "VERTEX", firstVertexIndex, firstVertex);
-                console.log("TRIANGLE", triangleIndex1, "EDGE", edgeIndex, "VERTEX", secondVertexIndex, secondVertex);
-            }
-            const triangleNormal = DelaunayGraph.crossProduct(
-                DelaunayGraph.subtract(points[0], points[1]),
-                DelaunayGraph.subtract(points[2], points[1])
-            );
-            const triangleAveragePoint = App.getAveragePoint(points);
-            const triangleFacingInward = DelaunayGraph.dotProduct(triangleNormal, triangleAveragePoint) > 0;
-            console.log("TRIANGLE", triangleIndex1, "NORMAL", triangleNormal, triangleFacingInward ? "FACING INWARD" : "GOOD TRIANGLE");
-        }
     }
 
     /**
@@ -274,7 +287,6 @@ class DelaunayGraph {
             const polarDiffAngle = Math.atan2(startToEndRotatePoint[1], startToEndRotatePoint[0]);
 
             // found negative angle, swap points so the edge always has the same orientation, counter clockwise
-            // console.log("POLAR DIFF ANGLE NEG", polarDiffAngle, "POINTS", start, end, "ROTATED POINTS", startRotatePoint, endRotatePoint);
             if (polarDiffAngle < 0) {
                 const tmp = edge[0];
                 edge[0] = edge[1];
@@ -452,6 +464,78 @@ class DelaunayGraph {
             yield data;
         }
     }
+
+    public getVoronoiGraph(): VoronoiGraph {
+        const graph = new VoronoiGraph();
+        for (const triangle of this.triangles) {
+            let points: Array<[number, number, number]> = [];
+            let edges: Array<{
+                a: [number, number, number],
+                b: [number, number, number]
+            }> = [];
+
+            // build edge data for algebra
+            for (const edgeIndex of triangle) {
+                const edge = this.edges[edgeIndex];
+                const aIndex = edge[0];
+                const bIndex = edge[1];
+                const aVertex = this.vertices[aIndex];
+                const bVertex = this.vertices[bIndex];
+                const averagePoint = DelaunayGraph.normalize(App.getAveragePoint([aVertex, bVertex]));
+                const orientation = Quaternion.fromAxisAngle([0, 0, 1], Math.PI / 2);
+                const position = Quaternion.fromBetweenVectors([0, 0, 1], averagePoint);
+                const a = orientation.clone().conjugate()
+                    .mul(position.clone().conjugate())
+                    .mul(Quaternion.fromBetweenVectors([0, 0, 1], aVertex))
+                    .mul(position.clone())
+                    .mul(orientation.clone())
+                    .rotateVector([0, 0, 1]);
+                const b = orientation.clone().conjugate()
+                    .mul(position.clone().conjugate())
+                    .mul(Quaternion.fromBetweenVectors([0, 0, 1], bVertex))
+                    .mul(position.clone())
+                    .mul(orientation.clone())
+                    .rotateVector([0, 0, 1]);
+                edges.push({
+                    a,
+                    b
+                });
+            }
+
+            // for each edge, compute a point of the voronoi cell
+            for (let i = 0; i < edges.length; i++) {
+                // get counter clockwise edge pair
+                const firstEdge = edges[i % edges.length];
+                const secondEdge = edges[(i + 1) % edges.length];
+
+                // compute intersection point
+                const firstNormal = DelaunayGraph.normalize(
+                    DelaunayGraph.crossProduct(firstEdge.a, firstEdge.b)
+                );
+                const secondNormal = DelaunayGraph.normalize(
+                    DelaunayGraph.crossProduct(secondEdge.a, secondEdge.b)
+                );
+                const line = DelaunayGraph.normalize(
+                    DelaunayGraph.crossProduct(firstNormal, secondNormal)
+                );
+                const point1 = line;
+                const point2: [number, number, number] = [-line[0], -line[1], -line[2]];
+                if (DelaunayGraph.dotProduct(firstEdge.a, point1) > 0) {
+                    points.push(point1);
+                } else {
+                    points.push(point2);
+                }
+            }
+
+            // create voronoi cell
+            const cell = new VoronoiCell();
+            cell.vertices.push(...points);
+            graph.cells.push(cell);
+        }
+
+        // return graph data
+        return graph;
+    }
 }
 
 class Planet implements ICameraState {
@@ -572,6 +656,8 @@ class App extends React.Component<IAppProps, IAppState> {
     private keyDownHandlerInstance: any;
     private keyUpHandlerInstance: any;
     private delaunayGraph: DelaunayGraph = new DelaunayGraph();
+    private delaunayData: DelaunayTriangle[] = [];
+    private voronoiGraph: VoronoiGraph = new VoronoiGraph();
 
     private static speed: number = 1 / 6000;
 
@@ -600,30 +686,20 @@ class App extends React.Component<IAppProps, IAppState> {
         throw new Error("Cannot find first ship");
     }
 
-    private rotateDelaunayTriangle(triangle: DelaunayTriangle, index: number): DelaunayTile {
+    private rotateDelaunayTriangle(triangle: ICellData, index: number): IDrawableTile {
         const {
             position: cameraPosition,
             orientation: cameraOrientation,
         } = this.getFirstShip();
-        const vertices = triangle.vertices.reduce((acc: Quaternion[], v, index, arr): Quaternion[] => {
-            // interpolate vertices to get more data points for round surfaces
-            const start = cameraOrientation.clone().inverse()
-                .mul(cameraPosition.clone().inverse())
-                .mul(Quaternion.fromBetweenVectors([0, 0, 1], v));
-            const end = cameraOrientation.clone().inverse()
-                .mul(cameraPosition.clone().inverse())
-                .mul(Quaternion.fromBetweenVectors([0, 0, 1], arr[(index + 1) % arr.length]));
-            // number of sub steps for each edge of a spherical polygon
-            const steps = 1;
-            const diff = Quaternion.fromBetweenVectors(
-                start.rotateVector([0, 0, 1]),
-                end.rotateVector([0, 0, 1])
-            ).pow(1 / steps);
-            for (let i = 0; i < steps; i++) {
-                acc.push(start.clone().mul(diff.clone().pow(i)));
+        const vertices = triangle.vertices.map((v): Quaternion => {
+            if (v[2] < -0.99) {
+                return Quaternion.fromAxisAngle([0, 1, 0], Math.PI * 0.99);
             }
-            return acc;
-        }, []);
+            const q = Quaternion.fromBetweenVectors([0, 0, 1], v);
+            return cameraOrientation.clone().conjugate()
+                .mul(cameraPosition.clone().conjugate())
+                .mul(q);
+        });
         let color: string = "red";
         if (index % 4 === 0) {
             color = "red";
@@ -851,61 +927,160 @@ class App extends React.Component<IAppProps, IAppState> {
         ];
     }
 
-    private drawDelaunayTile(tile: DelaunayTile) {
+    private static MAX_TESSELLATION: number = 3;
+
+    private *getDelaunayTileTessellation(vertices: Quaternion[], maxStep: number = App.MAX_TESSELLATION, step: number = 0): Generator<ITessellatedTriangle> {
+        if (step === maxStep) {
+            // max step, return current level of tessellation
+            const data: ITessellatedTriangle = {
+                vertices,
+            };
+            return yield data;
+        } else if (vertices.length > 3) {
+            // perform triangle fan
+            for (let i = 1; i < vertices.length - 1; i++) {
+                yield * Array.from(this.getDelaunayTileTessellation([
+                    vertices[0],
+                    vertices[i],
+                    vertices[i + 1]
+                ], maxStep, step + 1));
+            }
+
+        } else {
+            // perform triangle tessellation
+
+            // compute mid points used in tessellation
+            const midPoints: Quaternion[] = [];
+            for (let i = 0; i < vertices.length; i++) {
+                const a: Quaternion = vertices[i % vertices.length].clone();
+                const b: Quaternion = vertices[(i + 1) % vertices.length].clone();
+                const midPoint = Quaternion.fromBetweenVectors(
+                    [0, 0, 1],
+                    DelaunayGraph.normalize(App.lerp(a.rotateVector([0, 0, 1]), b.rotateVector([0, 0, 1]), 0.5))
+                );
+                midPoints.push(midPoint);
+            }
+
+            // return recursive tessellation of triangle into 4 triangles
+            yield * Array.from(this.getDelaunayTileTessellation([
+                vertices[0],
+                midPoints[0],
+                midPoints[2]
+            ], maxStep, step + 1));
+            yield * Array.from(this.getDelaunayTileTessellation([
+                vertices[1],
+                midPoints[1],
+                midPoints[0]
+            ], maxStep, step + 1));
+            yield * Array.from(this.getDelaunayTileTessellation([
+                vertices[2],
+                midPoints[2],
+                midPoints[1]
+            ], maxStep, step + 1));
+            yield * Array.from(this.getDelaunayTileTessellation([
+                midPoints[0],
+                midPoints[1],
+                midPoints[2]
+            ], maxStep, step + 1));
+        }
+    }
+
+    private getDelaunayTileMidPoint(tile: DelaunayTile): {x: number, y: number} {
         const rotatedPoints = tile.vertices.map((v: Quaternion): [number, number, number] => {
             return v.rotateVector([0, 0, 1]);
         });
-        for (const p of rotatedPoints) {
-            const pLength = DelaunayGraph.distanceFormula(p, [0, 0, 0]);
-            if (Math.abs(pLength - 1) > 0.01) {
-                console.log("BAD LENGTH", pLength);
-            }
-        }
-        const averagePoint = App.getAveragePoint(rotatedPoints);
-        const points: Array<{x: number, y: number}> = rotatedPoints.map(point => {
-            return {
-                x: point[0] * this.state.zoom,
-                y: point[1] * this.state.zoom,
-            };
-        }).map(p => {
-            return {
-                x: (p.x + 1) * 0.5,
-                y: (p.y + 1) * 0.5,
-            };
-        });
-        const averageDrawingPoint: {x: number, y: number} = {
+        const averagePoint = DelaunayGraph.normalize(App.getAveragePoint(rotatedPoints));
+        return {
             x: (averagePoint[0] * this.state.zoom + 1) * 0.5,
             y: (averagePoint[1] * this.state.zoom + 1) * 0.5,
         };
+    }
+
+    private getPointsAndRotatedPoints(vertices: Quaternion[]) {
+        const rotatedPoints = vertices.map((v: Quaternion): [number, number, number] => {
+            return v.rotateVector([0, 0, -1]);
+        });
+        const points: Array<{x: number, y: number}> = rotatedPoints.map(point => {
+            return {
+                x: (point[0] + 1) * 0.5,
+                y: (point[1] + 1) * 0.5,
+            };
+        }).map(p => {
+            return {
+                x: (p.x - 0.5) * this.state.zoom + 0.5,
+                y: (p.y - 0.5) * this.state.zoom + 0.5,
+            };
+        });
+
+        return {
+            points,
+            rotatedPoints
+        };
+    }
+
+    private drawDelaunayTessellatedTriangle(tile: DelaunayTile, triangle: ITessellatedTriangle, index: number, arr: ITessellatedTriangle[]) {
+        const {
+            points,
+            rotatedPoints
+        } = this.getPointsAndRotatedPoints(triangle.vertices);
 
         // determine if the triangle is facing the camera, do not draw triangles facing away from the camera
         const triangleNormal = DelaunayGraph.crossProduct(
             DelaunayGraph.subtract(rotatedPoints[1], rotatedPoints[0]),
             DelaunayGraph.subtract(rotatedPoints[2], rotatedPoints[0]),
         );
+
         const triangleFacingCamera = DelaunayGraph.dotProduct([0, 0, 1], triangleNormal) < 0;
+
+        // get a point position for the text box on the area
+        let averageDrawingPoint: {x: number, y: number} | null = null;
+        if (index === arr.length - 1 && triangleFacingCamera) {
+            averageDrawingPoint = this.getDelaunayTileMidPoint(tile);
+        }
 
         if (triangleFacingCamera) {
             return (
-                <g key={tile.id}>
+                <g key={`${tile.id}-${index}`}>
                     <polygon
-                        points={points.map(p => `${p.x * this.state.width},${p.y * this.state.height}`).join(" ")}
+                        points={points.map(p => `${p.x * this.state.width},${(1 - p.y) * this.state.height}`).join(" ")}
                         fill={tile.color}
-                        stroke="white"
-                        strokeDasharray="5,5"
                         style={{opacity: 0.1}}
                     />
-                    <text
-                        x={averageDrawingPoint.x * this.state.width}
-                        y={averageDrawingPoint.y * this.state.height}
-                        stroke="white"
-                        style={{opacity: 0.1}}
-                    >{tile.id}</text>
+                    {
+                        averageDrawingPoint && (
+                            <text
+                                x={averageDrawingPoint.x * this.state.width}
+                                y={averageDrawingPoint.y * this.state.height}
+                                stroke="white"
+                                style={{opacity: 0.1}}
+                            >{tile.id}</text>
+                        )
+                    }
                 </g>
             );
         } else {
             return null;
         }
+    }
+
+    public static lerp(a: [number, number, number], b: [number, number, number], t: number): [number, number, number] {
+        const delta = DelaunayGraph.subtract(b, a);
+        return [
+            a[0] + delta[0] * t,
+            a[1] + delta[1] * t,
+            a[2] + delta[2] * t
+        ];
+    }
+
+    private drawDelaunayTile(tile: IDrawableTile) {
+        const tessellationMesh = Array.from(this.getDelaunayTileTessellation(tile.vertices));
+        return (
+            <g key={tile.id}>
+                {
+                    tessellationMesh.map(this.drawDelaunayTessellatedTriangle.bind(this, tile))
+                }
+            </g>
+        );
     }
 
     private gameLoop() {
@@ -1053,9 +1228,11 @@ class App extends React.Component<IAppProps, IAppState> {
     componentDidMount() {
         // initialize 3d terrain stuff
         this.delaunayGraph.initialize();
-        for (let i = 0; i < 25; i++) {
+        for (let i = 0; i < 10; i++) {
             this.delaunayGraph.incrementalInsert();
         }
+        this.delaunayData = Array.from(this.delaunayGraph.GetTriangles());
+        this.voronoiGraph = this.delaunayGraph.getVoronoiGraph();
 
         // initialize planets and ships
         const planets: Planet[] = [];
@@ -1185,10 +1362,14 @@ class App extends React.Component<IAppProps, IAppState> {
                         ].sort((a: any, b: any) => b.distance - a.distance).map(this.drawPlanet.bind(this))
                     }
                     {
-                        Array.from(this.delaunayGraph.GetTriangles())
-                            .map(this.rotateDelaunayTriangle.bind(this))
+                        this.delaunayData.map(this.rotateDelaunayTriangle.bind(this))
                             .map(this.drawDelaunayTile.bind(this))
                     }
+                    {/*{*/}
+                    {/*    Array.from(this.voronoiGraph.cells)*/}
+                    {/*        .map(this.rotateDelaunayTriangle.bind(this))*/}
+                    {/*        .map(this.drawDelaunayTile.bind(this))*/}
+                    {/*}*/}
                     {
                         this.state.smokeClouds.map(this.rotatePlanet.bind(this))
                             .map(this.convertToDrawable.bind(this, "-smokeClouds", 1))
