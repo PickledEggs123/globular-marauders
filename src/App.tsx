@@ -2,6 +2,326 @@ import React from 'react';
 import './App.css';
 import Quaternion from 'quaternion';
 
+/**
+ * A simple class storing some vertices to render on scene
+ */
+class DelaunayTriangle {
+    public vertices: [number, number, number][] = [];
+}
+
+/**
+ * A class used to render a delaunay triangle tile.
+ */
+class DelaunayTile {
+    public vertices: Quaternion[] = [];
+    public color: string = "red";
+    public id: string = "";
+}
+
+/**
+ * A delaunay graph for procedural generation, automatic random landscapes.
+ */
+class DelaunayGraph {
+    /**
+     * The vertices of the graph.
+     */
+    public vertices: [number, number, number][] = [];
+    /**
+     * The edges of the graph.
+     */
+    public edges: [number, number][] = [];
+    /**
+     * The triangles of the graph.
+     */
+    public triangles: number[][] = [];
+
+    /**
+     * Initialize a basic graph, ready for incremental construction.
+     */
+    public initialize() {
+        const north: [number, number, number] = [0, 0, 1];
+        this.vertices.push(north);
+
+        const tetrahedronAngle = 120 / 180 * Math.PI;
+        const base1: [number, number, number] = [
+            Math.cos(0) * Math.sin(tetrahedronAngle),
+            Math.sin(0) * Math.sin(tetrahedronAngle),
+            Math.cos(tetrahedronAngle)
+        ];
+        const base2: [number, number, number] = [
+            Math.cos(tetrahedronAngle) * Math.sin(tetrahedronAngle),
+            Math.sin(tetrahedronAngle) * Math.sin(tetrahedronAngle),
+            Math.cos(tetrahedronAngle)
+        ];
+        const base3: [number, number, number] = [
+            Math.cos(2 * tetrahedronAngle) * Math.sin(tetrahedronAngle),
+            Math.sin(2 * tetrahedronAngle) * Math.sin(tetrahedronAngle),
+            Math.cos(2 * tetrahedronAngle)
+        ];
+        this.vertices.push(base1, base2, base3);
+
+        this.edges.push([0, 1], [1, 2], [2, 0]);
+        this.edges.push([0, 2], [2, 3], [3, 0]);
+        this.edges.push([0, 3], [3, 1], [1, 0]);
+        this.edges.push([1, 3], [3, 2], [2, 1]);
+
+        this.triangles.push([0, 1, 2]);
+        this.triangles.push([3, 4, 5]);
+        this.triangles.push([6, 7, 8]);
+        this.triangles.push([9, 10, 11]);
+        for (let triangleIndex = 0; triangleIndex < this.triangles.length; triangleIndex++) {
+            this.orientTriangle(triangleIndex);
+        }
+    }
+
+    private randomInt(): number {
+        return (Math.random() * 2) - 1;
+    }
+
+    private randomPoint(): [number, number, number] {
+        // generate random vertex
+        const vertex: [number, number, number] = [this.randomInt(), this.randomInt(), this.randomInt()];
+        return this.normalize(vertex);
+    }
+
+    private distanceFormula(a: [number, number, number], b: [number, number, number]): number {
+        return Math.sqrt(Math.pow(b[0] - a[0], 2) + Math.pow(b[1] - a[1], 2) + Math.pow(b[2] - a[2], 2));
+    }
+
+    private normalize(a: [number, number, number]): [number, number, number] {
+        const vertexLength = this.distanceFormula(a, [0, 0, 0]);
+        return [
+            a[0] / vertexLength,
+            a[1] / vertexLength,
+            a[2] / vertexLength,
+        ];
+    }
+
+    /**
+     * Compute the cross product of two vectors. Used to compute the normal of two vectors.
+     * @param a The first vector.
+     * @param b The second vector.
+     */
+    public static crossProduct(a: [number, number, number], b: [number, number, number]): [number, number, number] {
+        return [
+            a[1] * b[2] - a[2] * b[1],
+            a[2] * b[0] - a[0] * b[2],
+            a[0] * b[1] - a[1] * b[0],
+        ];
+    }
+
+    /**
+     * Compute the subtraction of two vectors.
+     * @param a The first vector.
+     * @param b The second vector.
+     */
+    public static subtract(a: [number, number, number], b: [number, number, number]): [number, number, number] {
+        return [
+            a[0] - b[0],
+            a[1] - b[1],
+            a[2] - b[2],
+        ];
+    }
+
+    /**
+     * Compute the cross product of two vectors.
+     * @param a The first vector.
+     * @param b The second vector.
+     */
+    public static dotProduct(a: [number, number, number], b: [number, number, number]): number {
+        return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    }
+
+    /**
+     * Return the triangle index of the triangle intersection.
+     * @param vertex The vertex to check for triangle intersection.
+     * @private
+     */
+    private findTriangleIntersection(vertex: [number, number, number]): number {
+        return this.triangles.findIndex((triangle, triangleIndex) => {
+            // for each edge of a spherical triangle
+            for (const edgeIndex of triangle) {
+                // compute half plane of edge
+                const startIndex = this.edges[edgeIndex][0];
+                const endIndex = this.edges[edgeIndex][1];
+                const start = this.vertices[startIndex];
+                const end = this.vertices[endIndex];
+                const normal = this.normalize(DelaunayGraph.crossProduct(start, end));
+                // check to see if point is on the correct side of the half plane
+                if (vertex[0] * normal[0] + vertex[1] * normal[1] + vertex[2] * normal[2] < 0) {
+                    // incorrect side, return false, try next triangle
+                    console.log(triangleIndex, "Is incorrect, not inside triangle", edgeIndex, normal, vertex);
+                    return false;
+                }
+            }
+            // return true, the point is inside the correct side of all edges of the triangle
+            // safe to assume the point is inside the triangle
+            console.log(triangleIndex, "Is Correct, inside triangle");
+            return true;
+        });
+    }
+
+    /**
+     * Build the initial triangle mesh for the newly inserted vertex.
+     * @param vertex The vertex that was inserted into the triangle at triangle index.
+     * @param triangleIndex The triangle to insert vertex into.
+     * @private
+     */
+    private buildInitialTriangleMeshForNewVertex(vertex: [number, number, number], triangleIndex: number) {
+        this.vertices.push(vertex);
+        const threeEdgeIndices = this.triangles[triangleIndex];
+        const threeVertexIndices = threeEdgeIndices.map((edgeIndex: number): number => {
+            // get vertex index
+            return this.edges[edgeIndex][0];
+        });
+        this.edges.push([this.vertices.length - 1, threeVertexIndices[0]], [threeVertexIndices[1], this.vertices.length - 1]);
+        this.edges.push([this.vertices.length - 1, threeVertexIndices[1]], [threeVertexIndices[2], this.vertices.length - 1]);
+        this.edges.push([this.vertices.length - 1, threeVertexIndices[2]], [threeVertexIndices[0], this.vertices.length - 1]);
+        this.triangles.splice(triangleIndex, 1);
+        this.triangles.push([threeEdgeIndices[0], this.edges.length - 7 + 2, this.edges.length - 7 + 1]);
+        this.triangles.push([threeEdgeIndices[1], this.edges.length - 7 + 4, this.edges.length - 7 + 3]);
+        this.triangles.push([threeEdgeIndices[2], this.edges.length - 7 + 6, this.edges.length - 7 + 5]);
+
+        // for (let i = 0; i < 1; i++) {
+        //     const triangleIndex1 = this.triangles.length - 1 - i;
+        //     for (const edgeIndex of this.triangles[triangleIndex1]) {
+        //         const edge = this.edges[edgeIndex];
+        //         const firstVertexIndex = edge[0];
+        //         const secondVertexIndex = edge[1];
+        //         const firstVertex = this.vertices[firstVertexIndex];
+        //         const secondVertex = this.vertices[secondVertexIndex];
+        //         console.log("TRIANGLE", triangleIndex1, "EDGE", edgeIndex, "VERTEX", firstVertexIndex, firstVertex);
+        //         console.log("TRIANGLE", triangleIndex1, "EDGE", edgeIndex, "VERTEX", secondVertexIndex, secondVertex);
+        //     }
+        // }
+    }
+
+    /**
+     * The average point of a triangle.
+     * @param triangleIndex The triangle index to find the average point for.
+     */
+    public getAveragePointOfTriangle(triangleIndex: number): [number, number, number] {
+        let vertexCount: number = 0;
+        let vertexSum: [number, number, number] = [0, 0, 0];
+        for (const edgeIndex of this.triangles[triangleIndex]) {
+            for (const vertexIndex of this.edges[edgeIndex]) {
+                const vertex = this.vertices[vertexIndex];
+                vertexSum = [
+                    vertexSum[0] + vertex[0],
+                    vertexSum[1] + vertex[1],
+                    vertexSum[2] + vertex[2],
+                ];
+                vertexCount += 1;
+            }
+        }
+        return [
+            vertexSum[0] / vertexCount,
+            vertexSum[1] / vertexCount,
+            vertexSum[2] / vertexCount,
+        ];
+    }
+
+    public orientTriangle(triangleIndex: number) {
+        // compute a reference frame around the north pole to the triangle
+        const averagePoint = this.getAveragePointOfTriangle(triangleIndex);
+        const averageQuaternionFrame = Quaternion.fromBetweenVectors([0, 0, 1], averagePoint);
+
+        // the theta angle counter clockwise of each edge
+        const edgeThetas: number[] = [];
+
+        // orient the vertices of each edge of the triangle
+        for (const edgeIndex of this.triangles[triangleIndex]) {
+            // determine rotation angle of start to end point
+            const edge = this.edges[edgeIndex];
+            const startIndex = edge[0];
+            const endIndex = edge[1];
+            const start = this.vertices[startIndex];
+            const end = this.vertices[endIndex];
+
+            // move two vertices from the triangle into reference around the north pole
+            const startRotatePoint = averageQuaternionFrame.clone().conjugate().mul(
+                Quaternion.fromBetweenVectors([0, 0, 1], start)
+            ).rotateVector([0, 0, 1]);
+            const endRotatePoint = averageQuaternionFrame.clone().conjugate().mul(
+                Quaternion.fromBetweenVectors([0, 0, 1], end)
+            ).rotateVector([0, 0, 1]);
+
+            // compute the rotation of the two points
+            const startToEndQuaternion = Quaternion.fromBetweenVectors(startRotatePoint, endRotatePoint);
+            const startToEndRotatePoint = startToEndQuaternion.rotateVector([1, 0, 0]);
+            const polarDiffAngle = Math.atan2(startToEndRotatePoint[1], startToEndRotatePoint[0]);
+
+            // found negative angle, swap points so the edge always has the same orientation, counter clockwise
+            // console.log("POLAR DIFF ANGLE NEG", polarDiffAngle, "POINTS", start, end, "ROTATED POINTS", startRotatePoint, endRotatePoint);
+            if (polarDiffAngle < 0) {
+                const tmp = edge[0];
+                edge[0] = edge[1];
+                edge[1] = tmp;
+            }
+
+            // compute theta angle of the edge
+            const edgeThetaPoint = polarDiffAngle >= 0 ? startRotatePoint : endRotatePoint;
+            const edgeThetaAngle = Math.atan2(edgeThetaPoint[1], edgeThetaPoint[0]);
+            edgeThetas.push(edgeThetaAngle);
+        }
+
+        // sort edges by their theta angle
+        const sortOrder: number[] = [];
+        while (true) {
+            const lowestValue = edgeThetas.reduce((acc: number, value: number): number => {
+                return value === Number.MIN_VALUE ? acc : Math.min(acc, value);
+            }, Number.MAX_VALUE);
+            const lowestIndex = edgeThetas.findIndex(value => value === lowestValue);
+            if (lowestIndex >= 0) {
+                sortOrder.push(lowestIndex);
+                edgeThetas[lowestIndex] = Number.MIN_VALUE;
+            } else {
+                break;
+            }
+        }
+
+        // orient the triangles so edges are counter clockwise
+        this.triangles[triangleIndex] = sortOrder.map(sortIndex => this.triangles[triangleIndex][sortIndex]);
+    }
+
+    /**
+     * Perform an incremental insert into the delaunay graph, add random data points and maintain the triangle mesh.
+     */
+    public incrementalInsert() {
+        const vertex = this.randomPoint();
+
+        // find triangle collision
+        const triangleIndex = this.findTriangleIntersection(vertex);
+        console.log("TRIANGLE MESH", triangleIndex);
+
+        // add triangle incrementally
+        this.buildInitialTriangleMeshForNewVertex(vertex, triangleIndex);
+
+        // orient triangles correctly
+        for (let i = 0; i < 3; i++) {
+            const triangleIndex = this.triangles.length - 1 - i;
+            this.orientTriangle(triangleIndex);
+        }
+    }
+
+    /**
+     * Get the data from the graph, most likely for rendering.
+     * @constructor
+     */
+    public *GetTriangles(): Generator<DelaunayTriangle> {
+        for (let triangleIndex = 0; triangleIndex < this.triangles.length; triangleIndex++) {
+            const triangle = this.triangles[triangleIndex];
+            const data = new DelaunayTriangle();
+            for (let edgeIndex = 0; edgeIndex < triangle.length; edgeIndex++) {
+                const edge = this.edges[triangle[edgeIndex]];
+                const vertex = this.vertices[edge[0]];
+                data.vertices.push(vertex);
+            }
+            yield data;
+        }
+    }
+}
+
 class Planet implements ICameraState {
     public id: string = "";
     public position: Quaternion = Quaternion.ONE;
@@ -28,6 +348,7 @@ class SmokeCloud implements ICameraState, IExpirable {
     public positionVelocity: Quaternion = Quaternion.ONE;
     public orientation: Quaternion = Quaternion.ONE;
     public orientationVelocity: Quaternion = Quaternion.ONE;
+    public size: number = 1;
     public created: Date = new Date(Date.now());
     public expires: Date = new Date(Date.now() + 10000);
 }
@@ -118,6 +439,7 @@ class App extends React.Component<IAppProps, IAppState> {
     private activeKeys: any[] = [];
     private keyDownHandlerInstance: any;
     private keyUpHandlerInstance: any;
+    private delaunayGraph: DelaunayGraph = new DelaunayGraph();
 
     private static speed: number = 1 / 6000;
 
@@ -144,6 +466,48 @@ class App extends React.Component<IAppProps, IAppState> {
             return App.GetCameraState(ship);
         }
         throw new Error("Cannot find first ship");
+    }
+
+    private rotateDelaunayTriangle(triangle: DelaunayTriangle, index: number): DelaunayTile {
+        const {
+            position: cameraPosition,
+            orientation: cameraOrientation,
+        } = this.getFirstShip();
+        const vertices = triangle.vertices.reduce((acc: Quaternion[], v, index, arr): Quaternion[] => {
+            // interpolate vertices to get more data points for round surfaces
+            const start = cameraOrientation.clone().conjugate()
+                .mul(cameraPosition.clone().conjugate())
+                .mul(Quaternion.fromBetweenVectors([0, 0, 1], v));
+            const end = cameraOrientation.clone().conjugate()
+                .mul(cameraPosition.clone().conjugate())
+                .mul(Quaternion.fromBetweenVectors([0, 0, 1], arr[(index + 1) % arr.length]));
+            // number of sub steps for each edge of a spherical polygon
+            const steps = 1;
+            const diff = Quaternion.fromBetweenVectors(
+                start.rotateVector([0, 0, 1]),
+                end.rotateVector([0, 0, 1])
+            ).pow(1 / steps);
+            for (let i = 0; i < steps; i++) {
+                acc.push(start.clone().mul(diff.clone().pow(i)));
+            }
+            return acc;
+        }, []);
+        let color: string = "red";
+        if (index % 4 === 0) {
+            color = "red";
+        } else if (index % 4 === 1) {
+            color = "green";
+        } else if (index % 4 === 2) {
+            color = "blue";
+        } else if (index % 4 === 3) {
+            color = "yellow";
+        }
+
+        const tile = new DelaunayTile();
+        tile.vertices = vertices;
+        tile.color = color;
+        tile.id = `tile-${index}`;
+        return tile;
     }
 
     private rotatePlanet<T extends ICameraState>(planet: T): T {
@@ -343,6 +707,45 @@ class App extends React.Component<IAppProps, IAppState> {
         );
     }
 
+    private drawDelaunayTile(tile: DelaunayTile) {
+        const rotatedPoints = tile.vertices.map((v: Quaternion): [number, number, number] => {
+            return v.rotateVector([0, 0, 1]);
+        });
+        const points: Array<{x: number, y: number}> = rotatedPoints.map(point => {
+            return {
+                x: point[0] * this.state.zoom,
+                y: point[1] * this.state.zoom,
+            };
+        }).map(p => {
+            return {
+                x: (p.x + 1) * 0.5,
+                y: (p.y + 1) * 0.5,
+            };
+        });
+
+        // determine if the triangle is facing the camera, do not draw triangles facing away from the camera
+        const triangleNormal = DelaunayGraph.crossProduct(
+            DelaunayGraph.subtract(rotatedPoints[1], rotatedPoints[0]),
+            DelaunayGraph.subtract(rotatedPoints[2], rotatedPoints[0]),
+        );
+        const triangleFacingCamera = DelaunayGraph.dotProduct([0, 0, 1], triangleNormal) < 0;
+
+        if (triangleFacingCamera) {
+            return (
+                <polygon
+                    key={tile.id}
+                    points={points.map(p => `${p.x * this.state.width},${p.y * this.state.height}`).join(" ")}
+                    fill={tile.color}
+                    stroke="white"
+                    strokeDasharray="5,5"
+                    style={{opacity: 0.1}}
+                />
+            );
+        } else {
+            return null;
+        }
+    }
+
     private gameLoop() {
         this.setState((state) => {
             if (state.ships.length === 0) {
@@ -377,13 +780,27 @@ class App extends React.Component<IAppProps, IAppState> {
                 const smokeCloud = new SmokeCloud();
                 smokeCloud.id = `${cameraId}-${Math.floor(Math.random() * 100000000)}`;
                 smokeCloud.position = cameraPosition;
-                smokeCloud.positionVelocity = rotation.conjugate();
+                smokeCloud.positionVelocity = rotation.clone().conjugate().pow(100);
+                smokeCloud.size = 1;
                 smokeClouds.push(smokeCloud);
             }
             if (this.activeKeys.includes("s")) {
                 const backward = cameraOrientation.clone().rotateVector([0, -1, 0]);
-                const rotation = Quaternion.fromBetweenVectors([0, 0, 1], backward).pow(App.speed);
+                const rotation = Quaternion.fromBetweenVectors([0, 0, 1], backward).pow(App.speed * 0.3);
                 cameraPositionVelocity = cameraPositionVelocity.clone().mul(rotation);
+
+                const smokeCloudLeft = new SmokeCloud();
+                smokeCloudLeft.id = `${cameraId}-${Math.floor(Math.random() * 100000000)}`;
+                smokeCloudLeft.position = cameraPosition;
+                smokeCloudLeft.positionVelocity = rotation.clone().conjugate().mul(Quaternion.fromAxisAngle([0, 0, 1], -Math.PI / 4)).pow(100);
+                smokeCloudLeft.size = 0.2;
+                smokeClouds.push(smokeCloudLeft);
+                const smokeCloudRight = new SmokeCloud();
+                smokeCloudRight.id = `${cameraId}-${Math.floor(Math.random() * 100000000)}`;
+                smokeCloudRight.position = cameraPosition;
+                smokeCloudRight.positionVelocity = rotation.clone().conjugate().mul(Quaternion.fromAxisAngle([0, 0, 1], Math.PI / 4)).pow(100);
+                smokeCloudRight.size = 0.2;
+                smokeClouds.push(smokeCloudRight);
             }
             if (this.activeKeys.includes(" ") && !cameraCannonLoading) {
                 cameraCannonLoading = new Date(Date.now());
@@ -461,6 +878,13 @@ class App extends React.Component<IAppProps, IAppState> {
     }
 
     componentDidMount() {
+        // initialize 3d terrain stuff
+        this.delaunayGraph.initialize();
+        for (let i = 0; i < 3; i++) {
+            this.delaunayGraph.incrementalInsert();
+        }
+
+        // initialize planets and ships
         const planets: Planet[] = [];
         for (let i = 0; i < 150; i++) {
             const planet = new Planet();
@@ -477,6 +901,8 @@ class App extends React.Component<IAppProps, IAppState> {
                 planet.color = "tan";
             planets.push(planet);
         }
+
+        // initialize planets and ships
         const ships: Ship[] = [];
         for (let i = 0; i < 200; i++) {
             const ship = new Ship();
@@ -522,12 +948,6 @@ class App extends React.Component<IAppProps, IAppState> {
                 <h1>
                     Globular Marauders
                 </h1>
-                <div>
-                    <span>Zoom</span>
-                    <button onClick={this.decrementZoom.bind(this)}>-</button>
-                    <span>{this.state.zoom}</span>
-                    <button onClick={this.incrementZoom.bind(this)}>+</button>
-                </div>
                 <div>
                     <input type="checkbox" ref={this.showNotesRef} checked={this.state.showNotes} onChange={this.handleShowNotes.bind(this)}/>
                     <span>Show Notes</span>
@@ -596,15 +1016,28 @@ class App extends React.Component<IAppProps, IAppState> {
                         ].sort((a: any, b: any) => b.distance - a.distance).map(this.drawPlanet.bind(this))
                     }
                     {
-                        this.state.ships.map(this.rotatePlanet.bind(this))
-                            .map(this.convertToDrawable.bind(this, "-ships", 1))
-                            .map(this.drawShip.bind(this))
+                        Array.from(this.delaunayGraph.GetTriangles())
+                            .map(this.rotateDelaunayTriangle.bind(this))
+                            .map(this.drawDelaunayTile.bind(this))
                     }
                     {
                         this.state.smokeClouds.map(this.rotatePlanet.bind(this))
                             .map(this.convertToDrawable.bind(this, "-smokeClouds", 1))
                             .map(this.drawSmokeCloud.bind(this))
                     }
+                    {
+                        this.state.ships.map(this.rotatePlanet.bind(this))
+                            .map(this.convertToDrawable.bind(this, "-ships", 1))
+                            .map(this.drawShip.bind(this))
+                    }
+                    <g>
+                        <text x="0" y="30" color="black">Zoom</text>
+                        <rect x="0" y="45" width="20" height="20" fill="grey" onClick={this.decrementZoom.bind(this)}/>
+                        <text x="25" y="60" textAnchor="center">{this.state.zoom}</text>
+                        <rect x="40" y="45" width="20" height="20" fill="grey" onClick={this.incrementZoom.bind(this)}/>
+                        <text x="5" y="60">-</text>
+                        <text x="40" y="60">+</text>
+                    </g>
                 </svg>
             </div>
         );
