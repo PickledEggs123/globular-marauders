@@ -37,6 +37,32 @@ class VoronoiTile implements IDrawableTile {
  */
 class VoronoiGraph {
     cells: VoronoiCell[] = [];
+
+    /**
+     * Create a list of centered points, which can be used to iteratively improve randomly generated points to
+     * create a good random mesh.
+     */
+    public lloydRelaxation(): Array<[number, number, number]> {
+        return this.cells.map((cell): [number, number, number] => {
+            const averagePoint = App.getAveragePoint(cell.vertices);
+            let sumWeight = 0;
+            let sumPoint: [number, number, number] = [0, 0, 0];
+            for (const vertex of cell.vertices) {
+                const vertexSumWeight = DelaunayGraph.distanceFormula(averagePoint, vertex);
+                sumPoint = DelaunayGraph.add(sumPoint, [
+                    vertex[0] * vertexSumWeight,
+                    vertex[1] * vertexSumWeight,
+                    vertex[2] * vertexSumWeight
+                ]);
+                sumWeight += vertexSumWeight;
+            }
+            return DelaunayGraph.normalize([
+                sumPoint[0] / sumWeight,
+                sumPoint[1] / sumWeight,
+                sumPoint[2] / sumWeight
+            ]);
+        });
+    }
 }
 
 /**
@@ -106,6 +132,13 @@ class DelaunayGraph {
         this.triangles.push([3, 4, 5]);
         this.triangles.push([6, 7, 8]);
         this.triangles.push([9, 10, 11]);
+    }
+
+    public initializeWithPoints(points: Array<[number, number, number]>) {
+        this.initialize();
+        for (const point of points) {
+            this.incrementalInsert(point);
+        }
     }
 
     public static randomInt(): number {
@@ -318,25 +351,105 @@ class DelaunayGraph {
             ];
 
             // determine if a flip is necessary based on the area ratio
-            const defaultAreaDiff = Math.abs(
-                DelaunayGraph.dotProduct(
-                    DelaunayGraph.subtract(this.vertices[vertexIndices[0]], this.vertices[vertexIndices[1]]),
-                    DelaunayGraph.subtract(this.vertices[vertexIndices[2]], this.vertices[vertexIndices[1]]),
-                ) -
-                DelaunayGraph.dotProduct(
-                    DelaunayGraph.subtract(this.vertices[vertexIndices[2]], this.vertices[vertexIndices[3]]),
-                    DelaunayGraph.subtract(this.vertices[vertexIndices[0]], this.vertices[vertexIndices[3]]),
-                )
+            const defaultAreaDiff = Math.max(
+                Math.abs(Math.acos(DelaunayGraph.dotProduct(
+                    DelaunayGraph.normalize(
+                        DelaunayGraph.subtract(this.vertices[vertexIndices[0]], this.vertices[vertexIndices[1]])
+                    ),
+                    DelaunayGraph.normalize(
+                        DelaunayGraph.subtract(this.vertices[vertexIndices[2]], this.vertices[vertexIndices[1]])
+                    )
+                ))),
+                Math.abs(Math.acos(DelaunayGraph.dotProduct(
+                    DelaunayGraph.normalize(
+                        DelaunayGraph.subtract(this.vertices[vertexIndices[2]], this.vertices[vertexIndices[3]])
+                    ),
+                    DelaunayGraph.normalize(
+                        DelaunayGraph.subtract(this.vertices[vertexIndices[0]], this.vertices[vertexIndices[3]])
+                    )
+                ))),
+                Math.abs(Math.acos(DelaunayGraph.dotProduct(
+                    DelaunayGraph.normalize(
+                        DelaunayGraph.subtract(this.vertices[vertexIndices[2]], this.vertices[vertexIndices[0]])
+                    ),
+                    DelaunayGraph.normalize(
+                        DelaunayGraph.subtract(this.vertices[vertexIndices[1]], this.vertices[vertexIndices[0]])
+                    )
+                ))),
+                Math.abs(Math.acos(DelaunayGraph.dotProduct(
+                    DelaunayGraph.normalize(
+                        DelaunayGraph.subtract(this.vertices[vertexIndices[2]], this.vertices[vertexIndices[0]])
+                    ),
+                    DelaunayGraph.normalize(
+                        DelaunayGraph.subtract(this.vertices[vertexIndices[3]], this.vertices[vertexIndices[0]])
+                    )
+                ))),
+                Math.abs(Math.acos(DelaunayGraph.dotProduct(
+                    DelaunayGraph.normalize(
+                        DelaunayGraph.subtract(this.vertices[vertexIndices[0]], this.vertices[vertexIndices[2]])
+                    ),
+                    DelaunayGraph.normalize(
+                        DelaunayGraph.subtract(this.vertices[vertexIndices[1]], this.vertices[vertexIndices[2]])
+                    )
+                ))),
+                Math.abs(Math.acos(DelaunayGraph.dotProduct(
+                    DelaunayGraph.normalize(
+                        DelaunayGraph.subtract(this.vertices[vertexIndices[0]], this.vertices[vertexIndices[2]])
+                    ),
+                    DelaunayGraph.normalize(
+                        DelaunayGraph.subtract(this.vertices[vertexIndices[3]], this.vertices[vertexIndices[2]])
+                    )
+                )))
             );
-            const complementAreaDiff = Math.abs(
-                DelaunayGraph.dotProduct(
-                    DelaunayGraph.subtract(this.vertices[vertexIndices[1]], this.vertices[vertexIndices[2]]),
-                    DelaunayGraph.subtract(this.vertices[vertexIndices[3]], this.vertices[vertexIndices[2]]),
-                ) -
-                DelaunayGraph.dotProduct(
-                    DelaunayGraph.subtract(this.vertices[vertexIndices[3]], this.vertices[vertexIndices[0]]),
-                    DelaunayGraph.subtract(this.vertices[vertexIndices[1]], this.vertices[vertexIndices[0]]),
-                )
+            const complementAreaDiff = Math.max(
+                Math.abs(Math.acos(DelaunayGraph.dotProduct(
+                    DelaunayGraph.normalize(
+                        DelaunayGraph.subtract(this.vertices[vertexIndices[1]], this.vertices[vertexIndices[2]])
+                    ),
+                    DelaunayGraph.normalize(
+                        DelaunayGraph.subtract(this.vertices[vertexIndices[3]], this.vertices[vertexIndices[2]])
+                    )
+                ))),
+                Math.abs(Math.acos(DelaunayGraph.dotProduct(
+                    DelaunayGraph.normalize(
+                        DelaunayGraph.subtract(this.vertices[vertexIndices[3]], this.vertices[vertexIndices[0]])
+                    ),
+                    DelaunayGraph.normalize(
+                        DelaunayGraph.subtract(this.vertices[vertexIndices[1]], this.vertices[vertexIndices[0]])
+                    )
+                ))),
+                Math.abs(Math.acos(DelaunayGraph.dotProduct(
+                    DelaunayGraph.normalize(
+                        DelaunayGraph.subtract(this.vertices[vertexIndices[1]], this.vertices[vertexIndices[1]])
+                    ),
+                    DelaunayGraph.normalize(
+                        DelaunayGraph.subtract(this.vertices[vertexIndices[3]], this.vertices[vertexIndices[1]])
+                    )
+                ))),
+                Math.abs(Math.acos(DelaunayGraph.dotProduct(
+                    DelaunayGraph.normalize(
+                        DelaunayGraph.subtract(this.vertices[vertexIndices[0]], this.vertices[vertexIndices[1]])
+                    ),
+                    DelaunayGraph.normalize(
+                        DelaunayGraph.subtract(this.vertices[vertexIndices[3]], this.vertices[vertexIndices[1]])
+                    )
+                ))),
+                Math.abs(Math.acos(DelaunayGraph.dotProduct(
+                    DelaunayGraph.normalize(
+                        DelaunayGraph.subtract(this.vertices[vertexIndices[1]], this.vertices[vertexIndices[3]])
+                    ),
+                    DelaunayGraph.normalize(
+                        DelaunayGraph.subtract(this.vertices[vertexIndices[2]], this.vertices[vertexIndices[3]])
+                    )
+                ))),
+                Math.abs(Math.acos(DelaunayGraph.dotProduct(
+                    DelaunayGraph.normalize(
+                        DelaunayGraph.subtract(this.vertices[vertexIndices[0]], this.vertices[vertexIndices[3]])
+                    ),
+                    DelaunayGraph.normalize(
+                        DelaunayGraph.subtract(this.vertices[vertexIndices[2]], this.vertices[vertexIndices[3]])
+                    )
+                )))
             );
             const shouldFlip = defaultAreaDiff > complementAreaDiff;
 
@@ -360,11 +473,17 @@ class DelaunayGraph {
 
     /**
      * Perform an incremental insert into the delaunay graph, add random data points and maintain the triangle mesh.
+     * @param point An optional point to insert into the delaunay graph. If no point is supplied, a random point will
+     * be generated.
      */
-    public incrementalInsert() {
+    public incrementalInsert(point?: [number, number, number]) {
         let vertex: [number, number, number];
         let triangleIndex: number;
-        vertex = DelaunayGraph.randomPoint();
+        if (point) {
+            vertex = point;
+        } else {
+            vertex = DelaunayGraph.randomPoint();
+        }
         triangleIndex = this.findTriangleIntersection(vertex);
 
         // add triangle incrementally
@@ -490,6 +609,7 @@ class Planet implements ICameraState {
     public orientation: Quaternion = Quaternion.ONE;
     public orientationVelocity: Quaternion = Quaternion.ONE;
     public color: string = "blue";
+    public size: number = 1;
 }
 
 class Ship implements ICameraState {
@@ -543,6 +663,10 @@ interface ICameraState {
      * The start of cannon loading.
      */
     cannonLoading?: Date;
+    /**
+     * The size of the object.
+     */
+    size?: number;
 }
 
 interface IExpirable {
@@ -564,6 +688,7 @@ interface IDrawable {
     orientation: Quaternion;
     orientationVelocity: Quaternion;
     cannonLoading?: Date;
+    size?: number;
     projection: { x: number, y: number };
     reverseProjection: { x: number, y: number };
     rotatedPosition: [number, number, number];
@@ -606,6 +731,7 @@ class App extends React.Component<IAppProps, IAppState> {
     private delaunayGraph: DelaunayGraph = new DelaunayGraph();
     private delaunayData: DelaunayTriangle[] = [];
     private voronoiGraph: VoronoiGraph = new VoronoiGraph();
+    private stars: Array<[number, number, number]> = []
 
     private static speed: number = 1 / 6000;
 
@@ -623,6 +749,7 @@ class App extends React.Component<IAppProps, IAppState> {
             orientation: viewableObject.orientation.clone(),
             orientationVelocity: viewableObject.orientationVelocity.clone(),
             cannonLoading: viewableObject.cannonLoading,
+            size: viewableObject.size,
         };
     }
 
@@ -692,7 +819,7 @@ class App extends React.Component<IAppProps, IAppState> {
         //     Math.pow(rotatedPosition[1], 2) +
         //     Math.pow(1 - rotatedPosition[2], 2)
         // );
-        const distance = 50 * (1 - rotatedPosition[2]);
+        const distance = 5 * (1 - rotatedPosition[2] * size);
         const orientationPoint = planet.orientation.rotateVector([1, 0, 0]);
         const rotation = Math.atan2(-orientationPoint[1], orientationPoint[0]) / Math.PI * 180;
         return {
@@ -703,6 +830,7 @@ class App extends React.Component<IAppProps, IAppState> {
             orientation: planet.orientation,
             orientationVelocity: planet.orientationVelocity,
             cannonLoading: planet.cannonLoading,
+            size: planet.size,
             projection,
             reverseProjection,
             rotatedPosition,
@@ -725,7 +853,7 @@ class App extends React.Component<IAppProps, IAppState> {
         const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
         const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
         const distance = planetDrawing.distance;
-        const size = 2 * Math.atan(10 / (2 * distance));
+        const size = 2 * Math.atan((planetDrawing.size || 1) / (2 * distance));
         return (
             <circle
                 key={planetDrawing.id}
@@ -737,6 +865,45 @@ class App extends React.Component<IAppProps, IAppState> {
                 strokeWidth={0.2 * size * this.state.zoom}
                 style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
             />
+        );
+    }
+
+    private drawStar(planetDrawing: IDrawable) {
+        const isReverseSide = planetDrawing.rotatedPosition[2] > 0;
+        const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
+        const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
+        const distance = planetDrawing.distance;
+        const size = 2 * Math.atan((planetDrawing.size || 1) / (2 * distance));
+        return (
+            <g key={planetDrawing.id}>
+                <circle
+                    cx={x * this.state.width}
+                    cy={(1 - y) * this.state.height}
+                    r={size * this.state.zoom}
+                    fill={planetDrawing.color}
+                    stroke="grey"
+                    strokeWidth={0.2 * size * this.state.zoom}
+                    style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
+                />
+                <line
+                    x1={(x + 0.01) * this.state.width}
+                    y1={(1 - y) * this.state.height}
+                    x2={(x - 0.01) * this.state.width}
+                    y2={(1 - y) * this.state.height}
+                    stroke={planetDrawing.color}
+                    strokeWidth={0.2 * size * this.state.zoom}
+                    style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
+                />
+                <line
+                    x1={x * this.state.width}
+                    y1={(1 - y + 0.01) * this.state.height}
+                    x2={x * this.state.width}
+                    y2={(1 - y - 0.01) * this.state.height}
+                    stroke={planetDrawing.color}
+                    strokeWidth={0.2 * size * this.state.zoom}
+                    style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
+                />
+            </g>
         );
     }
 
@@ -875,7 +1042,7 @@ class App extends React.Component<IAppProps, IAppState> {
         ];
     }
 
-    private static MAX_TESSELLATION: number = 3;
+    private static MAX_TESSELLATION: number = 2;
 
     private *getDelaunayTileTessellation(vertices: Quaternion[], maxStep: number = App.MAX_TESSELLATION, step: number = 0): Generator<ITessellatedTriangle> {
         if (step === maxStep) {
@@ -1074,8 +1241,7 @@ class App extends React.Component<IAppProps, IAppState> {
                 smokeClouds.push(smokeCloud);
             }
             if (this.activeKeys.includes("s")) {
-                const backward = cameraOrientation.clone().rotateVector([0, -1, 0]);
-                const rotation = Quaternion.fromBetweenVectors([0, 0, 1], backward).pow(App.speed * 0.3);
+                const rotation = cameraPositionVelocity.clone().conjugate().pow(1/30);
                 cameraPositionVelocity = cameraPositionVelocity.clone().mul(rotation);
 
                 const smokeCloudLeft = new SmokeCloud();
@@ -1186,21 +1352,66 @@ class App extends React.Component<IAppProps, IAppState> {
         entity.orientation = Quaternion.fromAxisAngle([0, 0, 1], Math.random() * 2 * Math.PI);
     }
 
+    private generateGoodPoints(numPoints: number = 10): Array<[number, number, number]> {
+        let delaunayGraph = new DelaunayGraph();
+        let voronoiGraph = new VoronoiGraph();
+        delaunayGraph.initialize();
+        for (let i = 0; i < numPoints; i++) {
+            delaunayGraph.incrementalInsert();
+        }
+        for (let step = 0; step < 5; step++) {
+            voronoiGraph = delaunayGraph.getVoronoiGraph();
+            const lloydPoints = voronoiGraph.lloydRelaxation();
+            delaunayGraph = new DelaunayGraph();
+            delaunayGraph.initializeWithPoints(lloydPoints);
+        }
+        voronoiGraph = delaunayGraph.getVoronoiGraph();
+        return voronoiGraph.lloydRelaxation();
+    }
+
+    private buildStars(point: [number, number, number], index: number): Planet {
+        const planet = new Planet();
+        planet.id = `star-${index}`;
+        planet.position = Quaternion.fromBetweenVectors([0, 0, 1], point);
+        if (index % 5 === 0 || index % 5 === 1) {
+            planet.color = "blue";
+        } else if (index % 5 === 2 || index % 5 === 3) {
+            planet.color = "yellow";
+        } else if (index % 5 === 4) {
+            planet.color = "red";
+        }
+        planet.size = 0.5;
+        return planet;
+    }
+
     componentDidMount() {
         // initialize 3d terrain stuff
         this.delaunayGraph.initialize();
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 6; i++) {
             this.delaunayGraph.incrementalInsert();
+        }
+        for (let step = 0; step < 5; step++) {
+            this.voronoiGraph = this.delaunayGraph.getVoronoiGraph();
+            const lloydPoints = this.voronoiGraph.lloydRelaxation();
+            this.delaunayGraph = new DelaunayGraph();
+            this.delaunayGraph.initializeWithPoints(lloydPoints);
         }
         this.delaunayData = Array.from(this.delaunayGraph.GetTriangles());
         this.voronoiGraph = this.delaunayGraph.getVoronoiGraph();
+        const planetPoints = this.voronoiGraph.lloydRelaxation();
+
+        const starPoints = this.generateGoodPoints(100);
+        this.stars.push(...starPoints);
 
         // initialize planets and ships
         const planets: Planet[] = [];
-        for (let i = 0; i < 150; i++) {
+        let planetI = 0;
+        for (const planetPoint of planetPoints) {
             const planet = new Planet();
-            planet.id = `planet-${i}`;
-            App.addRandomPositionAndOrientationToEntity(planet);
+            planet.id = `planet-${planetI++}`;
+            planet.position = Quaternion.fromBetweenVectors([0, 0, 1], planetPoint);
+            planet.position = planet.position.normalize();
+            planet.orientation = Quaternion.fromAxisAngle([0, 0, 1], Math.random() * 2 * Math.PI);
             const colorValue = Math.random();
             if (colorValue > 0.75)
                 planet.color = "red";
@@ -1341,15 +1552,22 @@ class App extends React.Component<IAppProps, IAppState> {
                         }
                         {
                             [
-                                ...this.state.planets.map(this.rotatePlanet.bind(this))
-                                    .map(this.convertToDrawable.bind(this, "-layer1", 1)),
-                                ...this.state.planets.map(this.rotatePlanet.bind(this))
-                                    .map(this.convertToDrawable.bind(this, "-layer2", 0.5)),
-                                ...this.state.planets.map(this.rotatePlanet.bind(this))
-                                    .map(this.convertToDrawable.bind(this, "-layer3", 0.25)),
-                                ...this.state.planets.map(this.rotatePlanet.bind(this))
-                                    .map(this.convertToDrawable.bind(this, "-layer4", 0.125))
-                            ].sort((a: any, b: any) => b.distance - a.distance).map(this.drawPlanet.bind(this))
+                                ...this.stars.map(this.buildStars.bind(this))
+                                    .map(this.rotatePlanet.bind(this))
+                                    .map(this.convertToDrawable.bind(this, "-star2", 0.5)),
+                                ...this.stars.map(this.buildStars.bind(this))
+                                    .map(this.rotatePlanet.bind(this))
+                                    .map(this.convertToDrawable.bind(this, "-star3", 0.25)),
+                                ...this.stars.map(this.buildStars.bind(this))
+                                    .map(this.rotatePlanet.bind(this))
+                                    .map(this.convertToDrawable.bind(this, "-star4", 0.125))
+                            ].sort((a: any, b: any) => b.distance - a.distance).map(this.drawStar.bind(this))
+                        }
+                        {
+                            this.stars.map(this.buildStars.bind(this))
+                                .map(this.rotatePlanet.bind(this))
+                                .map(this.convertToDrawable.bind(this, "-planet", 1))
+                                .map(this.drawPlanet.bind(this))
                         }
                         {
                             this.state.smokeClouds.map(this.rotatePlanet.bind(this))
