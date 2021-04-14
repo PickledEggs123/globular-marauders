@@ -880,7 +880,11 @@ class DelaunayGraph implements IPathingGraph {
     }
 }
 
-class PathFinder<T extends ICameraState> {
+interface IAutomatedShip extends ICameraState {
+    activeKeys: string[];
+}
+
+class PathFinder<T extends IAutomatedShip> {
     public owner: T;
     public points: Array<[number, number, number]> = [];
 
@@ -912,11 +916,16 @@ class PathFinder<T extends ICameraState> {
             // move towards points
             const positionPoint = this.owner.position.rotateVector([0, 0, 1]);
             const targetPoint = this.points[0];
-            const axisOfRotation = DelaunayGraph.crossProduct(positionPoint, targetPoint);
-            const angleOfRotation = -App.MAX_SPEED * Math.PI * 2 * 5;
-            this.owner.position = this.owner.position.mul(
-                Quaternion.fromAxisAngle(axisOfRotation, angleOfRotation)
-            );
+            const positionDiff = Quaternion.fromBetweenVectors(positionPoint, targetPoint);
+            const isMoving = !this.owner.positionVelocity.equals(Quaternion.ONE);
+            if (!isMoving) {
+                this.owner.activeKeys.push("w");
+            } else {
+                const wIndex = this.owner.activeKeys.findIndex((key) => key === "w");
+                if (wIndex >= 0) {
+                    this.owner.activeKeys.splice(wIndex, 1);
+                }
+            }
         }
     }
 
@@ -933,7 +942,7 @@ class Planet implements ICameraState {
     public pathingNode: PathingNode<DelaunayGraph> | null = null;
 }
 
-class Ship implements ICameraState {
+class Ship implements IAutomatedShip {
     public id: string = "";
     public color: string = "purple";
     public position: Quaternion = Quaternion.ONE;
@@ -941,6 +950,7 @@ class Ship implements ICameraState {
     public orientation: Quaternion = Quaternion.ONE;
     public orientationVelocity: Quaternion = Quaternion.ONE;
     public cannonLoading?: Date = undefined;
+    public activeKeys: string[] = [];
     public pathFinding: PathFinder<Ship> = new PathFinder<Ship>(this);
 }
 
@@ -1151,10 +1161,13 @@ class App extends React.Component<IAppProps, IAppState> {
             .mul(planet.position.clone());
         const orientation = cameraOrientation.clone().conjugate()
             .mul(planet.orientation.clone());
+        const positionVelocity = cameraOrientation.clone().conjugate()
+            .mul(planet.positionVelocity.clone());
         return {
             ...planet,
             position,
             orientation,
+            positionVelocity,
         };
     }
 
@@ -1266,19 +1279,13 @@ class App extends React.Component<IAppProps, IAppState> {
         let velocityY = 0;
         const isPlayerShip = planetDrawing.id === "ship-0-ships";
         if (isPlayerShip) {
-            const velocityPosition = [0, 0, 1];
-            const velocityLength = Math.sqrt(velocityPosition.reduce((sum: number, value: number): number => {
-                return sum + Math.pow(value, 2);
-            }, 0));
-            const velocityAngle = Math.atan2(velocityPosition[1], velocityPosition[0]);
-            const orientationPosition = planetDrawing.position.clone().conjugate()
-                .mul(planetDrawing.orientation.clone().conjugate())
-                .rotateVector([1, 0, 0]);
-            const orientationAngle = Math.atan2(orientationPosition[1], orientationPosition[0]);
-            if (velocityLength > 0) {
-                velocityX = velocityLength * Math.cos(velocityAngle + orientationAngle);
-                velocityY = velocityLength * Math.sin(velocityAngle + orientationAngle);
-            }
+            let velocityPoint = planetDrawing.positionVelocity.clone()
+                .rotateVector([0, 0, 1]);
+            velocityPoint[2] = 0;
+            velocityPoint = DelaunayGraph.normalize(velocityPoint);
+            console.log("CENTER", velocityPoint);
+            velocityX = velocityPoint[0];
+            velocityY = velocityPoint[1];
         }
         const rightCannonPointTop: [number, number] = [
             Math.max(this.state.width / 2, this.state.height / 2) * Math.cos((10 / 180 * Math.PI)) * this.state.zoom,
@@ -1308,7 +1315,7 @@ class App extends React.Component<IAppProps, IAppState> {
                             x1={0}
                             y1={0}
                             x2={this.state.width * 0.5 * velocityX}
-                            y2={this.state.height * 0.5 * velocityY}
+                            y2={this.state.height * 0.5 * -velocityY}
                             stroke="white"
                             strokeWidth={2}
                             strokeDasharray="1,5"
@@ -1550,10 +1557,13 @@ class App extends React.Component<IAppProps, IAppState> {
         );
     }
 
-    private handleShipLoop(getShip: () => ICameraState) {
-        if (this.ships.length === 0) {
-            return;
-        }
+    /**
+     * Process a ship by making changes to the ship's data.
+     * @param shipIndex Index to get ship's state.
+     * @param getActiveKeys Get the ship's active keys.
+     * @private
+     */
+    private handleShipLoop(shipIndex: number, getActiveKeys: () => string[]) {
         let {
             id: cameraId,
             position: cameraPosition,
@@ -1561,7 +1571,7 @@ class App extends React.Component<IAppProps, IAppState> {
             orientation: cameraOrientation,
             orientationVelocity: cameraOrientationVelocity,
             cannonLoading: cameraCannonLoading,
-        } = getShip();
+        } = this.ships[shipIndex];
         const smokeClouds = [
             ...this.smokeClouds.filter(smokeCloud => {
                 return +smokeCloud.expires > Date.now();
@@ -1570,15 +1580,16 @@ class App extends React.Component<IAppProps, IAppState> {
 
         let clearPathFindingPoints: boolean = false;
 
-        if (this.activeKeys.includes("a")) {
+        const activeKeys = getActiveKeys();
+        if (activeKeys.includes("a")) {
             const rotation = Quaternion.fromAxisAngle([0, 0, 1], Math.PI).pow(1/300);
             cameraOrientationVelocity = cameraOrientationVelocity.clone().mul(rotation);
         }
-        if (this.activeKeys.includes("d")) {
+        if (activeKeys.includes("d")) {
             const rotation = Quaternion.fromAxisAngle([0, 0, 1], -Math.PI).pow(1/300);
             cameraOrientationVelocity = cameraOrientationVelocity.clone().mul(rotation);
         }
-        if (this.activeKeys.includes("w")) {
+        if (activeKeys.includes("w")) {
             const forward = cameraOrientation.clone().rotateVector([0, 1, 0]);
             const rotation = Quaternion.fromBetweenVectors([0, 0, 1], forward).pow(App.MAX_SPEED);
             cameraPositionVelocity = cameraPositionVelocity.clone().mul(rotation);
@@ -1587,29 +1598,34 @@ class App extends React.Component<IAppProps, IAppState> {
             const smokeCloud = new SmokeCloud();
             smokeCloud.id = `${cameraId}-${Math.floor(Math.random() * 100000000)}`;
             smokeCloud.position = cameraPosition.clone();
-            smokeCloud.positionVelocity = rotation.conjugate().pow(10);
+            smokeCloud.positionVelocity = cameraOrientation.clone().conjugate()
+                .mul(cameraPosition.clone().conjugate())
+                .mul(rotation.clone().pow(10))
+                .mul(cameraPosition.clone())
+                .mul(cameraOrientation.clone());
             smokeCloud.size = 1;
             smokeClouds.push(smokeCloud);
         }
-        if (this.activeKeys.includes("s")) {
+        if (activeKeys.includes("s")) {
             const rotation = cameraPositionVelocity.clone().conjugate().pow(1/10);
             cameraPositionVelocity = cameraPositionVelocity.clone().mul(rotation);
 
             // get smoke cloud parameters
-            const velocityTilt = cameraPositionVelocity.clone().rotateVector([0, 0, 1]);
-            const velocityAngle = Math.atan2(velocityTilt[0], velocityTilt[1]);
+            const engineBackwardsPointInitial = rotation.rotateVector([0, 0, 1]);
+            engineBackwardsPointInitial[2] = 0;
+            const engineBackwardsPoint = DelaunayGraph.normalize(engineBackwardsPointInitial);
+            const engineBackwards = Quaternion.fromBetweenVectors([0, 0, 1], engineBackwardsPoint).pow(App.MAX_SPEED);
 
             // make left smoke cloud
             const smokeCloudLeft = new SmokeCloud();
             smokeCloudLeft.id = `${cameraId}-${Math.floor(Math.random() * 100000000)}`;
             smokeCloudLeft.position = cameraPosition.clone();
-            const engineForwardLeftForward: [number, number, number] = [
-                Math.cos(velocityAngle - Math.PI / 4 + Math.PI),
-                Math.sin(velocityAngle - Math.PI / 4 + Math.PI),
-                0
-            ];
-            const engineLeftRotation = Quaternion.fromBetweenVectors([0, 0, 1], engineForwardLeftForward).pow(App.MAX_SPEED);
-            smokeCloudLeft.positionVelocity = engineLeftRotation.pow(10);
+            smokeCloudLeft.positionVelocity = cameraOrientation.clone().conjugate()
+                .mul(cameraPosition.clone().conjugate())
+                .mul(Quaternion.fromAxisAngle([0, 0, 1], Math.PI / 4))
+                .mul(engineBackwards.clone().pow(10))
+                .mul(cameraPosition.clone())
+                .mul(cameraOrientation.clone());
             smokeCloudLeft.size = 0.2;
             smokeClouds.push(smokeCloudLeft);
 
@@ -1617,60 +1633,50 @@ class App extends React.Component<IAppProps, IAppState> {
             const smokeCloudRight = new SmokeCloud();
             smokeCloudRight.id = `${cameraId}-${Math.floor(Math.random() * 100000000)}`;
             smokeCloudRight.position = cameraPosition.clone();
-            const engineForwardRightForward: [number, number, number] = [
-                Math.cos(velocityAngle + Math.PI / 4 + Math.PI),
-                Math.sin(velocityAngle + Math.PI / 4 + Math.PI),
-                0
-            ];
-            const engineRightRotation = Quaternion.fromBetweenVectors([0, 0, 1], engineForwardRightForward).pow(App.MAX_SPEED);
-            smokeCloudLeft.positionVelocity = engineRightRotation.pow(10);
+            smokeCloudLeft.positionVelocity = cameraOrientation.clone().conjugate()
+                .mul(cameraPosition.clone().conjugate())
+                .mul(Quaternion.fromAxisAngle([0, 0, 1], -Math.PI / 4))
+                .mul(engineBackwards.clone().pow(10))
+                .mul(cameraPosition.clone())
+                .mul(cameraOrientation.clone());
             smokeCloudRight.size = 0.2;
             smokeClouds.push(smokeCloudRight);
         }
-        if (this.activeKeys.includes(" ") && !cameraCannonLoading) {
+        if (activeKeys.includes(" ") && !cameraCannonLoading) {
             cameraCannonLoading = new Date(Date.now());
         }
-        if (!this.activeKeys.includes(" ") && cameraCannonLoading) {
+        if (!activeKeys.includes(" ") && cameraCannonLoading) {
             // cannon fire
             cameraCannonLoading = undefined;
 
             // fire 8 guns
             for (let i = 0; i < 8; i++) {
                 // pick left or right side
-                let forward: [number, number, number] = [i % 2 === 0 ? -1 : 1, 0, 0];
+                let jitterPoint: [number, number, number] = [i % 2 === 0 ? -1 : 1, 0, 0];
                 // apply random jitter
-                forward[1] += DelaunayGraph.randomInt() * 0.15;
-                forward = DelaunayGraph.normalize(forward);
-                const fireAngle = Math.atan2(forward[1], forward[0]);
-
-                // find angle of ship
-                const orientationPoint = cameraOrientation.rotateVector([1, 0, 0]);
-                const orientationAngle = Math.atan2(orientationPoint[1], orientationPoint[0]);
-
-                // merge ship angle and fire angle
-                forward = [
-                    Math.cos(fireAngle + orientationAngle),
-                    Math.sin(fireAngle + orientationAngle),
-                    0
-                ];
-
-                // compute velocity of cannon ball
-                const rotation = Quaternion.fromBetweenVectors([0, 0, 1], forward).pow(1/60);
+                jitterPoint[1] += DelaunayGraph.randomInt() * 0.15;
+                jitterPoint = DelaunayGraph.normalize(jitterPoint);
+                const jitter = Quaternion.fromBetweenVectors([0, 0, 1], jitterPoint).pow(App.MAX_SPEED * 400);
 
                 // create a smoke cloud
                 const smokeCloud = new SmokeCloud();
                 smokeCloud.id = `${cameraId}-${Math.floor(Math.random() * 100000000)}`;
                 smokeCloud.position = cameraPosition.clone();
-                smokeCloud.positionVelocity = rotation;
+                smokeCloud.positionVelocity = cameraOrientation.clone().conjugate()
+                    .mul(cameraPosition.clone().conjugate())
+                    .mul(cameraPositionVelocity.clone())
+                    .mul(jitter.clone())
+                    .mul(cameraPosition.clone())
+                    .mul(cameraOrientation.clone());
                 smokeCloud.size = 1;
                 smokeClouds.push(smokeCloud);
             }
         }
-        if (this.activeKeys.includes(" ") && cameraCannonLoading && Date.now() - +cameraCannonLoading > 3000) {
+        if (activeKeys.includes(" ") && cameraCannonLoading && Date.now() - +cameraCannonLoading > 3000) {
             // cancel cannon fire
             cameraCannonLoading = undefined;
         }
-        if (this.activeKeys.length > 0) {
+        if (activeKeys.length > 0) {
             clearPathFindingPoints = true;
         }
         if (cameraPositionVelocity !== Quaternion.ONE) {
@@ -1679,28 +1685,25 @@ class App extends React.Component<IAppProps, IAppState> {
         if (cameraOrientationVelocity !== Quaternion.ONE) {
             cameraOrientation = cameraOrientation.clone().mul(cameraOrientationVelocity.clone());
         }
-        if (cameraPosition !== getShip().position && false) {
-            const diffQuaternion = getShip().position.clone().conjugate().mul(cameraPosition.clone());
+        if (cameraPosition !== this.ships[shipIndex].position && false) {
+            const diffQuaternion = this.ships[shipIndex].position.clone().conjugate().mul(cameraPosition.clone());
             cameraOrientation = cameraOrientation.clone().mul(diffQuaternion);
         }
-        const ship: Ship = {
-            ...this.ships[0],
-            position: cameraPosition,
-            orientation: cameraOrientation,
-            positionVelocity: cameraPositionVelocity,
-            orientationVelocity: cameraOrientationVelocity,
-            cannonLoading: cameraCannonLoading,
-        };
+
+        this.ships[shipIndex].position = cameraPosition;
+        this.ships[shipIndex].orientation = cameraOrientation;
+        this.ships[shipIndex].positionVelocity = cameraPositionVelocity;
+        this.ships[shipIndex].orientationVelocity = cameraOrientationVelocity;
+        this.ships[shipIndex].cannonLoading = cameraCannonLoading;
         if (clearPathFindingPoints) {
-            ship.pathFinding.points = [];
+            this.ships[shipIndex].pathFinding.points = [];
         }
         this.smokeClouds = smokeClouds;
-        this.ships = [ship, ...this.ships.slice(1, this.ships.length)];
     }
 
     private gameLoop() {
-        this.handleShipLoop(this.getPlayerShip.bind(this));
-        for (let i = 0; i < this.ships.length; i++) {
+        this.handleShipLoop(0, () => this.activeKeys);
+        for (let i = 1; i < this.ships.length; i++) {
             if (this.ships[i].pathFinding.points.length === 0) {
                 const shipPosition = this.ships[i].position.rotateVector([0, 0, 1]);
                 const nearestNode = this.delaunayGraph.findClosestPathingNode(shipPosition);
@@ -1709,6 +1712,7 @@ class App extends React.Component<IAppProps, IAppState> {
                 this.ships[i].pathFinding.points = nearestNode.pathToObject(randomTarget);
             }
             this.ships[i].pathFinding.pathFindingLoop();
+            this.handleShipLoop(i, () => this.ships[i].activeKeys);
         }
         this.forceUpdate();
     }
@@ -1805,7 +1809,8 @@ class App extends React.Component<IAppProps, IAppState> {
 
     /**
      * Create a planet.
-     * @param planetI
+     * @param planetPoint The point the planet is created at.
+     * @param planetI The index of the planet.
      * @private
      */
     private createPlanet(planetPoint: [number, number, number], planetI: number): Planet {
