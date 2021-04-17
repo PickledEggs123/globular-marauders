@@ -2,6 +2,11 @@ import React from 'react';
 import './App.css';
 import Quaternion from 'quaternion';
 
+interface ITargetLineData {
+    targetLines: Array<[[number, number], [number, number]]>,
+    targetNodes: Array<[[number, number], number]>
+}
+
 interface ITessellatedTriangle {
     vertices: Quaternion[];
 }
@@ -307,6 +312,11 @@ class PathingNode<T extends IPathingGraph> implements IPathingNode<T> {
             path.push(this.instance.vertices[start]);
         } else {
             throw new Error("Could not find end node after building A* map, pathfinding failed.");
+        }
+
+        // remove duplicate nodes
+        if (path.length >= 2 && VoronoiGraph.angularDistance(path[path.length - 1], path[path.length - 2]) < App.VELOCITY_STEP * Math.PI / 2) {
+            path.pop();
         }
         return path.reverse();
     }
@@ -921,7 +931,6 @@ class PathFinder<T extends IAutomatedShip> {
         // if near a point
         if (this.checkNearNode()) {
             // remove first point
-            console.log(this.owner.id, "is near node", this.points.length);
             this.points = this.points.slice(1);
         }
 
@@ -943,8 +952,8 @@ class PathFinder<T extends IAutomatedShip> {
             const orientationDiffAngle = Math.atan2(targetOrientationPoint[0], targetOrientationPoint[1]);
             const orientationSpeed = VoronoiGraph.angularDistanceQuaternion(this.owner.orientationVelocity) * (orientationDiffAngle > 0 ? 1 : -1);
             const desiredOrientationSpeed = Math.max(0, Math.min(Math.floor(
-                10 / Math.PI * orientationDiffAngle * (orientationDiffAngle > 0 ? 1 : -1)
-            ), App.VELOCITY_STEP * 5));
+                10 / Math.PI * orientationDiffAngle
+            ), App.VELOCITY_STEP * 10)) * (orientationDiffAngle > 0 ? 1 : -1);
 
             // compute speed towards target
             const positionAngularDistance = VoronoiGraph.angularDistanceQuaternion(positionDiff);
@@ -952,7 +961,7 @@ class PathFinder<T extends IAutomatedShip> {
             let desiredSpeed = Math.ceil(Math.max(0, Math.min(positionAngularDistance * 10 - speed * 10, 10)));
 
             // perform rotation and speed up
-            const shouldRotate = Math.abs(orientationDiffAngle) > 3 / 180 * Math.PI * (Math.pow(Math.PI - distance, 2) + 1) || desiredOrientationSpeed !== 0;
+            const shouldRotate = Math.abs(orientationDiffAngle) > 5 / 180 * Math.PI * (Math.pow(Math.PI - distance, 2) + 1) || desiredOrientationSpeed !== 0;
             if (!shouldRotate) {
                 desiredSpeed = 5;
             }
@@ -1151,6 +1160,7 @@ interface IAppState {
     height: number;
     zoom: number;
     showVoronoi: boolean;
+    autoPilotEnabled: boolean;
 }
 
 class App extends React.Component<IAppProps, IAppState> {
@@ -1160,10 +1170,12 @@ class App extends React.Component<IAppProps, IAppState> {
         height: 500 as number,
         zoom: 4 as number,
         showVoronoi: false as boolean,
+        autoPilotEnabled: true as boolean,
     };
 
     private showNotesRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
     private showVoronoiRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
+    private autoPilotEnabledRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
     private rotateCameraInterval: any = null;
     private activeKeys: any[] = [];
     private keyDownHandlerInstance: any;
@@ -1345,7 +1357,7 @@ class App extends React.Component<IAppProps, IAppState> {
         const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
         const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
         const distance = planetDrawing.distance;
-        const size = 2 * Math.atan((planetDrawing.original.size || 1) / (2 * distance));
+        const size = Math.max(0, 2 * Math.atan((planetDrawing.original.size || 1) / (2 * distance)));
         return (
             <circle
                 key={planetDrawing.id}
@@ -1365,7 +1377,7 @@ class App extends React.Component<IAppProps, IAppState> {
         const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
         const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
         const distance = planetDrawing.distance;
-        const size = 2 * Math.atan((planetDrawing.original.size || 1) / (2 * distance));
+        const size = Math.max(0, 2 * Math.atan((planetDrawing.original.size || 1) / (2 * distance)));
         return (
             <g key={planetDrawing.id}>
                 <circle
@@ -1399,20 +1411,112 @@ class App extends React.Component<IAppProps, IAppState> {
         );
     }
 
+    /**
+     * Get the target lines for a ship.
+     * @param planetDrawing The ship to get target lines for.
+     * @private
+     */
+    private getShipTargetLines(planetDrawing: IDrawable<Ship>): ITargetLineData {
+        const targetLines: Array<[[number, number], [number, number]]> = [];
+        const targetNodes: Array<[[number, number], number]> = [];
+
+        if (planetDrawing.original.pathFinding.points.length > 0) {
+            for (let i = -1; i < planetDrawing.original.pathFinding.points.length - 1; i++) {
+                // get pair of points to draw line in between two nodes
+                const a = i >= 0 ? planetDrawing.original.pathFinding.points[i] : planetDrawing.original.position.rotateVector([0, 0, 1]);
+                const b = planetDrawing.original.pathFinding.points[i + 1];
+
+                // get points projected onto plane
+                const aPoint = planetDrawing.original.orientation.clone().inverse()
+                    .mul(planetDrawing.original.position.clone().inverse())
+                    .rotateVector(a);
+                const bPoint = planetDrawing.original.orientation.clone().inverse()
+                    .mul(planetDrawing.original.position.clone().inverse())
+                    .rotateVector(b);
+
+                if (aPoint[2] >= 0 && bPoint[2] >= 0) {
+                    // both points on front of sphere
+                    const aLinePoint: [number, number] = [
+                        aPoint[0] * 0.5,
+                        aPoint[1] * 0.5,
+                    ];
+                    const bLinePoint: [number, number] = [
+                        bPoint[0] * 0.5,
+                        bPoint[1] * 0.5
+                    ];
+                    targetLines.push([aLinePoint, bLinePoint]);
+                } else if (aPoint[2] >= 0 && bPoint[2] < 0) {
+                    // first point on front of sphere while second point is behind sphere
+                    const aLinePoint: [number, number] = [
+                        aPoint[0] * 0.5,
+                        aPoint[1] * 0.5,
+                    ];
+                    const midPoint = DelaunayGraph.normalize(App.getAveragePoint([aPoint, bPoint]));
+                    const abNormal = DelaunayGraph.normalize(DelaunayGraph.crossProduct(
+                        DelaunayGraph.normalize(aPoint),
+                        DelaunayGraph.normalize(bPoint)
+                    ));
+                    const equatorNormal = DelaunayGraph.crossProduct([1, 0, 0], [0, 1, 0]);
+                    const line = DelaunayGraph.normalize(DelaunayGraph.crossProduct(abNormal, equatorNormal));
+                    const bLinePoint: [number, number] = DelaunayGraph.dotProduct(line, midPoint) >= 0 ? [
+                        line[0] * 0.5,
+                        line[1] * 0.5
+                    ] : [
+                        -line[0] * 0.5,
+                        -line[1] * 0.5
+                    ];
+                    targetLines.push([aLinePoint, bLinePoint]);
+                } else if (aPoint[2] < 0 && bPoint[2] >= 0) {
+                    // first point is behind sphere while second point is on front of sphere
+                    const bLinePoint: [number, number] = [
+                        bPoint[0] * 0.5,
+                        bPoint[1] * 0.5
+                    ];
+                    const midPoint = DelaunayGraph.normalize(App.getAveragePoint([aPoint, bPoint]));
+                    const abNormal = DelaunayGraph.normalize(DelaunayGraph.crossProduct(
+                        DelaunayGraph.normalize(aPoint),
+                        DelaunayGraph.normalize(bPoint)
+                    ));
+                    const equatorNormal = DelaunayGraph.crossProduct([1, 0, 0], [0, 1, 0]);
+                    const line = DelaunayGraph.normalize(DelaunayGraph.crossProduct(abNormal, equatorNormal));
+                    const aLinePoint: [number, number] = DelaunayGraph.dotProduct(line, midPoint) >= 0 ? [
+                        line[0] * 0.5,
+                        line[1] * 0.5
+                    ] : [
+                        -line[0] * 0.5,
+                        -line[1] * 0.5
+                    ];
+                    targetLines.push([aLinePoint, bLinePoint]);
+                }
+
+                if (bPoint[2] >= 0) {
+                    const bLinePoint: [number, number] = [
+                        bPoint[0] * 0.5,
+                        bPoint[1] * 0.5
+                    ];
+                    targetNodes.push([bLinePoint, planetDrawing.original.pathFinding.points.length - i - 1]);
+                }
+            }
+        }
+
+        return {
+            targetLines,
+            targetNodes
+        };
+    }
+
     private drawShip(planetDrawing: IDrawable<Ship>) {
         const isReverseSide = planetDrawing.rotatedPosition[2] > 0;
         const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
         const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
         const distance = planetDrawing.distance;
-        const size = 2 * Math.atan(1 / (2 * distance));
+        const size = Math.max(0, 2 * Math.atan(1 / (2 * distance)));
         const scale = (size * this.state.zoom) / 100;
 
         // handle UI lines
-        let velocityX = 0;
-        let velocityY = 0;
-        let targetX = 0;
-        let targetY = 0;
-        let targetValue = null;
+        let velocityX: number = 0;
+        let velocityY: number = 0;
+        let targetLineData: ITargetLineData | null = null;
         const isPlayerShip = planetDrawing.id === "ship-0-ships";
         if (isPlayerShip) {
             // handle velocity line
@@ -1423,15 +1527,7 @@ class App extends React.Component<IAppProps, IAppState> {
             velocityX = velocityPoint[0];
             velocityY = velocityPoint[1];
 
-            // handle target line
-            if (planetDrawing.original.pathFinding.points.length > 0) {
-                let targetPoint = planetDrawing.original.orientation.clone().inverse()
-                    .mul(planetDrawing.original.position.clone().inverse())
-                    .rotateVector(planetDrawing.original.pathFinding.points[0]);
-                targetX = targetPoint[0] * 0.5;
-                targetY = targetPoint[1] * 0.5;
-                targetValue = planetDrawing.original.pathFinding.points.length;
-            }
+            targetLineData = this.getShipTargetLines.call(this, planetDrawing);
         }
         const rightCannonPointTop: [number, number] = [
             Math.max(this.state.width / 2, this.state.height / 2) * Math.cos((10 / 180 * Math.PI)) * this.state.zoom,
@@ -1470,40 +1566,44 @@ class App extends React.Component<IAppProps, IAppState> {
                     )
                 }
                 {
-                    isPlayerShip && planetDrawing.original.pathFinding.points.length > 0 && !isNaN(targetX) && !isNaN(targetY) && (
-                        <>
+                    isPlayerShip && targetLineData && targetLineData.targetLines.map(([a, b]) => {
+                        return (
                             <line
                                 key="target-line"
-                                x1={0}
-                                y1={0}
-                                x2={this.state.width * targetX * this.state.zoom}
-                                y2={this.state.height * -targetY * this.state.zoom}
+                                x1={this.state.width * a[0] * this.state.zoom}
+                                y1={this.state.height * -a[1] * this.state.zoom}
+                                x2={this.state.width * b[0] * this.state.zoom}
+                                y2={this.state.height * -b[1] * this.state.zoom}
                                 stroke="blue"
                                 strokeWidth={2}
                                 strokeDasharray="1,5"
                             />
-                            <circle
-                                key="target-marker"
-                                r={10}
-                                cx={this.state.width * targetX * this.state.zoom}
-                                cy={this.state.height * -targetY * this.state.zoom}
-                                stroke="blue"
-                                fill="none"
-                            />
-                            {
-                                (targetValue ? (
-                                    <text
-                                        key="target-value"
-                                        textAnchor="middle"
-                                        x={this.state.width * targetX * this.state.zoom}
-                                        y={this.state.height * -targetY * this.state.zoom + 5}
-                                        stroke="blue"
-                                        fill="none"
-                                    >{targetValue}</text>
-                                ) : null)
-                            }
-                        </>
-                    )
+                        );
+                    })
+                }
+                {
+                    isPlayerShip && targetLineData && targetLineData.targetNodes.map(([a, value]) => {
+                        return (
+                            <>
+                                <circle
+                                    key="target-marker"
+                                    r={10}
+                                    cx={this.state.width * a[0] * this.state.zoom}
+                                    cy={this.state.height * -a[1] * this.state.zoom}
+                                    stroke="blue"
+                                    fill="none"
+                                />
+                                <text
+                                    key="target-value"
+                                    textAnchor="middle"
+                                    x={this.state.width * a[0] * this.state.zoom}
+                                    y={this.state.height * -a[1] * this.state.zoom + 5}
+                                    stroke="blue"
+                                    fill="none"
+                                >{value}</text>
+                            </>
+                        );
+                    })
                 }
                 <g transform={`rotate(${planetDrawing.rotation}) scale(${scale})`}>
                     <polygon
@@ -1553,7 +1653,7 @@ class App extends React.Component<IAppProps, IAppState> {
         const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
         const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
         const distance = planetDrawing.distance;
-        const size = 0.2 * 2 * Math.atan(10 / (2 * distance));
+        const size = 0.2 * Math.max(0, 2 * Math.atan(10 / (2 * distance)));
         return (
             <circle
                 key={planetDrawing.id}
@@ -1881,7 +1981,7 @@ class App extends React.Component<IAppProps, IAppState> {
             // cancel cannon fire
             cameraCannonLoading = undefined;
         }
-        if (activeKeys.length > 0 && !isAutomated) {
+        if (activeKeys.some(key => ["a", "s", "d", "w", " "].includes(key)) && !isAutomated) {
             clearPathFindingPoints = true;
         }
         if (cameraPositionVelocity !== Quaternion.ONE) {
@@ -1908,21 +2008,17 @@ class App extends React.Component<IAppProps, IAppState> {
         this.cannonBalls = cannonBalls;
     }
 
-    /**
-     * Number of ships that were repathed.
-     */
-    numShipsRepathed: number = 0;
-
     private gameLoop() {
-        //this.handleShipLoop(0, () => this.activeKeys, false);
-        for (let i = 0; i < this.ships.length; i++) {
+        if (!this.state.autoPilotEnabled) {
+            this.handleShipLoop(0, () => this.activeKeys, false);
+        }
+        for (let i = (this.state.autoPilotEnabled ? 0 : 1); i < this.ships.length; i++) {
             if (this.ships[i].pathFinding.points.length === 0) {
                 const shipPosition = this.ships[i].position.rotateVector([0, 0, 1]);
                 const nearestNode = this.delaunayGraph.findClosestPathingNode(shipPosition);
                 const nodes = Object.values(this.delaunayGraph.pathingNodes);
                 const randomTarget = nodes[Math.floor(Math.random() * nodes.length)];
                 this.ships[i].pathFinding.points = nearestNode.pathToObject(randomTarget);
-                console.log("Pathing SHIP", i, "so far", ++this.numShipsRepathed, "ships pathed");
             }
             this.ships[i].pathFinding.pathFindingLoop();
             this.handleShipLoop(i, () => this.ships[i].activeKeys, true);
@@ -1944,6 +2040,15 @@ class App extends React.Component<IAppProps, IAppState> {
             this.setState({
                 ...this.state,
                 showVoronoi: this.showVoronoiRef.current.checked,
+            });
+        }
+    }
+
+    private handleAutoPilotEnabled() {
+        if (this.autoPilotEnabledRef.current) {
+            this.setState({
+                ...this.state,
+                autoPilotEnabled: this.autoPilotEnabledRef.current.checked,
             });
         }
     }
@@ -2136,8 +2241,11 @@ class App extends React.Component<IAppProps, IAppState> {
                 .mul(clickQuaternion)
                 .rotateVector([0, 0, 1]);
 
-            // TODO: QUEUE PATH FINDING NODES
-            this.ships[0].pathFinding.points = [spherePoint];
+            if (event.shiftKey) {
+                this.ships[0].pathFinding.points.push(spherePoint);
+            } else {
+                this.ships[0].pathFinding.points = [spherePoint];
+            }
             // // create a planet at mouse click
             // this.planets.push(
             //     this.createPlanet(spherePoint, this.planets.length)
@@ -2168,6 +2276,10 @@ class App extends React.Component<IAppProps, IAppState> {
                         <input type="checkbox" ref={this.showVoronoiRef} checked={this.state.showVoronoi} onChange={this.handleShowVoronoi.bind(this)}/>
                         <span>Show Voronoi</span>
                     </div>
+                    <div>
+                        <input type="checkbox" ref={this.autoPilotEnabledRef} checked={this.state.autoPilotEnabled} onChange={this.handleAutoPilotEnabled.bind(this)}/>
+                        <span>AutoPilot Enabled</span>
+                    </div>
                 </div>
                 {
                     this.state.showNotes && (
@@ -2176,9 +2288,9 @@ class App extends React.Component<IAppProps, IAppState> {
                             <li>Create 3d sphere world which has different planets. -- DONE 3/28/2021</li>
                             <li>Project 3d world onto a small area for viewing, yet still able to navigate in a circle like a 3d sphere. -- DONE 3/28/2021</li>
                             <li>Create camera system centered around a small ship. Rotating will rotate camera/world. -- DONE 3/30/2021</li>
-                            <li>Add projectiles or cannon balls and small frictionless motion in space.</li>
+                            <li>Add projectiles or cannon balls and small frictionless motion in space. -- DONE 4/17/2021</li>
                             <li>Add gravity around planets.</li>
-                            <li>Improve random distribution of planets using Voronoi and Lloyd Relaxation.</li>
+                            <li>Improve random distribution of planets using Voronoi and Lloyd Relaxation. -- DONE 4/17/2021</li>
                             <li>Create factions which start from a home world and launch ships.</li>
                             <li>Spawn settler ships to colonize other worlds. Each world has upto 3 resources.</li>
                             <li>Spawn merchant ships to trade with colonies. Trading is simplified flying between A and B.</li>
