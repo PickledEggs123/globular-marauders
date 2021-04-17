@@ -47,11 +47,24 @@ class VoronoiGraph<T extends ICameraState> {
      */
     drawableMap: Record<number, Array<T>> = {};
 
+    /**
+     * The angular distance between two points.
+     * @param a The first point.
+     * @param b The second point.
+     */
     public static angularDistance(a: [number, number, number], b: [number, number, number]): number {
         return Math.acos(DelaunayGraph.dotProduct(
             DelaunayGraph.normalize(a),
             DelaunayGraph.normalize(b)
         ));
+    }
+
+    /**
+     * The angular distance of a quaternion.
+     * @param a A quaternion with a angular rotation.
+     */
+    public static angularDistanceQuaternion(a: Quaternion): number {
+        return Math.acos(a.w) * 2;
     }
 
     /**
@@ -302,7 +315,7 @@ class PathingNode<T extends IPathingGraph> implements IPathingNode<T> {
 /**
  * A delaunay graph for procedural generation, automatic random landscapes.
  */
-class DelaunayGraph implements IPathingGraph {
+class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
     /**
      * The vertices of the graph.
      */
@@ -319,7 +332,7 @@ class DelaunayGraph implements IPathingGraph {
     /**
      * A list of nodes such as planet to help AI travel around the map.
      */
-    public pathingNodes: Record<number, PathingNode<DelaunayGraph>> = {};
+    public pathingNodes: Record<number, PathingNode<DelaunayGraph<T>>> = {};
 
     /**
      * Find the closest vertex index to a given position.
@@ -343,7 +356,7 @@ class DelaunayGraph implements IPathingGraph {
     private nextPathingNodeId: number = 0;
     public createPathingNode(position: [number, number, number]) {
         const closestVertex = this.findClosestVertexIndex(position);
-        const pathingNode = new PathingNode<DelaunayGraph>(this);
+        const pathingNode = new PathingNode<DelaunayGraph<T>>(this);
         pathingNode.id = this.nextPathingNodeId++;
         pathingNode.instance = this;
         pathingNode.closestVertex = closestVertex;
@@ -356,9 +369,9 @@ class DelaunayGraph implements IPathingGraph {
      * FInd the closest pathing node to a position, used to begin path finding algorithm.
      * @param position The position to find a nearby pathing node.
      */
-    public findClosestPathingNode(position: [number, number, number]): PathingNode<DelaunayGraph> {
+    public findClosestPathingNode(position: [number, number, number]): PathingNode<DelaunayGraph<T>> {
         let closestDistance = Number.MAX_VALUE;
-        let closestPathingNode: PathingNode<DelaunayGraph> | null = null;
+        let closestPathingNode: PathingNode<DelaunayGraph<T>> | null = null;
         const pathingNodes = Object.values(this.pathingNodes);
         for (const pathingNode of pathingNodes) {
             const cellDistance = VoronoiGraph.angularDistance(position, pathingNode.position);
@@ -790,8 +803,8 @@ class DelaunayGraph implements IPathingGraph {
         }
     }
 
-    public getVoronoiGraph(): VoronoiGraph<ICameraState> {
-        const graph = new VoronoiGraph();
+    public getVoronoiGraph<T extends ICameraState>(): VoronoiGraph<T> {
+        const graph = new VoronoiGraph<T>();
         // for each vertex which becomes a voronoi cell
         // get vertex, center of a voronoi cell
         for (let vertexIndex = 0; vertexIndex < this.vertices.length; vertexIndex++) {
@@ -821,8 +834,8 @@ class DelaunayGraph implements IPathingGraph {
                 // compute the theta angle to orient the edges counter clockwise
                 const polarRotation = Quaternion.fromBetweenVectors([0, 0, 1], aVertex);
                 const delta = DelaunayGraph.subtract(
-                    polarRotation.conjugate().mul(Quaternion.fromBetweenVectors([0, 0, 1], bVertex)).rotateVector([0, 0, 1]),
-                    polarRotation.conjugate().mul(Quaternion.fromBetweenVectors([0, 0, 1], aVertex)).rotateVector([0, 0, 1])
+                    polarRotation.inverse().mul(Quaternion.fromBetweenVectors([0, 0, 1], bVertex)).rotateVector([0, 0, 1]),
+                    polarRotation.inverse().mul(Quaternion.fromBetweenVectors([0, 0, 1], aVertex)).rotateVector([0, 0, 1])
                 );
                 const thetaAngle = Math.atan2(delta[1], delta[0]);
 
@@ -898,17 +911,18 @@ class PathFinder<T extends IAutomatedShip> {
         }
 
         const distance = VoronoiGraph.angularDistance(
-            this.owner.position.rotateVector([0, 0, 1]),
+            this.owner.position.clone().rotateVector([0, 0, 1]),
             this.points[0]
         );
-        return this.points.length > 1 ? distance < App.MAX_SPEED * 40 : distance < App.MAX_SPEED * 20;
+        return this.points.length > 1 ? distance < App.VELOCITY_STEP * Math.PI / 2 * 300 : distance < App.VELOCITY_STEP * Math.PI / 2 * 100;
     }
 
     public pathFindingLoop() {
         // if near a point
         if (this.checkNearNode()) {
             // remove first point
-            this.points = [...this.points.slice(1)];
+            console.log(this.owner.id, "is near node", this.points.length);
+            this.points = this.points.slice(1);
         }
 
         // if there are more points
@@ -917,13 +931,103 @@ class PathFinder<T extends IAutomatedShip> {
             const positionPoint = this.owner.position.rotateVector([0, 0, 1]);
             const targetPoint = this.points[0];
             const positionDiff = Quaternion.fromBetweenVectors(positionPoint, targetPoint);
-            const isMoving = !this.owner.positionVelocity.equals(Quaternion.ONE);
-            if (!isMoving) {
-                this.owner.activeKeys.push("w");
+            const distance = VoronoiGraph.angularDistanceQuaternion(positionDiff);
+
+            // compute rotation towards target
+            let targetOrientationPoint = this.owner.orientation.clone().inverse()
+                .mul(this.owner.position.clone().inverse())
+                .mul(Quaternion.fromBetweenVectors([0, 0, 1], targetPoint))
+                .rotateVector([0, 0, 1]);
+            targetOrientationPoint[2] = 0;
+            targetOrientationPoint = DelaunayGraph.normalize(targetOrientationPoint);
+            const orientationDiffAngle = Math.atan2(targetOrientationPoint[0], targetOrientationPoint[1]);
+            const orientationSpeed = VoronoiGraph.angularDistanceQuaternion(this.owner.orientationVelocity) * (orientationDiffAngle > 0 ? 1 : -1);
+            const desiredOrientationSpeed = Math.max(0, Math.min(Math.floor(
+                10 / Math.PI * orientationDiffAngle * (orientationDiffAngle > 0 ? 1 : -1)
+            ), App.VELOCITY_STEP * 5));
+
+            // compute speed towards target
+            const positionAngularDistance = VoronoiGraph.angularDistanceQuaternion(positionDiff);
+            const speed = VoronoiGraph.angularDistanceQuaternion(this.owner.positionVelocity);
+            let desiredSpeed = Math.ceil(Math.max(0, Math.min(positionAngularDistance * 10 - speed * 10, 10)));
+
+            // perform rotation and speed up
+            const shouldRotate = Math.abs(orientationDiffAngle) > 3 / 180 * Math.PI * (Math.pow(Math.PI - distance, 2) + 1) || desiredOrientationSpeed !== 0;
+            if (!shouldRotate) {
+                desiredSpeed = 5;
+            }
+            const willReachTargetRotation = Math.abs(orientationDiffAngle) / Math.abs(orientationSpeed) < 5;
+            const shouldSlowDown = speed > desiredSpeed || shouldRotate;
+            const shouldSpeedUp = speed < desiredSpeed + 1 && !shouldRotate;
+            if (shouldRotate && desiredOrientationSpeed > orientationSpeed && !willReachTargetRotation && !this.owner.activeKeys.includes("a")) {
+                // press a to rotate left
+                this.owner.activeKeys.push("a");
+            }
+            else if (shouldRotate && desiredOrientationSpeed < orientationSpeed && !willReachTargetRotation && !this.owner.activeKeys.includes("d")) {
+                // press d to rotate right
+                this.owner.activeKeys.push("d");
+            } else if (shouldRotate && desiredOrientationSpeed > orientationSpeed && willReachTargetRotation && !this.owner.activeKeys.includes("d")) {
+                const aIndex = this.owner.activeKeys.findIndex((key) => key === "a");
+                if (aIndex >= 0) {
+                    this.owner.activeKeys.splice(aIndex, 1);
+                }
+
+                // press d to rotate right to slow down
+                this.owner.activeKeys.push("d");
+            }
+            else if (shouldRotate && desiredOrientationSpeed < orientationSpeed && willReachTargetRotation && !this.owner.activeKeys.includes("a")) {
+                const dIndex = this.owner.activeKeys.findIndex((key) => key === "d");
+                if (dIndex >= 0) {
+                    this.owner.activeKeys.splice(dIndex, 1);
+                }
+
+                // press a to rotate left to slow down
+                this.owner.activeKeys.push("a");
+            }
+            else if (!shouldRotate && orientationSpeed > 0 && willReachTargetRotation && !this.owner.activeKeys.includes("d")) {
+                const aIndex = this.owner.activeKeys.findIndex((key) => key === "a");
+                if (aIndex >= 0) {
+                    this.owner.activeKeys.splice(aIndex, 1);
+                }
+
+                // press d to rotate right to slow down
+                this.owner.activeKeys.push("d");
+            }
+            else if (!shouldRotate && orientationSpeed < 0 && willReachTargetRotation && !this.owner.activeKeys.includes("a")) {
+                const dIndex = this.owner.activeKeys.findIndex((key) => key === "d");
+                if (dIndex >= 0) {
+                    this.owner.activeKeys.splice(dIndex, 1);
+                }
+
+                // press a to rotate left to slow down
+                this.owner.activeKeys.push("a");
             } else {
+                // remove a d keys
+                const aIndex = this.owner.activeKeys.findIndex((key) => key === "a");
+                if (aIndex >= 0) {
+                    this.owner.activeKeys.splice(aIndex, 1);
+                }
+                const dIndex = this.owner.activeKeys.findIndex((key) => key === "d");
+                if (dIndex >= 0) {
+                    this.owner.activeKeys.splice(dIndex, 1);
+                }
+            }
+
+            if (shouldSpeedUp && !this.owner.activeKeys.includes("w")) {
+                // press w to speed up
+                this.owner.activeKeys.push("w");
+            } else if (shouldSlowDown && !this.owner.activeKeys.includes("s")) {
+                // press s to slow down
+                this.owner.activeKeys.push("s");
+            } else {
+                // remove w s keys
                 const wIndex = this.owner.activeKeys.findIndex((key) => key === "w");
                 if (wIndex >= 0) {
                     this.owner.activeKeys.splice(wIndex, 1);
+                }
+                const sIndex = this.owner.activeKeys.findIndex((key) => key === "s");
+                if (sIndex >= 0) {
+                    this.owner.activeKeys.splice(sIndex, 1);
                 }
             }
         }
@@ -939,7 +1043,7 @@ class Planet implements ICameraState {
     public orientationVelocity: Quaternion = Quaternion.ONE;
     public color: string = "blue";
     public size: number = 1;
-    public pathingNode: PathingNode<DelaunayGraph> | null = null;
+    public pathingNode: PathingNode<DelaunayGraph<Planet>> | null = null;
 }
 
 class Ship implements IAutomatedShip {
@@ -996,9 +1100,20 @@ interface ICameraState {
      */
     cannonLoading?: Date;
     /**
+     * The pathfinding component of the drawable.
+     */
+    pathFinding?: PathFinder<any>;
+    /**
      * The size of the object.
      */
     size?: number;
+}
+
+/**
+ * A combined camera state with original data, for rendering.
+ */
+interface ICameraStateWithOriginal<T extends ICameraState> extends ICameraState {
+    original: T;
 }
 
 interface IExpirable {
@@ -1012,15 +1127,14 @@ interface IExpirable {
     expires: Date;
 }
 
-interface IDrawable {
+interface IDrawable<T extends ICameraState> {
     id: string;
     color: string;
     position: Quaternion;
     positionVelocity: Quaternion;
     orientation: Quaternion;
     orientationVelocity: Quaternion;
-    cannonLoading?: Date;
-    size?: number;
+    original: T
     projection: { x: number, y: number };
     reverseProjection: { x: number, y: number };
     rotatedPosition: [number, number, number];
@@ -1054,18 +1168,35 @@ class App extends React.Component<IAppProps, IAppState> {
     private activeKeys: any[] = [];
     private keyDownHandlerInstance: any;
     private keyUpHandlerInstance: any;
-    private delaunayGraph: DelaunayGraph = new DelaunayGraph();
+    private delaunayGraph: DelaunayGraph<Planet> = new DelaunayGraph<Planet>();
     private delaunayData: DelaunayTriangle[] = [];
-    private voronoiGraph: VoronoiGraph<ICameraState> = new VoronoiGraph();
+    private voronoiGraph: VoronoiGraph<Planet> = new VoronoiGraph();
     private ships: Ship[] = [];
     private planets: Planet[] = [];
     private stars: Planet[] = [];
     private smokeClouds: SmokeCloud[] = [];
+    private cannonBalls: SmokeCloud[] = [];
 
     /**
-     * Max speed of ships.
+     * Velocity step size of ships.
      */
-    public static MAX_SPEED: number = 1 / 6000;
+    public static VELOCITY_STEP: number = 1 / 6000;
+    /**
+     * Rotation step size of ships.
+     */
+    public static ROTATION_STEP: number = 1 / 300;
+    /**
+     * The drag which slows down increases of velocity.
+     */
+    public static VELOCITY_DRAG: number = 1 / 20;
+    /**
+     * The rotation which slows down increases of rotation.
+     */
+    public static ROTATION_DRAG: number = 1 / 10;
+    /**
+     * The power of the brake action. Slow down velocity dramatically.
+     */
+    public static BRAKE_POWER: number = 1 / 10;
 
     private static randomRange(start: number = -1, end: number = 1): number {
         const value = Math.random();
@@ -1103,8 +1234,8 @@ class App extends React.Component<IAppProps, IAppState> {
                 return Quaternion.fromAxisAngle([0, 1, 0], Math.PI * 0.99);
             }
             const q = Quaternion.fromBetweenVectors([0, 0, 1], v);
-            return cameraOrientation.clone().conjugate()
-                .mul(cameraPosition.clone().conjugate())
+            return cameraOrientation.clone().inverse()
+                .mul(cameraPosition.clone().inverse())
                 .mul(q);
         });
         let color: string = "red";
@@ -1151,19 +1282,20 @@ class App extends React.Component<IAppProps, IAppState> {
         }
     }
 
-    private rotatePlanet<T extends ICameraState>(planet: T): T {
+    private rotatePlanet<T extends ICameraState>(planet: T): ICameraStateWithOriginal<T> {
         const {
             position: cameraPosition,
             orientation: cameraOrientation,
         } = this.getPlayerShip();
-        const position = cameraOrientation.clone().conjugate()
-            .mul(cameraPosition.clone().conjugate())
+        const position = cameraOrientation.clone().inverse()
+            .mul(cameraPosition.clone().inverse())
             .mul(planet.position.clone());
-        const orientation = cameraOrientation.clone().conjugate()
+        const orientation = cameraOrientation.clone().inverse()
             .mul(planet.orientation.clone());
-        const positionVelocity = cameraOrientation.clone().conjugate()
+        const positionVelocity = cameraOrientation.clone().inverse()
             .mul(planet.positionVelocity.clone());
         return {
+            original: planet,
             ...planet,
             position,
             orientation,
@@ -1171,7 +1303,7 @@ class App extends React.Component<IAppProps, IAppState> {
         };
     }
 
-    private convertToDrawable<T extends ICameraState>(layerPostfix: string, size: number, planet: T): IDrawable {
+    private convertToDrawable<T extends ICameraState>(layerPostfix: string, size: number, planet: ICameraStateWithOriginal<T>): IDrawable<T> {
         const rotatedPosition = planet.position.rotateVector([0, 0, 1]);
         const projection = this.stereographicProjection(planet, size);
         const reverseProjection = this.stereographicProjection(planet, size);
@@ -1190,8 +1322,7 @@ class App extends React.Component<IAppProps, IAppState> {
             positionVelocity: planet.positionVelocity,
             orientation: planet.orientation,
             orientationVelocity: planet.orientationVelocity,
-            cannonLoading: planet.cannonLoading,
-            size: planet.size,
+            original: planet.original,
             projection,
             reverseProjection,
             rotatedPosition,
@@ -1209,12 +1340,12 @@ class App extends React.Component<IAppProps, IAppState> {
         };
     }
 
-    private drawPlanet(planetDrawing: IDrawable) {
+    private drawPlanet(planetDrawing: IDrawable<Planet>) {
         const isReverseSide = planetDrawing.rotatedPosition[2] > 0;
         const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
         const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
         const distance = planetDrawing.distance;
-        const size = 2 * Math.atan((planetDrawing.size || 1) / (2 * distance));
+        const size = 2 * Math.atan((planetDrawing.original.size || 1) / (2 * distance));
         return (
             <circle
                 key={planetDrawing.id}
@@ -1229,12 +1360,12 @@ class App extends React.Component<IAppProps, IAppState> {
         );
     }
 
-    private drawStar(planetDrawing: IDrawable) {
+    private drawStar(planetDrawing: IDrawable<Planet>) {
         const isReverseSide = planetDrawing.rotatedPosition[2] > 0;
         const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
         const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
         const distance = planetDrawing.distance;
-        const size = 2 * Math.atan((planetDrawing.size || 1) / (2 * distance));
+        const size = 2 * Math.atan((planetDrawing.original.size || 1) / (2 * distance));
         return (
             <g key={planetDrawing.id}>
                 <circle
@@ -1268,24 +1399,39 @@ class App extends React.Component<IAppProps, IAppState> {
         );
     }
 
-    private drawShip(planetDrawing: IDrawable) {
+    private drawShip(planetDrawing: IDrawable<Ship>) {
         const isReverseSide = planetDrawing.rotatedPosition[2] > 0;
         const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
         const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
         const distance = planetDrawing.distance;
         const size = 2 * Math.atan(1 / (2 * distance));
         const scale = (size * this.state.zoom) / 100;
+
+        // handle UI lines
         let velocityX = 0;
         let velocityY = 0;
+        let targetX = 0;
+        let targetY = 0;
+        let targetValue = null;
         const isPlayerShip = planetDrawing.id === "ship-0-ships";
         if (isPlayerShip) {
+            // handle velocity line
             let velocityPoint = planetDrawing.positionVelocity.clone()
                 .rotateVector([0, 0, 1]);
             velocityPoint[2] = 0;
             velocityPoint = DelaunayGraph.normalize(velocityPoint);
-            console.log("CENTER", velocityPoint);
             velocityX = velocityPoint[0];
             velocityY = velocityPoint[1];
+
+            // handle target line
+            if (planetDrawing.original.pathFinding.points.length > 0) {
+                let targetPoint = planetDrawing.original.orientation.clone().inverse()
+                    .mul(planetDrawing.original.position.clone().inverse())
+                    .rotateVector(planetDrawing.original.pathFinding.points[0]);
+                targetX = targetPoint[0] * 0.5;
+                targetY = targetPoint[1] * 0.5;
+                targetValue = planetDrawing.original.pathFinding.points.length;
+            }
         }
         const rightCannonPointTop: [number, number] = [
             Math.max(this.state.width / 2, this.state.height / 2) * Math.cos((10 / 180 * Math.PI)) * this.state.zoom,
@@ -1304,14 +1450,15 @@ class App extends React.Component<IAppProps, IAppState> {
             Math.max(this.state.width / 2, this.state.height / 2) * Math.sin(Math.PI + (10 / 180 * Math.PI)) * this.state.zoom,
         ];
         let cannonLoadingPercentage = 0;
-        if (isPlayerShip && planetDrawing.cannonLoading) {
-            cannonLoadingPercentage = (Date.now() - +planetDrawing.cannonLoading) / 3000;
+        if (isPlayerShip && planetDrawing.original.cannonLoading) {
+            cannonLoadingPercentage = (Date.now() - +planetDrawing.original.cannonLoading) / 3000;
         }
         return (
             <g key={planetDrawing.id} transform={`translate(${x * this.state.width},${(1 - y) * this.state.height})`}>
                 {
-                    isPlayerShip && (
+                    isPlayerShip && !isNaN(velocityX) && !isNaN(velocityY) && (
                         <line
+                            key="velocity-line"
                             x1={0}
                             y1={0}
                             x2={this.state.width * 0.5 * velocityX}
@@ -1320,6 +1467,42 @@ class App extends React.Component<IAppProps, IAppState> {
                             strokeWidth={2}
                             strokeDasharray="1,5"
                         />
+                    )
+                }
+                {
+                    isPlayerShip && planetDrawing.original.pathFinding.points.length > 0 && !isNaN(targetX) && !isNaN(targetY) && (
+                        <>
+                            <line
+                                key="target-line"
+                                x1={0}
+                                y1={0}
+                                x2={this.state.width * targetX * this.state.zoom}
+                                y2={this.state.height * -targetY * this.state.zoom}
+                                stroke="blue"
+                                strokeWidth={2}
+                                strokeDasharray="1,5"
+                            />
+                            <circle
+                                key="target-marker"
+                                r={10}
+                                cx={this.state.width * targetX * this.state.zoom}
+                                cy={this.state.height * -targetY * this.state.zoom}
+                                stroke="blue"
+                                fill="none"
+                            />
+                            {
+                                (targetValue ? (
+                                    <text
+                                        key="target-value"
+                                        textAnchor="middle"
+                                        x={this.state.width * targetX * this.state.zoom}
+                                        y={this.state.height * -targetY * this.state.zoom + 5}
+                                        stroke="blue"
+                                        fill="none"
+                                    >{targetValue}</text>
+                                ) : null)
+                            }
+                        </>
                     )
                 }
                 <g transform={`rotate(${planetDrawing.rotation}) scale(${scale})`}>
@@ -1331,7 +1514,7 @@ class App extends React.Component<IAppProps, IAppState> {
                         style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
                     />
                     {
-                        isPlayerShip && planetDrawing.cannonLoading && (
+                        isPlayerShip && planetDrawing.original.cannonLoading && (
                             <>
                                 <polygon
                                     points={`10,-20 ${rightCannonPointBottom[0]},${rightCannonPointBottom[1]} ${rightCannonPointTop[0]},${rightCannonPointTop[1]} 10,20`}
@@ -1365,7 +1548,7 @@ class App extends React.Component<IAppProps, IAppState> {
         );
     }
 
-    private drawSmokeCloud(planetDrawing: IDrawable) {
+    private drawSmokeCloud(planetDrawing: IDrawable<SmokeCloud>) {
         const isReverseSide = planetDrawing.rotatedPosition[2] > 0;
         const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
         const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
@@ -1561,9 +1744,10 @@ class App extends React.Component<IAppProps, IAppState> {
      * Process a ship by making changes to the ship's data.
      * @param shipIndex Index to get ship's state.
      * @param getActiveKeys Get the ship's active keys.
+     * @param isAutomated If the function is called by AI, which shouldn't clear pathfinding logic.
      * @private
      */
-    private handleShipLoop(shipIndex: number, getActiveKeys: () => string[]) {
+    private handleShipLoop(shipIndex: number, getActiveKeys: () => string[], isAutomated: boolean) {
         let {
             id: cameraId,
             position: cameraPosition,
@@ -1577,29 +1761,46 @@ class App extends React.Component<IAppProps, IAppState> {
                 return +smokeCloud.expires > Date.now();
             }).slice(-20)
         ];
+        const cannonBalls = [
+            ...this.cannonBalls.filter(cannonBall => {
+                return +cannonBall.expires > Date.now();
+            }).slice(-100)
+        ];
 
         let clearPathFindingPoints: boolean = false;
 
         const activeKeys = getActiveKeys();
         if (activeKeys.includes("a")) {
-            const rotation = Quaternion.fromAxisAngle([0, 0, 1], Math.PI).pow(1/300);
-            cameraOrientationVelocity = cameraOrientationVelocity.clone().mul(rotation);
+            const rotation = Quaternion.fromAxisAngle([0, 0, 1], Math.PI).pow(App.ROTATION_STEP);
+            const rotationDrag = cameraOrientationVelocity.pow(App.ROTATION_DRAG).inverse();
+            cameraOrientationVelocity = cameraOrientationVelocity.clone().mul(rotation).mul(rotationDrag);
+            if (VoronoiGraph.angularDistanceQuaternion(cameraOrientationVelocity) < Math.PI * 2 * App.ROTATION_STEP) {
+                cameraPositionVelocity = Quaternion.ONE;
+            }
         }
         if (activeKeys.includes("d")) {
-            const rotation = Quaternion.fromAxisAngle([0, 0, 1], -Math.PI).pow(1/300);
-            cameraOrientationVelocity = cameraOrientationVelocity.clone().mul(rotation);
+            const rotation = Quaternion.fromAxisAngle([0, 0, 1], -Math.PI).pow(App.ROTATION_STEP);
+            const rotationDrag = cameraOrientationVelocity.pow(App.ROTATION_DRAG).inverse();
+            cameraOrientationVelocity = cameraOrientationVelocity.clone().mul(rotation).mul(rotationDrag);
+            if (VoronoiGraph.angularDistanceQuaternion(cameraOrientationVelocity) < Math.PI * 2 * App.ROTATION_STEP) {
+                cameraPositionVelocity = Quaternion.ONE;
+            }
         }
         if (activeKeys.includes("w")) {
             const forward = cameraOrientation.clone().rotateVector([0, 1, 0]);
-            const rotation = Quaternion.fromBetweenVectors([0, 0, 1], forward).pow(App.MAX_SPEED);
-            cameraPositionVelocity = cameraPositionVelocity.clone().mul(rotation);
+            const rotation = Quaternion.fromBetweenVectors([0, 0, 1], forward).pow(App.VELOCITY_STEP);
+            const rotationDrag = cameraPositionVelocity.pow(App.VELOCITY_DRAG).inverse();
+            cameraPositionVelocity = cameraPositionVelocity.clone().mul(rotation).mul(rotationDrag);
+            if (VoronoiGraph.angularDistanceQuaternion(cameraPositionVelocity) < Math.PI / 2 * App.VELOCITY_STEP) {
+                cameraPositionVelocity = Quaternion.ONE;
+            }
 
             // make backward smoke cloud
             const smokeCloud = new SmokeCloud();
             smokeCloud.id = `${cameraId}-${Math.floor(Math.random() * 100000000)}`;
             smokeCloud.position = cameraPosition.clone();
-            smokeCloud.positionVelocity = cameraOrientation.clone().conjugate()
-                .mul(cameraPosition.clone().conjugate())
+            smokeCloud.positionVelocity = cameraOrientation.clone().inverse()
+                .mul(cameraPosition.clone().inverse())
                 .mul(rotation.clone().pow(10))
                 .mul(cameraPosition.clone())
                 .mul(cameraOrientation.clone());
@@ -1607,21 +1808,24 @@ class App extends React.Component<IAppProps, IAppState> {
             smokeClouds.push(smokeCloud);
         }
         if (activeKeys.includes("s")) {
-            const rotation = cameraPositionVelocity.clone().conjugate().pow(1/10);
+            const rotation = cameraPositionVelocity.clone().inverse().pow(App.BRAKE_POWER);
             cameraPositionVelocity = cameraPositionVelocity.clone().mul(rotation);
+            if (VoronoiGraph.angularDistanceQuaternion(cameraPositionVelocity) < Math.PI / 2 * App.VELOCITY_STEP) {
+                cameraPositionVelocity = Quaternion.ONE;
+            }
 
             // get smoke cloud parameters
             const engineBackwardsPointInitial = rotation.rotateVector([0, 0, 1]);
             engineBackwardsPointInitial[2] = 0;
             const engineBackwardsPoint = DelaunayGraph.normalize(engineBackwardsPointInitial);
-            const engineBackwards = Quaternion.fromBetweenVectors([0, 0, 1], engineBackwardsPoint).pow(App.MAX_SPEED);
+            const engineBackwards = Quaternion.fromBetweenVectors([0, 0, 1], engineBackwardsPoint).pow(App.VELOCITY_STEP);
 
             // make left smoke cloud
             const smokeCloudLeft = new SmokeCloud();
             smokeCloudLeft.id = `${cameraId}-${Math.floor(Math.random() * 100000000)}`;
             smokeCloudLeft.position = cameraPosition.clone();
-            smokeCloudLeft.positionVelocity = cameraOrientation.clone().conjugate()
-                .mul(cameraPosition.clone().conjugate())
+            smokeCloudLeft.positionVelocity = cameraOrientation.clone().inverse()
+                .mul(cameraPosition.clone().inverse())
                 .mul(Quaternion.fromAxisAngle([0, 0, 1], Math.PI / 4))
                 .mul(engineBackwards.clone().pow(10))
                 .mul(cameraPosition.clone())
@@ -1633,8 +1837,8 @@ class App extends React.Component<IAppProps, IAppState> {
             const smokeCloudRight = new SmokeCloud();
             smokeCloudRight.id = `${cameraId}-${Math.floor(Math.random() * 100000000)}`;
             smokeCloudRight.position = cameraPosition.clone();
-            smokeCloudLeft.positionVelocity = cameraOrientation.clone().conjugate()
-                .mul(cameraPosition.clone().conjugate())
+            smokeCloudLeft.positionVelocity = cameraOrientation.clone().inverse()
+                .mul(cameraPosition.clone().inverse())
                 .mul(Quaternion.fromAxisAngle([0, 0, 1], -Math.PI / 4))
                 .mul(engineBackwards.clone().pow(10))
                 .mul(cameraPosition.clone())
@@ -1656,27 +1860,28 @@ class App extends React.Component<IAppProps, IAppState> {
                 // apply random jitter
                 jitterPoint[1] += DelaunayGraph.randomInt() * 0.15;
                 jitterPoint = DelaunayGraph.normalize(jitterPoint);
-                const jitter = Quaternion.fromBetweenVectors([0, 0, 1], jitterPoint).pow(App.MAX_SPEED * 400);
+                const jitter = Quaternion.fromBetweenVectors([0, 0, 1], jitterPoint).pow(App.VELOCITY_STEP * 400);
 
                 // create a smoke cloud
-                const smokeCloud = new SmokeCloud();
-                smokeCloud.id = `${cameraId}-${Math.floor(Math.random() * 100000000)}`;
-                smokeCloud.position = cameraPosition.clone();
-                smokeCloud.positionVelocity = cameraOrientation.clone().conjugate()
-                    .mul(cameraPosition.clone().conjugate())
+                const cannonBall = new SmokeCloud();
+                cannonBall.id = `${cameraId}-${Math.floor(Math.random() * 100000000)}`;
+                cannonBall.position = cameraPosition.clone();
+                cannonBall.positionVelocity = cameraOrientation.clone().inverse()
+                    .mul(cameraPosition.clone().inverse())
                     .mul(cameraPositionVelocity.clone())
                     .mul(jitter.clone())
                     .mul(cameraPosition.clone())
                     .mul(cameraOrientation.clone());
-                smokeCloud.size = 1;
-                smokeClouds.push(smokeCloud);
+                cannonBall.size = 1;
+                cannonBall.expires = new Date(+new Date() + 1000);
+                cannonBalls.push(cannonBall);
             }
         }
         if (activeKeys.includes(" ") && cameraCannonLoading && Date.now() - +cameraCannonLoading > 3000) {
             // cancel cannon fire
             cameraCannonLoading = undefined;
         }
-        if (activeKeys.length > 0) {
+        if (activeKeys.length > 0 && !isAutomated) {
             clearPathFindingPoints = true;
         }
         if (cameraPositionVelocity !== Quaternion.ONE) {
@@ -1686,7 +1891,7 @@ class App extends React.Component<IAppProps, IAppState> {
             cameraOrientation = cameraOrientation.clone().mul(cameraOrientationVelocity.clone());
         }
         if (cameraPosition !== this.ships[shipIndex].position && false) {
-            const diffQuaternion = this.ships[shipIndex].position.clone().conjugate().mul(cameraPosition.clone());
+            const diffQuaternion = this.ships[shipIndex].position.clone().inverse().mul(cameraPosition.clone());
             cameraOrientation = cameraOrientation.clone().mul(diffQuaternion);
         }
 
@@ -1698,21 +1903,29 @@ class App extends React.Component<IAppProps, IAppState> {
         if (clearPathFindingPoints) {
             this.ships[shipIndex].pathFinding.points = [];
         }
-        this.smokeClouds = smokeClouds;
+        if (shipIndex === 0)
+            this.smokeClouds = smokeClouds;
+        this.cannonBalls = cannonBalls;
     }
 
+    /**
+     * Number of ships that were repathed.
+     */
+    numShipsRepathed: number = 0;
+
     private gameLoop() {
-        this.handleShipLoop(0, () => this.activeKeys);
-        for (let i = 1; i < this.ships.length; i++) {
+        //this.handleShipLoop(0, () => this.activeKeys, false);
+        for (let i = 0; i < this.ships.length; i++) {
             if (this.ships[i].pathFinding.points.length === 0) {
                 const shipPosition = this.ships[i].position.rotateVector([0, 0, 1]);
                 const nearestNode = this.delaunayGraph.findClosestPathingNode(shipPosition);
                 const nodes = Object.values(this.delaunayGraph.pathingNodes);
                 const randomTarget = nodes[Math.floor(Math.random() * nodes.length)];
                 this.ships[i].pathFinding.points = nearestNode.pathToObject(randomTarget);
+                console.log("Pathing SHIP", i, "so far", ++this.numShipsRepathed, "ships pathed");
             }
             this.ships[i].pathFinding.pathFindingLoop();
-            this.handleShipLoop(i, () => this.ships[i].activeKeys);
+            this.handleShipLoop(i, () => this.ships[i].activeKeys, true);
         }
         this.forceUpdate();
     }
@@ -1837,13 +2050,13 @@ class App extends React.Component<IAppProps, IAppState> {
             this.delaunayGraph.incrementalInsert();
         }
         for (let step = 0; step < 10; step++) {
-            this.voronoiGraph = this.delaunayGraph.getVoronoiGraph();
+            this.voronoiGraph = this.delaunayGraph.getVoronoiGraph<Planet>();
             const lloydPoints = this.voronoiGraph.lloydRelaxation();
             this.delaunayGraph = new DelaunayGraph();
             this.delaunayGraph.initializeWithPoints(lloydPoints);
         }
         this.delaunayData = Array.from(this.delaunayGraph.GetTriangles());
-        this.voronoiGraph = this.delaunayGraph.getVoronoiGraph();
+        this.voronoiGraph = this.delaunayGraph.getVoronoiGraph<Planet>();
         const planetPoints = this.voronoiGraph.lloydRelaxation();
 
         // initialize stars
@@ -1933,6 +2146,14 @@ class App extends React.Component<IAppProps, IAppState> {
     }
 
     render() {
+        const numPathingNodes = this.ships.length > 0 && this.ships[0].pathFinding.points.length;
+        const distanceToNode = this.ships.length > 0 && this.ships[0].pathFinding.points.length > 0 ?
+            VoronoiGraph.angularDistance(
+                this.ships[0].position.rotateVector([0, 0, 1]),
+                this.ships[0].pathFinding.points[0]
+            ) :
+            0;
+
         return (
             <div className="App">
                 <h1>
@@ -1992,7 +2213,7 @@ class App extends React.Component<IAppProps, IAppState> {
                         </ul>
                     )
                 }
-                <svg width={this.state.width} height={this.state.height} onClick={this.handleSvgClick.bind(this)}>
+                <svg width={this.state.width} height={this.state.height}>
                     <defs>
                         <mask id="worldMask">
                             <circle
@@ -2003,7 +2224,7 @@ class App extends React.Component<IAppProps, IAppState> {
                             />
                         </mask>
                     </defs>
-                    <g mask="url(#worldMask)">
+                    <g mask="url(#worldMask)" onClick={this.handleSvgClick.bind(this)}>
                         <circle
                             cx={this.state.width * 0.5}
                             cy={this.state.height * 0.5}
@@ -2024,7 +2245,7 @@ class App extends React.Component<IAppProps, IAppState> {
                         {/*}*/}
                         {
                             this.ships.length > 0 ?
-                                [
+                                ([
                                     ...(this.state.zoom >= 2 ? this.stars : Array.from(this.voronoiGraph.fetchDrawables(
                                         this.getPlayerShip().position.rotateVector([0, 0, 1])
                                     ))).map(this.rotatePlanet.bind(this))
@@ -2037,33 +2258,45 @@ class App extends React.Component<IAppProps, IAppState> {
                                         this.getPlayerShip().position.rotateVector([0, 0, 1])
                                     ))).map(this.rotatePlanet.bind(this))
                                         .map(this.convertToDrawable.bind(this, "-star4", 0.125))
-                                ].sort((a: any, b: any) => b.distance - a.distance).map(this.drawStar.bind(this)) :
+                                ] as Array<IDrawable<Planet>>)
+                                    .sort((a: any, b: any) => b.distance - a.distance)
+                                    .map(this.drawStar.bind(this)) :
                                 null
                         }
                         {
-                            this.planets.map(this.rotatePlanet.bind(this))
-                                .map(this.convertToDrawable.bind(this, "-planet", 1))
+                            (this.planets.map(this.rotatePlanet.bind(this))
+                                .map(this.convertToDrawable.bind(this, "-planet", 1)) as Array<IDrawable<Planet>>)
                                 .map(this.drawPlanet.bind(this))
                         }
                         {
-                            this.smokeClouds.map(App.applyKinematics.bind(this))
+                            (this.smokeClouds.map(App.applyKinematics.bind(this))
                                 .map(this.rotatePlanet.bind(this))
-                                .map(this.convertToDrawable.bind(this, "-smokeClouds", 1))
+                                .map(this.convertToDrawable.bind(this, "-smokeClouds", 1)) as Array<IDrawable<SmokeCloud>>)
                                 .map(this.drawSmokeCloud.bind(this))
                         }
                         {
-                            this.ships.map(this.rotatePlanet.bind(this))
-                                .map(this.convertToDrawable.bind(this, "-ships", 1))
+                            (this.cannonBalls.map(App.applyKinematics.bind(this))
+                                .map(this.rotatePlanet.bind(this))
+                                .map(this.convertToDrawable.bind(this, "-cannonBalls", 1)) as Array<IDrawable<SmokeCloud>>)
+                                .map(this.drawSmokeCloud.bind(this))
+                        }
+                        {
+                            (this.ships.map(this.rotatePlanet.bind(this))
+                                .map(this.convertToDrawable.bind(this, "-ships", 1)) as Array<IDrawable<Ship>>)
                                 .map(this.drawShip.bind(this))
                         }
                     </g>
-                    <g>
+                    <g id="game-controls">
                         <text x="0" y="30" color="black">Zoom</text>
                         <rect x="0" y="45" width="20" height="20" fill="grey" onClick={this.decrementZoom.bind(this)}/>
                         <text x="25" y="60" textAnchor="center">{this.state.zoom}</text>
                         <rect x="40" y="45" width="20" height="20" fill="grey" onClick={this.incrementZoom.bind(this)}/>
                         <text x="5" y="60">-</text>
                         <text x="40" y="60">+</text>
+                    </g>
+                    <g id="game-status" transform={`translate(${this.state.width - 80},0)`}>
+                        <text x="0" y="30" fontSize={8} color="black">Node{numPathingNodes > 1 ? "s" : ""}: {numPathingNodes}</text>
+                        <text x="0" y="60" fontSize={8} color="black">Distance: {Math.round(distanceToNode * 100000 / Math.PI) / 100}</text>
                     </g>
                 </svg>
             </div>
