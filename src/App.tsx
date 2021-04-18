@@ -2,6 +2,13 @@ import React from 'react';
 import './App.css';
 import Quaternion from 'quaternion';
 
+interface IExplorationGraphData {
+    distance: number;
+    settlerShipIds: string[];
+    traderShipIds: string[];
+    planet: Planet;
+}
+
 enum EFaction {
     DUTCH = "DUTCH",
     ENGLISH = "ENGLISH",
@@ -47,6 +54,11 @@ export class Faction {
      * The number of wood accumulated by the faction, used to build ships.
      */
     public wood: number = 0;
+    /**
+     * The list of planet priorities for exploration.
+     * @private
+     */
+    private explorationGraph: Record<string, IExplorationGraphData> = {};
 
     /**
      * Create a new faction.
@@ -60,6 +72,36 @@ export class Faction {
         this.id = id;
         this.factionColor = factionColor;
         this.homeWoldPlanetId = homeWorldPlanetId;
+        this.planetIds.push(homeWorldPlanetId);
+
+        // build exploration graph for which planets to explore and in what order
+        const homeWorld = instance.planets.find(planet => planet.id === homeWorldPlanetId);
+        if (homeWorld) {
+            for (const planet of instance.planets) {
+                if (planet.pathingNode && homeWorld.pathingNode && planet.id !== homeWorld.id) {
+                    const path = planet.pathingNode.pathToObject(homeWorld.pathingNode);
+                    const distance = path.reduce((acc: {
+                        lastPosition: [number, number, number],
+                        totalDistance: number
+                    }, vertex) => {
+                        return {
+                            lastPosition: vertex,
+                            totalDistance: acc.totalDistance + VoronoiGraph.angularDistance(acc.lastPosition, vertex)
+                        };
+                    }, {
+                        lastPosition: homeWorld.position.rotateVector([0, 0, 1]),
+                        totalDistance: 0
+                    }).totalDistance;
+
+                    this.explorationGraph[planet.id] = {
+                        distance,
+                        settlerShipIds: [],
+                        traderShipIds: [],
+                        planet
+                    };
+                }
+            }
+        }
     }
 
     /**
@@ -71,6 +113,38 @@ export class Faction {
         // make a new AI ship every minute.
         if (this.wood >= 10 * 60 && this.shipIds.length < 50) {
             this.spawnShip();
+        }
+    }
+
+    /**
+     * Give an order to a ship.
+     * @param ship
+     */
+    public getOrder(ship: Ship): Order {
+        const entries = Object.entries(this.explorationGraph);
+        entries.sort((a, b) => a[1].distance - b[1].distance);
+        const worldEntry = entries.find(entry => {
+            // settle new worlds which have not been settled yet
+            const roomToSettleMore = entry[1].settlerShipIds.length <
+                Planet.NUM_SETTLEMENT_PROGRESS_STEPS -
+                Math.round(entry[1].planet.settlementProgress * Planet.NUM_SETTLEMENT_PROGRESS_STEPS);
+            const notSettledYet = Object.values(this.instance.factions).every(faction => {
+                return !faction.planetIds.includes(entry[0]);
+            });
+            return roomToSettleMore && notSettledYet;
+        });
+
+        if (worldEntry) {
+            worldEntry[1].settlerShipIds.push(ship.id);
+
+            const order = new Order(this.instance, ship, this);
+            order.orderType = EOrderType.SETTLE;
+            order.planetId = worldEntry[0];
+            return order;
+        } else {
+            const order = new Order(this.instance, ship, this);
+            order.orderType = EOrderType.ROAM;
+            return order;
         }
     }
 
@@ -912,7 +986,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
         }
     }
 
-    public getVoronoiGraph<T extends ICameraState>(): VoronoiGraph<T> {
+    public getVoronoiGraph(): VoronoiGraph<T> {
         const graph = new VoronoiGraph<T>();
         // for each vertex which becomes a voronoi cell
         // get vertex, center of a voronoi cell
@@ -1157,7 +1231,102 @@ export class Planet implements ICameraState {
     public orientationVelocity: Quaternion = Quaternion.ONE;
     public color: string = "blue";
     public size: number = 3;
+    public settlementProgress: number = 0;
+    public settlementLevel: number = 0;
     public pathingNode: PathingNode<DelaunayGraph<Planet>> | null = null;
+
+    /**
+     * Number of settlements to colonize a planet.
+     */
+    public static NUM_SETTLEMENT_PROGRESS_STEPS = 5;
+}
+
+export enum EOrderType {
+    ROAM = "ROAM",
+    SETTLE = "SETTLE",
+}
+
+export class Order {
+    public app: App;
+    public owner: Ship;
+    public faction: Faction;
+    public orderType: EOrderType = EOrderType.ROAM;
+    public planetId: string | null = null;
+    private stage: number = 0;
+
+    constructor(app: App, owner: Ship, faction: Faction) {
+        this.app = app;
+        this.owner = owner;
+        this.faction = faction;
+    }
+
+    orderLoop() {
+        if (this.orderType === EOrderType.ROAM) {
+            const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWoldPlanetId);
+            if (!homeWorld || !homeWorld.pathingNode) {
+                throw new Error("Could not find home world for pathing back to home world (ROAM)");
+            }
+
+            // pick random planets
+            if (this.stage === 0 && this.owner.pathFinding.points.length === 0) {
+                this.stage += 1;
+                // explore planet
+                const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
+                const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
+                const nodes = Object.values(this.app.delaunayGraph.pathingNodes);
+                const randomTarget = nodes[Math.floor(Math.random() * nodes.length)];
+                this.owner.pathFinding.points = nearestNode.pathToObject(randomTarget);
+            } else if (this.stage === 1 && this.owner.pathFinding.points.length === 0) {
+                this.stage += 1;
+                // return to home world
+                const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
+                const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
+                this.owner.pathFinding.points = nearestNode.pathToObject(homeWorld.pathingNode);
+            } else if (this.stage === 2 && this.owner.pathFinding.points.length === 0) {
+                // end order
+                this.owner.order = null;
+            }
+        } else if (this.orderType === EOrderType.SETTLE) {
+            if (!this.planetId) {
+                throw new Error("Could not find planetId to path to (SETTLE)");
+            }
+            const colonyWorld = this.app.planets.find(planet => planet.id === this.planetId);
+            if (!colonyWorld || !colonyWorld.pathingNode) {
+                throw new Error("Could not find home world for pathing back to home world (ROAM)");
+            }
+
+            // fly to a specific planet
+            if (this.stage === 0 && this.owner.pathFinding.points.length === 0) {
+                this.stage += 1;
+                // explore planet
+                const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
+                const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
+                this.owner.pathFinding.points = nearestNode.pathToObject(colonyWorld.pathingNode);
+            } else if (this.stage === 1 && this.owner.pathFinding.points.length === 0) {
+                this.stage += 1;
+                // update settlement progress
+                colonyWorld.settlementProgress = (
+                    Math.round(colonyWorld.settlementProgress * Planet.NUM_SETTLEMENT_PROGRESS_STEPS) + 1
+                ) / Planet.NUM_SETTLEMENT_PROGRESS_STEPS;
+                if (colonyWorld.settlementProgress === 1) {
+                    colonyWorld.settlementLevel = 1;
+                }
+                this.faction.planetIds.push(this.planetId);
+
+                // return to home world
+                const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
+                const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
+                const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWoldPlanetId);
+                if (!homeWorld || !homeWorld.pathingNode) {
+                    throw new Error("Could not find home world for pathing back to home world (ROAM)");
+                }
+                this.owner.pathFinding.points = nearestNode.pathToObject(homeWorld.pathingNode);
+            } else if (this.stage === 2 && this.owner.pathFinding.points.length === 0) {
+                // end order
+                this.owner.order = null;
+            }
+        }
+    }
 }
 
 export class Ship implements IAutomatedShip {
@@ -1170,6 +1339,7 @@ export class Ship implements IAutomatedShip {
     public cannonLoading?: Date = undefined;
     public activeKeys: string[] = [];
     public pathFinding: PathFinder<Ship> = new PathFinder<Ship>(this);
+    public order: Order | null = null;
 }
 
 export class SmokeCloud implements ICameraState, IExpirable {
@@ -1264,6 +1434,7 @@ interface IAppState {
     width: number;
     height: number;
     zoom: number;
+    showDelaunay: boolean;
     showVoronoi: boolean;
     autoPilotEnabled: boolean;
     showMainMenu: boolean;
@@ -1277,6 +1448,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         width: 500 as number,
         height: 500 as number,
         zoom: 4 as number,
+        showDelaunay: false as boolean,
         showVoronoi: false as boolean,
         autoPilotEnabled: true as boolean,
         faction: null as EFaction | null,
@@ -1285,6 +1457,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     };
 
     private showNotesRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
+    private showDelaunayRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
     private showVoronoiRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
     private autoPilotEnabledRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
     public rotateCameraInterval: any = null;
@@ -1474,23 +1647,54 @@ export class App extends React.Component<IAppProps, IAppState> {
         };
     }
 
+    /**
+     * Get the points of angular progress for a polygon pi chart.
+     * @param percent the percentage done from 0 to 1.
+     * @param radius the size of the pi chart
+     */
+    private getPointsOfAngularProgress(percent: number, radius: number) {
+        return new Array(17).fill(0).map((v, i) => {
+            return `${radius * Math.cos((i / 16) * percent * Math.PI * 2)},${radius * Math.sin((i / 16) * percent * Math.PI * 2)}`;
+        }).join(" ");
+    }
+
     private drawPlanet(planetDrawing: IDrawable<Planet>) {
         const isReverseSide = planetDrawing.rotatedPosition[2] > 0;
         const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
         const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
         const distance = planetDrawing.distance;
         const size = Math.max(0, 2 * Math.atan((planetDrawing.original.size || 1) / (2 * distance)));
+
+        // extract faction information
+        let factionColor: string | null = null;
+        const ownerFaction = Object.values(this.factions).find(faction => faction.planetIds.includes(planetDrawing.original.id));
+        if (ownerFaction) {
+            factionColor = ownerFaction.factionColor;
+        }
+
         return (
-            <circle
-                key={planetDrawing.id}
-                cx={x * this.state.width}
-                cy={(1 - y) * this.state.height}
-                r={size * this.state.zoom}
-                fill={planetDrawing.color}
-                stroke="grey"
-                strokeWidth={0.2 * size * this.state.zoom}
-                style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
-            />
+            <>
+                {
+                    planetDrawing.original.settlementProgress > 0 && factionColor && (
+                        <polygon
+                            key={`${planetDrawing.id}-settlement-progress`}
+                            transform={`translate(${x * this.state.width},${(1 - y) * this.state.height})`}
+                            fill={factionColor}
+                            points={`0,0 ${this.getPointsOfAngularProgress.call(this, planetDrawing.original.settlementProgress, size * this.state.zoom * 1.35)}`}
+                        />
+                    )
+                }
+                <circle
+                    key={`${planetDrawing.id}-planet`}
+                    cx={x * this.state.width}
+                    cy={(1 - y) * this.state.height}
+                    r={size * this.state.zoom}
+                    fill={planetDrawing.color}
+                    stroke="grey"
+                    strokeWidth={0.2 * size * this.state.zoom}
+                    style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
+                />
+            </>
         );
     }
 
@@ -2090,7 +2294,6 @@ export class App extends React.Component<IAppProps, IAppState> {
                 cannonBall.position = cameraPosition.clone();
                 cannonBall.positionVelocity = cameraOrientation.clone().inverse()
                     .mul(cameraPosition.clone().inverse())
-                    .mul(cameraPositionVelocity.clone())
                     .mul(jitter.clone())
                     .mul(cameraPosition.clone())
                     .mul(cameraOrientation.clone());
@@ -2131,19 +2334,31 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     public gameLoop() {
-        if (!this.state.autoPilotEnabled) {
-            this.handleShipLoop(0, () => this.activeKeys, false);
+        // move player ship if auto pilot is off
+        const playerShipIndex = this.ships.findIndex(ship => ship === this.playerShip);
+        if (!this.state.autoPilotEnabled && this.playerShip) {
+            this.handleShipLoop(playerShipIndex, () => this.activeKeys, false);
         }
-        for (let i = (this.state.autoPilotEnabled ? 0 : 1); i < this.ships.length; i++) {
-            if (this.ships[i].pathFinding.points.length === 0) {
-                const shipPosition = this.ships[i].position.rotateVector([0, 0, 1]);
-                const nearestNode = this.delaunayGraph.findClosestPathingNode(shipPosition);
-                const nodes = Object.values(this.delaunayGraph.pathingNodes);
-                const randomTarget = nodes[Math.floor(Math.random() * nodes.length)];
-                this.ships[i].pathFinding.points = nearestNode.pathToObject(randomTarget);
+
+        // AI ship loop
+        for (let i = 0; i < this.ships.length; i++) {
+            // ship player ship if autoPilot is not enabled
+            if (i === playerShipIndex && !this.state.autoPilotEnabled) {
+                continue;
             }
-            this.ships[i].pathFinding.pathFindingLoop();
-            this.handleShipLoop(i, () => this.ships[i].activeKeys, true);
+            const ship = this.ships[i];
+            if (!ship.order) {
+                const faction = Object.values(this.factions).find(f => f.shipIds.includes(this.ships[i].id));
+                if (faction) {
+                    ship.order = faction.getOrder(ship);
+                }
+            }
+            const shipOrder = ship.order;
+            if (shipOrder) {
+                shipOrder.orderLoop();
+            }
+            ship.pathFinding.pathFindingLoop();
+            this.handleShipLoop(i, () => ship.activeKeys, true);
         }
         this.forceUpdate();
     }
@@ -2153,6 +2368,15 @@ export class App extends React.Component<IAppProps, IAppState> {
             this.setState({
                 ...this.state,
                 showNotes: this.showNotesRef.current.checked,
+            });
+        }
+    }
+
+    private handleShowDelaunay() {
+        if (this.showDelaunayRef.current) {
+            this.setState({
+                ...this.state,
+                showDelaunay: this.showDelaunayRef.current.checked,
             });
         }
     }
@@ -2215,9 +2439,9 @@ export class App extends React.Component<IAppProps, IAppState> {
         entity.orientation = Quaternion.fromAxisAngle([0, 0, 1], Math.random() * 2 * Math.PI);
     }
 
-    private static generateGoodPoints(numPoints: number = 10): Array<[number, number, number]> {
-        let delaunayGraph = new DelaunayGraph();
-        let voronoiGraph = new VoronoiGraph();
+    private static generateGoodPoints<T extends ICameraState>(numPoints: number = 10): Array<[number, number, number]> {
+        let delaunayGraph = new DelaunayGraph<T>();
+        let voronoiGraph = new VoronoiGraph<T>();
         delaunayGraph.initialize();
         for (let i = 0; i < numPoints; i++) {
             delaunayGraph.incrementalInsert();
@@ -2225,7 +2449,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         for (let step = 0; step < 10; step++) {
             voronoiGraph = delaunayGraph.getVoronoiGraph();
             const lloydPoints = voronoiGraph.lloydRelaxation();
-            delaunayGraph = new DelaunayGraph();
+            delaunayGraph = new DelaunayGraph<T>();
             delaunayGraph.initializeWithPoints(lloydPoints);
         }
         voronoiGraph = delaunayGraph.getVoronoiGraph();
@@ -2269,7 +2493,9 @@ export class App extends React.Component<IAppProps, IAppState> {
         else if (colorValue > 0.25)
             planet.color = "tan";
         if (planetI < 5) {
-            planet.size = 5;
+            planet.size = 10;
+            planet.settlementProgress = 1;
+            planet.settlementLevel = 5;
         }
         planet.pathingNode = this.delaunayGraph.createPathingNode(planet.position.rotateVector([0, 0, 1]));
         return planet;
@@ -2282,17 +2508,17 @@ export class App extends React.Component<IAppProps, IAppState> {
             this.delaunayGraph.incrementalInsert();
         }
         for (let step = 0; step < 10; step++) {
-            this.voronoiGraph = this.delaunayGraph.getVoronoiGraph<Planet>();
+            this.voronoiGraph = this.delaunayGraph.getVoronoiGraph();
             const lloydPoints = this.voronoiGraph.lloydRelaxation();
-            this.delaunayGraph = new DelaunayGraph();
+            this.delaunayGraph = new DelaunayGraph<Planet>();
             this.delaunayGraph.initializeWithPoints(lloydPoints);
         }
         this.delaunayData = Array.from(this.delaunayGraph.GetTriangles());
-        this.voronoiGraph = this.delaunayGraph.getVoronoiGraph<Planet>();
+        this.voronoiGraph = this.delaunayGraph.getVoronoiGraph();
         const planetPoints = this.voronoiGraph.lloydRelaxation();
 
         // initialize stars
-        const starPoints = App.generateGoodPoints(100);
+        const starPoints = App.generateGoodPoints<Planet>(100);
         this.stars.push(...starPoints.map(App.buildStars.bind(this)));
         for (const star of this.stars) {
             this.voronoiGraph.addDrawable(star);
@@ -2393,18 +2619,18 @@ export class App extends React.Component<IAppProps, IAppState> {
                     r={Math.min(this.state.width, this.state.height) * 0.5}
                     fill="black"
                 />
-                {/*{*/}
-                {/*    !this.state.showVoronoi ?*/}
-                {/*        this.delaunayData.map(this.rotateDelaunayTriangle.bind(this))*/}
-                {/*            .map(this.drawDelaunayTile.bind(this)) :*/}
-                {/*        null*/}
-                {/*}*/}
-                {/*{*/}
-                {/*    this.state.showVoronoi ?*/}
-                {/*        this.voronoiGraph.cells.map(this.rotateDelaunayTriangle.bind(this))*/}
-                {/*            .map(this.drawDelaunayTile.bind(this)) :*/}
-                {/*        null*/}
-                {/*}*/}
+                {
+                    this.state.showDelaunay ?
+                        this.delaunayData.map(this.rotateDelaunayTriangle.bind(this))
+                            .map(this.drawDelaunayTile.bind(this)) :
+                        null
+                }
+                {
+                    this.state.showVoronoi ?
+                        this.voronoiGraph.cells.map(this.rotateDelaunayTriangle.bind(this))
+                            .map(this.drawDelaunayTile.bind(this)) :
+                        null
+                }
                 {
                     ([
                         ...(this.state.zoom >= 2 ? this.stars : Array.from(this.voronoiGraph.fetchDrawables(
@@ -2471,11 +2697,15 @@ export class App extends React.Component<IAppProps, IAppState> {
             ) :
             0;
 
+        const order = this.playerShip && this.playerShip.order;
+        const orderType = order ? order.orderType : "NONE";
+
         if (numPathingNodes) {
             return (
                 <g id="game-status" transform={`translate(${this.state.width - 80},0)`}>
                     <text x="0" y="30" fontSize={8} color="black">Node{numPathingNodes > 1 ? "s" : ""}: {numPathingNodes}</text>
                     <text x="0" y="45" fontSize={8} color="black">Distance: {Math.round(distanceToNode * 100000 / Math.PI) / 100}</text>
+                    <text x="0" y="60" fontSize={8} color="black">Order: {orderType}</text>
                 </g>
             );
         } else {
@@ -2556,7 +2786,17 @@ export class App extends React.Component<IAppProps, IAppState> {
                 showSpawnMenu: false
             });
             this.playerShip = this.factions[this.state.faction].spawnShip();
+        } else {
+            this.returnToMainMenu();
         }
+    }
+
+    private returnToMainMenu() {
+        this.setState({
+            showSpawnMenu: false,
+            showMainMenu: true,
+            faction: null
+        });
     }
 
     private renderSpawnMenu() {
@@ -2576,6 +2816,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 >{this.state.faction}</text>
                 <rect
                     stroke="white"
+                    fill="transparent"
                     x={x - width / 2}
                     y={y - 20}
                     width={width}
@@ -2589,6 +2830,22 @@ export class App extends React.Component<IAppProps, IAppState> {
                     textAnchor="middle"
                     onClick={this.beginSpawnShip.bind(this)}
                 >Spawn</text>
+                <rect
+                    stroke="white"
+                    fill="transparent"
+                    x={x - width / 2}
+                    y={y - 20 + height}
+                    width={width}
+                    height={height}
+                    onClick={this.returnToMainMenu.bind(this)}
+                />
+                <text
+                    fill="white"
+                    x={x}
+                    y={y + 5 + height}
+                    textAnchor="middle"
+                    onClick={this.returnToMainMenu.bind(this)}
+                >Back</text>
             </g>
         );
     }
@@ -2596,16 +2853,20 @@ export class App extends React.Component<IAppProps, IAppState> {
     render() {
         return (
             <div className="App">
-                <div style={{display: "grid"}}>
-                    <div>
+                <div style={{display: "flex"}}>
+                    <div style={{display: "inline-block"}}>
                         <input type="checkbox" ref={this.showNotesRef} checked={this.state.showNotes} onChange={this.handleShowNotes.bind(this)}/>
                         <span>Show Notes</span>
                     </div>
-                    <div>
+                    <div style={{display: "inline-block"}}>
+                        <input type="checkbox" ref={this.showDelaunayRef} checked={this.state.showDelaunay} onChange={this.handleShowDelaunay.bind(this)}/>
+                        <span>Show Delaunay</span>
+                    </div>
+                    <div style={{display: "inline-block"}}>
                         <input type="checkbox" ref={this.showVoronoiRef} checked={this.state.showVoronoi} onChange={this.handleShowVoronoi.bind(this)}/>
                         <span>Show Voronoi</span>
                     </div>
-                    <div>
+                    <div style={{display: "inline-block"}}>
                         <input type="checkbox" ref={this.autoPilotEnabledRef} checked={this.state.autoPilotEnabled} onChange={this.handleAutoPilotEnabled.bind(this)}/>
                         <span>AutoPilot Enabled</span>
                     </div>
