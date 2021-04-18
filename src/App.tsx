@@ -24,7 +24,7 @@ interface ICellData {
 /**
  * A polygon shape on a VoronoiGraph.
  */
-class VoronoiCell implements ICellData {
+export class VoronoiCell implements ICellData {
     public vertices: [number, number, number][] = [];
     public centroid: [number, number, number] = [0, 0, 0];
 }
@@ -32,7 +32,7 @@ class VoronoiCell implements ICellData {
 /**
  * A drawable VoronoiCell.
  */
-class VoronoiTile implements IDrawableTile {
+export class VoronoiTile implements IDrawableTile {
     public vertices: Quaternion[] = [];
     public color: string = "red";
     public id: string = "";
@@ -41,7 +41,7 @@ class VoronoiTile implements IDrawableTile {
 /**
  * A list of voronoi cells.
  */
-class VoronoiGraph<T extends ICameraState> {
+export class VoronoiGraph<T extends ICameraState> {
     /**
      * A list of voronoi cell used for rendering and physics.
      */
@@ -194,14 +194,14 @@ class VoronoiGraph<T extends ICameraState> {
 /**
  * A simple class storing some vertices to render on scene
  */
-class DelaunayTriangle implements ICellData {
+export class DelaunayTriangle implements ICellData {
     public vertices: [number, number, number][] = [];
 }
 
 /**
  * A class used to render a delaunay triangle tile.
  */
-class DelaunayTile implements IDrawableTile {
+export class DelaunayTile implements IDrawableTile {
     public vertices: Quaternion[] = [];
     public color: string = "red";
     public id: string = "";
@@ -218,7 +218,7 @@ interface IPathingNode<T extends IPathingGraph> {
     position: [number, number, number];
     pathToObject(other: IPathingNode<T>): Array<[number, number, number]>;
 }
-class PathingNode<T extends IPathingGraph> implements IPathingNode<T> {
+export class PathingNode<T extends IPathingGraph> implements IPathingNode<T> {
     public id: number = -1;
     public instance: T;
     public closestVertex: number = -1;
@@ -325,7 +325,7 @@ class PathingNode<T extends IPathingGraph> implements IPathingNode<T> {
 /**
  * A delaunay graph for procedural generation, automatic random landscapes.
  */
-class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
+export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
     /**
      * The vertices of the graph.
      */
@@ -907,9 +907,10 @@ interface IAutomatedShip extends ICameraState {
     activeKeys: string[];
 }
 
-class PathFinder<T extends IAutomatedShip> {
+export class PathFinder<T extends IAutomatedShip> {
     public owner: T;
     public points: Array<[number, number, number]> = [];
+    public lastStepShouldRotate: boolean = false;
 
     constructor(owner: T) {
         this.owner = owner;
@@ -951,9 +952,9 @@ class PathFinder<T extends IAutomatedShip> {
             targetOrientationPoint = DelaunayGraph.normalize(targetOrientationPoint);
             const orientationDiffAngle = Math.atan2(targetOrientationPoint[0], targetOrientationPoint[1]);
             const orientationSpeed = VoronoiGraph.angularDistanceQuaternion(this.owner.orientationVelocity) * (orientationDiffAngle > 0 ? 1 : -1);
-            const desiredOrientationSpeed = Math.max(0, Math.min(Math.floor(
-                10 / Math.PI * orientationDiffAngle
-            ), App.VELOCITY_STEP * 10)) * (orientationDiffAngle > 0 ? 1 : -1);
+            const desiredOrientationSpeed = Math.max(-App.ROTATION_STEP * 10, Math.min(Math.round(
+                -5 / Math.PI * orientationDiffAngle
+            ), App.ROTATION_STEP * 10));
 
             // compute speed towards target
             const positionAngularDistance = VoronoiGraph.angularDistanceQuaternion(positionDiff);
@@ -961,7 +962,12 @@ class PathFinder<T extends IAutomatedShip> {
             let desiredSpeed = Math.ceil(Math.max(0, Math.min(positionAngularDistance * 10 - speed * 10, 10)));
 
             // perform rotation and speed up
-            const shouldRotate = Math.abs(orientationDiffAngle) > 5 / 180 * Math.PI * (Math.pow(Math.PI - distance, 2) + 1) || desiredOrientationSpeed !== 0;
+            // use a class variable to force more tight angle correction, and a more relaxed angle check while moving
+            // should result in stop and go less often.
+            const shouldRotate = this.lastStepShouldRotate ?
+                Math.abs(orientationDiffAngle) > 2 / 180 * Math.PI * (Math.pow(Math.PI - distance, 2) + 1) || Math.abs(desiredOrientationSpeed) >= App.ROTATION_STEP :
+                Math.abs(orientationDiffAngle) > 5 / 180 * Math.PI * (Math.pow(Math.PI - distance, 2) + 1) || Math.abs(desiredOrientationSpeed) >= App.ROTATION_STEP;
+            this.lastStepShouldRotate = shouldRotate;
             if (!shouldRotate) {
                 desiredSpeed = 5;
             }
@@ -993,16 +999,7 @@ class PathFinder<T extends IAutomatedShip> {
                 // press a to rotate left to slow down
                 this.owner.activeKeys.push("a");
             }
-            else if (!shouldRotate && orientationSpeed > 0 && willReachTargetRotation && !this.owner.activeKeys.includes("d")) {
-                const aIndex = this.owner.activeKeys.findIndex((key) => key === "a");
-                if (aIndex >= 0) {
-                    this.owner.activeKeys.splice(aIndex, 1);
-                }
-
-                // press d to rotate right to slow down
-                this.owner.activeKeys.push("d");
-            }
-            else if (!shouldRotate && orientationSpeed < 0 && willReachTargetRotation && !this.owner.activeKeys.includes("a")) {
+            else if (!shouldRotate && orientationSpeed > 0 && willReachTargetRotation && !this.owner.activeKeys.includes("a")) {
                 const dIndex = this.owner.activeKeys.findIndex((key) => key === "d");
                 if (dIndex >= 0) {
                     this.owner.activeKeys.splice(dIndex, 1);
@@ -1010,6 +1007,15 @@ class PathFinder<T extends IAutomatedShip> {
 
                 // press a to rotate left to slow down
                 this.owner.activeKeys.push("a");
+            }
+            else if (!shouldRotate && orientationSpeed < 0 && willReachTargetRotation && !this.owner.activeKeys.includes("d")) {
+                const aIndex = this.owner.activeKeys.findIndex((key) => key === "a");
+                if (aIndex >= 0) {
+                    this.owner.activeKeys.splice(aIndex, 1);
+                }
+
+                // press d to rotate right to slow down
+                this.owner.activeKeys.push("d");
             } else {
                 // remove a d keys
                 const aIndex = this.owner.activeKeys.findIndex((key) => key === "a");
@@ -1044,7 +1050,7 @@ class PathFinder<T extends IAutomatedShip> {
 
 }
 
-class Planet implements ICameraState {
+export class Planet implements ICameraState {
     public id: string = "";
     public position: Quaternion = Quaternion.ONE;
     public positionVelocity: Quaternion = Quaternion.ONE;
@@ -1055,7 +1061,7 @@ class Planet implements ICameraState {
     public pathingNode: PathingNode<DelaunayGraph<Planet>> | null = null;
 }
 
-class Ship implements IAutomatedShip {
+export class Ship implements IAutomatedShip {
     public id: string = "";
     public color: string = "purple";
     public position: Quaternion = Quaternion.ONE;
@@ -1067,7 +1073,7 @@ class Ship implements IAutomatedShip {
     public pathFinding: PathFinder<Ship> = new PathFinder<Ship>(this);
 }
 
-class SmokeCloud implements ICameraState, IExpirable {
+export class SmokeCloud implements ICameraState, IExpirable {
     public id: string = "";
     public color: string = "grey";
     public position: Quaternion = Quaternion.ONE;
@@ -1163,7 +1169,7 @@ interface IAppState {
     autoPilotEnabled: boolean;
 }
 
-class App extends React.Component<IAppProps, IAppState> {
+export class App extends React.Component<IAppProps, IAppState> {
     state = {
         showNotes: false as boolean,
         width: 500 as number,
@@ -1176,18 +1182,18 @@ class App extends React.Component<IAppProps, IAppState> {
     private showNotesRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
     private showVoronoiRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
     private autoPilotEnabledRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
-    private rotateCameraInterval: any = null;
+    public rotateCameraInterval: any = null;
     private activeKeys: any[] = [];
     private keyDownHandlerInstance: any;
     private keyUpHandlerInstance: any;
-    private delaunayGraph: DelaunayGraph<Planet> = new DelaunayGraph<Planet>();
+    public delaunayGraph: DelaunayGraph<Planet> = new DelaunayGraph<Planet>();
     private delaunayData: DelaunayTriangle[] = [];
-    private voronoiGraph: VoronoiGraph<Planet> = new VoronoiGraph();
-    private ships: Ship[] = [];
-    private planets: Planet[] = [];
-    private stars: Planet[] = [];
-    private smokeClouds: SmokeCloud[] = [];
-    private cannonBalls: SmokeCloud[] = [];
+    public voronoiGraph: VoronoiGraph<Planet> = new VoronoiGraph();
+    public ships: Ship[] = [];
+    public planets: Planet[] = [];
+    public stars: Planet[] = [];
+    public smokeClouds: SmokeCloud[] = [];
+    public cannonBalls: SmokeCloud[] = [];
 
     /**
      * Velocity step size of ships.
@@ -1566,10 +1572,10 @@ class App extends React.Component<IAppProps, IAppState> {
                     )
                 }
                 {
-                    isPlayerShip && targetLineData && targetLineData.targetLines.map(([a, b]) => {
+                    isPlayerShip && targetLineData && targetLineData.targetLines.map(([a, b], index) => {
                         return (
                             <line
-                                key="target-line"
+                                key={`target-line-${index}`}
                                 x1={this.state.width * a[0] * this.state.zoom}
                                 y1={this.state.height * -a[1] * this.state.zoom}
                                 x2={this.state.width * b[0] * this.state.zoom}
@@ -1586,7 +1592,7 @@ class App extends React.Component<IAppProps, IAppState> {
                         return (
                             <>
                                 <circle
-                                    key="target-marker"
+                                    key={`target-marker-${value}`}
                                     r={10}
                                     cx={this.state.width * a[0] * this.state.zoom}
                                     cy={this.state.height * -a[1] * this.state.zoom}
@@ -1594,7 +1600,7 @@ class App extends React.Component<IAppProps, IAppState> {
                                     fill="none"
                                 />
                                 <text
-                                    key="target-value"
+                                    key={`target-value-${value}`}
                                     textAnchor="middle"
                                     x={this.state.width * a[0] * this.state.zoom}
                                     y={this.state.height * -a[1] * this.state.zoom + 5}
@@ -2008,7 +2014,7 @@ class App extends React.Component<IAppProps, IAppState> {
         this.cannonBalls = cannonBalls;
     }
 
-    private gameLoop() {
+    public gameLoop() {
         if (!this.state.autoPilotEnabled) {
             this.handleShipLoop(0, () => this.activeKeys, false);
         }
