@@ -2,6 +2,105 @@ import React from 'react';
 import './App.css';
 import Quaternion from 'quaternion';
 
+enum EFaction {
+    DUTCH = "DUTCH",
+    ENGLISH = "ENGLISH",
+    FRENCH = "FRENCH",
+    PORTUGUESE = "PORTUGUESE",
+    SPANISH = "SPANISH",
+}
+
+/**
+ * A class representing a faction in the game world. Responsible for building boats, setting up trade, and colonizing islands.
+ */
+export class Faction {
+    /**
+     * An instance of app to retrieve faction data.
+     */
+    public instance: App;
+    /**
+     * The id of the faction.
+     */
+    public id: string;
+    /**
+     * The color of the faction.
+     */
+    public factionColor: string;
+    /**
+     * The home world planet id.
+     */
+    public homeWoldPlanetId: string;
+    /**
+     * A list of planet ids of planets owned by this faction.
+     */
+    public planetIds: string[] = [];
+    /**
+     * A list of ship ids owned by this faction.
+     */
+    public shipIds: string[] = [];
+    /**
+     * A number which produces unique ship id names.
+     * @private
+     */
+    private shipIdAutoIncrement: number = 0;
+    /**
+     * The number of wood accumulated by the faction, used to build ships.
+     */
+    public wood: number = 0;
+
+    /**
+     * Create a new faction.
+     * @param instance The app which contains data for the faction to process.
+     * @param id The id of the faction.
+     * @param factionColor The color of the faction.
+     * @param homeWorldPlanetId The home world of the faction.
+     */
+    constructor(instance: App, id: string, factionColor: string, homeWorldPlanetId: string) {
+        this.instance = instance;
+        this.id = id;
+        this.factionColor = factionColor;
+        this.homeWoldPlanetId = homeWorldPlanetId;
+    }
+
+    /**
+     * Faction AI loop.
+     */
+    public handleFactionLoop() {
+        this.wood += 1;
+
+        // make a new AI ship every minute.
+        if (this.wood >= 10 * 60 && this.shipIds.length < 50) {
+            this.spawnShip();
+        }
+    }
+
+    /**
+     * Create a new ship.
+     */
+    public spawnShip(): Ship {
+        // get the position of the faction
+        const homeWorldPlanetId = this.homeWoldPlanetId;
+        const homeWorld = this.instance.planets.find(p => p.id === homeWorldPlanetId);
+        if (!homeWorld) {
+            throw new Error("Could not find Faction HomeWorld");
+        }
+        const shipPoint = homeWorld.position.rotateVector([0, 0, 1]);
+
+        // create ship
+        const ship = new Ship();
+        ship.id = `ship-${this.id}-${this.shipIdAutoIncrement++}`;
+        App.addRandomPositionAndOrientationToEntity(ship);
+        ship.position = Quaternion.fromBetweenVectors([0, 0, 1], shipPoint);
+        ship.color = this.factionColor;
+
+        // the faction ship
+        this.shipIds.push(ship.id);
+        this.instance.ships.push(ship);
+
+        return ship;
+    }
+}
+
 interface ITargetLineData {
     targetLines: Array<[[number, number], [number, number]]>,
     targetNodes: Array<[[number, number], number]>
@@ -1057,7 +1156,7 @@ export class Planet implements ICameraState {
     public orientation: Quaternion = Quaternion.ONE;
     public orientationVelocity: Quaternion = Quaternion.ONE;
     public color: string = "blue";
-    public size: number = 1;
+    public size: number = 3;
     public pathingNode: PathingNode<DelaunayGraph<Planet>> | null = null;
 }
 
@@ -1167,6 +1266,9 @@ interface IAppState {
     zoom: number;
     showVoronoi: boolean;
     autoPilotEnabled: boolean;
+    showMainMenu: boolean;
+    showSpawnMenu: boolean;
+    faction: EFaction | null;
 }
 
 export class App extends React.Component<IAppProps, IAppState> {
@@ -1177,6 +1279,9 @@ export class App extends React.Component<IAppProps, IAppState> {
         zoom: 4 as number,
         showVoronoi: false as boolean,
         autoPilotEnabled: true as boolean,
+        faction: null as EFaction | null,
+        showMainMenu: true as boolean,
+        showSpawnMenu: false as boolean,
     };
 
     private showNotesRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
@@ -1189,7 +1294,9 @@ export class App extends React.Component<IAppProps, IAppState> {
     public delaunayGraph: DelaunayGraph<Planet> = new DelaunayGraph<Planet>();
     private delaunayData: DelaunayTriangle[] = [];
     public voronoiGraph: VoronoiGraph<Planet> = new VoronoiGraph();
+    public factions: { [key: string]: Faction } = {};
     public ships: Ship[] = [];
+    public playerShip: Ship | null = null;
     public planets: Planet[] = [];
     public stars: Planet[] = [];
     public smokeClouds: SmokeCloud[] = [];
@@ -1235,11 +1342,20 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     private getPlayerShip(): ICameraState {
-        const ship = this.ships[0];
+        const ship = this.playerShip;
         if (ship) {
             return App.GetCameraState(ship);
         }
-        throw new Error("Cannot find first ship");
+
+        const tempShip = new Ship();
+        tempShip.id = "ghost-ship";
+        const numSecondsToCircle = 120;
+        const millisecondsPerSecond = 1000;
+        const circleSlice = numSecondsToCircle * millisecondsPerSecond;
+        const circleFraction = (+new Date() % circleSlice) / circleSlice;
+        const angle = circleFraction * (Math.PI * 2);
+        tempShip.position = Quaternion.fromAxisAngle([1, 0, 0], -angle);
+        return App.GetCameraState(tempShip);
     }
 
     private rotateDelaunayTriangle(triangle: ICellData, index: number): IDrawableTile {
@@ -1523,7 +1639,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         let velocityX: number = 0;
         let velocityY: number = 0;
         let targetLineData: ITargetLineData | null = null;
-        const isPlayerShip = planetDrawing.id === "ship-0-ships";
+        const isPlayerShip = planetDrawing.original.id === this.getPlayerShip().id;
         if (isPlayerShip) {
             // handle velocity line
             let velocityPoint = planetDrawing.positionVelocity.clone()
@@ -2009,7 +2125,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         if (clearPathFindingPoints) {
             this.ships[shipIndex].pathFinding.points = [];
         }
-        if (shipIndex === 0)
+        if (!isAutomated)
             this.smokeClouds = smokeClouds;
         this.cannonBalls = cannonBalls;
     }
@@ -2093,7 +2209,7 @@ export class App extends React.Component<IAppProps, IAppState> {
      * @param entity The entity to add random position and orientation to.
      * @private
      */
-    private static addRandomPositionAndOrientationToEntity(entity: ICameraState) {
+    public static addRandomPositionAndOrientationToEntity(entity: ICameraState) {
         entity.position = new Quaternion(0, App.randomRange(), App.randomRange(), App.randomRange());
         entity.position = entity.position.normalize();
         entity.orientation = Quaternion.fromAxisAngle([0, 0, 1], Math.random() * 2 * Math.PI);
@@ -2122,12 +2238,14 @@ export class App extends React.Component<IAppProps, IAppState> {
         planet.position = Quaternion.fromBetweenVectors([0, 0, 1], point);
         if (index % 5 === 0 || index % 5 === 1) {
             planet.color = "blue";
+            planet.size = 0.5;
         } else if (index % 5 === 2 || index % 5 === 3) {
             planet.color = "yellow";
+            planet.size = 0.25;
         } else if (index % 5 === 4) {
             planet.color = "red";
+            planet.size = 0.75;
         }
-        planet.size = 0.5;
         return planet;
     }
 
@@ -2150,6 +2268,9 @@ export class App extends React.Component<IAppProps, IAppState> {
             planet.color = "green";
         else if (colorValue > 0.25)
             planet.color = "tan";
+        if (planetI < 5) {
+            planet.size = 5;
+        }
         planet.pathingNode = this.delaunayGraph.createPathingNode(planet.position.rotateVector([0, 0, 1]));
         return planet;
     }
@@ -2177,7 +2298,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             this.voronoiGraph.addDrawable(star);
         }
 
-        // initialize planets and ships
+        // initialize planets
         const planets: Planet[] = [];
         let planetI = 0;
         for (const planetPoint of planetPoints) {
@@ -2186,25 +2307,31 @@ export class App extends React.Component<IAppProps, IAppState> {
         }
         this.planets = planets;
 
-        // initialize planets and ships
-        const ships: Ship[] = [];
-        const shipPoints = App.generateGoodPoints(256);
-        let shipI = 0;
-        for (const shipPoint of shipPoints) {
-            const ship = new Ship();
-            ship.id = `ship-${shipI++}`;
-            App.addRandomPositionAndOrientationToEntity(ship);
-            ship.position = Quaternion.fromBetweenVectors([0, 0, 1], shipPoint);
-            const colorValue = Math.random();
-            if (colorValue > 0.75)
-                ship.color = "red";
-            else if (colorValue > 0.5)
-                ship.color = "aquamarine";
-            else if (colorValue > 0.25)
-                ship.color = "silver";
-            ships.push(ship);
+        // initialize factions
+        const factionDataList = [{
+            id: EFaction.DUTCH,
+            color: "orange",
+            planetId: this.planets[0].id
+        }, {
+            id: EFaction.ENGLISH,
+            color: "red",
+            planetId: this.planets[1].id
+        }, {
+            id: EFaction.FRENCH,
+            color: "blue",
+            planetId: this.planets[2].id
+        }, {
+            id: EFaction.PORTUGUESE,
+            color: "green",
+            planetId: this.planets[3].id
+        }, {
+            id: EFaction.SPANISH,
+            color: "yellow",
+            planetId: this.planets[4].id
+        }];
+        for (const factionData of factionDataList) {
+            this.factions[factionData.id] = new Faction(this, factionData.id, factionData.color, factionData.planetId);
         }
-        this.ships = ships;
 
         this.rotateCameraInterval = setInterval(this.gameLoop.bind(this), 100);
         this.keyDownHandlerInstance = this.handleKeyDown.bind(this);
@@ -2247,32 +2374,228 @@ export class App extends React.Component<IAppProps, IAppState> {
                 .mul(clickQuaternion)
                 .rotateVector([0, 0, 1]);
 
-            if (event.shiftKey) {
-                this.ships[0].pathFinding.points.push(spherePoint);
-            } else {
-                this.ships[0].pathFinding.points = [spherePoint];
+            if (this.playerShip) {
+                if (event.shiftKey) {
+                    this.playerShip.pathFinding.points.push(spherePoint);
+                } else {
+                    this.playerShip.pathFinding.points = [spherePoint];
+                }
             }
-            // // create a planet at mouse click
-            // this.planets.push(
-            //     this.createPlanet(spherePoint, this.planets.length)
-            // );
         }
     }
 
-    render() {
-        const numPathingNodes = this.ships.length > 0 && this.ships[0].pathFinding.points.length;
-        const distanceToNode = this.ships.length > 0 && this.ships[0].pathFinding.points.length > 0 ?
+    private renderGameWorld() {
+        return (
+            <>
+                <circle
+                    cx={this.state.width * 0.5}
+                    cy={this.state.height * 0.5}
+                    r={Math.min(this.state.width, this.state.height) * 0.5}
+                    fill="black"
+                />
+                {/*{*/}
+                {/*    !this.state.showVoronoi ?*/}
+                {/*        this.delaunayData.map(this.rotateDelaunayTriangle.bind(this))*/}
+                {/*            .map(this.drawDelaunayTile.bind(this)) :*/}
+                {/*        null*/}
+                {/*}*/}
+                {/*{*/}
+                {/*    this.state.showVoronoi ?*/}
+                {/*        this.voronoiGraph.cells.map(this.rotateDelaunayTriangle.bind(this))*/}
+                {/*            .map(this.drawDelaunayTile.bind(this)) :*/}
+                {/*        null*/}
+                {/*}*/}
+                {
+                    ([
+                        ...(this.state.zoom >= 2 ? this.stars : Array.from(this.voronoiGraph.fetchDrawables(
+                            this.getPlayerShip().position.rotateVector([0, 0, 1])
+                        ))).map(this.rotatePlanet.bind(this))
+                            .map(this.convertToDrawable.bind(this, "-star2", 0.5)),
+                        ...(this.state.zoom >= 4 ? this.stars : Array.from(this.voronoiGraph.fetchDrawables(
+                            this.getPlayerShip().position.rotateVector([0, 0, 1])
+                        ))).map(this.rotatePlanet.bind(this))
+                            .map(this.convertToDrawable.bind(this, "-star3", 0.25)),
+                        ...(this.state.zoom >= 8 ? this.stars : Array.from(this.voronoiGraph.fetchDrawables(
+                            this.getPlayerShip().position.rotateVector([0, 0, 1])
+                        ))).map(this.rotatePlanet.bind(this))
+                            .map(this.convertToDrawable.bind(this, "-star4", 0.125))
+                    ] as Array<IDrawable<Planet>>)
+                        .sort((a: any, b: any) => b.distance - a.distance)
+                        .map(this.drawStar.bind(this))
+                }
+                {
+                    (this.planets.map(this.rotatePlanet.bind(this))
+                        .map(this.convertToDrawable.bind(this, "-planet", 1)) as Array<IDrawable<Planet>>)
+                        .map(this.drawPlanet.bind(this))
+                }
+                {
+                    (this.smokeClouds.map(App.applyKinematics.bind(this))
+                        .map(this.rotatePlanet.bind(this))
+                        .map(this.convertToDrawable.bind(this, "-smokeClouds", 1)) as Array<IDrawable<SmokeCloud>>)
+                        .map(this.drawSmokeCloud.bind(this))
+                }
+                {
+                    (this.cannonBalls.map(App.applyKinematics.bind(this))
+                        .map(this.rotatePlanet.bind(this))
+                        .map(this.convertToDrawable.bind(this, "-cannonBalls", 1)) as Array<IDrawable<SmokeCloud>>)
+                        .map(this.drawSmokeCloud.bind(this))
+                }
+                {
+                    (this.ships.map(this.rotatePlanet.bind(this))
+                        .map(this.convertToDrawable.bind(this, "-ships", 1)) as Array<IDrawable<Ship>>)
+                        .map(this.drawShip.bind(this))
+                }
+            </>
+        );
+    }
+
+    private renderGameControls() {
+        return (
+            <g id="game-controls">
+                <text x="0" y="30" color="black">Zoom</text>
+                <rect x="0" y="45" width="20" height="20" fill="grey" onClick={this.decrementZoom.bind(this)}/>
+                <text x="25" y="60" textAnchor="center">{this.state.zoom}</text>
+                <rect x="40" y="45" width="20" height="20" fill="grey" onClick={this.incrementZoom.bind(this)}/>
+                <text x="5" y="60">-</text>
+                <text x="40" y="60">+</text>
+            </g>
+        );
+    }
+
+    private renderGameStatus() {
+        const numPathingNodes = this.playerShip && this.playerShip.pathFinding.points.length;
+        const distanceToNode = this.playerShip && this.playerShip.pathFinding.points.length > 0 ?
             VoronoiGraph.angularDistance(
-                this.ships[0].position.rotateVector([0, 0, 1]),
-                this.ships[0].pathFinding.points[0]
+                this.playerShip.position.rotateVector([0, 0, 1]),
+                this.playerShip.pathFinding.points[0]
             ) :
             0;
 
+        if (numPathingNodes) {
+            return (
+                <g id="game-status" transform={`translate(${this.state.width - 80},0)`}>
+                    <text x="0" y="30" fontSize={8} color="black">Node{numPathingNodes > 1 ? "s" : ""}: {numPathingNodes}</text>
+                    <text x="0" y="45" fontSize={8} color="black">Distance: {Math.round(distanceToNode * 100000 / Math.PI) / 100}</text>
+                </g>
+            );
+        } else {
+            return null;
+        }
+    }
+
+    private selectFaction(faction: EFaction) {
+        this.setState({
+            faction,
+            showMainMenu: false,
+            showSpawnMenu: true,
+        });
+    }
+
+    private renderMainMenu() {
+        return (
+            <g id="main-menu">
+                <text fontSize="28"
+                      fill="white"
+                      x={this.state.width / 2}
+                      y={this.state.height / 2 - 14}
+                      textAnchor="middle">
+                    Globular Marauders
+                </text>
+                {
+                    [{
+                        faction: EFaction.DUTCH,
+                        text: "Dutch"
+                    }, {
+                        faction: EFaction.ENGLISH,
+                        text: "English"
+                    }, {
+                        faction: EFaction.FRENCH,
+                        text: "French"
+                    }, {
+                        faction: EFaction.PORTUGUESE,
+                        text: "Portuguese"
+                    }, {
+                        faction: EFaction.SPANISH,
+                        text: "Spanish"
+                    }].map(({faction, text}, index) => {
+                        const x = this.state.width / 5 * (index + 0.5);
+                        const y = this.state.height / 2 + 50;
+                        const width = (this.state.width / 5) - 20;
+                        const height = 40;
+                        return (
+                            <>
+                                <rect key={`${text}-rect`}
+                                      stroke="white"
+                                      fill="transparent"
+                                      x={x - width / 2}
+                                      y={y - 20}
+                                      width={width}
+                                      height={height}
+                                      onClick={this.selectFaction.bind(this, faction)}
+                                />
+                                <text
+                                    key={`${text}-text`}
+                                    fill="white"
+                                    x={x}
+                                    y={y + 5}
+                                    textAnchor="middle"
+                                    onClick={this.selectFaction.bind(this, faction)}>
+                                    {text}
+                                </text>
+                            </>
+                        );
+                    })
+                }
+            </g>
+        );
+    }
+
+    private beginSpawnShip() {
+        if (this.state.faction) {
+            this.setState({
+                showSpawnMenu: false
+            });
+            this.playerShip = this.factions[this.state.faction].spawnShip();
+        }
+    }
+
+    private renderSpawnMenu() {
+        const index = 2;
+        const x = this.state.width / 5 * (index + 0.5);
+        const y = this.state.height / 2 + 50;
+        const width = (this.state.width / 5) - 20;
+        const height = 40;
+        return (
+            <g id="spawn-menu">
+                <text
+                    fill="white"
+                    fontSize="28"
+                    x={this.state.width / 2}
+                    y={this.state.height / 2 - 14}
+                    textAnchor="middle"
+                >{this.state.faction}</text>
+                <rect
+                    stroke="white"
+                    x={x - width / 2}
+                    y={y - 20}
+                    width={width}
+                    height={height}
+                    onClick={this.beginSpawnShip.bind(this)}
+                />
+                <text
+                    fill="white"
+                    x={x}
+                    y={y + 5}
+                    textAnchor="middle"
+                    onClick={this.beginSpawnShip.bind(this)}
+                >Spawn</text>
+            </g>
+        );
+    }
+
+    render() {
         return (
             <div className="App">
-                <h1>
-                    Globular Marauders
-                </h1>
                 <div style={{display: "grid"}}>
                     <div>
                         <input type="checkbox" ref={this.showNotesRef} checked={this.state.showNotes} onChange={this.handleShowNotes.bind(this)}/>
@@ -2343,79 +2666,22 @@ export class App extends React.Component<IAppProps, IAppState> {
                         </mask>
                     </defs>
                     <g mask="url(#worldMask)" onClick={this.handleSvgClick.bind(this)}>
-                        <circle
-                            cx={this.state.width * 0.5}
-                            cy={this.state.height * 0.5}
-                            r={Math.min(this.state.width, this.state.height) * 0.5}
-                            fill="black"
-                        />
-                        {/*{*/}
-                        {/*    !this.state.showVoronoi ?*/}
-                        {/*        this.delaunayData.map(this.rotateDelaunayTriangle.bind(this))*/}
-                        {/*            .map(this.drawDelaunayTile.bind(this)) :*/}
-                        {/*        null*/}
-                        {/*}*/}
-                        {/*{*/}
-                        {/*    this.state.showVoronoi ?*/}
-                        {/*        this.voronoiGraph.cells.map(this.rotateDelaunayTriangle.bind(this))*/}
-                        {/*            .map(this.drawDelaunayTile.bind(this)) :*/}
-                        {/*        null*/}
-                        {/*}*/}
                         {
-                            this.ships.length > 0 ?
-                                ([
-                                    ...(this.state.zoom >= 2 ? this.stars : Array.from(this.voronoiGraph.fetchDrawables(
-                                        this.getPlayerShip().position.rotateVector([0, 0, 1])
-                                    ))).map(this.rotatePlanet.bind(this))
-                                        .map(this.convertToDrawable.bind(this, "-star2", 0.5)),
-                                    ...(this.state.zoom >= 4 ? this.stars : Array.from(this.voronoiGraph.fetchDrawables(
-                                        this.getPlayerShip().position.rotateVector([0, 0, 1])
-                                    ))).map(this.rotatePlanet.bind(this))
-                                        .map(this.convertToDrawable.bind(this, "-star3", 0.25)),
-                                    ...(this.state.zoom >= 8 ? this.stars : Array.from(this.voronoiGraph.fetchDrawables(
-                                        this.getPlayerShip().position.rotateVector([0, 0, 1])
-                                    ))).map(this.rotatePlanet.bind(this))
-                                        .map(this.convertToDrawable.bind(this, "-star4", 0.125))
-                                ] as Array<IDrawable<Planet>>)
-                                    .sort((a: any, b: any) => b.distance - a.distance)
-                                    .map(this.drawStar.bind(this)) :
-                                null
+                            this.renderGameWorld.call(this)
                         }
                         {
-                            (this.planets.map(this.rotatePlanet.bind(this))
-                                .map(this.convertToDrawable.bind(this, "-planet", 1)) as Array<IDrawable<Planet>>)
-                                .map(this.drawPlanet.bind(this))
+                            this.state.showMainMenu ? this.renderMainMenu.call(this) : null
                         }
                         {
-                            (this.smokeClouds.map(App.applyKinematics.bind(this))
-                                .map(this.rotatePlanet.bind(this))
-                                .map(this.convertToDrawable.bind(this, "-smokeClouds", 1)) as Array<IDrawable<SmokeCloud>>)
-                                .map(this.drawSmokeCloud.bind(this))
-                        }
-                        {
-                            (this.cannonBalls.map(App.applyKinematics.bind(this))
-                                .map(this.rotatePlanet.bind(this))
-                                .map(this.convertToDrawable.bind(this, "-cannonBalls", 1)) as Array<IDrawable<SmokeCloud>>)
-                                .map(this.drawSmokeCloud.bind(this))
-                        }
-                        {
-                            (this.ships.map(this.rotatePlanet.bind(this))
-                                .map(this.convertToDrawable.bind(this, "-ships", 1)) as Array<IDrawable<Ship>>)
-                                .map(this.drawShip.bind(this))
+                            this.state.showSpawnMenu ? this.renderSpawnMenu.call(this) : null
                         }
                     </g>
-                    <g id="game-controls">
-                        <text x="0" y="30" color="black">Zoom</text>
-                        <rect x="0" y="45" width="20" height="20" fill="grey" onClick={this.decrementZoom.bind(this)}/>
-                        <text x="25" y="60" textAnchor="center">{this.state.zoom}</text>
-                        <rect x="40" y="45" width="20" height="20" fill="grey" onClick={this.incrementZoom.bind(this)}/>
-                        <text x="5" y="60">-</text>
-                        <text x="40" y="60">+</text>
-                    </g>
-                    <g id="game-status" transform={`translate(${this.state.width - 80},0)`}>
-                        <text x="0" y="30" fontSize={8} color="black">Node{numPathingNodes > 1 ? "s" : ""}: {numPathingNodes}</text>
-                        <text x="0" y="60" fontSize={8} color="black">Distance: {Math.round(distanceToNode * 100000 / Math.PI) / 100}</text>
-                    </g>
+                    {
+                        this.renderGameControls()
+                    }
+                    {
+                        this.renderGameStatus()
+                    }
                 </svg>
             </div>
         );
