@@ -2,6 +2,62 @@ import React from 'react';
 import './App.css';
 import Quaternion from 'quaternion';
 
+export enum ESettlementLevel {
+    UNTAMED = 0,
+    OUTPOST = 1,
+    COLONY = 2,
+    TERRITORY = 3,
+    PROVINCE = 4,
+    CAPITAL = 5,
+}
+
+/**
+ * The luxuries an island planet can have.
+ */
+export enum EResourceType {
+    // output goods
+    COTTON = "COTTON",
+    FLAX = "FLAX",
+    TOBACCO = "TOBACCO",
+    MOLASSES = "MOLASSES",
+    RUM = "RUM",
+    COFFEE = "COFFEE",
+    COCOA = "COCOA",
+    RUBBER = "RUBBER",
+    FUR = "FUR",
+    MAHOGANY = "MAHOGANY",
+    // capital goods
+    FIREARM = "FIREARM",
+    GUNPOWDER = "GUNPOWDER",
+    IRON = "IRON",
+    RATION = "RATION"
+}
+
+/**
+ * A list of goods produced by outposts.
+ */
+export const OUTPOST_GOODS: EResourceType[] = [
+    EResourceType.COTTON,
+    EResourceType.FLAX,
+    EResourceType.TOBACCO,
+    EResourceType.MOLASSES,
+    EResourceType.RUM,
+    EResourceType.COFFEE,
+    EResourceType.COCOA,
+    EResourceType.RUBBER,
+    EResourceType.FUR,
+];
+
+/**
+ * A list of goods produced by capitals.
+ */
+export const CAPITAL_GOODS: EResourceType[] = [
+    EResourceType.FIREARM,
+    EResourceType.GUNPOWDER,
+    EResourceType.IRON,
+    EResourceType.RATION,
+];
+
 interface IExplorationGraphData {
     distance: number;
     settlerShipIds: string[];
@@ -58,7 +114,7 @@ export class Faction {
      * The list of planet priorities for exploration.
      * @private
      */
-    private explorationGraph: Record<string, IExplorationGraphData> = {};
+    public explorationGraph: Record<string, IExplorationGraphData> = {};
 
     /**
      * Create a new faction.
@@ -108,10 +164,11 @@ export class Faction {
      * Faction AI loop.
      */
     public handleFactionLoop() {
-        this.wood += 1;
+        this.wood += this.planetIds.length * (1 / 3) + 1;
 
         // make a new AI ship every minute.
         if (this.wood >= 10 * 60 && this.shipIds.length < 50) {
+            this.wood -= 10 * 60;
             this.spawnShip();
         }
     }
@@ -123,25 +180,61 @@ export class Faction {
     public getOrder(ship: Ship): Order {
         const entries = Object.entries(this.explorationGraph);
         entries.sort((a, b) => a[1].distance - b[1].distance);
-        const worldEntry = entries.find(entry => {
+
+        // find worlds to trade
+        const tradeWorldEntry = entries.find(entry => {
+            // settle new worlds which have not been settled yet
+            const roomToTrade = entry[1].settlerShipIds.length < entry[1].planet.resources.length;
+            const isSettledEnoughToTrade = entry[1].planet.settlementLevel >= ESettlementLevel.OUTPOST;
+            const notTradedYet = Object.values(this.instance.factions).every(faction => {
+                if (faction.id === this.id) {
+                    // skip the faction itself
+                    return true;
+                } else {
+                    // the faction should not colonize another planet colonized by another faction
+                    return !faction.planetIds.includes(entry[0]);
+                }
+            });
+            return roomToTrade && isSettledEnoughToTrade && notTradedYet;
+        });
+
+        // find worlds to settle
+        const settlementWorldEntry = entries.find(entry => {
             // settle new worlds which have not been settled yet
             const roomToSettleMore = entry[1].settlerShipIds.length <
                 Planet.NUM_SETTLEMENT_PROGRESS_STEPS -
                 Math.round(entry[1].planet.settlementProgress * Planet.NUM_SETTLEMENT_PROGRESS_STEPS);
             const notSettledYet = Object.values(this.instance.factions).every(faction => {
-                return !faction.planetIds.includes(entry[0]);
+                if (faction.id === this.id) {
+                    // skip the faction itself
+                    return true;
+                } else {
+                    // the faction should not colonize another planet colonized by another faction
+                    return !faction.planetIds.includes(entry[0]);
+                }
             });
             return roomToSettleMore && notSettledYet;
         });
 
-        if (worldEntry) {
-            worldEntry[1].settlerShipIds.push(ship.id);
+        if (tradeWorldEntry) {
+            // found a trade slot, add ship to trade
+            tradeWorldEntry[1].traderShipIds.push(ship.id);
+
+            const order = new Order(this.instance, ship, this);
+            order.orderType = EOrderType.TRADE;
+            order.planetId = tradeWorldEntry[0];
+            order.expireTicks = 10 * 60 * 20; // trade for 20 minutes before signing a new contract
+            return order;
+        } else if (settlementWorldEntry) {
+            // add ship to colonize
+            settlementWorldEntry[1].settlerShipIds.push(ship.id);
 
             const order = new Order(this.instance, ship, this);
             order.orderType = EOrderType.SETTLE;
-            order.planetId = worldEntry[0];
+            order.planetId = settlementWorldEntry[0];
             return order;
         } else {
+            // add ship to explore
             const order = new Order(this.instance, ship, this);
             order.orderType = EOrderType.ROAM;
             return order;
@@ -1232,18 +1325,63 @@ export class Planet implements ICameraState {
     public color: string = "blue";
     public size: number = 3;
     public settlementProgress: number = 0;
-    public settlementLevel: number = 0;
+    public settlementLevel: ESettlementLevel = ESettlementLevel.UNTAMED;
     public pathingNode: PathingNode<DelaunayGraph<Planet>> | null = null;
+    public resources: EResourceType[];
+    private resourceCycle: number = 0;
 
     /**
      * Number of settlements to colonize a planet.
      */
     public static NUM_SETTLEMENT_PROGRESS_STEPS = 5;
+
+    constructor() {
+        // initialize the natural resources
+        this.resources = [];
+        const numResources = Math.floor(Math.random() * 2 + 1);
+        const resourceValues = Object.values(OUTPOST_GOODS);
+        for (let i = 0; i < 100 && this.resources.length < numResources; i++) {
+            const randomResource = resourceValues[Math.floor(Math.random() * resourceValues.length)];
+            if (!this.resources.includes(randomResource)) {
+                this.resources.push(randomResource);
+            }
+        }
+    }
+
+    /**
+     * The planet will trade with a ship.
+     * @param ship
+     */
+    trade(ship: Ship) {
+        // a list of items to buy from ship and sell to ship
+        let goodsToTake: EResourceType[] = [];
+        let goodsToOffer: EResourceType[] = [];
+
+        // different levels of settlements take different goods
+        if (this.settlementLevel === ESettlementLevel.OUTPOST) {
+            goodsToTake = CAPITAL_GOODS;
+            goodsToOffer = this.resources;
+        } else if (this.settlementLevel === ESettlementLevel.CAPITAL) {
+            goodsToTake = OUTPOST_GOODS;
+            goodsToOffer = this.resources;
+        }
+
+        // trade with the ship
+        for (const goodToTake of goodsToTake) {
+            ship.buyGoodFromShip(goodToTake);
+        }
+        for (let i = 0; i < goodsToOffer.length; i++) {
+            if (ship.sellGoodToShip(goodsToOffer[this.resourceCycle % this.resources.length])) {
+                this.resourceCycle = (this.resourceCycle + 1) % this.resources.length;
+            }
+        }
+    }
 }
 
 export enum EOrderType {
     ROAM = "ROAM",
     SETTLE = "SETTLE",
+    TRADE = "TRADE",
 }
 
 export class Order {
@@ -1252,7 +1390,9 @@ export class Order {
     public faction: Faction;
     public orderType: EOrderType = EOrderType.ROAM;
     public planetId: string | null = null;
+    public expireTicks: number = 0;
     private stage: number = 0;
+    private runningTicks: number = 0;
 
     constructor(app: App, owner: Ship, faction: Faction) {
         this.app = app;
@@ -1260,71 +1400,139 @@ export class Order {
         this.faction = faction;
     }
 
+    private roam() {
+        const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWoldPlanetId);
+        if (!homeWorld || !homeWorld.pathingNode) {
+            throw new Error("Could not find home world for pathing back to home world (ROAM)");
+        }
+
+        // pick random planets
+        if (this.stage === 0 && this.owner.pathFinding.points.length === 0) {
+            this.stage += 1;
+
+            // explore a random planet
+            const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
+            const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
+            const nodes = Object.values(this.app.delaunayGraph.pathingNodes);
+            const randomTarget = nodes[Math.floor(Math.random() * nodes.length)];
+            this.owner.pathFinding.points = nearestNode.pathToObject(randomTarget);
+        } else if (this.stage === 1 && this.owner.pathFinding.points.length === 0) {
+            this.stage += 1;
+
+            // return to home world
+            const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
+            const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
+            this.owner.pathFinding.points = nearestNode.pathToObject(homeWorld.pathingNode);
+        } else if (this.stage === 2 && this.owner.pathFinding.points.length === 0) {
+            // end order
+            this.owner.order = null;
+        }
+    }
+
+    private settle() {
+        if (!this.planetId) {
+            throw new Error("Could not find planetId to path to (SETTLE)");
+        }
+        const colonyWorld = this.app.planets.find(planet => planet.id === this.planetId);
+        if (!colonyWorld || !colonyWorld.pathingNode) {
+            throw new Error("Could not find home world for pathing back to home world (SETTLE)");
+        }
+        const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWoldPlanetId);
+        if (!homeWorld || !homeWorld.pathingNode) {
+            throw new Error("Could not find home world for pathing back to home world (SETTLE)");
+        }
+
+        // fly to a specific planet
+        if (this.stage === 0 && this.owner.pathFinding.points.length === 0) {
+            this.stage += 1;
+
+            // find colony world
+            const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
+            const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
+            this.owner.pathFinding.points = nearestNode.pathToObject(colonyWorld.pathingNode);
+        } else if (this.stage === 1 && this.owner.pathFinding.points.length === 0) {
+            this.stage += 1
+
+            // update settlement progress
+            colonyWorld.settlementProgress = (
+                Math.round(colonyWorld.settlementProgress * Planet.NUM_SETTLEMENT_PROGRESS_STEPS) + 1
+            ) / Planet.NUM_SETTLEMENT_PROGRESS_STEPS;
+            if (colonyWorld.settlementProgress === 1) {
+                colonyWorld.settlementLevel = ESettlementLevel.OUTPOST;
+            }
+            this.faction.planetIds.push(this.planetId);
+
+            // return to home world
+            const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
+            const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
+            this.owner.pathFinding.points = nearestNode.pathToObject(homeWorld.pathingNode);
+        } else if (this.stage === 2 && this.owner.pathFinding.points.length === 0) {
+            // end order
+            const index = this.faction.explorationGraph[this.planetId].settlerShipIds.findIndex(s => s === this.owner.id);
+            if (index >= 0) {
+                this.faction.explorationGraph[this.planetId].settlerShipIds.splice(index, 1);
+            }
+            this.owner.order = null;
+        }
+    }
+
+    private trade() {
+        if (!this.planetId) {
+            throw new Error("Could not find planetId to path to (TRADE)");
+        }
+        const colonyWorld = this.app.planets.find(planet => planet.id === this.planetId);
+        if (!colonyWorld || !colonyWorld.pathingNode) {
+            throw new Error("Could not find home world for pathing back to home world (TRADE)");
+        }
+        const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWoldPlanetId);
+        if (!homeWorld || !homeWorld.pathingNode) {
+            throw new Error("Could not find home world for pathing back to home world (ROAM)");
+        }
+
+        // fly to a specific planet
+        if (this.stage === 0 && this.owner.pathFinding.points.length === 0) {
+            this.stage += 1;
+
+            // trade with homeWorld
+            homeWorld.trade(this.owner);
+
+            // find colony world
+            const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
+            const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
+            this.owner.pathFinding.points = nearestNode.pathToObject(colonyWorld.pathingNode);
+        } else if (this.stage === 1 && this.owner.pathFinding.points.length === 0) {
+            this.stage += 1;
+
+            // trade with colony world
+            colonyWorld.trade(this.owner);
+
+            // return to home world
+            const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
+            const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
+            this.owner.pathFinding.points = nearestNode.pathToObject(homeWorld.pathingNode);
+        } else if (this.stage === 2 && this.owner.pathFinding.points.length === 0) {
+            // check if order expired
+            if (this.runningTicks >= this.expireTicks) {
+                // end order
+                const index = this.faction.explorationGraph[this.planetId].settlerShipIds.findIndex(s => s === this.owner.id);
+                if (index >= 0) {
+                    this.faction.explorationGraph[this.planetId].settlerShipIds.splice(index, 1);
+                }
+                this.owner.order = null;
+            } else {
+                // reset order
+                this.stage = 0;
+            }
+        }
+    }
+
     orderLoop() {
         if (this.orderType === EOrderType.ROAM) {
-            const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWoldPlanetId);
-            if (!homeWorld || !homeWorld.pathingNode) {
-                throw new Error("Could not find home world for pathing back to home world (ROAM)");
-            }
-
-            // pick random planets
-            if (this.stage === 0 && this.owner.pathFinding.points.length === 0) {
-                this.stage += 1;
-                // explore planet
-                const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
-                const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
-                const nodes = Object.values(this.app.delaunayGraph.pathingNodes);
-                const randomTarget = nodes[Math.floor(Math.random() * nodes.length)];
-                this.owner.pathFinding.points = nearestNode.pathToObject(randomTarget);
-            } else if (this.stage === 1 && this.owner.pathFinding.points.length === 0) {
-                this.stage += 1;
-                // return to home world
-                const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
-                const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
-                this.owner.pathFinding.points = nearestNode.pathToObject(homeWorld.pathingNode);
-            } else if (this.stage === 2 && this.owner.pathFinding.points.length === 0) {
-                // end order
-                this.owner.order = null;
-            }
+            this.roam();
         } else if (this.orderType === EOrderType.SETTLE) {
-            if (!this.planetId) {
-                throw new Error("Could not find planetId to path to (SETTLE)");
-            }
-            const colonyWorld = this.app.planets.find(planet => planet.id === this.planetId);
-            if (!colonyWorld || !colonyWorld.pathingNode) {
-                throw new Error("Could not find home world for pathing back to home world (ROAM)");
-            }
-
-            // fly to a specific planet
-            if (this.stage === 0 && this.owner.pathFinding.points.length === 0) {
-                this.stage += 1;
-                // explore planet
-                const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
-                const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
-                this.owner.pathFinding.points = nearestNode.pathToObject(colonyWorld.pathingNode);
-            } else if (this.stage === 1 && this.owner.pathFinding.points.length === 0) {
-                this.stage += 1;
-                // update settlement progress
-                colonyWorld.settlementProgress = (
-                    Math.round(colonyWorld.settlementProgress * Planet.NUM_SETTLEMENT_PROGRESS_STEPS) + 1
-                ) / Planet.NUM_SETTLEMENT_PROGRESS_STEPS;
-                if (colonyWorld.settlementProgress === 1) {
-                    colonyWorld.settlementLevel = 1;
-                }
-                this.faction.planetIds.push(this.planetId);
-
-                // return to home world
-                const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
-                const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
-                const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWoldPlanetId);
-                if (!homeWorld || !homeWorld.pathingNode) {
-                    throw new Error("Could not find home world for pathing back to home world (ROAM)");
-                }
-                this.owner.pathFinding.points = nearestNode.pathToObject(homeWorld.pathingNode);
-            } else if (this.stage === 2 && this.owner.pathFinding.points.length === 0) {
-                // end order
-                this.owner.order = null;
-            }
+            this.settle();
+        } else if (this.orderType === EOrderType.TRADE) {
+            this.trade();
         }
     }
 }
@@ -1340,6 +1548,34 @@ export class Ship implements IAutomatedShip {
     public activeKeys: string[] = [];
     public pathFinding: PathFinder<Ship> = new PathFinder<Ship>(this);
     public order: Order | null = null;
+    private cargo: EResourceType[] = [];
+
+    /**
+     * Buy a good from the ship.
+     * @param item
+     */
+    public buyGoodFromShip(item: EResourceType): boolean {
+        const index = this.cargo.findIndex(c => c === item);
+        if (index >= 0) {
+            this.cargo.splice(index, 1);
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * Sell a good to the ship.
+     * @param item
+     */
+    public sellGoodToShip(item: EResourceType): boolean {
+        if (this.cargo.length < 3) {
+            this.cargo.push(item);
+            return true;
+        } else {
+            return false;
+        }
+    }
 }
 
 export class SmokeCloud implements ICameraState, IExpirable {
@@ -1659,7 +1895,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     private drawPlanet(planetDrawing: IDrawable<Planet>) {
-        const isReverseSide = planetDrawing.rotatedPosition[2] > 0;
+        const isReverseSide = planetDrawing.rotatedPosition[2] < 0;
         const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
         const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
         const distance = planetDrawing.distance;
@@ -2360,6 +2596,12 @@ export class App extends React.Component<IAppProps, IAppState> {
             ship.pathFinding.pathFindingLoop();
             this.handleShipLoop(i, () => ship.activeKeys, true);
         }
+
+        // handle AI factions
+        for (const faction of Object.values(this.factions)) {
+            faction.handleFactionLoop();
+        }
+
         this.forceUpdate();
     }
 
@@ -2495,7 +2737,8 @@ export class App extends React.Component<IAppProps, IAppState> {
         if (planetI < 5) {
             planet.size = 10;
             planet.settlementProgress = 1;
-            planet.settlementLevel = 5;
+            planet.settlementLevel = ESettlementLevel.CAPITAL;
+            planet.resources = [...CAPITAL_GOODS];
         }
         planet.pathingNode = this.delaunayGraph.createPathingNode(planet.position.rotateVector([0, 0, 1]));
         return planet;
@@ -2706,6 +2949,21 @@ export class App extends React.Component<IAppProps, IAppState> {
                     <text x="0" y="30" fontSize={8} color="black">Node{numPathingNodes > 1 ? "s" : ""}: {numPathingNodes}</text>
                     <text x="0" y="45" fontSize={8} color="black">Distance: {Math.round(distanceToNode * 100000 / Math.PI) / 100}</text>
                     <text x="0" y="60" fontSize={8} color="black">Order: {orderType}</text>
+                </g>
+            );
+        } else {
+            return null;
+        }
+    }
+
+    private renderFactionStatus() {
+        const faction = Object.values(this.factions).find(f => this.playerShip && f.shipIds.includes(this.playerShip.id));
+        if (faction) {
+            return (
+                <g id="game-status" transform={`translate(${this.state.width - 80},${this.state.height - 80})`}>
+                    <text x="0" y="30" fontSize={8} color="black">Faction: {faction.id}</text>
+                    <text x="0" y="45" fontSize={8} color="black">Planet{faction.planetIds.length > 1 ? "s" : ""}: {faction.planetIds.length}</text>
+                    <text x="0" y="60" fontSize={8} color="black">Ship{faction.shipIds.length > 1 ? "s" : ""}: {faction.shipIds.length}</text>
                 </g>
             );
         } else {
@@ -2942,6 +3200,9 @@ export class App extends React.Component<IAppProps, IAppState> {
                     }
                     {
                         this.renderGameStatus()
+                    }
+                    {
+                        this.renderFactionStatus()
                     }
                 </svg>
             </div>
