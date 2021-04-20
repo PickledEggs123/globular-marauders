@@ -2,6 +2,11 @@ import React from 'react';
 import './App.css';
 import Quaternion from 'quaternion';
 
+interface ICargoItem {
+    sourcePlanetId: string;
+    resourceType: EResourceType;
+}
+
 export enum ESettlementLevel {
     UNTAMED = 0,
     OUTPOST = 1,
@@ -74,6 +79,103 @@ enum EFaction {
 }
 
 /**
+ * A special buff applied to factions when they accumulate luxuries.
+ */
+class LuxuryBuff {
+    public instance: App;
+    public faction: Faction;
+    public resourceType: EResourceType;
+    public planetId: string;
+    private expires: number = 10 * 60 * 10;
+    private ticks: number = 0;
+
+    constructor(instance: App, faction: Faction, resourceType: EResourceType, planetId: string) {
+        this.instance = instance;
+        this.faction = faction;
+        this.resourceType = resourceType;
+        this.planetId = planetId;
+    }
+
+    /**
+     * Calculate the gold exchange of each faction.
+     * @param app
+     * @param faction
+     * @param resourceType
+     * @constructor
+     */
+    public static CalculateBuff(app: App, faction: Faction, resourceType: EResourceType) {
+        const totalLuxuries: number = Object.values(app.factions).reduce((acc: number, f) => {
+            return acc + f.luxuryBuffs.reduce((acc2: number, l) => {
+                if (l.resourceType === resourceType) {
+                    return acc2 + 1;
+                } else {
+                    return acc2;
+                }
+            }, 0);
+        }, 0);
+        const factionLuxuries: number = faction.luxuryBuffs.reduce((acc: number, l) => {
+            if (l.resourceType === resourceType) {
+                return acc + 1;
+            } else {
+                return acc;
+            }
+        }, 0);
+        const averageLuxuryConsumption: number = totalLuxuries / Object.values(app.factions).length;
+
+        // calculate the gold exchange based on luxuries
+        if (totalLuxuries > 0) {
+            faction.gold += (factionLuxuries / totalLuxuries) - averageLuxuryConsumption;
+        }
+    }
+
+    /**
+     * Increment the buff.
+     */
+    public handleLuxuryBuffLoop() {
+        this.ticks += 1;
+    }
+
+    /**
+     * Find a matching luxuary buff.
+     * @param resourceType
+     * @param planetId
+     */
+    public matches(resourceType: EResourceType, planetId: string) {
+        return this.resourceType === resourceType && this.planetId === planetId;
+    }
+
+    /**
+     * Reset the buff timer.
+     */
+    public replenish() {
+        this.ticks = 0;
+    }
+
+    /**
+     * The buff expired.
+     */
+    public expired() {
+        return this.ticks >= this.expires;
+    }
+
+    /**
+     * Remove the buff.
+     */
+    public remove() {
+        // remove from app
+        const appIndex = this.instance.luxuryBuffs.findIndex(l => l === this);
+        if (appIndex >= 0) {
+            this.instance.luxuryBuffs.splice(appIndex, 1);
+        }
+        // remove from faction
+        const factionIndex = this.faction.luxuryBuffs.findIndex(l => l === this);
+        if (factionIndex >= 0) {
+            this.faction.luxuryBuffs.splice(factionIndex, 1);
+        }
+    }
+}
+
+/**
  * A class representing a faction in the game world. Responsible for building boats, setting up trade, and colonizing islands.
  */
 export class Faction {
@@ -111,10 +213,18 @@ export class Faction {
      */
     public wood: number = 0;
     /**
+     * THe number of gold accumulated by the faction, used to pay captains.
+     */
+    public gold: number = 10000;
+    /**
      * The list of planet priorities for exploration.
      * @private
      */
     public explorationGraph: Record<string, IExplorationGraphData> = {};
+    /**
+     * A list of luxuryBuffs which improves the faction.
+     */
+    public luxuryBuffs: LuxuryBuff[] = [];
 
     /**
      * Create a new faction.
@@ -161,6 +271,20 @@ export class Faction {
     }
 
     /**
+     * Apply a new luxury buff to a faction.
+     * @param resourceType The resource type affects the buff.
+     * @param planetId The source world of the goods.
+     */
+    public applyLuxuryBuff(resourceType: EResourceType, planetId: string) {
+        const oldLuxuryBuff = this.luxuryBuffs.find(l => l.matches(resourceType, planetId));
+        if (oldLuxuryBuff) {
+            oldLuxuryBuff.replenish();
+        } else {
+            this.luxuryBuffs.push(new LuxuryBuff(this.instance, this, resourceType, planetId));
+        }
+    }
+
+    /**
      * Faction AI loop.
      */
     public handleFactionLoop() {
@@ -170,6 +294,20 @@ export class Faction {
         if (this.wood >= 10 * 60 && this.shipIds.length < 50) {
             this.wood -= 10 * 60;
             this.spawnShip();
+        }
+
+        // handle the luxury buffs from trading
+        const expiredLuxuryBuffs: LuxuryBuff[] = [];
+        for (const luxuryBuff of this.luxuryBuffs) {
+            const expired = luxuryBuff.expired();
+            if (expired) {
+                expiredLuxuryBuffs.push(luxuryBuff);
+            } else {
+                luxuryBuff.handleLuxuryBuffLoop();
+            }
+        }
+        for (const expiredLuxuryBuff of expiredLuxuryBuffs) {
+            expiredLuxuryBuff.remove();
         }
     }
 
@@ -1317,6 +1455,7 @@ export class PathFinder<T extends IAutomatedShip> {
 }
 
 export class Planet implements ICameraState {
+    public instance: App;
     public id: string = "";
     public position: Quaternion = Quaternion.ONE;
     public positionVelocity: Quaternion = Quaternion.ONE;
@@ -1335,7 +1474,9 @@ export class Planet implements ICameraState {
      */
     public static NUM_SETTLEMENT_PROGRESS_STEPS = 5;
 
-    constructor() {
+    constructor(instance: App) {
+        this.instance = instance;
+
         // initialize the natural resources
         this.resources = [];
         const numResources = Math.floor(Math.random() * 2 + 1);
@@ -1368,10 +1509,16 @@ export class Planet implements ICameraState {
 
         // trade with the ship
         for (const goodToTake of goodsToTake) {
-            ship.buyGoodFromShip(goodToTake);
+            const boughtGood = ship.buyGoodFromShip(goodToTake);
+            if (boughtGood) {
+                const faction = Object.values(this.instance.factions).find(f => f.homeWoldPlanetId === this.id);
+                if (faction) {
+                    faction.applyLuxuryBuff(goodToTake, boughtGood.sourcePlanetId);
+                }
+            }
         }
         for (let i = 0; i < goodsToOffer.length; i++) {
-            if (ship.sellGoodToShip(goodsToOffer[this.resourceCycle % this.resources.length])) {
+            if (ship.sellGoodToShip(goodsToOffer[this.resourceCycle % this.resources.length], this.id)) {
                 this.resourceCycle = (this.resourceCycle + 1) % this.resources.length;
             }
         }
@@ -1526,7 +1673,7 @@ export class Order {
         }
     }
 
-    orderLoop() {
+    handleOrderLoop() {
         if (this.orderType === EOrderType.ROAM) {
             this.roam();
         } else if (this.orderType === EOrderType.SETTLE) {
@@ -1548,29 +1695,32 @@ export class Ship implements IAutomatedShip {
     public activeKeys: string[] = [];
     public pathFinding: PathFinder<Ship> = new PathFinder<Ship>(this);
     public order: Order | null = null;
-    private cargo: EResourceType[] = [];
+    private cargo: ICargoItem[] = [];
 
     /**
      * Buy a good from the ship.
-     * @param item
+     * @param resourceType The resource to buy
      */
-    public buyGoodFromShip(item: EResourceType): boolean {
-        const index = this.cargo.findIndex(c => c === item);
+    public buyGoodFromShip(resourceType: EResourceType): ICargoItem | null {
+        const index = this.cargo.findIndex(c => c.resourceType === resourceType);
         if (index >= 0) {
-            this.cargo.splice(index, 1);
-            return true;
+           return this.cargo.splice(index, 1)[1];
         } else {
-            return false;
+            return null;
         }
     }
 
     /**
      * Sell a good to the ship.
-     * @param item
+     * @param resourceType The type of resource.
+     * @param sourcePlanetId The source of the resource.
      */
-    public sellGoodToShip(item: EResourceType): boolean {
+    public sellGoodToShip(resourceType: EResourceType, sourcePlanetId: string): boolean {
         if (this.cargo.length < 3) {
-            this.cargo.push(item);
+            this.cargo.push({
+                resourceType,
+                sourcePlanetId
+            });
             return true;
         } else {
             return false;
@@ -1710,6 +1860,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     public stars: Planet[] = [];
     public smokeClouds: SmokeCloud[] = [];
     public cannonBalls: SmokeCloud[] = [];
+    public luxuryBuffs: LuxuryBuff[] = [];
 
     /**
      * Velocity step size of ships.
@@ -1908,6 +2059,22 @@ export class App extends React.Component<IAppProps, IAppState> {
             factionColor = ownerFaction.factionColor;
         }
 
+        // extract planet information
+        let planetX: number = 0;
+        let planetY: number = 0;
+        let planetVisible: boolean = false;
+        let planetTitle: string = "";
+        if (planetDrawing.original.settlementProgress > 0) {
+            if (ownerFaction) {
+                const settlementEntry = Object.entries(ESettlementLevel).find(e => e[1] == planetDrawing.original.settlementLevel);
+                planetTitle = `${ownerFaction.id}${settlementEntry ? ` ${settlementEntry[0]}` : ""}`;
+            }
+
+            planetX = x * this.state.width;
+            planetY = (1 - y) * this.state.height;
+            planetVisible = !isReverseSide;
+        }
+
         return (
             <>
                 {
@@ -1930,6 +2097,32 @@ export class App extends React.Component<IAppProps, IAppState> {
                     strokeWidth={0.2 * size * this.state.zoom}
                     style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
                 />
+                {
+                    planetVisible && (
+                        <>
+                            <text
+                                key={`${planetDrawing.id}-planet-title`}
+                                x={planetX + size * this.state.zoom + 10}
+                                y={planetY}
+                                fill="white"
+                                fontSize="6"
+                            >{planetTitle}</text>
+                            {
+                                planetDrawing.original.resources.map((resource, index) => {
+                                    return (
+                                        <text
+                                            key={`${planetDrawing.id}-planet-resource-${index}`}
+                                            x={planetX + size * this.state.zoom + 10}
+                                            y={planetY + (index + 1) * 10}
+                                            fill="white"
+                                            fontSize="6"
+                                        >{resource}</text>
+                                    );
+                                })
+                            }
+                        </>
+                    )
+                }
             </>
         );
     }
@@ -2591,10 +2784,17 @@ export class App extends React.Component<IAppProps, IAppState> {
             }
             const shipOrder = ship.order;
             if (shipOrder) {
-                shipOrder.orderLoop();
+                shipOrder.handleOrderLoop();
             }
             ship.pathFinding.pathFindingLoop();
             this.handleShipLoop(i, () => ship.activeKeys, true);
+        }
+
+        // handle luxury buffs
+        for (const resourceType of Object.values(EResourceType)) {
+            for (const faction of Object.values(this.factions)) {
+                LuxuryBuff.CalculateBuff(this, faction, resourceType);
+            }
         }
 
         // handle AI factions
@@ -2698,8 +2898,8 @@ export class App extends React.Component<IAppProps, IAppState> {
         return voronoiGraph.lloydRelaxation();
     }
 
-    private static buildStars(point: [number, number, number], index: number): Planet {
-        const planet = new Planet();
+    private buildStars(point: [number, number, number], index: number): Planet {
+        const planet = new Planet(this);
         planet.id = `star-${index}`;
         planet.position = Quaternion.fromBetweenVectors([0, 0, 1], point);
         if (index % 5 === 0 || index % 5 === 1) {
@@ -2722,7 +2922,7 @@ export class App extends React.Component<IAppProps, IAppState> {
      * @private
      */
     private createPlanet(planetPoint: [number, number, number], planetI: number): Planet {
-        const planet = new Planet();
+        const planet = new Planet(this);
         planet.id = `planet-${planetI}`;
         planet.position = Quaternion.fromBetweenVectors([0, 0, 1], planetPoint);
         planet.position = planet.position.normalize();
@@ -2762,7 +2962,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         // initialize stars
         const starPoints = App.generateGoodPoints<Planet>(100);
-        this.stars.push(...starPoints.map(App.buildStars.bind(this)));
+        this.stars.push(...starPoints.map(this.buildStars.bind(this)));
         for (const star of this.stars) {
             this.voronoiGraph.addDrawable(star);
         }
@@ -2962,8 +3162,9 @@ export class App extends React.Component<IAppProps, IAppState> {
             return (
                 <g id="game-status" transform={`translate(${this.state.width - 80},${this.state.height - 80})`}>
                     <text x="0" y="30" fontSize={8} color="black">Faction: {faction.id}</text>
-                    <text x="0" y="45" fontSize={8} color="black">Planet{faction.planetIds.length > 1 ? "s" : ""}: {faction.planetIds.length}</text>
-                    <text x="0" y="60" fontSize={8} color="black">Ship{faction.shipIds.length > 1 ? "s" : ""}: {faction.shipIds.length}</text>
+                    <text x="0" y="45" fontSize={8} color="black">Gold: {faction.gold}</text>
+                    <text x="0" y="60" fontSize={8} color="black">Planet{faction.planetIds.length > 1 ? "s" : ""}: {faction.planetIds.length}</text>
+                    <text x="0" y="75" fontSize={8} color="black">Ship{faction.shipIds.length > 1 ? "s" : ""}: {faction.shipIds.length}</text>
                 </g>
             );
         } else {
