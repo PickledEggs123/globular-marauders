@@ -7,6 +7,12 @@ interface ICargoItem {
     resourceType: EResourceType;
 }
 
+export enum EOrderType {
+    ROAM = "ROAM",
+    SETTLE = "SETTLE",
+    TRADE = "TRADE",
+}
+
 export enum ESettlementLevel {
     UNTAMED = 0,
     OUTPOST = 1,
@@ -70,7 +76,7 @@ interface IExplorationGraphData {
     planet: Planet;
 }
 
-enum EFaction {
+export enum EFaction {
     DUTCH = "DUTCH",
     ENGLISH = "ENGLISH",
     FRENCH = "FRENCH",
@@ -1451,7 +1457,6 @@ export class PathFinder<T extends IAutomatedShip> {
             }
         }
     }
-
 }
 
 export class Planet implements ICameraState {
@@ -1523,12 +1528,6 @@ export class Planet implements ICameraState {
             }
         }
     }
-}
-
-export enum EOrderType {
-    ROAM = "ROAM",
-    SETTLE = "SETTLE",
-    TRADE = "TRADE",
 }
 
 export class Order {
@@ -1607,7 +1606,9 @@ export class Order {
             if (colonyWorld.settlementProgress === 1) {
                 colonyWorld.settlementLevel = ESettlementLevel.OUTPOST;
             }
-            this.faction.planetIds.push(this.planetId);
+            if (!this.faction.planetIds.includes(this.planetId)) {
+                this.faction.planetIds.push(this.planetId);
+            }
 
             // return to home world
             const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
@@ -1661,9 +1662,9 @@ export class Order {
             // check if order expired
             if (this.runningTicks >= this.expireTicks) {
                 // end order
-                const index = this.faction.explorationGraph[this.planetId].settlerShipIds.findIndex(s => s === this.owner.id);
+                const index = this.faction.explorationGraph[this.planetId].traderShipIds.findIndex(s => s === this.owner.id);
                 if (index >= 0) {
-                    this.faction.explorationGraph[this.planetId].settlerShipIds.splice(index, 1);
+                    this.faction.explorationGraph[this.planetId].traderShipIds.splice(index, 1);
                 }
                 this.owner.order = null;
             } else {
@@ -1681,6 +1682,7 @@ export class Order {
         } else if (this.orderType === EOrderType.TRADE) {
             this.trade();
         }
+        this.runningTicks += 1;
     }
 }
 
@@ -1704,7 +1706,7 @@ export class Ship implements IAutomatedShip {
     public buyGoodFromShip(resourceType: EResourceType): ICargoItem | null {
         const index = this.cargo.findIndex(c => c.resourceType === resourceType);
         if (index >= 0) {
-           return this.cargo.splice(index, 1)[1];
+           return this.cargo.splice(index, 1)[0];
         } else {
             return null;
         }
@@ -3120,7 +3122,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
     private renderGameControls() {
         return (
-            <g id="game-controls">
+            <g key="game-controls" id="game-controls">
                 <text x="0" y="30" color="black">Zoom</text>
                 <rect x="0" y="45" width="20" height="20" fill="grey" onClick={this.decrementZoom.bind(this)}/>
                 <text x="25" y="60" textAnchor="center">{this.state.zoom}</text>
@@ -3145,7 +3147,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         if (numPathingNodes) {
             return (
-                <g id="game-status" transform={`translate(${this.state.width - 80},0)`}>
+                <g key="game-status" id="game-status" transform={`translate(${this.state.width - 80},0)`}>
                     <text x="0" y="30" fontSize={8} color="black">Node{numPathingNodes > 1 ? "s" : ""}: {numPathingNodes}</text>
                     <text x="0" y="45" fontSize={8} color="black">Distance: {Math.round(distanceToNode * 100000 / Math.PI) / 100}</text>
                     <text x="0" y="60" fontSize={8} color="black">Order: {orderType}</text>
@@ -3160,7 +3162,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         const faction = Object.values(this.factions).find(f => this.playerShip && f.shipIds.includes(this.playerShip.id));
         if (faction) {
             return (
-                <g id="game-status" transform={`translate(${this.state.width - 80},${this.state.height - 80})`}>
+                <g key="faction-status" id="faction-status" transform={`translate(${this.state.width - 80},${this.state.height - 80})`}>
                     <text x="0" y="30" fontSize={8} color="black">Faction: {faction.id}</text>
                     <text x="0" y="45" fontSize={8} color="black">Gold: {faction.gold}</text>
                     <text x="0" y="60" fontSize={8} color="black">Planet{faction.planetIds.length > 1 ? "s" : ""}: {faction.planetIds.length}</text>
@@ -3172,7 +3174,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         }
     }
 
-    private selectFaction(faction: EFaction) {
+    public selectFaction(faction: EFaction) {
         this.setState({
             faction,
             showMainMenu: false,
@@ -3182,7 +3184,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
     private renderMainMenu() {
         return (
-            <g id="main-menu">
+            <g key="main-menu" id="main-menu">
                 <text fontSize="28"
                       fill="white"
                       x={this.state.width / 2}
@@ -3239,7 +3241,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         );
     }
 
-    private beginSpawnShip() {
+    public beginSpawnShip() {
         if (this.state.faction) {
             this.setState({
                 showSpawnMenu: false
@@ -3265,7 +3267,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         const width = (this.state.width / 5) - 20;
         const height = 40;
         return (
-            <g id="spawn-menu">
+            <g key="spawn-menu" id="spawn-menu">
                 <text
                     fill="white"
                     fontSize="28"
