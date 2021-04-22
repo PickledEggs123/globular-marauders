@@ -3342,11 +3342,16 @@ export class App extends React.Component<IAppProps, IAppState> {
                             <li>Add projectiles or cannon balls and small frictionless motion in space. -- DONE 4/17/2021</li>
                             <li>Add gravity around planets.</li>
                             <li>Improve random distribution of planets using Voronoi and Lloyd Relaxation. -- DONE 4/17/2021</li>
-                            <li>Create factions which start from a home world and launch ships.</li>
-                            <li>Spawn settler ships to colonize other worlds. Each world has upto 3 resources.</li>
-                            <li>Spawn merchant ships to trade with colonies. Trading is simplified flying between A and B.</li>
-                            <li>Add economics, price rising and falling based on supply and demand, traders will try to go towards important colonies.</li>
+                            <li>Create factions which start from a home world and launch ships. - DONE 4/21/2021</li>
+                            <li>Spawn settler ships to colonize other worlds. Each world has upto 3 resources. DONE 4/21/2021</li>
+                            <li>Spawn merchant ships to trade with colonies. Trading is simplified flying between A and B. DONE 4/21/2021</li>
+                            <li>Add economics, price rising and falling based on supply and demand, traders will try to go towards important colonies. DONE 4/21/2021</li>
+                            <li>Add ship building economy for each planet.</li>
+                            <li>Planets will sell ships using dutch auction, 50% will go to faction as tax, 50% will go to island renovation</li>
+                            <li>Make cannon balls damage merchant ships.</li>
                             <li>Add ability to pirate merchants and raid colonies.</li>
+                            <li>Add AI pirates and pirate hunters.</li>
+                            <li>Improve Voronoi generation to improve AI movement.</li>
                             <li>Factions will plan invasions of enemy colonies, merchants, and capitals.</li>
                             <li>Add multiplayer...</li>
                             <li>Play Styles:
