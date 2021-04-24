@@ -1,5 +1,14 @@
 import React from 'react';
-import App, {CAPITAL_GOODS, DelaunayGraph, EFaction, EOrderType, OUTPOST_GOODS, PathFinder, Ship} from './App';
+import App, {
+  CAPITAL_GOODS,
+  DelaunayGraph,
+  EFaction,
+  EOrderType,
+  EShipType,
+  OUTPOST_GOODS,
+  PathFinder,
+  Ship
+} from './App';
 import {shallow} from "enzyme";
 import Quaternion from "quaternion";
 import sinon from 'sinon';
@@ -63,7 +72,7 @@ const setupTradingTest = (numMinutes: number = 2) => {
   }
 
   // spawn at home world
-  app.beginSpawnShip(homeWorldTradeItem.planet.id);
+  app.beginSpawnShip(homeWorldTradeItem.planet.id, EShipType.HIND);
   wrapper.update();
 
   if (app.playerShip === null) {

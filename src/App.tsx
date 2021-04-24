@@ -2,6 +2,64 @@ import React from 'react';
 import './App.css';
 import Quaternion from 'quaternion';
 
+export enum EShipType {
+    SLOOP = "SLOOP",
+    CORVETTE = "CORVETTE",
+    HIND = "HIND",
+}
+
+export interface IShipData {
+    shipType: EShipType;
+    cost: number;
+    settlementProgressFactor: number;
+    cargoSize: number;
+    cannons: {
+        numCannons: number;
+        startY: number;
+        endY: number;
+        leftWall: number;
+        rightWall: number;
+    }
+}
+
+const SHIP_DATA: IShipData[] = [{
+    shipType: EShipType.HIND,
+    cost: 600,
+    settlementProgressFactor: 4,
+    cargoSize: 3,
+    cannons: {
+        numCannons: 8,
+        startY: 20,
+        endY: -20,
+        leftWall: 10,
+        rightWall: -10
+    }
+}, {
+    shipType: EShipType.CORVETTE,
+    cost: 300,
+    settlementProgressFactor: 2,
+    cargoSize: 2,
+    cannons: {
+        numCannons: 4,
+        startY: 15,
+        endY: -15,
+        leftWall: 6,
+        rightWall: -6
+    }
+}, {
+    shipType: EShipType.SLOOP,
+    cost: 150,
+    settlementProgressFactor: 1,
+    cargoSize: 1,
+    cannons: {
+        numCannons: 2,
+        startY: 10,
+        endY: -10,
+        leftWall: 4,
+        rightWall: -4
+    }
+}];
+
 interface IGoldAccount {
     gold: number;
 }
@@ -61,6 +119,7 @@ export const OUTPOST_GOODS: EResourceType[] = [
     EResourceType.COCOA,
     EResourceType.RUBBER,
     EResourceType.FUR,
+    EResourceType.MAHOGANY,
 ];
 
 /**
@@ -213,6 +272,11 @@ export class Faction {
      * A list of ship ids owned by this faction.
      */
     public shipIds: string[] = [];
+    public shipsAvailable: Record<EShipType, number> = {
+        [EShipType.SLOOP]: 0,
+        [EShipType.CORVETTE]: 0,
+        [EShipType.HIND]: 0
+    };
     /**
      * A number which produces unique ship id names.
      * @private
@@ -294,6 +358,19 @@ export class Faction {
         }
     }
 
+    public getFactionNextShipType(): EShipType {
+        if (this.shipsAvailable[EShipType.SLOOP] < Math.ceil(this.shipIds.length * (1 / 2))) {
+            return EShipType.SLOOP;
+        }
+        if (this.shipsAvailable[EShipType.CORVETTE] < Math.ceil(this.shipIds.length * (1 / 3))) {
+            return EShipType.CORVETTE;
+        }
+        if (this.shipsAvailable[EShipType.HIND] < Math.ceil(this.shipIds.length * (1 / 6))) {
+            return EShipType.HIND;
+        }
+        return EShipType.SLOOP;
+    }
+
     /**
      * Faction AI loop.
      */
@@ -302,10 +379,11 @@ export class Faction {
         this.instance.gold += 0.2;
 
         // captain new AI ships
+        const factionNextShipType = this.getFactionNextShipType();
         for (const planetId of this.planetIds) {
             const planet = this.instance.planets.find(p => p.id === planetId);
-            if (planet && planet.getNumShipsAvailable() > 3 && this.shipIds.length < 50 && this.gold >= planet.shipyard.quoteShip()) {
-                planet.spawnShip(this, true);
+            if (planet && planet.getNumShipsAvailable(factionNextShipType) > 2 && this.shipIds.length < 50 && this.gold >= planet.shipyard.quoteShip(factionNextShipType)) {
+                planet.spawnShip(this, factionNextShipType, true);
             }
         }
 
@@ -1451,6 +1529,7 @@ export class ShipyardDock {
     public shipyard: Shipyard;
     public progress: number = 0;
     public shipCost: number = 0;
+    public shipType: EShipType | null = null;
 
     constructor(instance: App, planet: Planet, shipyard: Shipyard) {
         this.instance = instance;
@@ -1458,9 +1537,14 @@ export class ShipyardDock {
         this.shipyard = shipyard;
     }
 
-    public beginBuildingOfShip() {
-        this.shipCost = Shipyard.SHIP_COST;
+    public beginBuildingOfShip(shipType: EShipType) {
+        const shipData = SHIP_DATA.find(i => i.shipType === shipType);
+        if (!shipData) {
+            throw new Error("Could not find ship type");
+        }
+        this.shipCost = shipData.cost;
         this.progress = 0;
+        this.shipType = shipData.shipType;
     }
 
     /**
@@ -1494,22 +1578,41 @@ export class Shipyard {
     public planet: Planet;
     public docks: ShipyardDock[] = [];
     public numberOfDocks: number = 10;
-    public shipsAvailable: number = 0;
-
-    public static SHIP_COST: number = 600;
+    public numShipsAvailable: number = 0;
+    public shipsAvailable: Record<EShipType, number> = {
+        [EShipType.SLOOP]: 0,
+        [EShipType.CORVETTE]: 0,
+        [EShipType.HIND]: 0
+    };
 
     constructor(instance: App, planet: Planet) {
         this.instance = instance;
         this.planet = planet;
     }
 
+    public getNextShipTypeToBuild(): EShipType {
+        if (this.shipsAvailable.SLOOP < 3) {
+            return EShipType.SLOOP;
+        }
+        if (this.shipsAvailable.CORVETTE < 3) {
+            return EShipType.CORVETTE;
+        }
+        return EShipType.HIND;
+    }
+
     /**
      * Build a new ship once in a while.
      */
     public handleShipyardLoop() {
+        const nextShipTypeToBuild = this.getNextShipTypeToBuild();
+        const shipData = SHIP_DATA.find(i => i.shipType === nextShipTypeToBuild);
+        if (!shipData) {
+            throw new Error("Could not find ship type");
+        }
+
         // build ship when there is enough wood and enough room
-        if (this.planet.wood >= Shipyard.SHIP_COST && this.docks.length < this.numberOfDocks) {
-            this.buildShip();
+        if (this.planet.wood >= shipData.cost && this.docks.length < this.numberOfDocks) {
+            this.buildShip(shipData.shipType);
         }
 
         // handle each dock
@@ -1521,12 +1624,17 @@ export class Shipyard {
     /**
      * Begin the process of building a ship.
      */
-    public buildShip() {
+    public buildShip(shipType: EShipType) {
+        const shipData = SHIP_DATA.find(i => i.shipType === shipType);
+        if (!shipData) {
+            throw new Error("Could not find ship type");
+        }
+
         // give wood to dock and begin building of ship.
-        this.planet.wood -= Shipyard.SHIP_COST;
+        this.planet.wood -= shipData.cost;
         const dock = new ShipyardDock(this.instance, this.planet, this);
         this.docks.push(dock);
-        dock.beginBuildingOfShip();
+        dock.beginBuildingOfShip(shipType);
     }
 
     /**
@@ -1534,15 +1642,19 @@ export class Shipyard {
      * @param dock
      */
     public dockIsDone(dock: ShipyardDock) {
-        this.shipsAvailable += 1;
+        if (!dock.shipType) {
+            throw new Error("Dock must have ship type to be done");
+        }
+        this.numShipsAvailable += 1;
+        this.shipsAvailable[dock.shipType] += 1;
     }
 
     /**
      * Player bought a ship from the shipyard.
      */
-    public buyShip(account: IGoldAccount, asFaction: boolean = false): Ship {
+    public buyShip(account: IGoldAccount, shipType: EShipType, asFaction: boolean = false): Ship {
         // check gold
-        const shipPrice = this.quoteShip(asFaction);
+        const shipPrice = this.quoteShip(shipType, asFaction);
         if (account.gold < shipPrice) {
             throw new Error("Need more gold to buy this ship");
         }
@@ -1555,24 +1667,34 @@ export class Shipyard {
         this.planet.gold += goldProfit;
 
         // spawn the ship
-        const doneDockIndex = this.docks.findIndex(d => d.isDone());
+        const doneDockIndex = this.docks.findIndex(d => d.isDone() && d.shipType === shipType);
+        const dock = this.docks[doneDockIndex];
+        if (!dock.shipType) {
+            throw new Error("Dock must have ship type to be done");
+        }
         this.docks.splice(doneDockIndex, 1);
-        this.shipsAvailable -= 1;
-        return this.planet.createShip();
+        this.numShipsAvailable -= 1;
+        this.shipsAvailable[dock.shipType] -= 1;
+        return this.planet.createShip(dock.shipType);
     }
 
     /**
      * The price of the ship to buy.
      */
-    public quoteShip(asFaction: boolean = false): number {
+    public quoteShip(shipType: EShipType, asFaction: boolean = false): number {
         // factions get free ships
         if (asFaction) {
             return 0;
         }
 
-        const priceCeiling = Math.ceil(Shipyard.SHIP_COST * 3);
+        const shipData = SHIP_DATA.find(i => i.shipType === shipType);
+        if (!shipData) {
+            throw new Error("Could not find ship type");
+        }
+
+        const priceCeiling = Math.ceil(shipData.cost * 3);
         const priceFloor = 0;
-        const price = Math.ceil(Shipyard.SHIP_COST * (3 / (this.shipsAvailable - 2)));
+        const price = Math.ceil(shipData.cost * (3 / (this.shipsAvailable[shipData.shipType])));
         return Math.max(priceFloor, Math.min(price, priceCeiling));
     }
 }
@@ -1599,13 +1721,13 @@ export class Planet implements ICameraState {
     /**
      * Number of settlements to colonize a planet.
      */
-    public static NUM_SETTLEMENT_PROGRESS_STEPS = 5;
+    public static NUM_SETTLEMENT_PROGRESS_STEPS = 20;
 
     /**
      * Get the number of ships available.
      */
-    public getNumShipsAvailable(): number {
-        return this.shipyard.shipsAvailable;
+    public getNumShipsAvailable(shipType: EShipType): number {
+        return this.shipyard.shipsAvailable[shipType];
     }
 
     constructor(instance: App) {
@@ -1633,7 +1755,7 @@ export class Planet implements ICameraState {
         }
 
         // collect wood
-        this.wood += 1 * (this.settlementLevel / 5);
+        this.wood += (this.settlementLevel / 5);
 
         // handle ship building
         this.shipyard.handleShipyardLoop();
@@ -1677,17 +1799,17 @@ export class Planet implements ICameraState {
     /**
      * Create a new ship.
      */
-    public spawnShip(account: IGoldAccount, asFaction: boolean = false): Ship {
+    public spawnShip(account: IGoldAccount, shipType: EShipType, asFaction: boolean = false): Ship {
         // check ship availability
-        if (this.shipyard.shipsAvailable === 0) {
+        if (this.shipyard.shipsAvailable[shipType] === 0) {
             throw new Error("No ships available");
         }
 
         // perform gold transaction, paying 50% taxes to the faction
-        return this.shipyard.buyShip(account, asFaction);
+        return this.shipyard.buyShip(account, shipType, asFaction);
     }
 
-    createShip(): Ship {
+    createShip(shipType: EShipType): Ship {
         // get the position of the planet
         const planetWorld = this.instance.planets.find(p => p.id === this.id);
         if (!planetWorld) {
@@ -1704,6 +1826,7 @@ export class Planet implements ICameraState {
         // create ship
         const ship = new Ship();
         ship.id = `ship-${this.id}-${faction.getShipAutoIncrement()}`;
+        ship.shipType = shipType;
         App.addRandomPositionAndOrientationToEntity(ship);
         ship.position = Quaternion.fromBetweenVectors([0, 0, 1], shipPoint);
         ship.color = faction.factionColor;
@@ -1711,6 +1834,7 @@ export class Planet implements ICameraState {
         // the faction ship
         faction.shipIds.push(ship.id);
         faction.instance.ships.push(ship);
+        faction.shipsAvailable[ship.shipType] += 1;
 
         return ship;
     }
@@ -1762,6 +1886,11 @@ export class Order {
     }
 
     private settle() {
+        const shipData = SHIP_DATA.find(s => s.shipType === this.owner.shipType);
+        if (!shipData) {
+            throw new Error("Could not find ship type");
+        }
+
         if (!this.planetId) {
             throw new Error("Could not find planetId to path to (SETTLE)");
         }
@@ -1787,7 +1916,7 @@ export class Order {
 
             // update settlement progress
             colonyWorld.settlementProgress = (
-                Math.round(colonyWorld.settlementProgress * Planet.NUM_SETTLEMENT_PROGRESS_STEPS) + 1
+                Math.round(colonyWorld.settlementProgress * Planet.NUM_SETTLEMENT_PROGRESS_STEPS) + shipData.settlementProgressFactor
             ) / Planet.NUM_SETTLEMENT_PROGRESS_STEPS;
             if (colonyWorld.settlementProgress === 1) {
                 colonyWorld.settlementLevel = ESettlementLevel.OUTPOST;
@@ -1874,6 +2003,7 @@ export class Order {
 
 export class Ship implements IAutomatedShip {
     public id: string = "";
+    public shipType: EShipType = EShipType.HIND;
     public color: string = "purple";
     public position: Quaternion = Quaternion.ONE;
     public positionVelocity: Quaternion = Quaternion.ONE;
@@ -1904,7 +2034,11 @@ export class Ship implements IAutomatedShip {
      * @param sourcePlanetId The source of the resource.
      */
     public sellGoodToShip(resourceType: EResourceType, sourcePlanetId: string): boolean {
-        if (this.cargo.length < 3) {
+        const shipData = SHIP_DATA.find(s => s.shipType === this.shipType);
+        if (!shipData) {
+            throw new Error("Could not find ship type");
+        }
+        if (this.cargo.length < shipData.cargoSize) {
             this.cargo.push({
                 resourceType,
                 sourcePlanetId
@@ -2005,6 +2139,7 @@ interface IAppProps {
 
 interface IAppState {
     showNotes: boolean;
+    showShips: boolean;
     width: number;
     height: number;
     zoom: number;
@@ -2019,6 +2154,7 @@ interface IAppState {
 export class App extends React.Component<IAppProps, IAppState> {
     state = {
         showNotes: false as boolean,
+        showShips: false as boolean,
         width: 500 as number,
         height: 500 as number,
         zoom: 4 as number,
@@ -2031,6 +2167,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     };
 
     private showNotesRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
+    private showShipsRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
     private showDelaunayRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
     private showVoronoiRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
     private autoPilotEnabledRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
@@ -2098,6 +2235,16 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         const tempShip = new Ship();
         tempShip.id = "ghost-ship";
+        if (this.state.faction) {
+            // faction selected, orbit the faction's home world
+            const faction = Object.values(this.factions).find(f => f.id === this.state.faction);
+            const ship = this.ships.find(s => faction && faction.shipIds.length > 0 && s.id === faction.shipIds[0]);
+            if (ship) {
+                return App.GetCameraState(ship);
+            }
+        }
+
+        // no faction selected, orbit the world
         const numSecondsToCircle = 120;
         const millisecondsPerSecond = 1000;
         const circleSlice = numSecondsToCircle * millisecondsPerSecond;
@@ -2360,7 +2507,7 @@ export class App extends React.Component<IAppProps, IAppState> {
      * @param planetDrawing The ship to get target lines for.
      * @private
      */
-    private getShipTargetLines(planetDrawing: IDrawable<Ship>): ITargetLineData {
+    private static getShipTargetLines(planetDrawing: IDrawable<Ship>): ITargetLineData {
         const targetLines: Array<[[number, number], [number, number]]> = [];
         const targetNodes: Array<[[number, number], number]> = [];
 
@@ -2449,6 +2596,106 @@ export class App extends React.Component<IAppProps, IAppState> {
         };
     }
 
+    private renderHull(planetDrawing: IDrawable<Ship>, size: number) {
+        switch (planetDrawing.original.shipType) {
+            case EShipType.SLOOP:
+                return this.renderSloopHull(planetDrawing, size);
+            case EShipType.CORVETTE:
+                return this.renderCorvetteHull(planetDrawing, size);
+            case EShipType.HIND:
+                return this.renderHindHull(planetDrawing, size);
+            default:
+                throw new Error("Unknown Hull Type");
+        }
+    }
+
+    private renderHindHull(planetDrawing: IDrawable<Ship>, size: number) {
+        return (
+            <polygon
+                key="ship-hull"
+                points="0,-30 10,-20 10,25 5,30 0,25 -5,30 -10,25 -10,-20"
+                fill={planetDrawing.color}
+                stroke="grey"
+                strokeWidth={0.05 * size * this.state.zoom}
+                style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
+            />
+        );
+    }
+
+    private renderCorvetteHull(planetDrawing: IDrawable<Ship>, size: number) {
+        return (
+            <polygon
+                key="ship-hull"
+                points="0,-20 8,-15 8,15 4,20 0,18 -4,20 -8,15 -8,-15"
+                fill={planetDrawing.color}
+                stroke="grey"
+                strokeWidth={0.05 * size * this.state.zoom}
+                style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
+            />
+        );
+    }
+
+    private renderSloopHull(planetDrawing: IDrawable<Ship>, size: number) {
+        return (
+            <polygon
+                key="ship-hull"
+                points="0,-15 5,-10 5,15 3,10 0,12 -3,10 -5,15 -5,-10"
+                fill={planetDrawing.color}
+                stroke="grey"
+                strokeWidth={0.05 * size * this.state.zoom}
+                style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
+            />
+        );
+    }
+
+    private renderShip(planetDrawing: IDrawable<Ship>, size: number) {
+        const shipData = SHIP_DATA.find(item => item.shipType === planetDrawing.original.shipType);
+        if (!shipData) {
+            throw new Error("Cannot find ship type");
+        }
+        const cannonsLeft = Math.ceil(shipData.cannons.numCannons / 2);
+        const cannonsRight = shipData.cannons.numCannons - cannonsLeft;
+        return (
+            <>
+                {
+                    this.renderHull(planetDrawing, size)
+                }
+                {
+                    new Array(cannonsRight).fill(0).map((v, index) => {
+                        const cannonRightSize = (shipData.cannons.startY - shipData.cannons.endY) / cannonsRight;
+                        return (
+                            <polygon
+                                key={`cannon-right-${index}`}
+                                transform={`translate(${-shipData.cannons.rightWall},${shipData.cannons.endY + cannonRightSize * (index + 0.5)})`}
+                                points="5,-2 0,-2 0,2 5,2"
+                                fill="darkgrey"
+                                stroke="grey"
+                                strokeWidth={0.05 * size * this.state.zoom}
+                                style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
+                            />
+                        );
+                    })
+                }
+                {
+                    new Array(cannonsLeft).fill(0).map((v, index) => {
+                        const cannonsLeftSize = (shipData.cannons.startY - shipData.cannons.endY) / cannonsLeft;
+                        return (
+                            <polygon
+                                key={`cannon-left-${index}`}
+                                transform={`translate(${-shipData.cannons.leftWall},${shipData.cannons.endY + cannonsLeftSize * (index + 0.5)})`}
+                                points="-5,-2 0,-2 0,2 -5,2"
+                                fill="darkgrey"
+                                stroke="grey"
+                                strokeWidth={0.05 * size * this.state.zoom}
+                                style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
+                            />
+                        );
+                    })
+                }
+            </>
+        )
+    }
+
     private drawShip(planetDrawing: IDrawable<Ship>) {
         const isReverseSide = planetDrawing.rotatedPosition[2] > 0;
         const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
@@ -2471,7 +2718,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             velocityX = velocityPoint[0];
             velocityY = velocityPoint[1];
 
-            targetLineData = this.getShipTargetLines.call(this, planetDrawing);
+            targetLineData = App.getShipTargetLines.call(this, planetDrawing);
         }
         const rightCannonPointTop: [number, number] = [
             Math.max(this.state.width / 2, this.state.height / 2) * Math.cos((10 / 180 * Math.PI)) * this.state.zoom,
@@ -2550,13 +2797,9 @@ export class App extends React.Component<IAppProps, IAppState> {
                     })
                 }
                 <g transform={`rotate(${planetDrawing.rotation}) scale(${scale})`}>
-                    <polygon
-                        points="0,-30 10,-20 10,25 5,30 0,25 -5,30 -10,25 -10,-20"
-                        fill={planetDrawing.color}
-                        stroke="grey"
-                        strokeWidth={0.05 * size * this.state.zoom}
-                        style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
-                    />
+                    {
+                        this.renderShip(planetDrawing, size)
+                    }
                     {
                         isPlayerShip && planetDrawing.original.cannonLoading && (
                             <>
@@ -2799,7 +3042,12 @@ export class App extends React.Component<IAppProps, IAppState> {
             orientation: cameraOrientation,
             orientationVelocity: cameraOrientationVelocity,
             cannonLoading: cameraCannonLoading,
+            shipType
         } = this.ships[shipIndex];
+        const shipData = SHIP_DATA.find(i => i.shipType === shipType);
+        if (!shipData) {
+            throw new Error("Could not find Ship Type");
+        }
         const smokeClouds = [
             ...this.smokeClouds.filter(smokeCloud => {
                 return +smokeCloud.expires > Date.now();
@@ -2898,7 +3146,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             cameraCannonLoading = undefined;
 
             // fire 8 guns
-            for (let i = 0; i < 8; i++) {
+            for (let i = 0; i < shipData.cannons.numCannons; i++) {
                 // pick left or right side
                 let jitterPoint: [number, number, number] = [i % 2 === 0 ? -1 : 1, 0, 0];
                 // apply random jitter
@@ -3004,6 +3252,15 @@ export class App extends React.Component<IAppProps, IAppState> {
             this.setState({
                 ...this.state,
                 showNotes: this.showNotesRef.current.checked,
+            });
+        }
+    }
+
+    private handleShowShips() {
+        if (this.showShipsRef.current) {
+            this.setState({
+                ...this.state,
+                showShips: this.showShipsRef.current.checked,
             });
         }
     }
@@ -3174,23 +3431,26 @@ export class App extends React.Component<IAppProps, IAppState> {
         const factionDataList = [{
             id: EFaction.DUTCH,
             color: "orange",
-            planetId: this.planets[0].id
+            // the forth planet is always in a random location
+            // the dutch are a republic which means players can vote on things
+            // but the dutch are weaker compared to the kingdoms
+            planetId: this.planets[4].id
         }, {
             id: EFaction.ENGLISH,
             color: "red",
-            planetId: this.planets[1].id
+            planetId: this.planets[0].id
         }, {
             id: EFaction.FRENCH,
             color: "blue",
-            planetId: this.planets[2].id
+            planetId: this.planets[1].id
         }, {
             id: EFaction.PORTUGUESE,
             color: "green",
-            planetId: this.planets[3].id
+            planetId: this.planets[2].id
         }, {
             id: EFaction.SPANISH,
             color: "yellow",
-            planetId: this.planets[4].id
+            planetId: this.planets[3].id
         }];
         for (const factionData of factionDataList) {
             this.factions[factionData.id] = new Faction(this, factionData.id, factionData.color, factionData.planetId);
@@ -3198,8 +3458,14 @@ export class App extends React.Component<IAppProps, IAppState> {
             if (planet) {
                 for (let numShipsToStartWith = 0; numShipsToStartWith < 5; numShipsToStartWith++) {
                     const dock = new ShipyardDock(this, planet, planet.shipyard);
-                    dock.shipCost = Shipyard.SHIP_COST;
-                    dock.progress = Shipyard.SHIP_COST - 1;
+                    const shipType = planet.shipyard.getNextShipTypeToBuild();
+                    const shipData = SHIP_DATA.find(s => s.shipType === shipType);
+                    if (!shipData) {
+                        throw new Error("Could not find ship type");
+                    }
+                    dock.shipType = shipType;
+                    dock.shipCost = shipData.cost;
+                    dock.progress = shipData.cost - 1;
                     planet.shipyard.docks.push(dock);
                 }
             }
@@ -3325,12 +3591,20 @@ export class App extends React.Component<IAppProps, IAppState> {
     private renderGameControls() {
         return (
             <g key="game-controls" id="game-controls">
-                <text x="0" y="30" color="black">Zoom</text>
+                <text x="0" y="30" fill="black">Zoom</text>
                 <rect x="0" y="45" width="20" height="20" fill="grey" onClick={this.decrementZoom.bind(this)}/>
                 <text x="25" y="60" textAnchor="center">{this.state.zoom}</text>
                 <rect x="40" y="45" width="20" height="20" fill="grey" onClick={this.incrementZoom.bind(this)}/>
-                <text x="5" y="60">-</text>
-                <text x="40" y="60">+</text>
+                <text x="5" y="60" onClick={this.decrementZoom.bind(this)}>-</text>
+                <text x="40" y="60" onClick={this.incrementZoom.bind(this)}>+</text>
+                {
+                    this.playerShip && (
+                        <>
+                            <rect key="return-to-menu-rect" x="5" y="75" width="50" height="20" fill="red" onClick={this.returnToMainMenu.bind(this)}/>
+                            <text key="return-to-menu-text" x="10" y="90" fill="white" onClick={this.returnToMainMenu.bind(this)}>Leave</text>
+                        </>
+                    )
+                }
             </g>
         );
     }
@@ -3443,14 +3717,14 @@ export class App extends React.Component<IAppProps, IAppState> {
         );
     }
 
-    public beginSpawnShip(planetId: string) {
+    public beginSpawnShip(planetId: string, shipType: EShipType) {
         if (this.state.faction) {
             this.setState({
                 showSpawnMenu: false
             });
             const planet = this.planets.find(p => p.id === planetId);
-            if (planet && this.gold >= planet.shipyard.quoteShip()) {
-                this.playerShip = planet.shipyard.buyShip(this);
+            if (planet && this.gold >= planet.shipyard.quoteShip(shipType)) {
+                this.playerShip = planet.shipyard.buyShip(this, shipType);
             } else {
                 this.returnToMainMenu();
             }
@@ -3465,12 +3739,13 @@ export class App extends React.Component<IAppProps, IAppState> {
             showMainMenu: true,
             faction: null
         });
+        this.playerShip = null;
     }
 
     private renderSpawnMenu() {
-        const x = this.state.width / 5;
+        const x = this.state.width / 3;
         const y = this.state.height / 2 + 50;
-        const width = (this.state.width / 5) - 20;
+        const width = (this.state.width / 3) - 20;
         const height = 40;
         const spawnLocations = [];
         let faction: Faction | null = null;
@@ -3497,11 +3772,17 @@ export class App extends React.Component<IAppProps, IAppState> {
             );
 
             for (const planet of planetsToSpawnAt) {
-                spawnLocations.push({
-                    id: planet.id,
-                    numShipsAvailable: planet.getNumShipsAvailable(),
-                    price: planet.shipyard.quoteShip(),
-                });
+                for (const shipType of Object.values(EShipType)) {
+                    const numShipsAvailable = planet.getNumShipsAvailable(shipType);
+                    if (numShipsAvailable > 0) {
+                        spawnLocations.push({
+                            id: planet.id,
+                            numShipsAvailable,
+                            price: planet.shipyard.quoteShip(shipType),
+                            shipType
+                        });
+                    }
+                }
             }
         }
         return (
@@ -3510,13 +3791,11 @@ export class App extends React.Component<IAppProps, IAppState> {
                     fill="white"
                     fontSize="28"
                     x={this.state.width / 2}
-                    y={this.state.height / 2 - 14}
+                    y={this.state.height / 2 - 14 - 50}
                     textAnchor="middle"
                 >{this.state.faction}</text>
                 {
                     spawnLocations.map((spawnLocation, index) => {
-                        // offset spawn menu so it is centered
-                        index += 2;
                         return (
                             <>
                                 <rect
@@ -3524,19 +3803,34 @@ export class App extends React.Component<IAppProps, IAppState> {
                                     stroke="white"
                                     fill="transparent"
                                     x={x * (index + 0.5) - width / 2}
-                                    y={y - 20}
+                                    y={y - 20 - 50}
                                     width={width}
-                                    height={height}
-                                    onClick={this.beginSpawnShip.bind(this, spawnLocation.id)}
+                                    height={height + 50}
+                                    onClick={this.beginSpawnShip.bind(this, spawnLocation.id, spawnLocation.shipType)}
                                 />
+                                {
+                                    <g
+                                        key={`${spawnLocation.id}-ship`}
+                                        transform={`translate(${x * (index + 0.5)},${y - 10 - 25})`}
+                                        onClick={this.beginSpawnShip.bind(this, spawnLocation.id, spawnLocation.shipType)}
+                                    >
+                                        {
+                                            this.renderShip(this.getShowShipDrawing(
+                                                `${spawnLocation.id}-spawn-location-ship`,
+                                                spawnLocation.shipType,
+                                                this.state.faction
+                                            ), 1)
+                                        }
+                                    </g>
+                                }
                                 <text
                                     key={`${spawnLocation.id}-spawn-location-text`}
                                     fill="white"
                                     x={x * (index + 0.5)}
                                     y={y + 5}
                                     textAnchor="middle"
-                                    onClick={this.beginSpawnShip.bind(this, spawnLocation.id)}
-                                >Spawn ({spawnLocation.numShipsAvailable} Ships, {spawnLocation.price}gp)</text>
+                                    onClick={this.beginSpawnShip.bind(this, spawnLocation.id, spawnLocation.shipType)}
+                                >{spawnLocation.shipType} {spawnLocation.price}gp</text>
                             </>
                         );
                     })
@@ -3544,7 +3838,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 <rect
                     stroke="white"
                     fill="transparent"
-                    x={x * 2.5 - width / 2}
+                    x={x * 1.5 - width / 2}
                     y={y - 20 + height}
                     width={width}
                     height={height}
@@ -3552,13 +3846,26 @@ export class App extends React.Component<IAppProps, IAppState> {
                 />
                 <text
                     fill="white"
-                    x={x * 2.5}
+                    x={x * 1.5}
                     y={y + 5 + height}
                     textAnchor="middle"
                     onClick={this.returnToMainMenu.bind(this)}
                 >Back</text>
             </g>
         );
+    }
+
+    getShowShipDrawing(id: string, shipType: EShipType, factionType: EFaction | null = null): IDrawable<Ship> {
+        const original: Ship = new Ship();
+        original.shipType = shipType;
+        original.id = id;
+        if (factionType) {
+            const faction = Object.values(this.factions).find(f => f.id === factionType);
+            if (faction) {
+                original.color = faction.factionColor;
+            }
+        }
+        return this.convertToDrawable("draw-ships", 1, this.rotatePlanet(original));
     }
 
     render() {
@@ -3568,6 +3875,10 @@ export class App extends React.Component<IAppProps, IAppState> {
                     <div style={{display: "inline-block"}}>
                         <input type="checkbox" ref={this.showNotesRef} checked={this.state.showNotes} onChange={this.handleShowNotes.bind(this)}/>
                         <span>Show Notes</span>
+                    </div>
+                    <div style={{display: "inline-block"}}>
+                        <input type="checkbox" ref={this.showShipsRef} checked={this.state.showShips} onChange={this.handleShowShips.bind(this)}/>
+                        <span>Show Ships</span>
                     </div>
                     <div style={{display: "inline-block"}}>
                         <input type="checkbox" ref={this.showDelaunayRef} checked={this.state.showDelaunay} onChange={this.handleShowDelaunay.bind(this)}/>
@@ -3596,8 +3907,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                             <li>Spawn settler ships to colonize other worlds. Each world has upto 3 resources. DONE 4/21/2021</li>
                             <li>Spawn merchant ships to trade with colonies. Trading is simplified flying between A and B. DONE 4/21/2021</li>
                             <li>Add economics, price rising and falling based on supply and demand, traders will try to go towards important colonies. DONE 4/21/2021</li>
-                            <li>Add ship building economy for each planet.</li>
-                            <li>Planets will sell ships using dutch auction, 50% will go to faction as tax, 50% will go to island renovation.</li>
+                            <li>Add ship building economy for each planet. DONE 4/24/2021</li>
+                            <li>Planets will sell ships using dutch auction, 50% will go to faction as tax, 50% will go to island renovation. DONE 4/24/2021</li>
                             <li>Make cannon balls damage merchant ships.</li>
                             <li>Add ability to pirate merchants and raid colonies.</li>
                             <li>Add AI pirates and pirate hunters.</li>
@@ -3628,6 +3939,25 @@ export class App extends React.Component<IAppProps, IAppState> {
                                 </ul>
                             </li>
                             <li>Make multiple rooms/worlds for large amounts of players.</li>
+                        </ul>
+                    )
+                }
+                {
+                    this.state.showShips && (
+                        <ul>
+                            {
+                                SHIP_DATA.map(ship => {
+                                    return (
+                                        <svg key={`show-ship-${ship.shipType}`} width="100" height="100">
+                                            <g transform="translate(50, 50)">
+                                                {
+                                                    this.renderShip(this.getShowShipDrawing(ship.shipType, ship.shipType), 1)
+                                                }
+                                            </g>
+                                        </svg>
+                                    );
+                                })
+                            }
                         </ul>
                     )
                 }
