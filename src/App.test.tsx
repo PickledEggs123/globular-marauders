@@ -1,5 +1,5 @@
 import React from 'react';
-import App, {CAPITAL_GOODS, DelaunayGraph, EFaction, EOrderType, OUTPOST_GOODS, PathFinder, Planet, Ship} from './App';
+import App, {CAPITAL_GOODS, DelaunayGraph, EFaction, EOrderType, OUTPOST_GOODS, PathFinder, Ship} from './App';
 import {shallow} from "enzyme";
 import Quaternion from "quaternion";
 import sinon from 'sinon';
@@ -47,22 +47,30 @@ const setupTradingTest = (numMinutes: number = 2) => {
   app.forceUpdate = () => undefined;
 
   // setup test ship and nav point
+  // select faction
   clearInterval(app.rotateCameraInterval);
   app.rotateCameraInterval = null;
   app.selectFaction(EFaction.DUTCH);
   wrapper.update();
-  app.beginSpawnShip();
+
+  // get planets
+  const faction = app.factions[EFaction.DUTCH];
+  const getOrder = sinon.spy(faction, "getOrder");
+  const colonyWorldTrades = app.planets.map(p => ({ id: p.id, spy: sinon.spy(p, "trade"), planet: p }));
+  const homeWorldTradeItem = colonyWorldTrades.find(c => c.id === faction.homeWoldPlanetId);
+  if (!homeWorldTradeItem) {
+    throw new Error("Could not find home world trade");
+  }
+
+  // spawn at home world
+  app.beginSpawnShip(homeWorldTradeItem.planet.id);
   wrapper.update();
 
   if (app.playerShip === null) {
     throw new Error("NULL PLAYER SHIP");
   }
   const testShip = app.playerShip;
-  const faction = app.factions[EFaction.DUTCH];
-  const getOrder = sinon.spy(faction, "getOrder");
-  const colonyWorldTrades = app.planets.map(p => ({ id: p.id, spy: sinon.spy(p, "trade"), planet: p }));
   const buyGoodFromShip = sinon.spy(testShip, "buyGoodFromShip");
-  const sellGoodToShip = sinon.spy(testShip, "sellGoodToShip");
 
   // test the ship navigation to nav point
   const numStepsPerSecond = 10;
@@ -71,7 +79,7 @@ const setupTradingTest = (numMinutes: number = 2) => {
   let successfullyReachedDestination = false;
   let lastCallCount: number = 0;
   for (let step = 0; step < numSteps; step++) {
-    Object.values(app.factions).forEach(f => f.wood = 0);
+    Object.values(app.planets).forEach(p => p.wood = 0);
     app.gameLoop.call(app);
     if (getOrder.callCount !== lastCallCount) {
       lastCallCount = getOrder.callCount;
@@ -83,6 +91,11 @@ const setupTradingTest = (numMinutes: number = 2) => {
   }
 
   // expect the ship to successfully colonize land
+  const colonyWorldTradeItem = colonyWorldTrades.find(c => c.id === getOrder.returnValues[4].planetId);
+  if (!colonyWorldTradeItem) {
+    throw new Error("Could not find colony world trade");
+  }
+
   expect(successfullyReachedDestination).toBeTruthy();
   expect(getOrder.returnValues[0].orderType).toBe(EOrderType.SETTLE);
   expect(getOrder.returnValues[1].orderType).toBe(EOrderType.SETTLE);
@@ -91,24 +104,14 @@ const setupTradingTest = (numMinutes: number = 2) => {
   expect(getOrder.returnValues[4].orderType).toBe(EOrderType.SETTLE);
 
   // expect ship to trade with second planet
-  const homeWorldTradeItem = colonyWorldTrades.find(c => c.id === faction.homeWoldPlanetId);
-  if (!homeWorldTradeItem) {
-    throw new Error("Could not find home world trade");
-  }
-
-  const colonyWorldTradeItem = colonyWorldTrades.find(c => c.id === getOrder.returnValues[4].planetId);
-  if (!colonyWorldTradeItem) {
-    throw new Error("Could not find colony world trade");
-  }
-
   expect(getOrder.returnValues[5].orderType).toBe(EOrderType.TRADE);
   expect(colonyWorldTradeItem.spy.callCount).toBeGreaterThan(0);
   let buyGoodCall = 0;
   for (let step = 0; step < colonyWorldTradeItem.spy.callCount; step++) {
-    for (const outpostGood of homeWorldTradeItem.planet.resources) {
+    for (const outpostGood of OUTPOST_GOODS) {
       expect(buyGoodFromShip.getCall(buyGoodCall++).args[0]).toBe(outpostGood);
     }
-    for (const capitalGood of colonyWorldTradeItem.planet.resources) {
+    for (const capitalGood of CAPITAL_GOODS) {
       expect(buyGoodFromShip.getCall(buyGoodCall++).args[0]).toBe(capitalGood);
     }
   }
