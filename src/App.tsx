@@ -2,17 +2,96 @@ import React from 'react';
 import './App.css';
 import Quaternion from 'quaternion';
 
+export interface IHitTest {
+    success: boolean;
+    point: [number, number, number] | null;
+    distance: number | null;
+    time: number | null;
+}
+
+/**
+ * The min distance in rendering to prevent disappearing ship bug.
+ */
+export const MIN_DISTANCE = 1 / 10;
+
+/**
+ * The scale of the graphics engine to physics. All graphics is a plane scaled down by this factor, then projected
+ * onto the sphere.
+ */
+export const PHYSICS_SCALE = 1 / 1000;
+
+/**
+ * The hind class ship hull. This format allows rendering in graphics and computing the physics hull.
+ */
+export const HindHull: Array<[number, number]> = [
+    [0, -30],
+    [10, -20],
+    [10, 25],
+    [5, 30],
+    [0, 25],
+    [-5, 30],
+    [-10, 25],
+    [-10, -20]
+];
+
+/**
+ * The hull of the corvette class ship. This format allows rendering and physics hull computations.
+ */
+export const CorvetteHull: Array<[number, number]> = [
+    [0, -20],
+    [8, -15],
+    [8, 15],
+    [4, 20],
+    [0, 18],
+    [-4, 20],
+    [-8, 15],
+    [-8, -15]
+];
+
+/**
+ * The hull of the sloop class ships. This format allows for rendering and physics hull computations.
+ */
+export const SloopHull: Array<[number, number]> = [
+    [0, -15],
+    [5, -10],
+    [5, 15],
+    [3, 10],
+    [0, 12],
+    [-3, 10],
+    [-5, 15],
+    [-5, -10]
+];
+
+/**
+ * Types of ships.
+ */
 export enum EShipType {
+    /**
+     * A small ship with two cannons, one on each side. Meant for trading and speed. It is cheap to build.
+     * It has 4 cannonades.
+     */
     SLOOP = "SLOOP",
+    /**
+     * A ship with four cannons, two on each side, it has 10 cannonades which automatically fire at near by ship.
+     * Great for speed and harassing enemies from strange angles. Also cheap to build.
+     */
     CORVETTE = "CORVETTE",
+    /**
+     * The cheap main battle ship which has 8 cannons, 4 on each side and no cannonades. Made to attack ships directly.
+     */
     HIND = "HIND",
 }
 
+/**
+ * The data format for new ships.
+ */
 export interface IShipData {
     shipType: EShipType;
     cost: number;
     settlementProgressFactor: number;
     cargoSize: number;
+    hull: Array<[number, number]>;
+    hullStrength: number;
     cannons: {
         numCannons: number;
         startY: number;
@@ -22,11 +101,16 @@ export interface IShipData {
     }
 }
 
+/**
+ * The list of ship data.
+ */
 const SHIP_DATA: IShipData[] = [{
     shipType: EShipType.HIND,
     cost: 600,
     settlementProgressFactor: 4,
     cargoSize: 3,
+    hull: HindHull,
+    hullStrength: 60,
     cannons: {
         numCannons: 8,
         startY: 20,
@@ -39,6 +123,8 @@ const SHIP_DATA: IShipData[] = [{
     cost: 300,
     settlementProgressFactor: 2,
     cargoSize: 2,
+    hull: CorvetteHull,
+    hullStrength: 30,
     cannons: {
         numCannons: 4,
         startY: 15,
@@ -51,6 +137,8 @@ const SHIP_DATA: IShipData[] = [{
     cost: 150,
     settlementProgressFactor: 1,
     cargoSize: 1,
+    hull: SloopHull,
+    hullStrength: 20,
     cannons: {
         numCannons: 2,
         startY: 10,
@@ -60,27 +148,86 @@ const SHIP_DATA: IShipData[] = [{
     }
 }];
 
+/**
+ * An object which has gold. Can be used to pay for ships.
+ */
 interface IGoldAccount {
     gold: number;
 }
 
+/**
+ * An object which represents cargo.
+ */
 interface ICargoItem {
+    /**
+     * The source of the cargo. Delivering cargo will apply a cargo buff to the faction, giving the faction more gold
+     * for 10 minutes. Delivering cargo from the same planet will not stack the buff.
+     */
     sourcePlanetId: string;
+    /**
+     * The type of resource. Each resource will be used to compute buffs separately. One faction can specialize in tea
+     * while another can specialize in coffee. A faction which has large amounts of a single resource will force
+     * other factions to pay it gold to access the luxury. Factions will be forced to tariff, embargo or declare war
+     * to resolve the trade deficit.
+     */
     resourceType: EResourceType;
 }
 
+/**
+ * A type of order for a ship to complete. Orders are actions the ship should take on behalf of the faction.
+ */
 export enum EOrderType {
+    /**
+     * Explore space randomly.
+     */
     ROAM = "ROAM",
+    /**
+     * Move settlers to a planet to colonize it.
+     */
     SETTLE = "SETTLE",
+    /**
+     * Trade with a planet to collect luxuries.
+     */
     TRADE = "TRADE",
 }
 
+/**
+ * The level of settlement of a world.
+ */
 export enum ESettlementLevel {
+    /**
+     * The world does not have any faction on it.
+     */
     UNTAMED = 0,
+    /**
+     * The world is a small outpost which can repair ships and produce luxuries such as fur. But it cannot produce
+     * ships. Ship production is too complicated for an outpost. This planet has no government.
+     */
     OUTPOST = 1,
+    /**
+     * The world is larger and can repair ships and also produce small ships. It is able to engage in manufacturing,
+     * producing more complicated goods. This planet has a small government, either a republic or a governor. Colonies
+     * will send taxes with a trade ship back to the capital so the capital can issue more orders.
+     */
     COLONY = 2,
+    /**
+     * The world is larger and can repair ships and also produce medium ships. It is able to produce complicated goods
+     * and is considered a core part of the faction. This world is able to issue it's own orders to it's own local fleet,
+     * similar to a capital but the capital will always override the territory. Capitals can issue general economic orders
+     * to territories.
+     */
     TERRITORY = 3,
+    /**
+     * This world is a core part of the faction and contains lots of manufacturing and investments. It is able to produce
+     * large ships. Provinces can issue it's own orders to it's local fleet similar to a capital but the capital will always
+     * override the province. Capitals can issue general economic orders to provinces. Provinces can issue general
+     * economic orders to territories.
+     */
     PROVINCE = 4,
+    /**
+     * This world is the capital of the faction. It is able to produce the largest ships. All orders come from the capital.
+     * If the capital is captured, another province or territory can become a second capital to replace the original capital.
+     */
     CAPITAL = 5,
 }
 
@@ -132,6 +279,9 @@ export const CAPITAL_GOODS: EResourceType[] = [
     EResourceType.RATION,
 ];
 
+/**
+ * A list of planets to explore, used internally by the faction.
+ */
 interface IExplorationGraphData {
     distance: number;
     settlerShipIds: string[];
@@ -496,6 +646,7 @@ interface ICellData {
 export class VoronoiCell implements ICellData {
     public vertices: [number, number, number][] = [];
     public centroid: [number, number, number] = [0, 0, 0];
+    public radius: number = 0;
 }
 
 /**
@@ -520,6 +671,11 @@ export class VoronoiGraph<T extends ICameraState> {
      * A list of drawables mapped to voronoi cells to speed up rendering.
      */
     drawableMap: Record<number, Array<T>> = {};
+
+    /**
+     * A list of drawable id to drawable map for quick reference.
+     */
+    drawableSet: Record<string, number> = {};
 
     /**
      * The angular distance between two points.
@@ -565,13 +721,23 @@ export class VoronoiGraph<T extends ICameraState> {
      * @param drawable The drawable to add.
      */
     addDrawable(drawable: T) {
+
         const drawablePosition = drawable.position.rotateVector([0, 0, 1]);
         const closestIndex = this.findClosestVoronoiCellIndex(drawablePosition);
         if (closestIndex >= 0) {
+            // if old index is different, remove old index
+            const oldIndex: number | undefined = this.drawableSet[drawable.id];
+            if (oldIndex !== undefined && closestIndex !== oldIndex) {
+                const index = this.drawableMap[oldIndex].findIndex(d => d === drawable);
+                this.drawableMap[oldIndex].splice(index, 1);
+            }
+
+            // add new mapping
             if (typeof(this.drawableMap[closestIndex]) === "undefined") {
                 this.drawableMap[closestIndex] = [];
             }
             this.drawableMap[closestIndex].push(drawable);
+            this.drawableSet[drawable.id] = closestIndex;
         }
     }
 
@@ -582,11 +748,12 @@ export class VoronoiGraph<T extends ICameraState> {
     *fetchDrawables(position: [number, number, number]): Generator<T> {
         const closestCellIndices: number[] = [];
         for (let i = 0; i < this.cells.length; i++) {
+            const cell = this.cells[i];
             const cellDistance = Math.acos(DelaunayGraph.dotProduct(
                 position,
-                this.cells[i].centroid
-            )) * 180 / Math.PI;
-            if (cellDistance > 80) {
+                cell.centroid
+            ));
+            if (cellDistance < cell.radius) {
                 closestCellIndices.push(i);
             }
         }
@@ -1363,6 +1530,15 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                 const cell = new VoronoiCell();
                 cell.vertices.push(...points);
                 cell.centroid = VoronoiGraph.centroidOfCell(cell);
+                cell.radius = cell.vertices.reduce((acc: number, vertex): number => {
+                    return Math.max(
+                        acc,
+                        VoronoiGraph.angularDistance(
+                            cell.centroid,
+                            vertex
+                        )
+                    );
+                }, 0);
                 graph.cells.push(cell);
             }
         }
@@ -1824,9 +2000,8 @@ export class Planet implements ICameraState {
         }
 
         // create ship
-        const ship = new Ship();
+        const ship = new Ship(shipType);
         ship.id = `ship-${this.id}-${faction.getShipAutoIncrement()}`;
-        ship.shipType = shipType;
         App.addRandomPositionAndOrientationToEntity(ship);
         ship.position = Quaternion.fromBetweenVectors([0, 0, 1], shipPoint);
         ship.color = faction.factionColor;
@@ -2003,7 +2178,7 @@ export class Order {
 
 export class Ship implements IAutomatedShip {
     public id: string = "";
-    public shipType: EShipType = EShipType.HIND;
+    public shipType: EShipType;
     public color: string = "purple";
     public position: Quaternion = Quaternion.ONE;
     public positionVelocity: Quaternion = Quaternion.ONE;
@@ -2013,7 +2188,28 @@ export class Ship implements IAutomatedShip {
     public activeKeys: string[] = [];
     public pathFinding: PathFinder<Ship> = new PathFinder<Ship>(this);
     public order: Order | null = null;
+    public health: number = 1;
+    public maxHealth: number = 1;
     private cargo: ICargoItem[] = [];
+
+    constructor(shipType: EShipType) {
+        this.shipType = shipType;
+
+        const shipData = SHIP_DATA.find(s => s.shipType === this.shipType);
+        if (!shipData) {
+            throw new Error("Could not find ship type");
+        }
+        this.health = shipData.hullStrength;
+        this.maxHealth = shipData.hullStrength;
+    }
+
+    /**
+     * Apply damage to the ship. Damage will slow down the ship and enough damage will destroy it.
+     * @param cannonBall
+     */
+    public applyDamage(cannonBall: CannonBall) {
+        this.health = Math.max(0, this.health - 1);
+    }
 
     /**
      * Buy a good from the ship.
@@ -2060,6 +2256,18 @@ export class SmokeCloud implements ICameraState, IExpirable {
     public size: number = 1;
     public created: Date = new Date(Date.now());
     public expires: Date = new Date(Date.now() + 10000);
+}
+
+export class CannonBall implements ICameraState {
+    public id: string = "";
+    public color: string = "grey";
+    public position: Quaternion = Quaternion.ONE;
+    public positionVelocity: Quaternion = Quaternion.ONE;
+    public orientation: Quaternion = Quaternion.ONE;
+    public orientationVelocity: Quaternion = Quaternion.ONE;
+    public size: number = 1;
+    public maxLife: number = 10 * 5;
+    public life: number = 0;
 }
 
 interface ICameraState {
@@ -2178,13 +2386,14 @@ export class App extends React.Component<IAppProps, IAppState> {
     public delaunayGraph: DelaunayGraph<Planet> = new DelaunayGraph<Planet>();
     private delaunayData: DelaunayTriangle[] = [];
     public voronoiGraph: VoronoiGraph<Planet> = new VoronoiGraph();
+    public voronoiShips: VoronoiGraph<Ship> = new VoronoiGraph();
     public factions: { [key: string]: Faction } = {};
     public ships: Ship[] = [];
     public playerShip: Ship | null = null;
     public planets: Planet[] = [];
     public stars: Planet[] = [];
     public smokeClouds: SmokeCloud[] = [];
-    public cannonBalls: SmokeCloud[] = [];
+    public cannonBalls: CannonBall[] = [];
     public luxuryBuffs: LuxuryBuff[] = [];
     public gold: number = 100000;
 
@@ -2233,12 +2442,12 @@ export class App extends React.Component<IAppProps, IAppState> {
             return App.GetCameraState(ship);
         }
 
-        const tempShip = new Ship();
+        const tempShip = new Ship(EShipType.SLOOP);
         tempShip.id = "ghost-ship";
         if (this.state.faction) {
             // faction selected, orbit the faction's home world
             const faction = Object.values(this.factions).find(f => f.id === this.state.faction);
-            const ship = this.ships.find(s => faction && faction.shipIds.length > 0 && s.id === faction.shipIds[0]);
+            const ship = this.ships.find(s => faction && faction.shipIds.length > 0 && s.id === faction.shipIds[faction.shipIds.length - 1]);
             if (ship) {
                 return App.GetCameraState(ship);
             }
@@ -2301,7 +2510,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         } = graphicsOnlyObject;
 
         // apply basic kinematics
-        const t = (+new Date() - +created) / 1000;
+        const t = (+new Date() - +created) / 100;
         const position = objectPositionVelocity.clone().pow(t).mul(objectPosition);
         const orientation = objectOrientationVelocity.clone().pow(t).mul(objectOrientation);
 
@@ -2337,12 +2546,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         const rotatedPosition = planet.position.rotateVector([0, 0, 1]);
         const projection = this.stereographicProjection(planet, size);
         const reverseProjection = this.stereographicProjection(planet, size);
-        // const distance = 50 * Math.sqrt(
-        //     Math.pow(rotatedPosition[0], 2) +
-        //     Math.pow(rotatedPosition[1], 2) +
-        //     Math.pow(1 - rotatedPosition[2], 2)
-        // );
-        const distance = 5 * (1 - rotatedPosition[2] * size);
+        const distance = Math.max(MIN_DISTANCE, 5 * (1 - rotatedPosition[2] * size));
         const orientationPoint = planet.orientation.rotateVector([1, 0, 0]);
         const rotation = Math.atan2(-orientationPoint[1], orientationPoint[0]) / Math.PI * 180;
         return {
@@ -2385,8 +2589,8 @@ export class App extends React.Component<IAppProps, IAppState> {
         const isReverseSide = planetDrawing.rotatedPosition[2] < 0;
         const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
         const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
-        const distance = planetDrawing.distance;
-        const size = Math.max(0, 2 * Math.atan((planetDrawing.original.size || 1) / (2 * distance)));
+        const distance = planetDrawing.distance * 5;
+        const size = 5 * Math.max(0, 2 * Math.atan(planetDrawing.original.size / (2 * distance)));
 
         // extract faction information
         let factionColor: string | null = null;
@@ -2468,7 +2672,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
         const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
         const distance = planetDrawing.distance;
-        const size = Math.max(0, 2 * Math.atan((planetDrawing.original.size || 1) / (2 * distance)));
+        const size = 0.1 * Math.max(0, 2 * Math.atan((planetDrawing.original.size || 1) / (2 * distance)));
         return (
             <g key={planetDrawing.id}>
                 <circle
@@ -2596,54 +2800,57 @@ export class App extends React.Component<IAppProps, IAppState> {
         };
     }
 
-    private renderHull(planetDrawing: IDrawable<Ship>, size: number) {
-        switch (planetDrawing.original.shipType) {
-            case EShipType.SLOOP:
-                return this.renderSloopHull(planetDrawing, size);
-            case EShipType.CORVETTE:
-                return this.renderCorvetteHull(planetDrawing, size);
-            case EShipType.HIND:
-                return this.renderHindHull(planetDrawing, size);
-            default:
-                throw new Error("Unknown Hull Type");
+    /**
+     * Compute a set of physics quaternions for the hull.
+     * @param hullPoints A physics hull to convert to quaternions.
+     * @private
+     */
+    private static getPhysicsHull(hullPoints: Array<[number, number]>): Quaternion[] {
+        const hullSpherePoints = hullPoints.map(([xi, yi]): [number, number, number] => {
+            const x = xi * PHYSICS_SCALE;
+            const y = -yi * PHYSICS_SCALE;
+            const z = Math.sqrt(1 - Math.pow(x, 2) - Math.pow(y, 2));
+            return [x, y, z];
+        });
+        return hullSpherePoints.map((point) => Quaternion.fromBetweenVectors([0, 0, 1], point));
+    }
+
+    /**
+     * Draw a physics hull.
+     * @param planetDrawing
+     * @param size
+     * @param hullPoints
+     * @private
+     */
+    private renderPhysicsHull(planetDrawing: IDrawable<Ship>) {
+        // do not draw hulls on the other side of the world
+        if (planetDrawing.rotatedPosition[2] < 0) {
+            return null;
         }
-    }
 
-    private renderHindHull(planetDrawing: IDrawable<Ship>, size: number) {
+        const shipData = SHIP_DATA.find(s => s.shipType === planetDrawing.original.shipType);
+        if (!shipData) {
+            throw new Error("Could not find ship type");
+        }
+        const hullPoints = shipData.hull;
+
+        const hullQuaternions = App.getPhysicsHull(hullPoints);
+        const rotatedHullQuaternion = hullQuaternions.map((q): Quaternion => {
+            return planetDrawing.position.clone()
+                .mul(q);
+        });
+        const rotatedHullPoints = rotatedHullQuaternion.map((q): [number, number] => {
+            const point = q.rotateVector([0, 0, 1]);
+            return [point[0], point[1]]
+        });
+
         return (
             <polygon
-                key="ship-hull"
-                points="0,-30 10,-20 10,25 5,30 0,25 -5,30 -10,25 -10,-20"
-                fill={planetDrawing.color}
-                stroke="grey"
-                strokeWidth={0.05 * size * this.state.zoom}
-                style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
-            />
-        );
-    }
-
-    private renderCorvetteHull(planetDrawing: IDrawable<Ship>, size: number) {
-        return (
-            <polygon
-                key="ship-hull"
-                points="0,-20 8,-15 8,15 4,20 0,18 -4,20 -8,15 -8,-15"
-                fill={planetDrawing.color}
-                stroke="grey"
-                strokeWidth={0.05 * size * this.state.zoom}
-                style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
-            />
-        );
-    }
-
-    private renderSloopHull(planetDrawing: IDrawable<Ship>, size: number) {
-        return (
-            <polygon
-                key="ship-hull"
-                points="0,-15 5,-10 5,15 3,10 0,12 -3,10 -5,15 -5,-10"
-                fill={planetDrawing.color}
-                stroke="grey"
-                strokeWidth={0.05 * size * this.state.zoom}
-                style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
+                key={`${planetDrawing.id}-physics-hull`}
+                points={rotatedHullPoints.map(([x, y]) => `${(x * this.state.zoom + 1) * 0.5 * this.state.width},${(1 - (y * this.state.zoom + 1) * 0.5) * this.state.height}`).join(" ")}
+                fill="white"
+                stroke="cyan"
+                opacity={0.5}
             />
         );
     }
@@ -2657,9 +2864,14 @@ export class App extends React.Component<IAppProps, IAppState> {
         const cannonsRight = shipData.cannons.numCannons - cannonsLeft;
         return (
             <>
-                {
-                    this.renderHull(planetDrawing, size)
-                }
+                <polygon
+                    key={`${planetDrawing.id}-ship-hull`}
+                    points={`${shipData.hull.map(([x, y]) => `${x},${y}`).join(" ")}`}
+                    fill={planetDrawing.color}
+                    stroke="grey"
+                    strokeWidth={0.05 * size * this.state.zoom}
+                    style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
+                />
                 {
                     new Array(cannonsRight).fill(0).map((v, index) => {
                         const cannonRightSize = (shipData.cannons.startY - shipData.cannons.endY) / cannonsRight;
@@ -2697,12 +2909,17 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     private drawShip(planetDrawing: IDrawable<Ship>) {
+        const shipData = SHIP_DATA.find(s => s.shipType === planetDrawing.original.shipType);
+        if (!shipData) {
+            throw new Error("Could not find ship type");
+        }
+
         const isReverseSide = planetDrawing.rotatedPosition[2] > 0;
         const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
         const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
         const distance = planetDrawing.distance;
-        const size = Math.max(0, 2 * Math.atan(1 / (2 * distance)));
-        const scale = (size * this.state.zoom) / 100;
+        const size = 0.1 * Math.max(0, 2 * Math.atan(1 / (2 * distance)));
+        const scale = size * this.state.zoom;
 
         // handle UI lines
         let velocityX: number = 0;
@@ -2800,6 +3017,16 @@ export class App extends React.Component<IAppProps, IAppState> {
                     {
                         this.renderShip(planetDrawing, size)
                     }
+                    <polyline
+                        key={`${planetDrawing.id}-health`}
+                        fill="none"
+                        stroke="green"
+                        strokeWidth={5}
+                        points={`${this.getPointsOfAngularProgress.call(
+                            this, planetDrawing.original.health / planetDrawing.original.maxHealth,
+                            shipData.hull[0][1] * 3 + 5
+                        )}`}
+                    />
                     {
                         isPlayerShip && planetDrawing.original.cannonLoading && (
                             <>
@@ -2840,7 +3067,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
         const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
         const distance = planetDrawing.distance;
-        const size = 0.2 * Math.max(0, 2 * Math.atan(10 / (2 * distance)));
+        const size = 0.1 * Math.max(0, 2 * Math.atan(planetDrawing.original.size / (2 * distance)));
         return (
             <circle
                 key={planetDrawing.id}
@@ -3042,21 +3269,19 @@ export class App extends React.Component<IAppProps, IAppState> {
             orientation: cameraOrientation,
             orientationVelocity: cameraOrientationVelocity,
             cannonLoading: cameraCannonLoading,
-            shipType
+            shipType,
+            health,
+            maxHealth
         } = this.ships[shipIndex];
         const shipData = SHIP_DATA.find(i => i.shipType === shipType);
         if (!shipData) {
             throw new Error("Could not find Ship Type");
         }
         const smokeClouds = [
-            ...this.smokeClouds.filter(smokeCloud => {
-                return +smokeCloud.expires > Date.now();
-            }).slice(-20)
+            ...this.smokeClouds.slice(-20)
         ];
         const cannonBalls = [
-            ...this.cannonBalls.filter(cannonBall => {
-                return +cannonBall.expires > Date.now();
-            }).slice(-100)
+            ...this.cannonBalls.slice(-100)
         ];
 
         let clearPathFindingPoints: boolean = false;
@@ -3066,16 +3291,16 @@ export class App extends React.Component<IAppProps, IAppState> {
             const rotation = Quaternion.fromAxisAngle([0, 0, 1], Math.PI).pow(App.ROTATION_STEP);
             const rotationDrag = cameraOrientationVelocity.pow(App.ROTATION_DRAG).inverse();
             cameraOrientationVelocity = cameraOrientationVelocity.clone().mul(rotation).mul(rotationDrag);
-            if (VoronoiGraph.angularDistanceQuaternion(cameraOrientationVelocity) < Math.PI * 2 * App.ROTATION_STEP) {
-                cameraPositionVelocity = Quaternion.ONE;
+            if (VoronoiGraph.angularDistanceQuaternion(cameraOrientationVelocity) < Math.PI * App.ROTATION_STEP * 0.9) {
+                cameraOrientationVelocity = Quaternion.ONE;
             }
         }
         if (activeKeys.includes("d")) {
             const rotation = Quaternion.fromAxisAngle([0, 0, 1], -Math.PI).pow(App.ROTATION_STEP);
             const rotationDrag = cameraOrientationVelocity.pow(App.ROTATION_DRAG).inverse();
             cameraOrientationVelocity = cameraOrientationVelocity.clone().mul(rotation).mul(rotationDrag);
-            if (VoronoiGraph.angularDistanceQuaternion(cameraOrientationVelocity) < Math.PI * 2 * App.ROTATION_STEP) {
-                cameraPositionVelocity = Quaternion.ONE;
+            if (VoronoiGraph.angularDistanceQuaternion(cameraOrientationVelocity) < Math.PI * App.ROTATION_STEP * 0.9) {
+                cameraOrientationVelocity = Quaternion.ONE;
             }
         }
         if (activeKeys.includes("w")) {
@@ -3093,10 +3318,10 @@ export class App extends React.Component<IAppProps, IAppState> {
             smokeCloud.position = cameraPosition.clone();
             smokeCloud.positionVelocity = cameraOrientation.clone().inverse()
                 .mul(cameraPosition.clone().inverse())
-                .mul(rotation.clone().pow(10))
+                .mul(rotation.clone())
                 .mul(cameraPosition.clone())
                 .mul(cameraOrientation.clone());
-            smokeCloud.size = 1;
+            smokeCloud.size = 2;
             smokeClouds.push(smokeCloud);
         }
         if (activeKeys.includes("s")) {
@@ -3119,10 +3344,10 @@ export class App extends React.Component<IAppProps, IAppState> {
             smokeCloudLeft.positionVelocity = cameraOrientation.clone().inverse()
                 .mul(cameraPosition.clone().inverse())
                 .mul(Quaternion.fromAxisAngle([0, 0, 1], Math.PI / 4))
-                .mul(engineBackwards.clone().pow(10))
+                .mul(engineBackwards.clone())
                 .mul(cameraPosition.clone())
                 .mul(cameraOrientation.clone());
-            smokeCloudLeft.size = 0.2;
+            smokeCloudLeft.size = 2;
             smokeClouds.push(smokeCloudLeft);
 
             // make right smoke cloud
@@ -3132,10 +3357,10 @@ export class App extends React.Component<IAppProps, IAppState> {
             smokeCloudLeft.positionVelocity = cameraOrientation.clone().inverse()
                 .mul(cameraPosition.clone().inverse())
                 .mul(Quaternion.fromAxisAngle([0, 0, 1], -Math.PI / 4))
-                .mul(engineBackwards.clone().pow(10))
+                .mul(engineBackwards.clone())
                 .mul(cameraPosition.clone())
                 .mul(cameraOrientation.clone());
-            smokeCloudRight.size = 0.2;
+            smokeCloudRight.size = 2;
             smokeClouds.push(smokeCloudRight);
         }
         if (activeKeys.includes(" ") && !cameraCannonLoading) {
@@ -3152,19 +3377,20 @@ export class App extends React.Component<IAppProps, IAppState> {
                 // apply random jitter
                 jitterPoint[1] += DelaunayGraph.randomInt() * 0.15;
                 jitterPoint = DelaunayGraph.normalize(jitterPoint);
-                const jitter = Quaternion.fromBetweenVectors([0, 0, 1], jitterPoint).pow(App.VELOCITY_STEP * 400);
+                const jitter = Quaternion.fromBetweenVectors([0, 0, 1], jitterPoint).pow(App.VELOCITY_STEP * 60);
 
                 // create a smoke cloud
-                const cannonBall = new SmokeCloud();
+                const cannonBall = new CannonBall();
                 cannonBall.id = `${cameraId}-${Math.floor(Math.random() * 100000000)}`;
                 cannonBall.position = cameraPosition.clone();
-                cannonBall.positionVelocity = cameraOrientation.clone().inverse()
-                    .mul(cameraPosition.clone().inverse())
+                cannonBall.positionVelocity = cameraPosition.clone().inverse()
+                    .mul(cameraOrientation.clone())
                     .mul(jitter.clone())
-                    .mul(cameraPosition.clone())
-                    .mul(cameraOrientation.clone());
-                cannonBall.size = 1;
-                cannonBall.expires = new Date(+new Date() + 1000);
+                    .mul(cameraPositionVelocity.clone())
+                    .mul(cameraOrientation.clone().inverse())
+                    .mul(cameraPosition.clone());
+                cannonBall.position = cannonBall.position.clone().mul(cannonBall.positionVelocity.pow(3))
+                cannonBall.size = 10;
                 cannonBalls.push(cannonBall);
             }
         }
@@ -3172,14 +3398,14 @@ export class App extends React.Component<IAppProps, IAppState> {
             // cancel cannon fire
             cameraCannonLoading = undefined;
         }
-        if (activeKeys.some(key => ["a", "s", "d", "w", " "].includes(key)) && !isAutomated) {
-            clearPathFindingPoints = true;
-        }
+        // if (activeKeys.some(key => ["a", "s", "d", "w", " "].includes(key)) && !isAutomated) {
+        //     clearPathFindingPoints = true;
+        // }
         if (cameraPositionVelocity !== Quaternion.ONE) {
-            cameraPosition = cameraPosition.clone().mul(cameraPositionVelocity.clone());
+            cameraPosition = cameraPosition.clone().mul(cameraPositionVelocity.clone().pow(health / maxHealth));
         }
         if (cameraOrientationVelocity !== Quaternion.ONE) {
-            cameraOrientation = cameraOrientation.clone().mul(cameraOrientationVelocity.clone());
+            cameraOrientation = cameraOrientation.clone().mul(cameraOrientationVelocity.clone().pow(health / maxHealth));
         }
         if (cameraPosition !== this.ships[shipIndex].position && false) {
             const diffQuaternion = this.ships[shipIndex].position.clone().inverse().mul(cameraPosition.clone());
@@ -3199,7 +3425,132 @@ export class App extends React.Component<IAppProps, IAppState> {
         this.cannonBalls = cannonBalls;
     }
 
+    public static computeIntercept(a: [number, number, number], b: [number, number, number], c: [number, number, number], d: [number, number, number]): [number, number, number] {
+        const midPoint = DelaunayGraph.normalize(App.getAveragePoint([a, b]));
+        const n1 = DelaunayGraph.crossProduct(a, b);
+        const n2 = DelaunayGraph.crossProduct(c, d);
+        const n = DelaunayGraph.crossProduct(n1, n2);
+        return DelaunayGraph.dotProduct(n, midPoint) >= 0 ? n : [
+            -n[0],
+            -n[1],
+            -n[2]
+        ];
+    }
+
+    /**
+     * Compute a cannon ball collision.
+     * @param cannonBall The cannon ball to shoot.
+     * @param ship The ship to collide against.
+     * @private
+     */
+    public static cannonBallCollision(cannonBall: CannonBall, ship: Ship): IHitTest {
+        const shipData = SHIP_DATA.find(s => s.shipType === ship.shipType);
+        if (!shipData) {
+            throw new Error("Could not find ship type");
+        }
+
+        const c = cannonBall.position.clone().rotateVector([0, 0, 1]);
+        const d = cannonBall.position.clone().mul(cannonBall.positionVelocity.clone()).rotateVector([0, 0, 1]);
+        const cannonBallDistance = VoronoiGraph.angularDistance(c, d);
+
+        let hitPoint: [number, number, number] | null = null;
+        let hitDistance: number | null = null;
+        const hull = App.getPhysicsHull(shipData.hull).map((q): Quaternion => {
+            return ship.position.clone().mul(ship.orientation.clone()).mul(q);
+        });
+        for (let i = 0; i < hull.length; i++) {
+            const a = hull[i % hull.length].rotateVector([0, 0, 1]);
+            const b = hull[(i + 1) % hull.length].rotateVector([0, 0, 1]);
+            const intercept = App.computeIntercept(a, b, c, d);
+            const segmentLength = VoronoiGraph.angularDistance(a, b);
+            const interceptSegmentLength = VoronoiGraph.angularDistance(a, intercept) + VoronoiGraph.angularDistance(intercept, b);
+            const isInsideSegment = interceptSegmentLength - PHYSICS_SCALE * cannonBall.size * 2 <= segmentLength;
+            const interceptVelocityLength = VoronoiGraph.angularDistance(c, intercept) + VoronoiGraph.angularDistance(intercept, d);
+            const isInsideVelocity = interceptVelocityLength - PHYSICS_SCALE <= cannonBallDistance;
+            const interceptDistance = VoronoiGraph.angularDistance(c, intercept);
+            if (isInsideSegment && isInsideVelocity && (!hitPoint || (hitPoint && hitDistance && interceptDistance < hitDistance))) {
+                hitPoint = intercept;
+                hitDistance = interceptDistance;
+            }
+        }
+
+        const hitTime: number | null = hitDistance ? hitDistance / cannonBallDistance : null;
+        return {
+            success: hitTime !== null && hitTime >= 0 && hitTime < 1,
+            distance: hitDistance,
+            point: hitPoint,
+            time: hitTime,
+        };
+    }
+
     public gameLoop() {
+        // expire smoke clouds
+        const expiredSmokeClouds: SmokeCloud[] = [];
+        for (const smokeCloud of this.smokeClouds) {
+            const isExpired = +smokeCloud.expires > Date.now();
+            if (isExpired) {
+                expiredSmokeClouds.push(smokeCloud);
+            }
+        }
+        for (const expiredSmokeCloud of expiredSmokeClouds) {
+            const index = this.smokeClouds.findIndex(s => s === expiredSmokeCloud);
+            if (index >= 0) {
+                this.smokeClouds.splice(index, 1);
+            }
+        }
+        
+        // expire cannon balls
+        const expiredCannonBalls: CannonBall[] = [];
+        for (const cannonBall of this.cannonBalls) {
+            const isExpired = cannonBall.life >= cannonBall.maxLife;
+            if (isExpired) {
+                expiredCannonBalls.push(cannonBall);
+            }
+        }
+        for (const expiredCannonBall of expiredCannonBalls) {
+            const index = this.cannonBalls.findIndex(s => s === expiredCannonBall);
+            if (index >= 0) {
+                this.cannonBalls.splice(index, 1);
+            }
+        }
+        // move cannon balls
+        for (const cannonBall of this.cannonBalls) {
+            cannonBall.position = cannonBall.position.clone().mul(cannonBall.positionVelocity.clone());
+            cannonBall.orientation = cannonBall.orientation.clone().mul(cannonBall.orientationVelocity.clone());
+            cannonBall.life += 1;
+        }
+        // handle physics and collision detection
+        const cannonBallsToRemove = [];
+        for (const cannonBall of this.cannonBalls) {
+            // get nearby ships
+            const position = cannonBall.position.rotateVector([0, 0, 1]);
+            const nearByShips = Array.from(this.voronoiShips.fetchDrawables(position));
+
+            // compute closest ship
+            let bestHit: IHitTest | null = null;
+            let bestShip: Ship | null = null;
+            for (const nearByShip of nearByShips) {
+                const hit = App.cannonBallCollision(cannonBall, nearByShip);
+                if (hit.success && hit.time && (!bestHit || (bestHit && bestHit.time && hit.time < bestHit.time))) {
+                    bestHit = hit;
+                    bestShip = nearByShip;
+                }
+            }
+
+            // apply damage
+            if (bestHit && bestShip) {
+                bestShip.applyDamage(cannonBall);
+                cannonBallsToRemove.push(cannonBall);
+            }
+        }
+        // remove collided cannon balls
+        for (const cannonBallToRemove of cannonBallsToRemove) {
+            const index = this.cannonBalls.findIndex(c => c === cannonBallToRemove);
+            if (index >= 0) {
+                this.cannonBalls.splice(index, 1);
+            }
+        }
+
         // move player ship if auto pilot is off
         const playerShipIndex = this.ships.findIndex(ship => ship === this.playerShip);
         if (!this.state.autoPilotEnabled && this.playerShip) {
@@ -3208,10 +3559,6 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         // AI ship loop
         for (let i = 0; i < this.ships.length; i++) {
-            // ship player ship if autoPilot is not enabled
-            if (i === playerShipIndex && !this.state.autoPilotEnabled) {
-                continue;
-            }
             const ship = this.ships[i];
             if (!ship.order) {
                 const faction = Object.values(this.factions).find(f => f.shipIds.includes(this.ships[i].id));
@@ -3224,7 +3571,15 @@ export class App extends React.Component<IAppProps, IAppState> {
                 shipOrder.handleOrderLoop();
             }
             ship.pathFinding.pathFindingLoop();
-            this.handleShipLoop(i, () => ship.activeKeys, true);
+            // ship player ship if autoPilot is not enabled
+            if (!(i === playerShipIndex && !this.state.autoPilotEnabled)) {
+                this.handleShipLoop(i, () => ship.activeKeys, true);
+            }
+        }
+
+        // update collision acceleration structures
+        for (const ship of this.ships) {
+            this.voronoiShips.addDrawable(ship);
         }
 
         // handle luxury buffs
@@ -3293,14 +3648,14 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     private handleKeyDown(event: KeyboardEvent) {
-        if (!event.repeat) {
+        if (!this.activeKeys.includes(event.key)) {
             this.activeKeys.push(event.key);
         }
     }
 
     private handleKeyUp(event: KeyboardEvent) {
-        if (!event.repeat) {
-            const index = this.activeKeys.findIndex(k => k === event.key);
+        const index = this.activeKeys.findIndex(k => k === event.key);
+        if (index >= 0) {
             this.activeKeys.splice(index, 1);
         }
     }
@@ -3355,13 +3710,13 @@ export class App extends React.Component<IAppProps, IAppState> {
         planet.position = Quaternion.fromBetweenVectors([0, 0, 1], point);
         if (index % 5 === 0 || index % 5 === 1) {
             planet.color = "blue";
-            planet.size = 0.5;
+            planet.size = 5;
         } else if (index % 5 === 2 || index % 5 === 3) {
             planet.color = "yellow";
-            planet.size = 0.25;
+            planet.size = 2.5;
         } else if (index % 5 === 4) {
             planet.color = "red";
-            planet.size = 0.75;
+            planet.size = 7.5;
         }
         return planet;
     }
@@ -3410,6 +3765,11 @@ export class App extends React.Component<IAppProps, IAppState> {
         this.delaunayData = Array.from(this.delaunayGraph.GetTriangles());
         this.voronoiGraph = this.delaunayGraph.getVoronoiGraph();
         const planetPoints = this.voronoiGraph.lloydRelaxation();
+
+        // initialize ship acceleration structure
+        const delaunayShip = new DelaunayGraph<Ship>();
+        delaunayShip.initializeWithPoints(planetPoints);
+        this.voronoiShips = delaunayShip.getVoronoiGraph();
 
         // initialize stars
         const starPoints = App.generateGoodPoints<Planet>(100);
@@ -3511,14 +3871,6 @@ export class App extends React.Component<IAppProps, IAppState> {
                 .mul(ship.orientation.clone())
                 .mul(clickQuaternion)
                 .rotateVector([0, 0, 1]);
-
-            if (this.playerShip) {
-                if (event.shiftKey) {
-                    this.playerShip.pathFinding.points.push(spherePoint);
-                } else {
-                    this.playerShip.pathFinding.points = [spherePoint];
-                }
-            }
         }
     }
 
@@ -3574,8 +3926,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                         .map(this.drawSmokeCloud.bind(this))
                 }
                 {
-                    (this.cannonBalls.map(App.applyKinematics.bind(this))
-                        .map(this.rotatePlanet.bind(this))
+                    (this.cannonBalls.map(this.rotatePlanet.bind(this))
                         .map(this.convertToDrawable.bind(this, "-cannonBalls", 1)) as Array<IDrawable<SmokeCloud>>)
                         .map(this.drawSmokeCloud.bind(this))
                 }
@@ -3583,6 +3934,11 @@ export class App extends React.Component<IAppProps, IAppState> {
                     (this.ships.map(this.rotatePlanet.bind(this))
                         .map(this.convertToDrawable.bind(this, "-ships", 1)) as Array<IDrawable<Ship>>)
                         .map(this.drawShip.bind(this))
+                }
+                {
+                    (this.ships.map(this.rotatePlanet.bind(this))
+                        .map(this.convertToDrawable.bind(this, "-physics-hulls", 1)) as Array<IDrawable<Ship>>)
+                        .map(this.renderPhysicsHull.bind(this))
                 }
             </>
         );
@@ -3856,8 +4212,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     getShowShipDrawing(id: string, shipType: EShipType, factionType: EFaction | null = null): IDrawable<Ship> {
-        const original: Ship = new Ship();
-        original.shipType = shipType;
+        const original: Ship = new Ship(shipType);
         original.id = id;
         if (factionType) {
             const faction = Object.values(this.factions).find(f => f.id === factionType);

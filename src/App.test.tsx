@@ -1,5 +1,6 @@
 import React from 'react';
 import App, {
+  CannonBall,
   CAPITAL_GOODS,
   DelaunayGraph,
   EFaction,
@@ -7,7 +8,9 @@ import App, {
   EShipType,
   OUTPOST_GOODS,
   PathFinder,
-  Ship
+  PHYSICS_SCALE,
+  Ship, SmokeCloud,
+  VoronoiGraph
 } from './App';
 import {shallow} from "enzyme";
 import Quaternion from "quaternion";
@@ -20,7 +23,7 @@ const setupPathingTest = (points: Array<[number, number, number]>, numMinutes: n
   app.forceUpdate = () => undefined;
 
   // setup test ship and nav point
-  const testShip = new Ship();
+  const testShip = new Ship(EShipType.HIND);
   testShip.id = "ship-0";
   testShip.position = Quaternion.ONE;
   testShip.orientation = Quaternion.ONE;
@@ -126,7 +129,7 @@ const setupTradingTest = (numMinutes: number = 2) => {
   }
 };
 
-describe('test AI Pathing', () => {
+describe.skip('test AI Pathing', () => {
   describe('test pathing from all 360 degrees', () => {
     for (let angle = 0; angle < 360; angle += 5) {
       it(`test pathing form angle ${angle}`, () => {
@@ -157,5 +160,116 @@ describe('test AI Pathing', () => {
         setupTradingTest(60);
       });
     }
+  });
+});
+describe('Collision Detection', () => {
+  describe('line segment', () => {
+    it('large line segment and big movement', () => {
+      const a = DelaunayGraph.normalize([1, 0, 1]);
+      const b = DelaunayGraph.normalize([1, 0, -1]);
+      const c: [number, number, number] = [0, 1, 0];
+      const d: [number, number, number] = [1, 0, 0];
+      const intercept = App.computeIntercept(a, b, c, d);
+      expect(VoronoiGraph.angularDistance(intercept, [1, 0, 0])).toBeLessThan(PHYSICS_SCALE / 1000);
+
+      const segmentDistance: number = VoronoiGraph.angularDistance(a, b);
+      const interceptDistance: number = VoronoiGraph.angularDistance(a, intercept) + VoronoiGraph.angularDistance(intercept, b);
+      expect(Math.abs(segmentDistance - interceptDistance)).toBeLessThan(PHYSICS_SCALE / 1000);
+    });
+    it('large line segment and small movement', () => {
+      const a = DelaunayGraph.normalize([1, 0, 1]);
+      const b = DelaunayGraph.normalize([1, 0, -1]);
+      const c: [number, number, number] = [0, 1, 0];
+      const d: [number, number, number] = DelaunayGraph.normalize([PHYSICS_SCALE, 1, 0]);
+      const intercept = App.computeIntercept(a, b, c, d);
+      expect(VoronoiGraph.angularDistance(intercept, [1, 0, 0])).toBeLessThan(PHYSICS_SCALE / 1000);
+
+      const segmentDistance: number = VoronoiGraph.angularDistance(a, b);
+      const interceptDistance: number = VoronoiGraph.angularDistance(a, intercept) + VoronoiGraph.angularDistance(intercept, b);
+      expect(Math.abs(segmentDistance - interceptDistance)).toBeLessThan(PHYSICS_SCALE / 1000);
+    });
+    it('small line segment and small movement', () => {
+      const a = DelaunayGraph.normalize([1, 0, 1]);
+      const b = DelaunayGraph.normalize([1, 0, 1 - PHYSICS_SCALE]);
+      const c: [number, number, number] = [0, 1, 0];
+      const d: [number, number, number] = DelaunayGraph.normalize([PHYSICS_SCALE, 1, 0]);
+      const intercept = App.computeIntercept(a, b, c, d);
+      expect(VoronoiGraph.angularDistance(intercept, [1, 0, 0])).toBeLessThan(PHYSICS_SCALE / 1000);
+
+      const segmentDistance: number = VoronoiGraph.angularDistance(a, b);
+      const interceptDistance: number = VoronoiGraph.angularDistance(a, intercept) + VoronoiGraph.angularDistance(intercept, b);
+      expect(Math.abs(segmentDistance - interceptDistance)).not.toBeLessThan(PHYSICS_SCALE / 1000);
+    });
+    it('cannon ball hits ship', () => {
+      const ship = new Ship(EShipType.HIND);
+      ship.id = "test-ship";
+      const cannonBall = new CannonBall();
+      cannonBall.position = Quaternion.fromBetweenVectors(
+          [0, 0, 1],
+          DelaunayGraph.normalize([0, 1 - PHYSICS_SCALE * 10, 1])
+      );
+      cannonBall.positionVelocity = Quaternion.fromBetweenVectors([0, 0, 1], [0, -1, 0]);
+      const hit = App.cannonBallCollision(cannonBall, ship);
+      expect(hit).toEqual({
+        success: true,
+        point: [0, 0.0000029999999999999992, 0.0009999954999898746],
+        distance: 0.7818979088140966,
+        time: 0.4977716687239181,
+      });
+    });
+    it('cannon ball misses ship (too slow)', () => {
+      const ship = new Ship(EShipType.HIND);
+      ship.id = "test-ship";
+      const cannonBall = new CannonBall();
+      cannonBall.position = Quaternion.fromBetweenVectors(
+          [0, 0, 1],
+          DelaunayGraph.normalize([0, 1 - PHYSICS_SCALE * 10, 1])
+      );
+      cannonBall.positionVelocity = Quaternion.fromBetweenVectors(
+          [0, 0, 1],
+          DelaunayGraph.normalize([0, -PHYSICS_SCALE, 1])
+      );
+      const hit = App.cannonBallCollision(cannonBall, ship);
+      expect(hit).toEqual({
+        success: false,
+        point: null,
+        distance: null,
+        time: null,
+      });
+    });
+    it('cannon ball misses ship (opposite direction)', () => {
+      const ship = new Ship(EShipType.HIND);
+      ship.id = "test-ship";
+      const cannonBall = new CannonBall();
+      cannonBall.position = Quaternion.fromBetweenVectors(
+          [0, 0, 1],
+          DelaunayGraph.normalize([0, 1 - PHYSICS_SCALE * 10, 1])
+      );
+      cannonBall.positionVelocity = Quaternion.fromBetweenVectors([0, 0, 1], [0, 1, 0]);
+      const hit = App.cannonBallCollision(cannonBall, ship);
+      expect(hit).toEqual({
+        success: false,
+        point: null,
+        distance: null,
+        time: null,
+      });
+    });
+    it('cannon ball misses ship (parallel direction)', () => {
+      const ship = new Ship(EShipType.HIND);
+      ship.id = "test-ship";
+      const cannonBall = new CannonBall();
+      cannonBall.position = Quaternion.fromBetweenVectors(
+          [0, 0, 1],
+          DelaunayGraph.normalize([0, 1 - PHYSICS_SCALE * 10, 1])
+      );
+      cannonBall.positionVelocity = Quaternion.fromBetweenVectors([0, 0, 1], [1, 0, 0]);
+      const hit = App.cannonBallCollision(cannonBall, ship);
+      expect(hit).toEqual({
+        success: false,
+        point: null,
+        distance: null,
+        time: null,
+      });
+    });
   });
 });
