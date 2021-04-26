@@ -94,6 +94,7 @@ export interface IShipData {
     hullStrength: number;
     cannons: {
         numCannons: number;
+        numCannonades: number;
         startY: number;
         endY: number;
         leftWall: number;
@@ -113,6 +114,7 @@ const SHIP_DATA: IShipData[] = [{
     hullStrength: 60,
     cannons: {
         numCannons: 8,
+        numCannonades: 4,
         startY: 20,
         endY: -20,
         leftWall: 10,
@@ -127,6 +129,7 @@ const SHIP_DATA: IShipData[] = [{
     hullStrength: 30,
     cannons: {
         numCannons: 4,
+        numCannonades: 10,
         startY: 15,
         endY: -15,
         leftWall: 6,
@@ -141,6 +144,7 @@ const SHIP_DATA: IShipData[] = [{
     hullStrength: 20,
     cannons: {
         numCannons: 2,
+        numCannonades: 4,
         startY: 10,
         endY: -10,
         leftWall: 4,
@@ -656,6 +660,215 @@ export class VoronoiTile implements IDrawableTile {
     public vertices: Quaternion[] = [];
     public color: string = "red";
     public id: string = "";
+}
+
+interface IVoronoiTreeNodeParent<T extends ICameraState> {
+    nodes: Array<VoronoiTreeNode<T>>;
+}
+
+/**
+ * A voronoi tree used to speed up collision detection.
+ */
+export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNodeParent<T> {
+    public nodes: Array<VoronoiTreeNode<T>> = [];
+    public point: [number, number, number];
+    public radius: number = 0;
+    public level: number;
+    public parent: IVoronoiTreeNodeParent<T>;
+    public items: T[] = [];
+
+    public static MAX_TREE_LEVEL = 2;
+
+    constructor(point: [number, number, number], level: number, parent: IVoronoiTreeNodeParent<T>) {
+        this.point = point;
+        this.level = level;
+        this.parent = parent;
+    }
+
+    addItem(drawable: T) {
+        if (this.nodes.length === 0 && this.level < VoronoiTreeNode.MAX_TREE_LEVEL) {
+            this.nodes = VoronoiTreeNode.createTreeNodes<T>(this.parent.nodes, this);
+        }
+
+        // end of tree, add to tree
+        if (this.nodes.length === 0) {
+            this.items.push(drawable);
+            return;
+        }
+
+        // recurse tree
+        const position = drawable.position.clone().rotateVector([0, 0, 1]);
+
+        let bestDistance: number | null = null;
+        let bestNode: VoronoiTreeNode<T> | null = null;
+        for (const node of this.nodes) {
+            const distance = VoronoiGraph.angularDistance(node.point, position);
+            if (bestDistance === null || distance < bestDistance) {
+                bestDistance = distance;
+                bestNode = node;
+            }
+        }
+        if (bestDistance !== null && bestNode !== null) {
+            bestNode.addItem(drawable);
+        }
+    }
+    removeItem(drawable: T) {
+        // end of tree, remove from tree
+        if (this.nodes.length === 0) {
+            const index = this.items.findIndex(i => i === drawable);
+            if (index >= 0) {
+                this.items.splice(index, 1);
+            }
+            return;
+        }
+
+        // recurse tree
+        const position = drawable.position.clone().rotateVector([0, 0, 1]);
+
+        let bestDistance: number | null = null;
+        let bestNode: VoronoiTreeNode<T> | null = null;
+        for (const node of this.nodes) {
+            const distance = VoronoiGraph.angularDistance(node.point, position);
+            if (bestDistance === null || distance < bestDistance) {
+                bestDistance = distance;
+                bestNode = node;
+            }
+        }
+        if (bestDistance !== null && bestNode !== null) {
+            bestNode.removeItem(drawable);
+        }
+    }
+    public *listItems(position: [number, number, number]): Generator<T> {
+        // found items
+        if (this.nodes.length === 0) {
+            return yield * this.items;
+        }
+
+        // recurse tree
+        for (const node of this.nodes) {
+            const distance = VoronoiGraph.angularDistance(node.point, position);
+            if (distance < node.radius) {
+                yield * Array.from(node.listItems(position));
+            }
+        }
+    }
+
+    public static createRootNodes<T extends ICameraState>(parent: IVoronoiTreeNodeParent<T>) {
+        const nodes: Array<VoronoiTreeNode<T>> = [];
+
+        // compute points
+        for (let i = 0; i < 10; i++) {
+            const point = DelaunayGraph.randomPoint();
+            nodes.push(new VoronoiTreeNode<T>(point, 1, parent));
+        }
+
+        // compute radius
+        for (const node of nodes) {
+            const otherNodes = nodes.map(n => ({
+                node: n,
+                distance: VoronoiGraph.angularDistance(n.point, node.point)
+            })).sort((a, b) => a.distance - b.distance);
+            node.radius = VoronoiGraph.angularDistance(otherNodes[1].node.point, otherNodes[2].node.point) +
+                VoronoiGraph.angularDistance(otherNodes[2].node.point, otherNodes[3].node.point) +
+                VoronoiGraph.angularDistance(otherNodes[3].node.point, otherNodes[1].node.point);
+        }
+        return nodes;
+    }
+
+    public static createTreeNodes<T extends ICameraState>(originalNodes: Array<VoronoiTreeNode<T>>, forNode: VoronoiTreeNode<T>) {
+        const nodes: Array<VoronoiTreeNode<T>> = [];
+
+        // compute points
+        for (let i = 0; i < 100000 && nodes.length < 10; i++) {
+            // generate points within a voronoi cell, forNode
+            const point = DelaunayGraph.randomPoint();
+            let badPoint: boolean = false;
+            const distanceToForNode = VoronoiGraph.angularDistance(point, forNode.point);
+            for (const originalNode of originalNodes) {
+                if (originalNode === forNode) {
+                    continue;
+                }
+                const distanceToOriginalNode = VoronoiGraph.angularDistance(point, originalNode.point);
+                if (distanceToOriginalNode < distanceToForNode) {
+                    badPoint = true;
+                    break;
+                }
+            }
+            if (badPoint) {
+                // found bad point, try again
+                continue;
+            }
+
+            nodes.push(new VoronoiTreeNode<T>(point, forNode.level + 1, forNode))
+        }
+
+        // compute radius
+        for (const node of nodes) {
+            const otherNodes = nodes.map(n => ({
+                node: n,
+                distance: VoronoiGraph.angularDistance(n.point, node.point)
+            })).sort((a, b) => a.distance - b.distance);
+            node.radius = VoronoiGraph.angularDistance(otherNodes[1].node.point, otherNodes[2].node.point) +
+                VoronoiGraph.angularDistance(otherNodes[2].node.point, otherNodes[3].node.point) +
+                VoronoiGraph.angularDistance(otherNodes[3].node.point, otherNodes[1].node.point);
+        }
+
+        return nodes;
+    }
+}
+
+/**
+ * A voronoi tree used to speed up collision detection.
+ */
+export class VoronoiTree<T extends ICameraState> implements IVoronoiTreeNodeParent<T> {
+    public nodes: Array<VoronoiTreeNode<T>> = [];
+
+    public addItem(drawable: T) {
+        if (this.nodes.length === 0) {
+            this.nodes = VoronoiTreeNode.createRootNodes<T>(this);
+        }
+
+        const position = drawable.position.clone().rotateVector([0, 0, 1]);
+
+        let bestDistance: number | null = null;
+        let bestNode: VoronoiTreeNode<T> | null = null;
+        for (const node of this.nodes) {
+            const distance = VoronoiGraph.angularDistance(node.point, position);
+            if (bestDistance === null || distance < bestDistance) {
+                bestDistance = distance;
+                bestNode = node;
+            }
+        }
+        if (bestDistance !== null && bestNode !== null) {
+            bestNode.addItem(drawable);
+        }
+    }
+    public removeItem(drawable: T) {
+        // recurse tree
+        const position = drawable.position.clone().rotateVector([0, 0, 1]);
+
+        let bestDistance: number | null = null;
+        let bestNode: VoronoiTreeNode<T> | null = null;
+        for (const node of this.nodes) {
+            const distance = VoronoiGraph.angularDistance(node.point, position);
+            if (bestDistance === null || distance < bestDistance) {
+                bestDistance = distance;
+                bestNode = node;
+            }
+        }
+        if (bestDistance !== null && bestNode !== null) {
+            bestNode.removeItem(drawable);
+        }
+    }
+    public *listItems(position: [number, number, number]): Generator<T> {
+        // recurse tree
+        for (const node of this.nodes) {
+            const distance = VoronoiGraph.angularDistance(node.point, position);
+            if (distance < node.radius) {
+                yield * Array.from(node.listItems(position));
+            }
+        }
+    }
 }
 
 /**
@@ -1526,9 +1739,20 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                     }
                 }
 
+                // sort points counter clockwise
+                const averagePoint = this.vertices[vertexIndex];
+                const averageTransform = Quaternion.fromBetweenVectors([0, 0, 1], averagePoint).inverse();
+                const sortedPoints = points.sort((a, b): number => {
+                    const aPoint = averageTransform.rotateVector(a);
+                    const bPoint = averageTransform.rotateVector(b);
+                    const aTheta = Math.atan2(aPoint[1], aPoint[0]);
+                    const bTheta = Math.atan2(bPoint[1], bPoint[0]);
+                    return bTheta - aTheta;
+                });
+
                 // create voronoi cell
                 const cell = new VoronoiCell();
-                cell.vertices.push(...points);
+                cell.vertices.push(...sortedPoints);
                 cell.centroid = VoronoiGraph.centroidOfCell(cell);
                 cell.radius = cell.vertices.reduce((acc: number, vertex): number => {
                     return Math.max(
@@ -2386,7 +2610,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     public delaunayGraph: DelaunayGraph<Planet> = new DelaunayGraph<Planet>();
     private delaunayData: DelaunayTriangle[] = [];
     public voronoiGraph: VoronoiGraph<Planet> = new VoronoiGraph();
-    public voronoiShips: VoronoiGraph<Ship> = new VoronoiGraph();
+    public voronoiShips: VoronoiTree<Ship> = new VoronoiTree();
     public factions: { [key: string]: Faction } = {};
     public ships: Ship[] = [];
     public playerShip: Ship | null = null;
@@ -3094,7 +3318,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         ];
     }
 
-    private static MAX_TESSELLATION: number = 2;
+    private static MAX_TESSELLATION: number = 3;
 
     private *getDelaunayTileTessellation(vertices: Quaternion[], maxStep: number = App.MAX_TESSELLATION, step: number = 0): Generator<ITessellatedTriangle> {
         if (step === maxStep) {
@@ -3370,7 +3594,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             // cannon fire
             cameraCannonLoading = undefined;
 
-            // fire 8 guns
+            // fire cannons
             for (let i = 0; i < shipData.cannons.numCannons; i++) {
                 // pick left or right side
                 let jitterPoint: [number, number, number] = [i % 2 === 0 ? -1 : 1, 0, 0];
@@ -3379,14 +3603,13 @@ export class App extends React.Component<IAppProps, IAppState> {
                 jitterPoint = DelaunayGraph.normalize(jitterPoint);
                 const jitter = Quaternion.fromBetweenVectors([0, 0, 1], jitterPoint).pow(App.VELOCITY_STEP * 60);
 
-                // create a smoke cloud
+                // create a cannon ball
                 const cannonBall = new CannonBall();
                 cannonBall.id = `${cameraId}-${Math.floor(Math.random() * 100000000)}`;
                 cannonBall.position = cameraPosition.clone();
                 cannonBall.positionVelocity = cameraPosition.clone().inverse()
                     .mul(cameraOrientation.clone())
                     .mul(jitter.clone())
-                    .mul(cameraPositionVelocity.clone())
                     .mul(cameraOrientation.clone().inverse())
                     .mul(cameraPosition.clone());
                 cannonBall.position = cannonBall.position.clone().mul(cannonBall.positionVelocity.pow(3))
@@ -3398,9 +3621,12 @@ export class App extends React.Component<IAppProps, IAppState> {
             // cancel cannon fire
             cameraCannonLoading = undefined;
         }
+
         // if (activeKeys.some(key => ["a", "s", "d", "w", " "].includes(key)) && !isAutomated) {
         //     clearPathFindingPoints = true;
         // }
+
+        // apply velocity
         if (cameraPositionVelocity !== Quaternion.ONE) {
             cameraPosition = cameraPosition.clone().mul(cameraPositionVelocity.clone().pow(health / maxHealth));
         }
@@ -3524,7 +3750,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         for (const cannonBall of this.cannonBalls) {
             // get nearby ships
             const position = cannonBall.position.rotateVector([0, 0, 1]);
-            const nearByShips = Array.from(this.voronoiShips.fetchDrawables(position));
+            const nearByShips = Array.from(this.voronoiShips.listItems(position));
 
             // compute closest ship
             let bestHit: IHitTest | null = null;
@@ -3549,6 +3775,11 @@ export class App extends React.Component<IAppProps, IAppState> {
             if (index >= 0) {
                 this.cannonBalls.splice(index, 1);
             }
+        }
+
+        // update collision acceleration structures
+        for (const ship of this.ships) {
+            this.voronoiShips.removeItem(ship);
         }
 
         // move player ship if auto pilot is off
@@ -3579,7 +3810,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         // update collision acceleration structures
         for (const ship of this.ships) {
-            this.voronoiShips.addDrawable(ship);
+            this.voronoiShips.addItem(ship);
         }
 
         // handle luxury buffs
@@ -3698,7 +3929,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             voronoiGraph = delaunayGraph.getVoronoiGraph();
             const lloydPoints = voronoiGraph.lloydRelaxation();
             delaunayGraph = new DelaunayGraph<T>();
-            delaunayGraph.initializeWithPoints(lloydPoints);
+            delaunayGraph.initializeWithPoints(lloydPoints.slice(4));
         }
         voronoiGraph = delaunayGraph.getVoronoiGraph();
         return voronoiGraph.lloydRelaxation();
@@ -3765,11 +3996,6 @@ export class App extends React.Component<IAppProps, IAppState> {
         this.delaunayData = Array.from(this.delaunayGraph.GetTriangles());
         this.voronoiGraph = this.delaunayGraph.getVoronoiGraph();
         const planetPoints = this.voronoiGraph.lloydRelaxation();
-
-        // initialize ship acceleration structure
-        const delaunayShip = new DelaunayGraph<Ship>();
-        delaunayShip.initializeWithPoints(planetPoints);
-        this.voronoiShips = delaunayShip.getVoronoiGraph();
 
         // initialize stars
         const starPoints = App.generateGoodPoints<Planet>(100);
@@ -3935,11 +4161,11 @@ export class App extends React.Component<IAppProps, IAppState> {
                         .map(this.convertToDrawable.bind(this, "-ships", 1)) as Array<IDrawable<Ship>>)
                         .map(this.drawShip.bind(this))
                 }
-                {
-                    (this.ships.map(this.rotatePlanet.bind(this))
-                        .map(this.convertToDrawable.bind(this, "-physics-hulls", 1)) as Array<IDrawable<Ship>>)
-                        .map(this.renderPhysicsHull.bind(this))
-                }
+                {/*{*/}
+                {/*    (this.ships.map(this.rotatePlanet.bind(this))*/}
+                {/*        .map(this.convertToDrawable.bind(this, "-physics-hulls", 1)) as Array<IDrawable<Ship>>)*/}
+                {/*        .map(this.renderPhysicsHull.bind(this))*/}
+                {/*}*/}
             </>
         );
     }
