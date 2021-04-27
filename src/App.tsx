@@ -561,13 +561,18 @@ export class Faction {
      * @param ship
      */
     public getOrder(ship: Ship): Order {
+        const shipData = SHIP_DATA.find(s => s.shipType === ship.shipType);
+        if (!shipData) {
+            throw new Error("Could not find ship type");
+        }
+
         const entries = Object.entries(this.explorationGraph)
             .sort((a, b) => a[1].distance - b[1].distance);
 
         // find worlds to trade
         const tradeWorldEntry = entries.find(entry => {
             // settle new worlds which have not been settled yet
-            const roomToTrade = entry[1].settlerShipIds.length < entry[1].planet.resources.length;
+            const roomToTrade = entry[1].traderShipIds.length < entry[1].planet.resources.length - shipData.cargoSize;
             const isSettledEnoughToTrade = entry[1].planet.settlementLevel >= ESettlementLevel.OUTPOST;
             const notTradedYet = Object.values(this.instance.factions).every(faction => {
                 if (faction.id === this.id) {
@@ -586,7 +591,7 @@ export class Faction {
             // settle new worlds which have not been settled yet
             const roomToSettleMore = entry[1].settlerShipIds.length <
                 Planet.NUM_SETTLEMENT_PROGRESS_STEPS -
-                Math.round(entry[1].planet.settlementProgress * Planet.NUM_SETTLEMENT_PROGRESS_STEPS);
+                Math.round(entry[1].planet.settlementProgress * Planet.NUM_SETTLEMENT_PROGRESS_STEPS) - shipData.settlementProgressFactor;
             const notSettledYet = Object.values(this.instance.factions).every(faction => {
                 if (faction.id === this.id) {
                     // skip the faction itself
@@ -599,7 +604,7 @@ export class Faction {
             return roomToSettleMore && notSettledYet;
         });
 
-        if (tradeWorldEntry) {
+        if (tradeWorldEntry && shipData.cannons.numCannons <= 4) {
             // found a trade slot, add ship to trade
             tradeWorldEntry[1].traderShipIds.push(ship.id);
 
@@ -636,12 +641,14 @@ interface ITessellatedTriangle {
 
 interface IDrawableTile {
     vertices: Quaternion[];
+    centroid: Quaternion;
     color: string;
     id: string;
 }
 
 interface ICellData {
     vertices: Array<[number, number, number]>;
+    centroid: [number, number, number];
 }
 
 /**
@@ -658,6 +665,7 @@ export class VoronoiCell implements ICellData {
  */
 export class VoronoiTile implements IDrawableTile {
     public vertices: Quaternion[] = [];
+    public centroid: Quaternion = Quaternion.ONE;
     public color: string = "red";
     public id: string = "";
 }
@@ -672,19 +680,29 @@ interface IVoronoiTreeNodeParent<T extends ICameraState> {
 export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNodeParent<T> {
     public nodes: Array<VoronoiTreeNode<T>> = [];
     public point: [number, number, number];
+    public voronoiCell: VoronoiCell;
     public radius: number = 0;
     public level: number;
     public parent: IVoronoiTreeNodeParent<T>;
     public items: T[] = [];
 
-    public static MAX_TREE_LEVEL = 2;
+    /**
+     * How many levels of voronoi trees will the graph show.
+     */
+    public static MAX_TREE_LEVEL: number = 3;
 
-    constructor(point: [number, number, number], level: number, parent: IVoronoiTreeNodeParent<T>) {
-        this.point = point;
+    constructor(voronoiCell: VoronoiCell, level: number, parent: IVoronoiTreeNodeParent<T>) {
+        this.voronoiCell = voronoiCell;
+        this.point = voronoiCell.centroid;
         this.level = level;
         this.parent = parent;
     }
 
+    /**
+     * Add an object to the voronoi tree for faster referencing when performing physics and collision, possibly even
+     * networking. Send only people or ships within the player's section of a tree.
+     * @param drawable
+     */
     addItem(drawable: T) {
         if (this.nodes.length === 0 && this.level < VoronoiTreeNode.MAX_TREE_LEVEL) {
             this.nodes = VoronoiTreeNode.createTreeNodes<T>(this.parent.nodes, this);
@@ -712,6 +730,11 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
             bestNode.addItem(drawable);
         }
     }
+
+    /**
+     * Remove an object from the voronoi tree.
+     * @param drawable
+     */
     removeItem(drawable: T) {
         // end of tree, remove from tree
         if (this.nodes.length === 0) {
@@ -738,6 +761,11 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
             bestNode.removeItem(drawable);
         }
     }
+
+    /**
+     * Return a list of items within a visible area on the voronoi tree.
+     * @param position A position to find near by objects with.
+     */
     public *listItems(position: [number, number, number]): Generator<T> {
         // found items
         if (this.nodes.length === 0) {
@@ -753,64 +781,184 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
         }
     }
 
+    /**
+     * Create initial level 1 nodes for a tree. These are top level nodes.
+     * @param parent The parent containing top level nodes, most likely VoronoiTree.
+     */
     public static createRootNodes<T extends ICameraState>(parent: IVoronoiTreeNodeParent<T>) {
         const nodes: Array<VoronoiTreeNode<T>> = [];
 
         // compute points
-        for (let i = 0; i < 10; i++) {
-            const point = DelaunayGraph.randomPoint();
-            nodes.push(new VoronoiTreeNode<T>(point, 1, parent));
-        }
-
-        // compute radius
-        for (const node of nodes) {
-            const otherNodes = nodes.map(n => ({
-                node: n,
-                distance: VoronoiGraph.angularDistance(n.point, node.point)
-            })).sort((a, b) => a.distance - b.distance);
-            node.radius = VoronoiGraph.angularDistance(otherNodes[1].node.point, otherNodes[2].node.point) +
-                VoronoiGraph.angularDistance(otherNodes[2].node.point, otherNodes[3].node.point) +
-                VoronoiGraph.angularDistance(otherNodes[3].node.point, otherNodes[1].node.point);
+        const goodPoints = App.generateGoodPoints(10);
+        for (const point of goodPoints) {
+            const node = new VoronoiTreeNode<T>(point, 1, parent);
+            node.radius = point.vertices.reduce((acc, v) => Math.max(
+                acc,
+                VoronoiGraph.angularDistance(point.centroid, v)
+            ), 0);
+            nodes.push(node);
         }
         return nodes;
     }
 
+    /**
+     * Return a random polygon triangle of a voronoi cell.
+     * @private
+     */
+    private static getRandomTriangleOfSphericalPolygon<T extends ICameraState>(forNode: VoronoiTreeNode<T>): number {
+        const triangleAreasInPolygon: number[] = [];
+        for (let i = 1; i < forNode.voronoiCell.vertices.length - 1; i++) {
+            const a = forNode.voronoiCell.vertices[0];
+            const b = forNode.voronoiCell.vertices[i];
+            const c = forNode.voronoiCell.vertices[i + 1];
+            const nab = DelaunayGraph.crossProduct(a, b);
+            const nbc = DelaunayGraph.crossProduct(b, c);
+            const nca = DelaunayGraph.crossProduct(c, a);
+            const angleA = DelaunayGraph.dotProduct(nab, [-nca[0], -nca[1], -nca[2]]);
+            const angleB = DelaunayGraph.dotProduct(nbc, [-nab[0], -nab[1], -nab[2]]);
+            const angleC = DelaunayGraph.dotProduct(nca, [-nbc[0], -nbc[1], -nbc[2]]);
+            const area = angleA + angleB + angleC - Math.PI;
+            triangleAreasInPolygon.push(area);
+        }
+        const triangleAreasInPolygonSum = triangleAreasInPolygon.reduce((sum, v) => sum + v, 0);
+        const triangleAreasInPolygonCum = triangleAreasInPolygon.reduce((acc: number[], v): number[] => {
+            if (acc.length > 0) {
+                acc.push(acc[acc.length - 1] + v);
+            } else {
+                acc.push(v);
+            }
+            return acc;
+        }, [] as number[]);
+        const randomTriangleInPolygonRandValue = Math.random() * triangleAreasInPolygonSum;
+        let randomTriangleInPolygonIndex: number = 0;
+        for (let i = triangleAreasInPolygonCum.length - 1; i >= 0; i--) {
+            if (triangleAreasInPolygonCum[i] > randomTriangleInPolygonRandValue) {
+                randomTriangleInPolygonIndex = i;
+                break;
+            }
+        }
+        return randomTriangleInPolygonIndex;
+    }
+
+    /**
+     * Perform Sutherland-hodgman polygon clipping on a pair of voronoi cells. This will fit a voronoi cell inside
+     * another voronoi cell, on a sphere. For hierarchical voronoi tree.
+     * @param forNode The outer polygon.
+     * @param polygon The inner polygon.
+     * @private
+     */
+    private static polygonClip<T extends ICameraState>(forNode: VoronoiTreeNode<T>, polygon: VoronoiCell): VoronoiCell {
+        // copy data, to make the function immutable
+        const copy: VoronoiCell = {
+            ...polygon,
+            vertices: []
+        };
+
+        // for each outer line, assume infinite line segment
+        for (let outerIndex = 0; outerIndex < forNode.voronoiCell.vertices.length; outerIndex++) {
+            const outerA = forNode.voronoiCell.vertices[outerIndex % forNode.voronoiCell.vertices.length];
+            const outerB = forNode.voronoiCell.vertices[(outerIndex + 1) % forNode.voronoiCell.vertices.length];
+            const outerN = DelaunayGraph.normalize(DelaunayGraph.crossProduct(outerA, outerB));
+
+            // used to clip the polygon, the first goal is to find an inner a and outer b
+            let beginClipping: boolean = false;
+
+            // for each inner line segment
+            for (let innerIndex = 0; innerIndex < polygon.vertices.length || beginClipping; innerIndex++) {
+                // compute intersection with line segment and infinite culling line
+                const innerA = polygon.vertices[innerIndex % polygon.vertices.length];
+                const innerB = polygon.vertices[(innerIndex + 1) % polygon.vertices.length];
+                const midPoint = DelaunayGraph.normalize(App.getAveragePoint([innerA, innerB]));
+                const innerN = DelaunayGraph.normalize(DelaunayGraph.crossProduct(innerA, innerB));
+                const line = DelaunayGraph.normalize(DelaunayGraph.crossProduct(outerN, innerN));
+                const intercept: [number, number, number] = DelaunayGraph.dotProduct(line, midPoint) >= 0 ? line : [
+                    -line[0],
+                    -line[1],
+                    -line[2]
+                ];
+
+                // determine if to cull or to cut the polygon
+                const isInnerAInside = DelaunayGraph.dotProduct(outerN, innerA) > 0;
+                const isInnerBInside = DelaunayGraph.dotProduct(outerN, innerB) > 0;
+                if (isInnerAInside && !isInnerBInside) {
+                    // moved outside of polygon, begin clipping
+                    beginClipping = true;
+                    copy.vertices.push(innerA, intercept);
+                } else if (!isInnerAInside && !isInnerBInside) {
+                    // still outside of polygon, skip this segment
+                } else if (!isInnerAInside && isInnerBInside) {
+                    // moved back inside polygon, perform clip
+                    beginClipping = false;
+                    // fix duplicate vertex bug caused by a polygon starting on a polygon clip
+                    // if there is a triangle 1, 2, 3 with 1 being out of bounds, it would insert intercept 1-2, 2, 3, intercept 3-1
+                    // do not insert intercept 1-2 twice, the for loop can continue past the last index
+                    if (innerIndex < polygon.vertices.length) {
+                        copy.vertices.push(intercept);
+                    }
+                } else {
+                    copy.vertices.push(innerA);
+                }
+            }
+        }
+
+        return copy;
+    }
+
+    /**
+     * Create child nodes of a current child node. This will create a hierarchical voronoi graph. Voronoi cells within
+     * a voronoi cells, on a sphere.
+     * @param originalNodes
+     * @param forNode
+     */
     public static createTreeNodes<T extends ICameraState>(originalNodes: Array<VoronoiTreeNode<T>>, forNode: VoronoiTreeNode<T>) {
         const nodes: Array<VoronoiTreeNode<T>> = [];
 
-        // compute points
-        for (let i = 0; i < 100000 && nodes.length < 10; i++) {
-            // generate points within a voronoi cell, forNode
-            const point = DelaunayGraph.randomPoint();
-            let badPoint: boolean = false;
-            const distanceToForNode = VoronoiGraph.angularDistance(point, forNode.point);
-            for (const originalNode of originalNodes) {
-                if (originalNode === forNode) {
-                    continue;
-                }
-                const distanceToOriginalNode = VoronoiGraph.angularDistance(point, originalNode.point);
-                if (distanceToOriginalNode < distanceToForNode) {
-                    badPoint = true;
-                    break;
-                }
-            }
-            if (badPoint) {
-                // found bad point, try again
-                continue;
+        // generate random points within a voronoi cell.
+        const randomPointsWithinVoronoiCell: Array<[number, number, number]> = [];
+        for (let i = 0; i < 10; i++) {
+            // pick a random triangle of a polygon
+            const randomTriangleIndex = VoronoiTreeNode.getRandomTriangleOfSphericalPolygon<T>(forNode);
+
+            // pick a random point within a spherical triangle
+            //
+            // the random point is in the area bounded by x = 0, y = 1 - x, and y = 0
+            // start with a square
+            let randomX = Math.random();
+            let randomY = Math.random();
+            if (randomX + randomY > 0.5) {
+                // flip point back onto triangle if it is above y = 1 - x
+                randomX = 1 - randomX;
+                randomY = 1 - randomY;
             }
 
-            nodes.push(new VoronoiTreeNode<T>(point, forNode.level + 1, forNode))
+            // create x and y axis interpolation quaternions
+            const a = Quaternion.fromBetweenVectors([0, 0, 1], forNode.voronoiCell.vertices[0]);
+            const b = Quaternion.fromBetweenVectors([0, 0, 1], forNode.voronoiCell.vertices[randomTriangleIndex]);
+            const c = Quaternion.fromBetweenVectors([0, 0, 1], forNode.voronoiCell.vertices[randomTriangleIndex + 1]);
+            const x = a.clone().inverse().mul(b).pow(randomX);
+            const y = a.clone().inverse().mul(c).pow(randomY);
+
+            // interpolate point on random values
+            const point = a.clone().mul(x.clone()).mul(y.clone());
+            randomPointsWithinVoronoiCell.push(point.rotateVector([0, 0, 1]));
         }
 
-        // compute radius
-        for (const node of nodes) {
-            const otherNodes = nodes.map(n => ({
-                node: n,
-                distance: VoronoiGraph.angularDistance(n.point, node.point)
-            })).sort((a, b) => a.distance - b.distance);
-            node.radius = VoronoiGraph.angularDistance(otherNodes[1].node.point, otherNodes[2].node.point) +
-                VoronoiGraph.angularDistance(otherNodes[2].node.point, otherNodes[3].node.point) +
-                VoronoiGraph.angularDistance(otherNodes[3].node.point, otherNodes[1].node.point);
+        // compute random nodes within voronoi cell, hierarchical voronoi tree.
+        const delaunay = new DelaunayGraph<T>();
+        delaunay.initializeWithPoints(randomPointsWithinVoronoiCell);
+        const outOfBoundsVoronoiCells = delaunay.getVoronoiGraph().cells.slice(4);
+
+        // perform sutherland-hodgman polygon clipping
+        const goodPoints = outOfBoundsVoronoiCells.map((polygon) => VoronoiTreeNode.polygonClip<T>(forNode, polygon));
+
+        // create tree nodes
+        for (const point of goodPoints) {
+            const node = new VoronoiTreeNode<T>(point, forNode.level + 1, forNode);
+            node.radius = point.vertices.reduce((acc, v) => Math.max(
+                acc,
+                VoronoiGraph.angularDistance(point.centroid, v)
+            ), 0);
+            nodes.push(node);
         }
 
         return nodes;
@@ -1045,6 +1193,7 @@ export class VoronoiGraph<T extends ICameraState> {
  */
 export class DelaunayTriangle implements ICellData {
     public vertices: [number, number, number][] = [];
+    public centroid: [number, number, number] = [0, 0, 0];
 }
 
 /**
@@ -1052,6 +1201,7 @@ export class DelaunayTriangle implements ICellData {
  */
 export class DelaunayTile implements IDrawableTile {
     public vertices: Quaternion[] = [];
+    public centroid: Quaternion = Quaternion.ONE;
     public color: string = "red";
     public id: string = "";
 }
@@ -1658,6 +1808,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                 const vertex = this.vertices[edge[0]];
                 data.vertices.push(vertex);
             }
+            data.centroid = DelaunayGraph.normalize(App.getAveragePoint(data.vertices));
             yield data;
         }
     }
@@ -1753,7 +1904,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                 // create voronoi cell
                 const cell = new VoronoiCell();
                 cell.vertices.push(...sortedPoints);
-                cell.centroid = VoronoiGraph.centroidOfCell(cell);
+                cell.centroid = DelaunayGraph.normalize(VoronoiGraph.centroidOfCell(cell));
                 cell.radius = cell.vertices.reduce((acc: number, vertex): number => {
                     return Math.max(
                         acc,
@@ -2692,7 +2843,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             position: cameraPosition,
             orientation: cameraOrientation,
         } = this.getPlayerShip();
-        const vertices = triangle.vertices.map((v): Quaternion => {
+        const pointToQuaternion = (v: [number, number, number]): Quaternion => {
             if (v[2] < -0.99) {
                 return Quaternion.fromAxisAngle([0, 1, 0], Math.PI * 0.99);
             }
@@ -2700,7 +2851,8 @@ export class App extends React.Component<IAppProps, IAppState> {
             return cameraOrientation.clone().inverse()
                 .mul(cameraPosition.clone().inverse())
                 .mul(q);
-        });
+        };
+        const vertices = triangle.vertices.map(pointToQuaternion);
         let color: string = "red";
         if (index % 4 === 0) {
             color = "red";
@@ -2714,6 +2866,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         const tile = new DelaunayTile();
         tile.vertices = vertices;
+        tile.centroid = pointToQuaternion(triangle.centroid);
         tile.color = color;
         tile.id = `tile-${index}`;
         return tile;
@@ -3318,22 +3471,22 @@ export class App extends React.Component<IAppProps, IAppState> {
         ];
     }
 
-    private static MAX_TESSELLATION: number = 3;
+    private static MAX_TESSELLATION: number = 4;
 
-    private *getDelaunayTileTessellation(vertices: Quaternion[], maxStep: number = App.MAX_TESSELLATION, step: number = 0): Generator<ITessellatedTriangle> {
+    private *getDelaunayTileTessellation(centroid: Quaternion, vertices: Quaternion[], maxStep: number = App.MAX_TESSELLATION, step: number = 0): Generator<ITessellatedTriangle> {
         if (step === maxStep) {
             // max step, return current level of tessellation
             const data: ITessellatedTriangle = {
                 vertices,
             };
             return yield data;
-        } else if (vertices.length > 3) {
+        } else if (step === 0) {
             // perform triangle fan
-            for (let i = 1; i < vertices.length - 1; i++) {
-                yield * Array.from(this.getDelaunayTileTessellation([
-                    vertices[0],
-                    vertices[i],
-                    vertices[i + 1]
+            for (let i = 0; i < vertices.length; i++) {
+                yield * Array.from(this.getDelaunayTileTessellation(centroid, [
+                    centroid,
+                    vertices[i % vertices.length],
+                    vertices[(i + 1) % vertices.length],
                 ], maxStep, step + 1));
             }
 
@@ -3345,34 +3498,42 @@ export class App extends React.Component<IAppProps, IAppState> {
             for (let i = 0; i < vertices.length; i++) {
                 const a: Quaternion = vertices[i % vertices.length].clone();
                 const b: Quaternion = vertices[(i + 1) % vertices.length].clone();
-                const midPoint = Quaternion.fromBetweenVectors(
-                    [0, 0, 1],
-                    DelaunayGraph.normalize(App.lerp(
+                let lerpPoint = App.lerp(
+                    a.rotateVector([0, 0, 1]),
+                    b.rotateVector([0, 0, 1]),
+                    0.5
+                );
+                if (DelaunayGraph.distanceFormula(lerpPoint, [0, 0, 0]) < 0.01) {
+                    lerpPoint = App.lerp(
                         a.rotateVector([0, 0, 1]),
                         b.rotateVector([0, 0, 1]),
-                        0.5
-                    ))
+                        0.4
+                    );
+                }
+                const midPoint = Quaternion.fromBetweenVectors(
+                    [0, 0, 1],
+                    DelaunayGraph.normalize(lerpPoint)
                 );
                 midPoints.push(midPoint);
             }
 
             // return recursive tessellation of triangle into 4 triangles
-            yield * Array.from(this.getDelaunayTileTessellation([
+            yield * Array.from(this.getDelaunayTileTessellation(centroid, [
                 vertices[0],
                 midPoints[0],
                 midPoints[2]
             ], maxStep, step + 1));
-            yield * Array.from(this.getDelaunayTileTessellation([
+            yield * Array.from(this.getDelaunayTileTessellation(centroid, [
                 vertices[1],
                 midPoints[1],
                 midPoints[0]
             ], maxStep, step + 1));
-            yield * Array.from(this.getDelaunayTileTessellation([
+            yield * Array.from(this.getDelaunayTileTessellation(centroid, [
                 vertices[2],
                 midPoints[2],
                 midPoints[1]
             ], maxStep, step + 1));
-            yield * Array.from(this.getDelaunayTileTessellation([
+            yield * Array.from(this.getDelaunayTileTessellation(centroid, [
                 midPoints[0],
                 midPoints[1],
                 midPoints[2]
@@ -3468,7 +3629,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     private drawDelaunayTile(tile: IDrawableTile) {
-        const tessellationMesh = Array.from(this.getDelaunayTileTessellation(tile.vertices));
+        const tessellationMesh = Array.from(this.getDelaunayTileTessellation(tile.centroid, tile.vertices));
         return (
             <g key={tile.id}>
                 {
@@ -3918,7 +4079,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         entity.orientation = Quaternion.fromAxisAngle([0, 0, 1], Math.random() * 2 * Math.PI);
     }
 
-    private static generateGoodPoints<T extends ICameraState>(numPoints: number = 10): Array<[number, number, number]> {
+    public static generateGoodPoints<T extends ICameraState>(numPoints: number = 10): VoronoiCell[] {
         let delaunayGraph = new DelaunayGraph<T>();
         let voronoiGraph = new VoronoiGraph<T>();
         delaunayGraph.initialize();
@@ -3932,7 +4093,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             delaunayGraph.initializeWithPoints(lloydPoints.slice(4));
         }
         voronoiGraph = delaunayGraph.getVoronoiGraph();
-        return voronoiGraph.lloydRelaxation();
+        return voronoiGraph.cells.slice(4);
     }
 
     private buildStars(point: [number, number, number], index: number): Planet {
@@ -3999,7 +4160,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         // initialize stars
         const starPoints = App.generateGoodPoints<Planet>(100);
-        this.stars.push(...starPoints.map(this.buildStars.bind(this)));
+        this.stars.push(...starPoints.map((cell, index) => this.buildStars.call(this, cell.centroid, index)));
         for (const star of this.stars) {
             this.voronoiGraph.addDrawable(star);
         }
