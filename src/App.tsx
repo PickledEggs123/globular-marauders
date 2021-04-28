@@ -776,7 +776,35 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
         for (const node of this.nodes) {
             const distance = VoronoiGraph.angularDistance(node.point, position);
             if (distance < node.radius) {
-                yield * Array.from(node.listItems(position));
+                const generator = node.listItems(position);
+                while (true) {
+                    const res = generator.next();
+                    if (res.done) {
+                        break;
+                    }
+                    yield res.value;
+                }
+            }
+        }
+    }
+
+    /**
+     * Return a list of voronoi cells form the tree.
+     */
+    public *listCells(): Generator<VoronoiCell> {
+        // found leaf node, return voronoi cell
+        if (this.level === VoronoiTreeNode.MAX_TREE_LEVEL) {
+            return yield this.voronoiCell;
+        }
+
+        for (const node of this.nodes) {
+            const generator = node.listCells();
+            while (true) {
+                const res = generator.next();
+                if (res.done) {
+                    break;
+                }
+                yield res.value;
             }
         }
     }
@@ -849,10 +877,7 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
      */
     private static polygonClip<T extends ICameraState>(forNode: VoronoiTreeNode<T>, polygon: VoronoiCell): VoronoiCell {
         // copy data, to make the function immutable
-        const copy: VoronoiCell = {
-            ...polygon,
-            vertices: []
-        };
+        const vertices: Array<[number, number, number]> = [];
 
         // for each outer line, assume infinite line segment
         for (let outerIndex = 0; outerIndex < forNode.voronoiCell.vertices.length; outerIndex++) {
@@ -878,12 +903,12 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
                 ];
 
                 // determine if to cull or to cut the polygon
-                const isInnerAInside = DelaunayGraph.dotProduct(outerN, innerA) > 0;
-                const isInnerBInside = DelaunayGraph.dotProduct(outerN, innerB) > 0;
+                const isInnerAInside = DelaunayGraph.dotProduct(outerN, innerA) < 0;
+                const isInnerBInside = DelaunayGraph.dotProduct(outerN, innerB) < 0;
                 if (isInnerAInside && !isInnerBInside) {
                     // moved outside of polygon, begin clipping
                     beginClipping = true;
-                    copy.vertices.push(innerA, intercept);
+                    vertices.push(innerA, intercept);
                 } else if (!isInnerAInside && !isInnerBInside) {
                     // still outside of polygon, skip this segment
                 } else if (!isInnerAInside && isInnerBInside) {
@@ -893,13 +918,27 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
                     // if there is a triangle 1, 2, 3 with 1 being out of bounds, it would insert intercept 1-2, 2, 3, intercept 3-1
                     // do not insert intercept 1-2 twice, the for loop can continue past the last index
                     if (innerIndex < polygon.vertices.length) {
-                        copy.vertices.push(intercept);
+                        vertices.push(intercept);
                     }
                 } else {
-                    copy.vertices.push(innerA);
+                    vertices.push(innerA);
                 }
             }
         }
+
+        // compute new voronoi cell
+        const copy = new VoronoiCell();
+        copy.vertices = vertices;
+        copy.centroid = App.getAveragePoint(copy.vertices);
+        copy.radius = copy.vertices.reduce((acc: number, vertex): number => {
+            return Math.max(
+                acc,
+                VoronoiGraph.angularDistance(
+                    copy.centroid,
+                    vertex
+                )
+            );
+        }, 0);
 
         return copy;
     }
@@ -914,7 +953,7 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
         const nodes: Array<VoronoiTreeNode<T>> = [];
 
         // generate random points within a voronoi cell.
-        const randomPointsWithinVoronoiCell: Array<[number, number, number]> = [];
+        let randomPointsWithinVoronoiCell: Array<[number, number, number]> = [];
         for (let i = 0; i < 10; i++) {
             // pick a random triangle of a polygon
             const randomTriangleIndex = VoronoiTreeNode.getRandomTriangleOfSphericalPolygon<T>(forNode);
@@ -944,12 +983,16 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
         }
 
         // compute random nodes within voronoi cell, hierarchical voronoi tree.
-        const delaunay = new DelaunayGraph<T>();
-        delaunay.initializeWithPoints(randomPointsWithinVoronoiCell);
-        const outOfBoundsVoronoiCells = delaunay.getVoronoiGraph().cells.slice(4);
+        let goodPoints: VoronoiCell[] = [];
+        for (let step = 0; step < 10; step++) {
+            const delaunay = new DelaunayGraph<T>();
+            delaunay.initializeWithPoints(randomPointsWithinVoronoiCell);
+            const outOfBoundsVoronoiCells = delaunay.getVoronoiGraph().cells.slice(4);
 
-        // perform sutherland-hodgman polygon clipping
-        const goodPoints = outOfBoundsVoronoiCells.map((polygon) => VoronoiTreeNode.polygonClip<T>(forNode, polygon));
+            // perform sutherland-hodgman polygon clipping
+            goodPoints = outOfBoundsVoronoiCells.map((polygon) => VoronoiTreeNode.polygonClip<T>(forNode, polygon));
+            randomPointsWithinVoronoiCell = goodPoints.map(v => v.centroid);
+        }
 
         // create tree nodes
         for (const point of goodPoints) {
@@ -971,6 +1014,13 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
 export class VoronoiTree<T extends ICameraState> implements IVoronoiTreeNodeParent<T> {
     public nodes: Array<VoronoiTreeNode<T>> = [];
 
+    /**
+     * Add an item to the voronoi tree for quick lookup in the future. Useful for grouping objects close together. Required
+     * for good physics and collision detection. Instead of comparing 1 cannon ball to 2000 ships which would be 2000
+     * physics operations, use this class to divide recursively, 2000 / 10 = 200 / 10 = 20 / 10 = 2, resulting in
+     * 30 tree operations + 2 physics operations.
+     * @param drawable
+     */
     public addItem(drawable: T) {
         if (this.nodes.length === 0) {
             this.nodes = VoronoiTreeNode.createRootNodes<T>(this);
@@ -991,6 +1041,11 @@ export class VoronoiTree<T extends ICameraState> implements IVoronoiTreeNodePare
             bestNode.addItem(drawable);
         }
     }
+
+    /**
+     * Remove an item from the voronoi tree. Useful for resetting the tree before the movement phase.
+     * @param drawable
+     */
     public removeItem(drawable: T) {
         // recurse tree
         const position = drawable.position.clone().rotateVector([0, 0, 1]);
@@ -1008,12 +1063,41 @@ export class VoronoiTree<T extends ICameraState> implements IVoronoiTreeNodePare
             bestNode.removeItem(drawable);
         }
     }
+
+    /**
+     * List items near a specific position within the Voronoi Tree. Useful for finding nearest neighbors, when doing
+     * physics and collision detection.
+     * @param position
+     */
     public *listItems(position: [number, number, number]): Generator<T> {
         // recurse tree
         for (const node of this.nodes) {
             const distance = VoronoiGraph.angularDistance(node.point, position);
             if (distance < node.radius) {
-                yield * Array.from(node.listItems(position));
+                const generator = node.listItems(position);
+                while (true) {
+                    const res = generator.next();
+                    if (res.done) {
+                        break;
+                    }
+                    yield res.value;
+                }
+            }
+        }
+    }
+
+    /**
+     * Get a list of cells to print, useful for debugging the voronoi tree structure.
+     */
+    public *listCells(): Generator<VoronoiCell> {
+        for (const node of this.nodes) {
+            const generator = node.listCells();
+            while (true) {
+                const res = generator.next();
+                if (res.done) {
+                    break;
+                }
+                yield res.value;
             }
         }
     }
@@ -2762,6 +2846,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     private delaunayData: DelaunayTriangle[] = [];
     public voronoiGraph: VoronoiGraph<Planet> = new VoronoiGraph();
     public voronoiShips: VoronoiTree<Ship> = new VoronoiTree();
+    public voronoiShipsCells: VoronoiCell[] = [];
     public factions: { [key: string]: Faction } = {};
     public ships: Ship[] = [];
     public playerShip: Ship | null = null;
@@ -3483,11 +3568,18 @@ export class App extends React.Component<IAppProps, IAppState> {
         } else if (step === 0) {
             // perform triangle fan
             for (let i = 0; i < vertices.length; i++) {
-                yield * Array.from(this.getDelaunayTileTessellation(centroid, [
+                const generator = this.getDelaunayTileTessellation(centroid, [
                     centroid,
                     vertices[i % vertices.length],
                     vertices[(i + 1) % vertices.length],
-                ], maxStep, step + 1));
+                ], maxStep, step + 1);
+                while (true) {
+                    const res = generator.next();
+                    if (res.done) {
+                        break;
+                    }
+                    yield res.value;
+                }
             }
 
         } else {
@@ -3518,26 +3610,37 @@ export class App extends React.Component<IAppProps, IAppState> {
             }
 
             // return recursive tessellation of triangle into 4 triangles
-            yield * Array.from(this.getDelaunayTileTessellation(centroid, [
-                vertices[0],
-                midPoints[0],
-                midPoints[2]
-            ], maxStep, step + 1));
-            yield * Array.from(this.getDelaunayTileTessellation(centroid, [
-                vertices[1],
-                midPoints[1],
-                midPoints[0]
-            ], maxStep, step + 1));
-            yield * Array.from(this.getDelaunayTileTessellation(centroid, [
-                vertices[2],
-                midPoints[2],
-                midPoints[1]
-            ], maxStep, step + 1));
-            yield * Array.from(this.getDelaunayTileTessellation(centroid, [
-                midPoints[0],
-                midPoints[1],
-                midPoints[2]
-            ], maxStep, step + 1));
+            const generators: Array<Generator<ITessellatedTriangle>> = [
+                this.getDelaunayTileTessellation(centroid, [
+                    vertices[0],
+                    midPoints[0],
+                    midPoints[2]
+                ], maxStep, step + 1),
+                this.getDelaunayTileTessellation(centroid, [
+                    vertices[1],
+                    midPoints[1],
+                    midPoints[0]
+                ], maxStep, step + 1),
+                this.getDelaunayTileTessellation(centroid, [
+                    vertices[2],
+                    midPoints[2],
+                    midPoints[1]
+                ], maxStep, step + 1),
+                this.getDelaunayTileTessellation(centroid, [
+                    midPoints[0],
+                    midPoints[1],
+                    midPoints[2]
+                ], maxStep, step + 1)
+            ];
+            for (const generator of generators) {
+                while (true) {
+                    const res = generator.next();
+                    if (res.done) {
+                        break;
+                    }
+                    yield res.value;
+                }
+            }
         }
     }
 
@@ -4023,6 +4126,11 @@ export class App extends React.Component<IAppProps, IAppState> {
 
     private handleShowVoronoi() {
         if (this.showVoronoiRef.current) {
+            // cache a copy of the data since it updates often
+            if (this.showVoronoiRef.current.checked) {
+                this.voronoiShipsCells = Array.from(this.voronoiShips.listCells());
+            }
+
             this.setState({
                 ...this.state,
                 showVoronoi: this.showVoronoiRef.current.checked,
@@ -4283,6 +4391,12 @@ export class App extends React.Component<IAppProps, IAppState> {
                             .map(this.drawDelaunayTile.bind(this)) :
                         null
                 }
+                {/*{*/}
+                {/*    this.state.showVoronoi ?*/}
+                {/*        this.voronoiShipsCells.map(this.rotateDelaunayTriangle.bind(this))*/}
+                {/*            .map(this.drawDelaunayTile.bind(this)) :*/}
+                {/*        null*/}
+                {/*}*/}
                 {
                     ([
                         ...(this.state.zoom >= 2 ? this.stars : Array.from(this.voronoiGraph.fetchDrawables(
@@ -4651,12 +4765,17 @@ export class App extends React.Component<IAppProps, IAppState> {
                             <li>Add economics, price rising and falling based on supply and demand, traders will try to go towards important colonies. DONE 4/21/2021</li>
                             <li>Add ship building economy for each planet. DONE 4/24/2021</li>
                             <li>Planets will sell ships using dutch auction, 50% will go to faction as tax, 50% will go to island renovation. DONE 4/24/2021</li>
-                            <li>Make cannon balls damage merchant ships.</li>
+                            <li>Make cannon balls damage merchant ships. -- DONE 4/27/2021</li>
+                            <li>Add upgradable buildings to island planets, so they can spend profit to make the island planet better.</li>
+                            <li>Add tax trading and construction trading between colonies and capitals.</li>
                             <li>Add ability to pirate merchants and raid colonies.</li>
+                            <li>Add ability for AI to aim at player.</li>
                             <li>Add AI pirates and pirate hunters.</li>
                             <li>Improve Voronoi generation to improve AI movement.</li>
                             <li>Factions will plan invasions of enemy colonies, merchants, and capitals.</li>
                             <li>Add multiplayer...</li>
+                            <li>Break game into client and server.</li>
+                            <li>Add multiple clients.</li>
                             <li>Play Styles:
                                 <ul>
                                     <li>Pirate/Marauder will attack kingdoms and other pirates.</li>
