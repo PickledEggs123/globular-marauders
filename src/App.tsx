@@ -2759,7 +2759,7 @@ export class Ship implements IAutomatedShip {
             const crate = new Crate(cargo.resourceType, cargo.sourcePlanetId);
             crate.id = `${this.id}-crate-${Math.floor(Math.random() * 100000)}`;
             crate.position = this.position;
-            crate.positionVelocity = this.positionVelocity.mul(randomVelocity);
+            crate.positionVelocity = this.positionVelocity.clone().pow(1 / 10).mul(randomVelocity);
             crate.orientation = Quaternion.fromAxisAngle([0, 0, 1], Math.random() * 2 * Math.PI - Math.PI);
             crate.orientationVelocity = Quaternion.fromAxisAngle([0, 0, 1], Math.random() > 0 ? App.ROTATION_STEP : -App.ROTATION_STEP);
             crates.push(crate);
@@ -4075,7 +4075,9 @@ export class App extends React.Component<IAppProps, IAppState> {
         }
 
         const c = cannonBall.position.clone().rotateVector([0, 0, 1]);
-        const d = cannonBall.position.clone().mul(cannonBall.positionVelocity.clone()).rotateVector([0, 0, 1]);
+        const d = cannonBall.position.clone().mul(
+            ship.positionVelocity.clone().inverse().mul(cannonBall.positionVelocity.clone())
+        ).rotateVector([0, 0, 1]);
         const cannonBallDistance = VoronoiGraph.angularDistance(c, d);
 
         let hitPoint: [number, number, number] | null = null;

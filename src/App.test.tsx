@@ -212,9 +212,9 @@ describe('Collision Detection', () => {
       const hit = App.cannonBallCollision(cannonBall, ship);
       expect(hit).toEqual({
         success: true,
-        point: [0, 0.0000029999999999999992, 0.0009999954999898746],
-        distance: 0.7818979088140966,
-        time: 0.4977716687239181,
+        point: [-0, 0.0003, 0.009995498987044117],
+        distance: 0.7503685782431588,
+        time: 0.47769947347294545,
       });
     });
     it('cannon ball misses ship (too slow)', () => {
@@ -269,6 +269,23 @@ describe('Collision Detection', () => {
         point: null,
         distance: null,
         time: null,
+      });
+    });
+    it('ship hits still cannon ball', () => {
+      const ship = new Ship(EShipType.HIND);
+      ship.id = "test-ship";
+      ship.position = Quaternion.fromBetweenVectors(
+          [0, 0, 1],
+          DelaunayGraph.normalize([0, 1 - PHYSICS_SCALE * 10, 1])
+      );
+      ship.positionVelocity = Quaternion.fromBetweenVectors([0, 0, 1], [0, -1, 0]);
+      const cannonBall = new CannonBall();
+      const hit = App.cannonBallCollision(cannonBall, ship);
+      expect(hit).toEqual({
+        success: true,
+        point: [0, 0.0034277921407224843, 0.0036400880538801747],
+        distance: 0.7553704751672747,
+        time: 0.4808837799541822,
       });
     });
   });
