@@ -9,6 +9,11 @@ export interface IHitTest {
     time: number | null;
 }
 
+export interface IExpirableTicks {
+    life: number;
+    maxLife: number;
+}
+
 /**
  * The min distance in rendering to prevent disappearing ship bug.
  */
@@ -111,7 +116,7 @@ const SHIP_DATA: IShipData[] = [{
     settlementProgressFactor: 4,
     cargoSize: 3,
     hull: HindHull,
-    hullStrength: 60,
+    hullStrength: 40,
     cannons: {
         numCannons: 8,
         numCannonades: 4,
@@ -126,7 +131,7 @@ const SHIP_DATA: IShipData[] = [{
     settlementProgressFactor: 2,
     cargoSize: 2,
     hull: CorvetteHull,
-    hullStrength: 30,
+    hullStrength: 20,
     cannons: {
         numCannons: 4,
         numCannonades: 10,
@@ -141,7 +146,7 @@ const SHIP_DATA: IShipData[] = [{
     settlementProgressFactor: 1,
     cargoSize: 1,
     hull: SloopHull,
-    hullStrength: 20,
+    hullStrength: 10,
     cannons: {
         numCannons: 2,
         numCannonades: 4,
@@ -572,7 +577,7 @@ export class Faction {
         // find worlds to trade
         const tradeWorldEntry = entries.find(entry => {
             // settle new worlds which have not been settled yet
-            const roomToTrade = entry[1].traderShipIds.length < entry[1].planet.resources.length - shipData.cargoSize;
+            const roomToTrade = entry[1].traderShipIds.length <= entry[1].planet.resources.length - shipData.cargoSize;
             const isSettledEnoughToTrade = entry[1].planet.settlementLevel >= ESettlementLevel.OUTPOST;
             const notTradedYet = Object.values(this.instance.factions).every(faction => {
                 if (faction.id === this.id) {
@@ -589,7 +594,7 @@ export class Faction {
         // find worlds to settle
         const settlementWorldEntry = entries.find(entry => {
             // settle new worlds which have not been settled yet
-            const roomToSettleMore = entry[1].settlerShipIds.length <
+            const roomToSettleMore = entry[1].settlerShipIds.length <=
                 Planet.NUM_SETTLEMENT_PROGRESS_STEPS -
                 Math.round(entry[1].planet.settlementProgress * Planet.NUM_SETTLEMENT_PROGRESS_STEPS) - shipData.settlementProgressFactor;
             const notSettledYet = Object.values(this.instance.factions).every(faction => {
@@ -627,6 +632,28 @@ export class Faction {
             order.orderType = EOrderType.ROAM;
             return order;
         }
+    }
+
+    public handleShipDestroyed(ship: Ship) {
+        // remove ship from exploration graph
+        if (ship.order && ship.order.planetId) {
+            const node = this.explorationGraph[ship.order.planetId];
+            const settlerIndex = node.settlerShipIds.findIndex(s => s === ship.id);
+            if (settlerIndex >= 0) {
+                node.settlerShipIds.splice(settlerIndex, 1);
+            }
+            const traderIndex = node.traderShipIds.findIndex(s => s === ship.id);
+            if (traderIndex >= 0) {
+                node.traderShipIds.splice(traderIndex, 1);
+            }
+        }
+
+        // remove ship from faction registry
+        const shipIndex = this.shipIds.findIndex(s => s === ship.id);
+        if (shipIndex >= 0) {
+            this.shipIds.splice(shipIndex, 1);
+        }
+        this.shipsAvailable[ship.shipType] -= 1;
     }
 }
 
@@ -996,6 +1023,12 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
 
         // create tree nodes
         for (const point of goodPoints) {
+            // skip bad voronoi cells
+            if (point.vertices.length < 3) {
+                continue;
+            }
+
+            // insert good voronoi cell
             const node = new VoronoiTreeNode<T>(point, forNode.level + 1, forNode);
             node.radius = point.vertices.reduce((acc, v) => Math.max(
                 acc,
@@ -2460,6 +2493,7 @@ export class Planet implements ICameraState {
 
         // create ship
         const ship = new Ship(shipType);
+        ship.faction = faction;
         ship.id = `ship-${this.id}-${faction.getShipAutoIncrement()}`;
         App.addRandomPositionAndOrientationToEntity(ship);
         ship.position = Quaternion.fromBetweenVectors([0, 0, 1], shipPoint);
@@ -2635,9 +2669,33 @@ export class Order {
     }
 }
 
+interface ICollidable extends ICameraState {
+    size: number;
+}
+
+export class Crate implements ICameraState, ICargoItem, IExpirableTicks, ICollidable {
+    public id: string = "";
+    public color: string = "brown";
+    public size: number = 1;
+    public position: Quaternion = Quaternion.ONE;
+    public positionVelocity: Quaternion = Quaternion.ONE;
+    public orientation: Quaternion = Quaternion.ONE;
+    public orientationVelocity: Quaternion = Quaternion.ONE;
+    public resourceType: EResourceType;
+    public sourcePlanetId: string;
+    public maxLife: number = 10 * 60;
+    public life: number = 0;
+
+    constructor(resourceType: EResourceType, sourcePlanetId: string) {
+        this.resourceType = resourceType;
+        this.sourcePlanetId = sourcePlanetId;
+    }
+}
+
 export class Ship implements IAutomatedShip {
     public id: string = "";
     public shipType: EShipType;
+    public faction: Faction | null = null;
     public color: string = "purple";
     public position: Quaternion = Quaternion.ONE;
     public positionVelocity: Quaternion = Quaternion.ONE;
@@ -2668,6 +2726,51 @@ export class Ship implements IAutomatedShip {
      */
     public applyDamage(cannonBall: CannonBall) {
         this.health = Math.max(0, this.health - 1);
+    }
+
+    /**
+     * Add cargo to a ship.
+     * @param crate
+     */
+    public pickUpCargo(crate: ICargoItem) {
+        const shipData = SHIP_DATA.find(s => s.shipType === this.shipType);
+        if (!shipData) {
+            throw new Error("Could not find ship type");
+        }
+        if (this.cargo.length < shipData.cargoSize) {
+            const cargoItem: ICargoItem = {
+                resourceType: crate.resourceType,
+                sourcePlanetId: crate.sourcePlanetId,
+            };
+            this.cargo.push(cargoItem);
+        }
+    }
+
+    /**
+     * Destroy the ship and create crates.
+     */
+    public destroy(): Crate[] {
+        const crates: Crate[] = [];
+        for (const cargo of this.cargo) {
+            const randomDirection = Quaternion.fromAxisAngle([0, 0, 1], Math.random() * 2 * Math.PI - Math.PI)
+                .rotateVector([1, 0, 0]);
+            const randomVelocity = Quaternion.fromBetweenVectors([0, 0, 1], randomDirection).pow(App.VELOCITY_STEP * 0.1);
+
+            const crate = new Crate(cargo.resourceType, cargo.sourcePlanetId);
+            crate.id = `${this.id}-crate-${Math.floor(Math.random() * 100000)}`;
+            crate.position = this.position;
+            crate.positionVelocity = this.positionVelocity.mul(randomVelocity);
+            crate.orientation = Quaternion.fromAxisAngle([0, 0, 1], Math.random() * 2 * Math.PI - Math.PI);
+            crate.orientationVelocity = Quaternion.fromAxisAngle([0, 0, 1], Math.random() > 0 ? App.ROTATION_STEP : -App.ROTATION_STEP);
+            crates.push(crate);
+        }
+
+        // register a destroyed ship with the faction
+        // incorrect behavior, the faction should think the ship is destroyed after a timeout
+        if (this.faction) {
+            this.faction.handleShipDestroyed(this);
+        }
+        return crates;
     }
 
     /**
@@ -2717,7 +2820,7 @@ export class SmokeCloud implements ICameraState, IExpirable {
     public expires: Date = new Date(Date.now() + 10000);
 }
 
-export class CannonBall implements ICameraState {
+export class CannonBall implements ICameraState, IExpirableTicks, ICollidable {
     public id: string = "";
     public color: string = "grey";
     public position: Quaternion = Quaternion.ONE;
@@ -2850,6 +2953,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     public factions: { [key: string]: Faction } = {};
     public ships: Ship[] = [];
     public playerShip: Ship | null = null;
+    public crates: Crate[] = [];
     public planets: Planet[] = [];
     public stars: Planet[] = [];
     public smokeClouds: SmokeCloud[] = [];
@@ -3544,6 +3648,37 @@ export class App extends React.Component<IAppProps, IAppState> {
         );
     }
 
+    private drawCrate(planetDrawing: IDrawable<Crate>) {
+        const isReverseSide = planetDrawing.rotatedPosition[2] > 0;
+        const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
+        const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
+        const distance = planetDrawing.distance;
+        const size = 0.1 * Math.max(0, 2 * Math.atan(planetDrawing.original.size / (2 * distance)));
+        return (
+            <g
+                key={planetDrawing.id}
+                transform={`translate(${x * this.state.width},${(1 - y) * this.state.height})`}
+            >
+                <rect
+                    transform={`rotate(${planetDrawing.rotation}) scale(${size * this.state.zoom})`}
+                    width="10"
+                    height="10"
+                    fill={planetDrawing.color}
+                    stroke="darkgray"
+                    strokeWidth={0.02}
+                    style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
+                />
+                <text
+                    stroke="white"
+                    x={size * this.state.zoom + 10}
+                    y={0}
+                >
+                    {planetDrawing.original.resourceType}
+                </text>
+            </g>
+        );
+    }
+
     public static getAveragePoint(points: Array<[number, number, number]>): [number, number, number] {
         let sum: [number, number, number] = [0, 0, 0];
         for (const point of points) {
@@ -3933,7 +4068,7 @@ export class App extends React.Component<IAppProps, IAppState> {
      * @param ship The ship to collide against.
      * @private
      */
-    public static cannonBallCollision(cannonBall: CannonBall, ship: Ship): IHitTest {
+    public static cannonBallCollision(cannonBall: ICollidable, ship: Ship): IHitTest {
         const shipData = SHIP_DATA.find(s => s.shipType === ship.shipType);
         if (!shipData) {
             throw new Error("Could not find ship type");
@@ -3989,55 +4124,89 @@ export class App extends React.Component<IAppProps, IAppState> {
             }
         }
         
-        // expire cannon balls
-        const expiredCannonBalls: CannonBall[] = [];
-        for (const cannonBall of this.cannonBalls) {
-            const isExpired = cannonBall.life >= cannonBall.maxLife;
-            if (isExpired) {
-                expiredCannonBalls.push(cannonBall);
-            }
-        }
-        for (const expiredCannonBall of expiredCannonBalls) {
-            const index = this.cannonBalls.findIndex(s => s === expiredCannonBall);
-            if (index >= 0) {
-                this.cannonBalls.splice(index, 1);
-            }
-        }
-        // move cannon balls
-        for (const cannonBall of this.cannonBalls) {
-            cannonBall.position = cannonBall.position.clone().mul(cannonBall.positionVelocity.clone());
-            cannonBall.orientation = cannonBall.orientation.clone().mul(cannonBall.orientationVelocity.clone());
-            cannonBall.life += 1;
-        }
-        // handle physics and collision detection
-        const cannonBallsToRemove = [];
-        for (const cannonBall of this.cannonBalls) {
-            // get nearby ships
-            const position = cannonBall.position.rotateVector([0, 0, 1]);
-            const nearByShips = Array.from(this.voronoiShips.listItems(position));
+        // expire cannon balls and crates
+        const expirableArrays: Array<IExpirableTicks[]> = [
+            this.cannonBalls,
+            this.crates
+        ];
+        for (const expirableArray of expirableArrays) {
 
-            // compute closest ship
-            let bestHit: IHitTest | null = null;
-            let bestShip: Ship | null = null;
-            for (const nearByShip of nearByShips) {
-                const hit = App.cannonBallCollision(cannonBall, nearByShip);
-                if (hit.success && hit.time && (!bestHit || (bestHit && bestHit.time && hit.time < bestHit.time))) {
-                    bestHit = hit;
-                    bestShip = nearByShip;
+            // collect expired entities
+            const expiredEntities: IExpirableTicks[] = [];
+            for (const entity of expirableArray) {
+                const isExpired = entity.life >= entity.maxLife;
+                if (isExpired) {
+                    expiredEntities.push(entity);
                 }
             }
 
-            // apply damage
-            if (bestHit && bestShip) {
-                bestShip.applyDamage(cannonBall);
-                cannonBallsToRemove.push(cannonBall);
+            // remove expired entities
+            for (const expiredEntity of expiredEntities) {
+                const index = expirableArray.findIndex(s => s === expiredEntity);
+                if (index >= 0) {
+                    expirableArray.splice(index, 1);
+                }
             }
         }
-        // remove collided cannon balls
-        for (const cannonBallToRemove of cannonBallsToRemove) {
-            const index = this.cannonBalls.findIndex(c => c === cannonBallToRemove);
-            if (index >= 0) {
-                this.cannonBalls.splice(index, 1);
+
+        // move cannon balls and crates
+        const movableArrays: Array<Array<ICameraState & IExpirableTicks>> = [
+            this.cannonBalls,
+            this.crates
+        ];
+        for (const movableArray of movableArrays) {
+            for (const entity of movableArray) {
+                entity.position = entity.position.clone().mul(entity.positionVelocity.clone());
+                entity.orientation = entity.orientation.clone().mul(entity.orientationVelocity.clone());
+                entity.life += 1;
+            }
+        }
+
+        // handle physics and collision detection
+        const collidableArrays: Array<{
+            arr: ICollidable[],
+            collideFn: (ship: Ship, entity: ICollidable) => void
+        }> = [{
+            arr: this.cannonBalls,
+            collideFn(ship: Ship, entity: ICollidable) {
+                ship.applyDamage(entity as CannonBall);
+            }
+        }, {
+            arr: this.crates,
+            collideFn(ship: Ship, entity: ICollidable) {
+                ship.pickUpCargo(entity as Crate);
+            }
+        }];
+        for (const { arr: collidableArray, collideFn } of collidableArrays) {
+            const entitiesToRemove = [];
+            for (const entity of collidableArray) {
+                // get nearby ships
+                const position = entity.position.rotateVector([0, 0, 1]);
+                const nearByShips = Array.from(this.voronoiShips.listItems(position));
+
+                // compute closest ship
+                let bestHit: IHitTest | null = null;
+                let bestShip: Ship | null = null;
+                for (const nearByShip of nearByShips) {
+                    const hit = App.cannonBallCollision(entity, nearByShip);
+                    if (hit.success && hit.time && (!bestHit || (bestHit && bestHit.time && hit.time < bestHit.time))) {
+                        bestHit = hit;
+                        bestShip = nearByShip;
+                    }
+                }
+
+                // apply damage
+                if (bestHit && bestShip) {
+                    collideFn(bestShip, entity);
+                    entitiesToRemove.push(entity);
+                }
+            }
+            // remove collided cannon balls
+            for (const entityToRemove of entitiesToRemove) {
+                const index = collidableArray.findIndex(c => c === entityToRemove);
+                if (index >= 0) {
+                    collidableArray.splice(index, 1);
+                }
             }
         }
 
@@ -4053,8 +4222,21 @@ export class App extends React.Component<IAppProps, IAppState> {
         }
 
         // AI ship loop
+        const destroyedShips: Ship[] = [];
         for (let i = 0; i < this.ships.length; i++) {
             const ship = this.ships[i];
+
+            // handle ship health
+            if (ship.health <= 0) {
+                destroyedShips.push(ship);
+                const crates = ship.destroy();
+                for (const crate of crates) {
+                    this.crates.push(crate);
+                }
+                continue;
+            }
+
+            // handle ship orders
             if (!ship.order) {
                 const faction = Object.values(this.factions).find(f => f.shipIds.includes(this.ships[i].id));
                 if (faction) {
@@ -4065,10 +4247,20 @@ export class App extends React.Component<IAppProps, IAppState> {
             if (shipOrder) {
                 shipOrder.handleOrderLoop();
             }
+
+            // handle pathfinding
             ship.pathFinding.pathFindingLoop();
             // ship player ship if autoPilot is not enabled
             if (!(i === playerShipIndex && !this.state.autoPilotEnabled)) {
                 this.handleShipLoop(i, () => ship.activeKeys, true);
+            }
+        }
+
+        // remove destroyed ships
+        for (const destroyedShip of destroyedShips) {
+            const index = this.ships.findIndex(s => s === destroyedShip);
+            if (index >= 0) {
+                this.ships.splice(index, 1);
             }
         }
 
@@ -4430,6 +4622,11 @@ export class App extends React.Component<IAppProps, IAppState> {
                     (this.cannonBalls.map(this.rotatePlanet.bind(this))
                         .map(this.convertToDrawable.bind(this, "-cannonBalls", 1)) as Array<IDrawable<SmokeCloud>>)
                         .map(this.drawSmokeCloud.bind(this))
+                }
+                {
+                    (this.crates.map(this.rotatePlanet.bind(this))
+                        .map(this.convertToDrawable.bind(this, "-crates", 1)) as Array<IDrawable<Crate>>)
+                        .map(this.drawCrate.bind(this))
                 }
                 {
                     (this.ships.map(this.rotatePlanet.bind(this))

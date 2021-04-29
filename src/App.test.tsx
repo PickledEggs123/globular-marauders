@@ -9,7 +9,7 @@ import App, {
   OUTPOST_GOODS,
   PathFinder,
   PHYSICS_SCALE,
-  Ship, SmokeCloud,
+  Ship,
   VoronoiGraph
 } from './App';
 import {shallow} from "enzyme";
