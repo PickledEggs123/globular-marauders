@@ -15,6 +15,78 @@ export interface IExpirableTicks {
 }
 
 /**
+ * The luxuries an island planet can have.
+ */
+export enum EResourceType {
+    // output goods
+    COTTON = "COTTON",
+    FLAX = "FLAX",
+    TOBACCO = "TOBACCO",
+    MOLASSES = "MOLASSES",
+    RUM = "RUM",
+    COFFEE = "COFFEE",
+    CACAO = "CACAO",
+    RUBBER = "RUBBER",
+    FUR = "FUR",
+    MAHOGANY = "MAHOGANY",
+    // capital goods
+    FIREARM = "FIREARM",
+    GUNPOWDER = "GUNPOWDER",
+    IRON = "IRON",
+    RATION = "RATION"
+}
+
+/**
+ * A list of goods produced by outposts.
+ */
+export const OUTPOST_GOODS: EResourceType[] = [
+    EResourceType.COTTON,
+    EResourceType.FLAX,
+    EResourceType.TOBACCO,
+    EResourceType.MOLASSES,
+    EResourceType.RUM,
+    EResourceType.COFFEE,
+    EResourceType.CACAO,
+    EResourceType.RUBBER,
+    EResourceType.FUR,
+    EResourceType.MAHOGANY,
+];
+
+/**
+ * A list of goods produced by capitals.
+ */
+export const CAPITAL_GOODS: EResourceType[] = [
+    EResourceType.FIREARM,
+    EResourceType.GUNPOWDER,
+    EResourceType.IRON,
+    EResourceType.RATION,
+];
+
+export interface IItemData {
+    resourceType: EResourceType;
+    basePrice: number;
+}
+
+export const ITEM_DATA: IItemData[] = [
+    // outpost goods
+    { resourceType: EResourceType.COTTON, basePrice: 1 },
+    { resourceType: EResourceType.FLAX, basePrice: 1 },
+    { resourceType: EResourceType.TOBACCO, basePrice: 3 },
+    { resourceType: EResourceType.MOLASSES, basePrice: 1 },
+    { resourceType: EResourceType.RUM, basePrice: 5 },
+    { resourceType: EResourceType.COFFEE, basePrice: 2 },
+    { resourceType: EResourceType.CACAO, basePrice: 2 },
+    { resourceType: EResourceType.RUBBER, basePrice: 5 },
+    { resourceType: EResourceType.FUR, basePrice: 5 },
+    { resourceType: EResourceType.MAHOGANY, basePrice: 5 },
+    // capital goods
+    { resourceType: EResourceType.FIREARM, basePrice: 100 },
+    { resourceType: EResourceType.GUNPOWDER, basePrice: 100 },
+    { resourceType: EResourceType.IRON, basePrice: 50 },
+    { resourceType: EResourceType.RATION, basePrice: 10 },
+];
+
+/**
  * The min distance in rendering to prevent disappearing ship bug.
  */
 export const MIN_DISTANCE = 1 / 10;
@@ -239,54 +311,6 @@ export enum ESettlementLevel {
      */
     CAPITAL = 5,
 }
-
-/**
- * The luxuries an island planet can have.
- */
-export enum EResourceType {
-    // output goods
-    COTTON = "COTTON",
-    FLAX = "FLAX",
-    TOBACCO = "TOBACCO",
-    MOLASSES = "MOLASSES",
-    RUM = "RUM",
-    COFFEE = "COFFEE",
-    COCOA = "COCOA",
-    RUBBER = "RUBBER",
-    FUR = "FUR",
-    MAHOGANY = "MAHOGANY",
-    // capital goods
-    FIREARM = "FIREARM",
-    GUNPOWDER = "GUNPOWDER",
-    IRON = "IRON",
-    RATION = "RATION"
-}
-
-/**
- * A list of goods produced by outposts.
- */
-export const OUTPOST_GOODS: EResourceType[] = [
-    EResourceType.COTTON,
-    EResourceType.FLAX,
-    EResourceType.TOBACCO,
-    EResourceType.MOLASSES,
-    EResourceType.RUM,
-    EResourceType.COFFEE,
-    EResourceType.COCOA,
-    EResourceType.RUBBER,
-    EResourceType.FUR,
-    EResourceType.MAHOGANY,
-];
-
-/**
- * A list of goods produced by capitals.
- */
-export const CAPITAL_GOODS: EResourceType[] = [
-    EResourceType.FIREARM,
-    EResourceType.GUNPOWDER,
-    EResourceType.IRON,
-    EResourceType.RATION,
-];
 
 /**
  * A list of planets to explore, used internally by the faction.
@@ -2910,6 +2934,7 @@ interface IAppProps {
 interface IAppState {
     showNotes: boolean;
     showShips: boolean;
+    showItems: boolean;
     width: number;
     height: number;
     zoom: number;
@@ -2925,6 +2950,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     state = {
         showNotes: false as boolean,
         showShips: false as boolean,
+        showItems: false as boolean,
         width: 500 as number,
         height: 500 as number,
         zoom: 4 as number,
@@ -2938,6 +2964,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
     private showNotesRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
     private showShipsRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
+    private showItemsRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
     private showDelaunayRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
     private showVoronoiRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
     private autoPilotEnabledRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
@@ -4309,6 +4336,15 @@ export class App extends React.Component<IAppProps, IAppState> {
         }
     }
 
+    private handleShowItems() {
+        if (this.showItemsRef.current) {
+            this.setState({
+                ...this.state,
+                showItems: this.showItemsRef.current.checked,
+            });
+        }
+    }
+
     private handleShowDelaunay() {
         if (this.showDelaunayRef.current) {
             this.setState({
@@ -4923,6 +4959,142 @@ export class App extends React.Component<IAppProps, IAppState> {
         return this.convertToDrawable("draw-ships", 1, this.rotatePlanet(original));
     }
 
+    renderItem(resourceType: EResourceType, index: number = 0) {
+        switch (resourceType) {
+            case EResourceType.CACAO: {
+                return (
+                    <>
+                        <polygon
+                            key={`cacao-bowl-${index}`}
+                            fill="grey"
+                            stroke="darkgray"
+                            strokeWidth="5"
+                            points="-50,-30 50,-30 40,0 30,20, 20,30, 10,35, 0,38 -10,35, -20,30, -30,20, -40,0"
+                        />
+                        <ellipse
+                            key={`cacao-powder-${index}`}
+                            fill="brown"
+                            stroke="darkgray"
+                            strokeWidth="5"
+                            cx="0"
+                            cy="-30"
+                            rx="50"
+                            ry="20"
+                        />
+                    </>
+                );
+            }
+            case EResourceType.COFFEE: {
+                const coffeeBeanLocations: Array<{x: number, y: number}> = [{
+                    x: -30, y: 40
+                }, {
+                    x: -10, y: 40
+                }, {
+                    x: 10, y: 40
+                }, {
+                    x: 30, y: 40
+                }, {
+                    x: -20, y: 20
+                }, {
+                    x: 0, y: 20
+                }, {
+                    x: 20, y: 20
+                }, {
+                    x: -10, y: 0
+                }, {
+                    x: 10, y: 0
+                }, {
+                    x: 0, y: -20
+                }]
+                return coffeeBeanLocations.map(({x, y}, beanIndex) => (
+                    <>
+                        <ellipse
+                            key={`coffee-beans-${beanIndex}-${index}`}
+                            fill="brown"
+                            stroke="#330C00"
+                            strokeWidth="3"
+                            cx={x}
+                            cy={y}
+                            rx="20"
+                            ry="10"
+                        />
+                        <line
+                            key={`coffee-beans-${beanIndex}-line-${index}`}
+                            stroke="#330C00"
+                            strokeWidth="3"
+                            x1={x - 20}
+                            x2={x + 20}
+                            y1={y}
+                            y2={y}
+                        />
+                    </>
+                ));
+            }
+            case EResourceType.RUM: {
+                return (
+                    <>
+                        <polygon
+                            key={`rum-bottle-${index}`}
+                            fill="maroon"
+                            stroke="#330C00"
+                            strokeWidth="3"
+                            points="-10,-40 10,-40 10,-20 30,-20 30,50 -30,50 -30,-20 -10,-20"
+                        />
+                        <polygon
+                            key={`rum-bottle-label-${index}`}
+                            fill="tan"
+                            stroke="#330C00"
+                            strokeWidth="3"
+                            points="30,-10 30,20 -30,20 -30,-10"
+                        />
+                        <text
+                            key={`rum-bottle-text-${index}`}
+                            stroke="#330C00"
+                            strokeWidth="3"
+                            textAnchor="middle"
+                            x={0}
+                            y={10}
+                        >XXX</text>
+                    </>
+                );
+            }
+            default: {
+                return (
+                    <>
+                        <rect
+                            key={`item-rect-${index}`}
+                            fill="white"
+                            stroke="red"
+                            strokeWidth="5"
+                            x={-50}
+                            y={-50}
+                            width="100"
+                            height="100"
+                        />
+                        <line
+                            key={`item-line-1-${index}`}
+                            stroke="red"
+                            strokeWidth="5"
+                            x1={-50}
+                            x2={50}
+                            y1={-50}
+                            y2={50}
+                        />
+                        <line
+                            key={`item-line-2-${index}`}
+                            stroke="red"
+                            strokeWidth="5"
+                            x1={-50}
+                            x2={50}
+                            y1={50}
+                            y2={-50}
+                        />
+                    </>
+                );
+            }
+        }
+    }
+
     render() {
         return (
             <div className="App">
@@ -4934,6 +5106,10 @@ export class App extends React.Component<IAppProps, IAppState> {
                     <div style={{display: "inline-block"}}>
                         <input type="checkbox" ref={this.showShipsRef} checked={this.state.showShips} onChange={this.handleShowShips.bind(this)}/>
                         <span>Show Ships</span>
+                    </div>
+                    <div style={{display: "inline-block"}}>
+                        <input type="checkbox" ref={this.showItemsRef} checked={this.state.showItems} onChange={this.handleShowItems.bind(this)}/>
+                        <span>Show Items</span>
                     </div>
                     <div style={{display: "inline-block"}}>
                         <input type="checkbox" ref={this.showDelaunayRef} checked={this.state.showDelaunay} onChange={this.handleShowDelaunay.bind(this)}/>
@@ -5012,6 +5188,28 @@ export class App extends React.Component<IAppProps, IAppState> {
                                             <g transform="translate(50, 50)">
                                                 {
                                                     this.renderShip(this.getShowShipDrawing(ship.shipType, ship.shipType), 1)
+                                                }
+                                            </g>
+                                        </svg>
+                                    );
+                                })
+                            }
+                        </ul>
+                    )
+                }
+                {
+                    this.state.showItems && (
+                        <ul>
+                            {
+                                ITEM_DATA.map(item => {
+                                    return (
+                                        <svg key={`show-item-${item.resourceType}`} width="100" height="100">
+                                            <g transform="translate(50, 50)">
+                                                {
+                                                    this.renderItem(item.resourceType)
+                                                }
+                                                {
+                                                    <text textAnchor="middle">{item.resourceType}</text>
                                                 }
                                             </g>
                                         </svg>
