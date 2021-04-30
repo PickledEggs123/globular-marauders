@@ -4961,6 +4961,29 @@ export class App extends React.Component<IAppProps, IAppState> {
 
     renderItem(resourceType: EResourceType, index: number = 0) {
         switch (resourceType) {
+            case EResourceType.RUBBER: {
+                return (
+                    <>
+                        <polygon
+                            key={`cacao-bowl-${index}`}
+                            fill="tan"
+                            stroke="brown"
+                            strokeWidth="3"
+                            points="-50,-30 50,-30 40,0 30,20, 20,30, 10,35, 0,38 -10,35, -20,30, -30,20, -40,0"
+                        />
+                        <ellipse
+                            key={`cacao-powder-${index}`}
+                            fill="white"
+                            stroke="darkgray"
+                            strokeWidth="3"
+                            cx="0"
+                            cy="-30"
+                            rx="50"
+                            ry="20"
+                        />
+                    </>
+                );
+            }
             case EResourceType.CACAO: {
                 return (
                     <>
@@ -4968,14 +4991,14 @@ export class App extends React.Component<IAppProps, IAppState> {
                             key={`cacao-bowl-${index}`}
                             fill="grey"
                             stroke="darkgray"
-                            strokeWidth="5"
+                            strokeWidth="3"
                             points="-50,-30 50,-30 40,0 30,20, 20,30, 10,35, 0,38 -10,35, -20,30, -30,20, -40,0"
                         />
                         <ellipse
                             key={`cacao-powder-${index}`}
                             fill="brown"
                             stroke="darkgray"
-                            strokeWidth="5"
+                            strokeWidth="3"
                             cx="0"
                             cy="-30"
                             rx="50"
@@ -5038,7 +5061,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                             fill="maroon"
                             stroke="#330C00"
                             strokeWidth="3"
-                            points="-10,-40 10,-40 10,-20 30,-20 30,50 -30,50 -30,-20 -10,-20"
+                            points="-10,-40 10,-40 10,-20 20,-15 30,-10 30,50 -30,50 -30,-10 -20,-15 -10,-20"
                         />
                         <polygon
                             key={`rum-bottle-label-${index}`}
@@ -5055,6 +5078,211 @@ export class App extends React.Component<IAppProps, IAppState> {
                             x={0}
                             y={10}
                         >XXX</text>
+                    </>
+                );
+            }
+            case EResourceType.MOLASSES: {
+                return (
+                    <>
+                        <polygon
+                            key={`molasses-jar-${index}`}
+                            fill="maroon"
+                            stroke="#330C00"
+                            strokeWidth="3"
+                            points="-30,-40 30,-40 30,40 20,45 0,50 -20,45 -30,40"
+                        />
+                        <ellipse
+                            key={`molasses-jar-lid-${index}`}
+                            fill="grey"
+                            stroke="darkgrey"
+                            strokeWidth="3"
+                            cx={0}
+                            cy={-40}
+                            rx={30}
+                            ry={10}
+                        />
+                    </>
+                );
+            }
+            case EResourceType.COTTON: {
+                return (
+                    <>
+                        <polyline
+                            key={`cotton-stem-1-${index}`}
+                            stroke="brown"
+                            strokeWidth="3"
+                            points="-30,-30 50,50"
+                        />
+                        <polyline
+                            key={`cotton-stem-2-${index}`}
+                            stroke="brown"
+                            strokeWidth="3"
+                            points="-30,20 20,20"
+                        />
+                        <ellipse
+                            key={`cotton-leaf-1-${index}`}
+                            fill="green"
+                            stroke="darkgreen"
+                            strokeWidth="3"
+                            cx={20}
+                            cy={0}
+                            rx={20}
+                            ry={10}
+                        />
+                        <ellipse
+                            key={`cotton-leaf-2-${index}`}
+                            fill="green"
+                            stroke="darkgreen"
+                            strokeWidth="3"
+                            cx={-20}
+                            cy={0}
+                            rx={25}
+                            ry={10}
+                        />
+                        <circle
+                            key={`cotton-1-${index}`}
+                            fill="white"
+                            stroke="grey"
+                            strokeWidth="3"
+                            cx={-30}
+                            cy={-30}
+                            r={20}
+                        />
+                        <circle
+                            key={`cotton-2-${index}`}
+                            fill="white"
+                            stroke="grey"
+                            strokeWidth="3"
+                            cx={-10}
+                            cy={0}
+                            r={10}
+                        />
+                        <circle
+                            key={`cotton-2-${index}`}
+                            fill="white"
+                            stroke="grey"
+                            strokeWidth="3"
+                            cx={-15}
+                            cy={-20}
+                            r={15}
+                        />
+                        <circle
+                            key={`cotton-2-${index}`}
+                            fill="white"
+                            stroke="grey"
+                            strokeWidth="3"
+                            cx={-25}
+                            cy={20}
+                            r={15}
+                        />
+                    </>
+                );
+            }
+            case EResourceType.FLAX: {
+                return (
+                    <>
+                        <polyline
+                            key={`flax-stem-1-${index}`}
+                            stroke="green"
+                            strokeWidth="3"
+                            points="0,-50 0,50"
+                        />
+                        <polyline
+                            key={`flax-stem-2-${index}`}
+                            stroke="green"
+                            strokeWidth="3"
+                            points="10,-40 0,50"
+                        />
+                        <polyline
+                            key={`flax-stem-3-${index}`}
+                            stroke="green"
+                            strokeWidth="3"
+                            points="-10,-40 0,50"
+                        />
+                        <polyline
+                            key={`flax-stem-4-${index}`}
+                            stroke="green"
+                            strokeWidth="3"
+                            points="20,-35 0,50"
+                        />
+                        <polyline
+                            key={`flax-stem-5-${index}`}
+                            stroke="green"
+                            strokeWidth="3"
+                            points="-20,-35 0,50"
+                        />
+                    </>
+                );
+            }
+            case EResourceType.TOBACCO: {
+                return (
+                    <>
+                        <polyline
+                            key={`tobacco-stem-1-${index}`}
+                            stroke="green"
+                            strokeWidth="3"
+                            points="0,-50 0,50"
+                        />
+                        <ellipse
+                            key={`tobacco-leaf-1-${index}`}
+                            fill="green"
+                            stroke="darkgreen"
+                            strokeWidth="3"
+                            cx={-25}
+                            cy={40}
+                            rx={25}
+                            ry={10}
+                        />
+                        <ellipse
+                            key={`tobacco-leaf-2-${index}`}
+                            fill="green"
+                            stroke="darkgreen"
+                            strokeWidth="3"
+                            cx={25}
+                            cy={40}
+                            rx={25}
+                            ry={10}
+                        />
+                        <ellipse
+                            key={`tobacco-leaf-3-${index}`}
+                            fill="green"
+                            stroke="darkgreen"
+                            strokeWidth="3"
+                            cx={20}
+                            cy={10}
+                            rx={20}
+                            ry={10}
+                        />
+                        <ellipse
+                            key={`tobacco-leaf-4-${index}`}
+                            fill="green"
+                            stroke="darkgreen"
+                            strokeWidth="3"
+                            cx={-20}
+                            cy={10}
+                            rx={20}
+                            ry={10}
+                        />
+                        <ellipse
+                            key={`tobacco-leaf-5-${index}`}
+                            fill="green"
+                            stroke="darkgreen"
+                            strokeWidth="3"
+                            cx={-15}
+                            cy={-20}
+                            rx={15}
+                            ry={10}
+                        />
+                        <ellipse
+                            key={`tobacco-leaf-6-${index}`}
+                            fill="green"
+                            stroke="darkgreen"
+                            strokeWidth="3"
+                            cx={15}
+                            cy={-20}
+                            rx={15}
+                            ry={10}
+                        />
                     </>
                 );
             }
