@@ -2276,6 +2276,11 @@ export class Shipyard {
         [EShipType.CORVETTE]: 0,
         [EShipType.HIND]: 0
     };
+    public shipsBuilding: Record<EShipType, number> = {
+        [EShipType.SLOOP]: 0,
+        [EShipType.CORVETTE]: 0,
+        [EShipType.HIND]: 0
+    };
 
     constructor(instance: App, planet: Planet) {
         this.instance = instance;
@@ -2283,10 +2288,10 @@ export class Shipyard {
     }
 
     public getNextShipTypeToBuild(): EShipType {
-        if (this.shipsAvailable.SLOOP < 3) {
+        if (this.shipsAvailable.SLOOP + this.shipsBuilding.SLOOP < 3) {
             return EShipType.SLOOP;
         }
-        if (this.shipsAvailable.CORVETTE < 3) {
+        if (this.shipsAvailable.CORVETTE + this.shipsBuilding.CORVETTE < 3) {
             return EShipType.CORVETTE;
         }
         return EShipType.HIND;
@@ -2327,6 +2332,7 @@ export class Shipyard {
         const dock = new ShipyardDock(this.instance, this.planet, this);
         this.docks.push(dock);
         dock.beginBuildingOfShip(shipType);
+        this.shipsBuilding[shipType] += 1;
     }
 
     /**
@@ -2337,6 +2343,7 @@ export class Shipyard {
         if (!dock.shipType) {
             throw new Error("Dock must have ship type to be done");
         }
+        this.shipsBuilding[dock.shipType] -= 1;
         this.numShipsAvailable += 1;
         this.shipsAvailable[dock.shipType] += 1;
     }
@@ -2607,14 +2614,22 @@ export class Order {
             this.stage += 1
 
             // update settlement progress
-            colonyWorld.settlementProgress = (
-                Math.round(colonyWorld.settlementProgress * Planet.NUM_SETTLEMENT_PROGRESS_STEPS) + shipData.settlementProgressFactor
-            ) / Planet.NUM_SETTLEMENT_PROGRESS_STEPS;
-            if (colonyWorld.settlementProgress === 1) {
-                colonyWorld.settlementLevel = ESettlementLevel.OUTPOST;
-            }
-            if (!this.faction.planetIds.includes(this.planetId)) {
-                this.faction.planetIds.push(this.planetId);
+            const wasSettledByAnotherFactionYet = Object.values(this.app.factions).some(f => {
+                if (this.planetId && f.planetIds.includes(this.planetId) && f.id !== this.faction.id) {
+                    return true;
+                }
+                return false;
+            });
+            if (!wasSettledByAnotherFactionYet) {
+                colonyWorld.settlementProgress = (
+                    Math.round(colonyWorld.settlementProgress * Planet.NUM_SETTLEMENT_PROGRESS_STEPS) + shipData.settlementProgressFactor
+                ) / Planet.NUM_SETTLEMENT_PROGRESS_STEPS;
+                if (colonyWorld.settlementProgress === 1) {
+                    colonyWorld.settlementLevel = ESettlementLevel.OUTPOST;
+                }
+                if (!this.faction.planetIds.includes(this.planetId)) {
+                    this.faction.planetIds.push(this.planetId);
+                }
             }
 
             // return to home world
@@ -2731,7 +2746,7 @@ export class Ship implements IAutomatedShip {
     public order: Order | null = null;
     public health: number = 1;
     public maxHealth: number = 1;
-    private cargo: ICargoItem[] = [];
+    public cargo: ICargoItem[] = [];
 
     constructor(shipType: EShipType) {
         this.shipType = shipType;
@@ -3686,15 +3701,11 @@ export class App extends React.Component<IAppProps, IAppState> {
                 key={planetDrawing.id}
                 transform={`translate(${x * this.state.width},${(1 - y) * this.state.height})`}
             >
-                <rect
-                    transform={`rotate(${planetDrawing.rotation}) scale(${size * this.state.zoom})`}
-                    width="10"
-                    height="10"
-                    fill={planetDrawing.color}
-                    stroke="darkgray"
-                    strokeWidth={0.02}
-                    style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
-                />
+                <g transform={`scale(0.2)`}>
+                    {
+                        this.renderItem(planetDrawing.original.resourceType)
+                    }
+                </g>
                 <text
                     stroke="white"
                     x={size * this.state.zoom + 10}
@@ -4287,6 +4298,9 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         // remove destroyed ships
         for (const destroyedShip of destroyedShips) {
+            if (destroyedShip === this.playerShip) {
+                this.playerShip = null;
+            }
             const index = this.ships.findIndex(s => s === destroyedShip);
             if (index >= 0) {
                 this.ships.splice(index, 1);
@@ -4541,17 +4555,18 @@ export class App extends React.Component<IAppProps, IAppState> {
             this.factions[factionData.id] = new Faction(this, factionData.id, factionData.color, factionData.planetId);
             const planet = this.planets.find(p => p.id === factionData.planetId);
             if (planet) {
-                for (let numShipsToStartWith = 0; numShipsToStartWith < 5; numShipsToStartWith++) {
-                    const dock = new ShipyardDock(this, planet, planet.shipyard);
+                for (let numShipsToStartWith = 0; numShipsToStartWith < 10; numShipsToStartWith++) {
                     const shipType = planet.shipyard.getNextShipTypeToBuild();
                     const shipData = SHIP_DATA.find(s => s.shipType === shipType);
                     if (!shipData) {
                         throw new Error("Could not find ship type");
                     }
-                    dock.shipType = shipType;
-                    dock.shipCost = shipData.cost;
-                    dock.progress = shipData.cost - 1;
-                    planet.shipyard.docks.push(dock);
+                    planet.wood += shipData.cost;
+                    planet.shipyard.buildShip(shipType);
+                    const dock = planet.shipyard.docks[planet.shipyard.docks.length - 1];
+                    if (dock) {
+                        dock.progress = dock.shipCost - 1;
+                    }
                 }
             }
         }
@@ -4719,6 +4734,47 @@ export class App extends React.Component<IAppProps, IAppState> {
                     <text x="0" y="30" fontSize={8} color="black">Node{numPathingNodes > 1 ? "s" : ""}: {numPathingNodes}</text>
                     <text x="0" y="45" fontSize={8} color="black">Distance: {Math.round(distanceToNode * 100000 / Math.PI) / 100}</text>
                     <text x="0" y="60" fontSize={8} color="black">Order: {orderType}</text>
+                </g>
+            );
+        } else {
+            return null;
+        }
+    }
+
+    private renderCargoStatus() {
+        if (this.playerShip) {
+            const shipType = this.playerShip.shipType;
+            const shipData = SHIP_DATA.find(s => s.shipType === shipType);
+            if (!shipData) {
+                throw new Error("Could not find ship type");
+            }
+
+            const cargoSlotSize = Math.min(50, this.state.width / shipData.cargoSize);
+            const cargos = this.playerShip.cargo;
+            const cargoSize = shipData.cargoSize;
+            return (
+                <g key="cargo-status" id="cargo-status" transform={`translate(${this.state.width / 2},${this.state.height - 50})`}>
+                    {
+                        new Array(shipData.cargoSize).fill(0).map((v, i) => {
+                            const cargo = cargos[i];
+                            if (cargo) {
+                                return (
+                                    <g key={`cargo-slot-${i}`} transform={`translate(${cargoSlotSize * (i - cargoSize / 2 + 0.5)},0)`}>
+                                        <g transform={`scale(0.5)`}>
+                                            {this.renderItem(cargo.resourceType)}
+                                        </g>
+                                        <rect x={-25} y={-25} width={50} height={50} fill="none" stroke="grey" strokeWidth={3}/>
+                                    </g>
+                                );
+                            } else {
+                                return (
+                                    <g key={`cargo-slot-${i}`} transform={`translate(${cargoSlotSize * (i - cargoSize / 2 + 0.5)},0)`}>
+                                        <rect x={-25} y={-25} width={50} height={50} fill="none" stroke="grey" strokeWidth={3}/>
+                                    </g>
+                                );
+                            }
+                        })
+                    }
                 </g>
             );
         } else {
@@ -4961,18 +5017,247 @@ export class App extends React.Component<IAppProps, IAppState> {
 
     renderItem(resourceType: EResourceType, index: number = 0) {
         switch (resourceType) {
+            case EResourceType.RATION: {
+                return (
+                    <>
+                        <polygon
+                            key={`ration-bar-1-${index}`}
+                            fill="tan"
+                            stroke="brown"
+                            strokeWidth="3"
+                            points="40,40 -40,40 -40,-40 40,-40"
+                        />
+                        <line
+                            key={`ration-line-1-${index}`}
+                            stroke="brown"
+                            strokeWidth="3"
+                            x1={40}
+                            x2={40}
+                            y1={-40}
+                            y2={40}
+                        />
+                        <line
+                            key={`ration-line-2-${index}`}
+                            stroke="brown"
+                            strokeWidth="3"
+                            x1={30}
+                            x2={30}
+                            y1={-40}
+                            y2={40}
+                        />
+                        <line
+                            key={`ration-line-3-${index}`}
+                            stroke="brown"
+                            strokeWidth="3"
+                            x1={20}
+                            x2={20}
+                            y1={-40}
+                            y2={40}
+                        />
+                        <line
+                            key={`ration-line-4-${index}`}
+                            stroke="brown"
+                            strokeWidth="3"
+                            x1={10}
+                            x2={10}
+                            y1={-40}
+                            y2={40}
+                        />
+                        <line
+                            key={`ration-line-5-${index}`}
+                            stroke="brown"
+                            strokeWidth="3"
+                            x1={0}
+                            x2={0}
+                            y1={-40}
+                            y2={40}
+                        />
+                        <line
+                            key={`ration-line-6-${index}`}
+                            stroke="brown"
+                            strokeWidth="3"
+                            x1={-10}
+                            x2={-10}
+                            y1={-40}
+                            y2={40}
+                        />
+                        <line
+                            key={`ration-line-7-${index}`}
+                            stroke="brown"
+                            strokeWidth="3"
+                            x1={-20}
+                            x2={-20}
+                            y1={-40}
+                            y2={40}
+                        />
+                        <line
+                            key={`ration-line-8-${index}`}
+                            stroke="brown"
+                            strokeWidth="3"
+                            x1={-30}
+                            x2={-30}
+                            y1={-40}
+                            y2={40}
+                        />
+                    </>
+                );
+            }
+            case EResourceType.IRON: {
+                return (
+                    <>
+                        <polygon
+                            key={`iron-bar-1-${index}`}
+                            fill="darkgrey"
+                            stroke="grey"
+                            strokeWidth="3"
+                            points="50,50 40,30 10,30 0,50"
+                        />
+                        <polygon
+                            key={`iron-bar-2-${index}`}
+                            fill="darkgrey"
+                            stroke="grey"
+                            strokeWidth="3"
+                            points="-50,50 -40,30 -10,30 0,50"
+                        />
+                        <polygon
+                            key={`iron-bar-3-${index}`}
+                            fill="darkgrey"
+                            stroke="grey"
+                            strokeWidth="3"
+                            points="25,30 15,10 -15,10 -25,30"
+                        />
+                    </>
+                );
+            }
+            case EResourceType.GUNPOWDER: {
+                return (
+                    <>
+                        <polygon
+                            key={`gunpowder-cone-${index}`}
+                            fill="darkgrey"
+                            stroke="grey"
+                            strokeWidth="3"
+                            points="-40,40 0,-40 40,40 30,45 0,50 -30,45"
+                        />
+                    </>
+                );
+            }
+            case EResourceType.FIREARM: {
+                return (
+                    <>
+                        <polygon
+                            key={`firearm-handle-${index}`}
+                            fill="tan"
+                            stroke="brown"
+                            strokeWidth="3"
+                            points="10,-20 40,-20 50,-10 40,10 30,0 30,-10"
+                        />
+                        <rect
+                            key={`firearm-barrel-${index}`}
+                            fill="grey"
+                            stroke="darkgrey"
+                            strokeWidth="3"
+                            x={-20}
+                            y={-20}
+                            width={60}
+                            height={10}
+                        />
+                    </>
+                );
+            }
+            case EResourceType.MAHOGANY: {
+                return (
+                    <>
+                        <polygon
+                            key={`mahogany-log-1-${index}`}
+                            fill="tan"
+                            stroke="brown"
+                            strokeWidth="3"
+                            points="-40,-40 40,-40 45,-25 50,0 45,25 40,40 -40,40"
+                        />
+                        <ellipse
+                            key={`mahogany-log-2-${index}`}
+                            fill="tan"
+                            stroke="brown"
+                            strokeWidth="3"
+                            cx={-40}
+                            cy={0}
+                            rx={10}
+                            ry={40}
+                        />
+                    </>
+                );
+            }
+            case EResourceType.FUR: {
+                return (
+                    <>
+                        <polygon
+                            key={`fur-${index}`}
+                            fill="orange"
+                            stroke="brown"
+                            strokeWidth="3"
+                            points="-40,-40 -30,-50 -20,-40 0,-50 20,-40 30,-50 40,-40 40,50 30,40 20,50 0,40 -20,50 -30,40 -40,50"
+                        />
+                        <line
+                            key={`fur-line-1-${index}`}
+                            stroke="brown"
+                            strokeWidth="3"
+                            x1={-30}
+                            y1={-40}
+                            x2={-30}
+                            y2={30}
+                        />
+                        <line
+                            key={`fur-line-2-${index}`}
+                            stroke="brown"
+                            strokeWidth="3"
+                            x1={30}
+                            y1={-40}
+                            x2={30}
+                            y2={30}
+                        />
+                        <line
+                            key={`fur-line-3-${index}`}
+                            stroke="brown"
+                            strokeWidth="3"
+                            x1={-20}
+                            y1={-30}
+                            x2={-20}
+                            y2={40}
+                        />
+                        <line
+                            key={`fur-line-4-${index}`}
+                            stroke="brown"
+                            strokeWidth="3"
+                            x1={20}
+                            y1={-30}
+                            x2={20}
+                            y2={40}
+                        />
+                        <line
+                            key={`fur-line-5-${index}`}
+                            stroke="brown"
+                            strokeWidth="3"
+                            x1={0}
+                            y1={-40}
+                            x2={0}
+                            y2={30}
+                        />
+                    </>
+                );
+            }
             case EResourceType.RUBBER: {
                 return (
                     <>
                         <polygon
-                            key={`cacao-bowl-${index}`}
+                            key={`rubber-bowl-${index}`}
                             fill="tan"
                             stroke="brown"
                             strokeWidth="3"
                             points="-50,-30 50,-30 40,0 30,20, 20,30, 10,35, 0,38 -10,35, -20,30, -30,20, -40,0"
                         />
                         <ellipse
-                            key={`cacao-powder-${index}`}
+                            key={`rubber-powder-${index}`}
                             fill="white"
                             stroke="darkgray"
                             strokeWidth="3"
@@ -5474,6 +5759,9 @@ export class App extends React.Component<IAppProps, IAppState> {
                     }
                     {
                         this.renderGameStatus()
+                    }
+                    {
+                        this.renderCargoStatus()
                     }
                     {
                         this.renderFactionStatus()
