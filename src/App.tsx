@@ -9,6 +9,13 @@ export interface IHitTest {
     time: number | null;
 }
 
+export interface IConeHitTest {
+    success: boolean;
+    point: [number, number] | null;
+    distance: number | null;
+    time: number | null;
+}
+
 export interface IExpirableTicks {
     life: number;
     maxLife: number;
