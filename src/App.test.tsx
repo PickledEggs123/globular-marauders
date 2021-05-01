@@ -171,10 +171,10 @@ describe('Collision Detection', () => {
       const c: [number, number, number] = [0, 1, 0];
       const d: [number, number, number] = [1, 0, 0];
       const intercept = App.computeIntercept(a, b, c, d);
-      expect(VoronoiGraph.angularDistance(intercept, [1, 0, 0])).toBeLessThan(PHYSICS_SCALE / 1000);
+      expect(VoronoiGraph.angularDistance(intercept, [1, 0, 0], 1)).toBeLessThan(PHYSICS_SCALE / 1000);
 
-      const segmentDistance: number = VoronoiGraph.angularDistance(a, b);
-      const interceptDistance: number = VoronoiGraph.angularDistance(a, intercept) + VoronoiGraph.angularDistance(intercept, b);
+      const segmentDistance: number = VoronoiGraph.angularDistance(a, b, 1);
+      const interceptDistance: number = VoronoiGraph.angularDistance(a, intercept, 1) + VoronoiGraph.angularDistance(intercept, b, 1);
       expect(Math.abs(segmentDistance - interceptDistance)).toBeLessThan(PHYSICS_SCALE / 1000);
     });
     it('large line segment and small movement', () => {
@@ -183,10 +183,10 @@ describe('Collision Detection', () => {
       const c: [number, number, number] = [0, 1, 0];
       const d: [number, number, number] = DelaunayGraph.normalize([PHYSICS_SCALE, 1, 0]);
       const intercept = App.computeIntercept(a, b, c, d);
-      expect(VoronoiGraph.angularDistance(intercept, [1, 0, 0])).toBeLessThan(PHYSICS_SCALE / 1000);
+      expect(VoronoiGraph.angularDistance(intercept, [1, 0, 0], 1)).toBeLessThan(PHYSICS_SCALE / 1000);
 
-      const segmentDistance: number = VoronoiGraph.angularDistance(a, b);
-      const interceptDistance: number = VoronoiGraph.angularDistance(a, intercept) + VoronoiGraph.angularDistance(intercept, b);
+      const segmentDistance: number = VoronoiGraph.angularDistance(a, b, 1);
+      const interceptDistance: number = VoronoiGraph.angularDistance(a, intercept, 1) + VoronoiGraph.angularDistance(intercept, b, 1);
       expect(Math.abs(segmentDistance - interceptDistance)).toBeLessThan(PHYSICS_SCALE / 1000);
     });
     it('small line segment and small movement', () => {
@@ -195,10 +195,10 @@ describe('Collision Detection', () => {
       const c: [number, number, number] = [0, 1, 0];
       const d: [number, number, number] = DelaunayGraph.normalize([PHYSICS_SCALE, 1, 0]);
       const intercept = App.computeIntercept(a, b, c, d);
-      expect(VoronoiGraph.angularDistance(intercept, [1, 0, 0])).toBeLessThan(PHYSICS_SCALE / 1000);
+      expect(VoronoiGraph.angularDistance(intercept, [1, 0, 0], 1)).toBeLessThan(PHYSICS_SCALE / 1000);
 
-      const segmentDistance: number = VoronoiGraph.angularDistance(a, b);
-      const interceptDistance: number = VoronoiGraph.angularDistance(a, intercept) + VoronoiGraph.angularDistance(intercept, b);
+      const segmentDistance: number = VoronoiGraph.angularDistance(a, b, 1);
+      const interceptDistance: number = VoronoiGraph.angularDistance(a, intercept, 1) + VoronoiGraph.angularDistance(intercept, b, 1);
       expect(Math.abs(segmentDistance - interceptDistance)).not.toBeLessThan(PHYSICS_SCALE / 1000);
     });
     it('cannon ball hits ship', () => {
@@ -210,7 +210,7 @@ describe('Collision Detection', () => {
           DelaunayGraph.normalize([0, 1 - PHYSICS_SCALE * 10, 1])
       );
       cannonBall.positionVelocity = Quaternion.fromBetweenVectors([0, 0, 1], [0, -1, 0]);
-      const hit = App.cannonBallCollision(cannonBall, ship);
+      const hit = App.cannonBallCollision(cannonBall, ship, 1);
       expect(hit).toEqual({
         success: true,
         point: [-0, 0.0003, 0.009995498987044117],
@@ -230,7 +230,7 @@ describe('Collision Detection', () => {
           [0, 0, 1],
           DelaunayGraph.normalize([0, -PHYSICS_SCALE, 1])
       );
-      const hit = App.cannonBallCollision(cannonBall, ship);
+      const hit = App.cannonBallCollision(cannonBall, ship, 1);
       expect(hit).toEqual({
         success: false,
         point: null,
@@ -247,7 +247,7 @@ describe('Collision Detection', () => {
           DelaunayGraph.normalize([0, 1 - PHYSICS_SCALE * 10, 1])
       );
       cannonBall.positionVelocity = Quaternion.fromBetweenVectors([0, 0, 1], [0, 1, 0]);
-      const hit = App.cannonBallCollision(cannonBall, ship);
+      const hit = App.cannonBallCollision(cannonBall, ship, 1);
       expect(hit).toEqual({
         success: false,
         point: null,
@@ -264,7 +264,7 @@ describe('Collision Detection', () => {
           DelaunayGraph.normalize([0, 1 - PHYSICS_SCALE * 10, 1])
       );
       cannonBall.positionVelocity = Quaternion.fromBetweenVectors([0, 0, 1], [1, 0, 0]);
-      const hit = App.cannonBallCollision(cannonBall, ship);
+      const hit = App.cannonBallCollision(cannonBall, ship, 1);
       expect(hit).toEqual({
         success: false,
         point: null,
@@ -281,7 +281,7 @@ describe('Collision Detection', () => {
       );
       ship.positionVelocity = Quaternion.fromBetweenVectors([0, 0, 1], [0, -1, 0]);
       const cannonBall = new CannonBall(EFaction.ENGLISH);
-      const hit = App.cannonBallCollision(cannonBall, ship);
+      const hit = App.cannonBallCollision(cannonBall, ship, 1);
       expect(hit).toEqual({
         success: true,
         point: [0, 0.0034277921407224843, 0.0036400880538801747],
