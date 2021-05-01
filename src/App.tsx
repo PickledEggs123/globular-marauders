@@ -16,6 +16,218 @@ export interface IConeHitTest {
     time: number | null;
 }
 
+/**
+ * Determine the direction to aim at a moving target.
+ * @param shipPosition The position of the ship right now.
+ * @param shipDirection The direction of the ship right now, will extrapolate a target angle
+ * @param projectileSpeed The projectile speed will affect the target angle
+ */
+export const computeConeLineIntersection = (shipPosition: [number, number], shipDirection: [number, number], projectileSpeed: number): IConeHitTest => {
+    // line cone intersection equations
+    // https://www.geometrictools.com/Documentation/IntersectionLineCone.pdf
+    // cone - origin V direction D angle Y
+    // line - origin P direction U
+    const multiply = (a: number[], b: number[], transpose: boolean = false): number[] => {
+        if (a.length === 1 && b.length === 1) {
+            return [
+                a[0] * b[0]
+            ];
+        } else if (a.length === 3 && b.length === 9) {
+            return [
+                a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+                a[0] * b[3] + a[1] * b[4] + a[2] * b[5],
+                a[0] * b[6] + a[1] * b[7] + a[2] * b[8]
+            ];
+        } else if (a.length === 9 && b.length === 3) {
+            return [
+                a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+                a[3] * b[0] + a[4] * b[1] + a[5] * b[2],
+                a[6] * b[0] + a[7] * b[1] + a[8] * b[2]
+            ];
+        } else if (a.length === 3 && b.length === 3 && !transpose) {
+            return [
+                a[0] * b[0], a[0] * b[1], a[0] * b[2],
+                a[1] * b[0], a[1] * b[1], a[1] * b[2],
+                a[2] * b[0], a[2] * b[1], a[2] * b[2]
+            ];
+        } else if (a.length === 3 && b.length === 3 && transpose) {
+            return [
+                a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+            ];
+        } else if (a.length === 9 && b.length === 9) {
+            return [
+                a[0] * b[0] + a[1] * b[3] + a[2] * b[6],
+                a[0] * b[1] + a[1] * b[4] + a[2] * b[7],
+                a[0] * b[2] + a[1] * b[5] + a[2] * b[8],
+                a[3] * b[0] + a[4] * b[3] + a[5] * b[6],
+                a[3] * b[1] + a[4] * b[4] + a[5] * b[7],
+                a[3] * b[2] + a[4] * b[5] + a[5] * b[8],
+                a[6] * b[0] + a[7] * b[3] + a[8] * b[6],
+                a[6] * b[1] + a[7] * b[4] + a[8] * b[7],
+                a[6] * b[2] + a[7] * b[5] + a[8] * b[8]
+            ];
+        }
+        else if (a.length === 1 && b.length === 9) {
+            return [
+                a[0] * b[0], a[0] * b[1], a[0] * b[2],
+                a[0] * b[3], a[0] * b[4], a[0] * b[5],
+                a[0] * b[6], a[0] * b[7], a[0] * b[8]
+            ];
+        }
+        else if (a.length === 1 && b.length === 3) {
+            return [
+                a[0] * b[0], a[0] * b[1], a[0] * b[2]
+            ];
+        } else {
+            throw new Error("Unknown multiplication values");
+        }
+    };
+    const add = (a: number[], b: number[]): number[] => {
+        if (a.length === 3 && b.length === 3) {
+            return [
+                a[0] + b[0],
+                a[1] + b[1],
+                a[2] + b[2]
+            ];
+        } else if (a.length === 1 && b.length === 1) {
+            return [
+                a[0] + b[0]
+            ];
+        } else {
+            throw new Error("Unknown addition values");
+        }
+    };
+    const subtract = (a: number[], b: number[]): number[] => {
+        if (a.length === 9 && b.length === 9) {
+            return [
+                a[0] - b[0], a[1] - b[1], a[2] - b[2],
+                a[3] - b[3], a[4] - b[4], a[5] - b[5],
+                a[6] - b[6], a[7] - b[7], a[8] - b[8]
+            ];
+        } else if (a.length === 1 && b.length === 9) {
+            return [
+                a[0] - b[0], a[0] - b[1], a[0] - b[2],
+                a[0] - b[3], a[0] - b[4], a[0] - b[5],
+                a[0] - b[6], a[0] - b[7], a[0] - b[8]
+            ];
+        } else if (a.length === 3 && b.length === 3) {
+            return [
+                a[0] - b[0],
+                a[1] - b[1],
+                a[2] - b[2]
+            ];
+        } else if (a.length === 1 && b.length === 3) {
+            return [
+                a[0] - b[0],
+                a[0] - b[1],
+                a[0] - b[2]
+            ];
+        } else if (a.length === 3 && b.length === 1) {
+            return [
+                a[0] - b[0],
+                a[1] - b[0],
+                a[2] - b[0]
+            ];
+        } else if (a.length === 1 && b.length === 1) {
+            return [
+                a[0] - b[0]
+            ];
+        } else {
+            throw new Error("Unknown subtraction values");
+        }
+    };
+
+    // ship parameters
+    const o = [shipPosition[0], shipPosition[1], 0]; // ship position relative to attacking ship
+    const d = [shipDirection[0], shipDirection[1], 1];
+    const yVector = [projectileSpeed, 0, 1]; // cone size parameters
+    const yLength = Math.sqrt(Math.pow(yVector[0], 2) + Math.pow(yVector[1], 2) + Math.pow(yVector[2], 2));
+    const yUnit = [yVector[0] / yLength, yVector[1] / yLength, yVector[2] / yLength];
+    const v = [0, 0, 1]; // direction of cone facing upwards, attacking ship is not moving
+    const y = multiply(v, yUnit, true)[0]; // angle of cone, speed of projectile
+
+    // quadratic equation constants
+    const a = subtract(
+        multiply(
+            multiply(d, v, true),
+            multiply(d, v, true),
+        ),
+        multiply(
+            multiply(d, d, true),
+            [Math.pow(y, 2)]
+        )
+    )[0];
+    const b = multiply(
+        [2],
+        subtract(
+            multiply(
+                multiply(o, v, true),
+                multiply(d, v, true)
+            ),
+            multiply(
+                multiply(o, d, true),
+                [Math.pow(y, 2)]
+            )
+        )
+    )[0];
+    const c = subtract(
+        multiply(
+            multiply(o, v, true),
+            multiply(o, v, true)
+        ),
+        multiply(
+            multiply(o, o, true),
+            [Math.pow(y, 2)]
+        )
+    )[0];
+
+    // a list of possible time values
+    const timeValues: number[] = [];
+
+    // case 1
+    if (c !== 0) {
+        const root = Math.pow(b, 2) - 4 * a * c;
+        if (root < 0) {
+            // do nothing, no collision possible
+        } else if (root === 0) {
+            const t = -b / (2 * a);
+            timeValues.push(t);
+        } else {
+            // the pdf contained the wrong quadratic formula, it's not perfectly correct
+            const t1 = (-b - Math.sqrt(root)) / (2 * a);
+            const t2 = (-b + Math.sqrt(root)) / (2 * a);
+            timeValues.push(t1);
+            timeValues.push(t2);
+        }
+    }
+
+    let tMin: number | null = null;
+    for (const t of timeValues) {
+        if (t >= 0 && (tMin === null || t < tMin)) {
+            tMin = t;
+        }
+    }
+    if (tMin === null) {
+        return {
+            success: false,
+            point: null,
+            distance: null,
+            time: null
+        };
+    } else {
+        const point = add(o, multiply([tMin], d)) as [number, number, number];
+        const distance = Math.sqrt(Math.pow(point[0], 2) + Math.pow(point[1], 2));
+        const time = tMin;
+        return {
+            success: true,
+            point: [point[0], point[1]],
+            distance,
+            time
+        };
+    }
+};
+
+
 export interface IExpirableTicks {
     life: number;
     maxLife: number;
@@ -2116,6 +2328,9 @@ interface IAutomatedShip extends ICameraState {
     activeKeys: string[];
 }
 
+/**
+ * Allows the AI ship to move through the world.
+ */
 export class PathFinder<T extends IAutomatedShip> {
     public owner: T;
     public points: Array<[number, number, number]> = [];
@@ -2258,6 +2473,153 @@ export class PathFinder<T extends IAutomatedShip> {
                 if (sIndex >= 0) {
                     this.owner.activeKeys.splice(sIndex, 1);
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Allows the AI ship to fire at other ships in the world.
+ */
+export class FireControl<T extends IAutomatedShip> {
+    public app: App;
+    public owner: T;
+    public targetShipId: string | null = null;
+    public coolDown: number = 0;
+    public lastStepShouldRotate: boolean = false;
+
+    constructor(app: App, owner: T) {
+        this.app = app;
+        this.owner = owner;
+    }
+
+    /**
+     * Handle the fire control of the ship. Will aim at ships, ect...
+     */
+    public fireControlLoop() {
+        const target = this.app.ships.find(s => s.id === this.targetShipId);
+        if (!target) {
+            // no targets, cancel attack
+            this.targetShipId = null;
+            return;
+        }
+
+        // there are targets, begin attack
+        //
+        // compute moving projectile path to hit target
+        const shipPositionPoint = this.owner.orientation.clone().inverse()
+            .mul(this.owner.position.clone().inverse())
+            .mul(target.position.clone())
+            .rotateVector([0, 0, 1]);
+        const shipPosition: [number, number] = [
+            shipPositionPoint[0],
+            shipPositionPoint[1]
+        ];
+        const shipDirectionPoint = this.owner.orientation.clone().inverse()
+            .mul(this.owner.position.clone().inverse())
+            .mul(target.position.clone())
+            .mul(target.orientation.clone())
+            .rotateVector([0, 0, 1]);
+        const shipDirection: [number, number] = [
+            shipDirectionPoint[0] - shipPosition[0],
+            shipDirectionPoint[1] - shipPosition[1]
+        ];
+        const projectileSpeed = App.PROJECTILE_SPEED;
+        const coneHit = computeConeLineIntersection(shipPosition, shipDirection, projectileSpeed);
+        if (!(coneHit.success && coneHit.point && coneHit.time && coneHit.time < 30)) {
+            // target is moving too fast, cannot hit it
+            return;
+        }
+
+        // compute rotation towards target
+        let targetOrientationPoint: [number, number, number] = [
+            coneHit.point[0],
+            coneHit.point[1],
+            0
+        ];
+        targetOrientationPoint = DelaunayGraph.normalize(targetOrientationPoint);
+        let orientationDiffAngle = Math.atan2(targetOrientationPoint[0], targetOrientationPoint[1]);
+        orientationDiffAngle = (orientationDiffAngle - Math.PI / 2) % (Math.PI * 2);
+        const orientationSpeed = VoronoiGraph.angularDistanceQuaternion(this.owner.orientationVelocity) * (orientationDiffAngle > 0 ? 1 : -1);
+        const desiredOrientationSpeed = Math.max(-App.ROTATION_STEP * 10, Math.min(Math.round(
+            -5 / Math.PI * orientationDiffAngle
+        ), App.ROTATION_STEP * 10));
+
+        // perform rotation and speed up
+        // use a class variable to force more tight angle correction, and a more relaxed angle check while moving
+        // should result in stop and go less often.
+        const shouldRotate = this.lastStepShouldRotate ?
+            Math.abs(orientationDiffAngle) > 2 / 180 * Math.PI || Math.abs(desiredOrientationSpeed) >= App.ROTATION_STEP :
+            Math.abs(orientationDiffAngle) > 5 / 180 * Math.PI || Math.abs(desiredOrientationSpeed) >= App.ROTATION_STEP;
+        this.lastStepShouldRotate = shouldRotate;
+        const willReachTargetRotation = Math.abs(orientationDiffAngle) / Math.abs(orientationSpeed) < 5;
+        if (shouldRotate && desiredOrientationSpeed > orientationSpeed && !willReachTargetRotation && !this.owner.activeKeys.includes("a")) {
+            // press a to rotate left
+            this.owner.activeKeys.push("a");
+        }
+        else if (shouldRotate && desiredOrientationSpeed < orientationSpeed && !willReachTargetRotation && !this.owner.activeKeys.includes("d")) {
+            // press d to rotate right
+            this.owner.activeKeys.push("d");
+        } else if (shouldRotate && desiredOrientationSpeed > orientationSpeed && willReachTargetRotation && !this.owner.activeKeys.includes("d")) {
+            const aIndex = this.owner.activeKeys.findIndex((key) => key === "a");
+            if (aIndex >= 0) {
+                this.owner.activeKeys.splice(aIndex, 1);
+            }
+
+            // press d to rotate right to slow down
+            this.owner.activeKeys.push("d");
+        }
+        else if (shouldRotate && desiredOrientationSpeed < orientationSpeed && willReachTargetRotation && !this.owner.activeKeys.includes("a")) {
+            const dIndex = this.owner.activeKeys.findIndex((key) => key === "d");
+            if (dIndex >= 0) {
+                this.owner.activeKeys.splice(dIndex, 1);
+            }
+
+            // press a to rotate left to slow down
+            this.owner.activeKeys.push("a");
+        }
+        else if (!shouldRotate && orientationSpeed > 0 && willReachTargetRotation && !this.owner.activeKeys.includes("a")) {
+            const dIndex = this.owner.activeKeys.findIndex((key) => key === "d");
+            if (dIndex >= 0) {
+                this.owner.activeKeys.splice(dIndex, 1);
+            }
+
+            // press a to rotate left to slow down
+            this.owner.activeKeys.push("a");
+        }
+        else if (!shouldRotate && orientationSpeed < 0 && willReachTargetRotation && !this.owner.activeKeys.includes("d")) {
+            const aIndex = this.owner.activeKeys.findIndex((key) => key === "a");
+            if (aIndex >= 0) {
+                this.owner.activeKeys.splice(aIndex, 1);
+            }
+
+            // press d to rotate right to slow down
+            this.owner.activeKeys.push("d");
+        } else {
+            // remove a d keys
+            const aIndex = this.owner.activeKeys.findIndex((key) => key === "a");
+            if (aIndex >= 0) {
+                this.owner.activeKeys.splice(aIndex, 1);
+            }
+            const dIndex = this.owner.activeKeys.findIndex((key) => key === "d");
+            if (dIndex >= 0) {
+                this.owner.activeKeys.splice(dIndex, 1);
+            }
+
+            if (!this.owner.activeKeys.includes(" ") && this.coolDown <= 0) {
+                // press space bar to begin firing
+                this.owner.activeKeys.push(" ");
+            } else if (this.owner.activeKeys.includes(" ") && this.coolDown <= 0) {
+                // release space bar to fire cannons
+                const spaceIndex = this.owner.activeKeys.findIndex((key) => key === " ");
+                if (spaceIndex >= 0) {
+                    this.owner.activeKeys.splice(spaceIndex, 1);
+                }
+
+                this.coolDown = 20;
+            } else if (this.coolDown > 0) {
+                // wait to cool down cannons
+                this.coolDown -= 1;
             }
         }
     }
@@ -2578,7 +2940,7 @@ export class Planet implements ICameraState {
         }
 
         // create ship
-        const ship = new Ship(shipType);
+        const ship = new Ship(this.instance, shipType);
         ship.faction = faction;
         ship.id = `ship-${this.id}-${faction.getShipAutoIncrement()}`;
         App.addRandomPositionAndOrientationToEntity(ship);
@@ -2839,6 +3201,7 @@ export class Crate implements ICameraState, ICargoItem, IExpirableTicks, ICollid
 }
 
 export class Ship implements IAutomatedShip {
+    public app: App;
     public id: string = "";
     public shipType: EShipType;
     public faction: Faction | null = null;
@@ -2850,12 +3213,15 @@ export class Ship implements IAutomatedShip {
     public cannonLoading?: Date = undefined;
     public activeKeys: string[] = [];
     public pathFinding: PathFinder<Ship> = new PathFinder<Ship>(this);
+    public fireControl: FireControl<Ship>;
     public orders: Order[] = [];
     public health: number = 1;
     public maxHealth: number = 1;
     public cargo: ICargoItem[] = [];
 
-    constructor(shipType: EShipType) {
+    constructor(app: App, shipType: EShipType) {
+        this.app = app;
+        this.fireControl = new FireControl<Ship>(this.app, this);
         this.shipType = shipType;
 
         const shipData = SHIP_DATA.find(s => s.shipType === this.shipType);
@@ -3136,6 +3502,10 @@ export class App extends React.Component<IAppProps, IAppState> {
      */
     public static VELOCITY_STEP: number = 1 / 6000;
     /**
+     * The speed of the cannon ball projectiles.
+     */
+    public static PROJECTILE_SPEED: number = App.VELOCITY_STEP * 60;
+    /**
      * Rotation step size of ships.
      */
     public static ROTATION_STEP: number = 1 / 300;
@@ -3176,7 +3546,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             return App.GetCameraState(ship);
         }
 
-        const tempShip = new Ship(EShipType.SLOOP);
+        const tempShip = new Ship(this, EShipType.SLOOP);
         tempShip.id = "ghost-ship";
         if (this.state.faction) {
             // faction selected, orbit the faction's home world
@@ -4167,7 +4537,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 // apply random jitter
                 jitterPoint[1] += DelaunayGraph.randomInt() * 0.15;
                 jitterPoint = DelaunayGraph.normalize(jitterPoint);
-                const jitter = Quaternion.fromBetweenVectors([0, 0, 1], jitterPoint).pow(App.VELOCITY_STEP * 60);
+                const jitter = Quaternion.fromBetweenVectors([0, 0, 1], jitterPoint).pow(App.PROJECTILE_SPEED);
 
                 // create a cannon ball
                 const cannonBall = new CannonBall(faction.id);
@@ -4428,9 +4798,14 @@ export class App extends React.Component<IAppProps, IAppState> {
                 shipOrder.handleOrderLoop();
             }
 
-            // handle pathfinding
-            ship.pathFinding.pathFindingLoop();
-            // ship player ship if autoPilot is not enabled
+            if (ship.fireControl.targetShipId) {
+                // handle firing at ships
+                ship.fireControl.fireControlLoop();
+            } else {
+                // handle pathfinding
+                ship.pathFinding.pathFindingLoop();
+            }
+            // ship is player ship if autoPilot is not enabled
             if (!(i === playerShipIndex && !this.state.autoPilotEnabled)) {
                 this.handleShipLoop(i, () => ship.activeKeys, true);
             }
@@ -4440,6 +4815,9 @@ export class App extends React.Component<IAppProps, IAppState> {
         for (const destroyedShip of destroyedShips) {
             if (destroyedShip === this.playerShip) {
                 this.playerShip = null;
+                this.setState({
+                    showSpawnMenu: true
+                });
             }
             const index = this.ships.findIndex(s => s === destroyedShip);
             if (index >= 0) {
@@ -4450,6 +4828,25 @@ export class App extends React.Component<IAppProps, IAppState> {
         // update collision acceleration structures
         for (const ship of this.ships) {
             this.voronoiShips.addItem(ship);
+        }
+
+        for (const ship of this.ships) {
+            // handle detecting ships to shoot at
+            if (!ship.fireControl.targetShipId) {
+                const shipPosition = ship.position.clone().rotateVector([0, 0, 1]);
+                const nearByShips = Array.from(this.voronoiShips.listItems(shipPosition));
+                for (const nearByShip of nearByShips) {
+                    if (!(nearByShip.faction && ship.faction && nearByShip.faction.id === ship.faction.id)) {
+                        if (VoronoiGraph.angularDistance(
+                            nearByShip.position.clone().rotateVector([0, 0, 1]),
+                            ship.position.clone().rotateVector([0, 0, 1])
+                        ) < App.PROJECTILE_SPEED * 100) {
+                            ship.fireControl.targetShipId = nearByShip.id;
+                        }
+                        break;
+                    }
+                }
+            }
         }
 
         // handle luxury buffs
@@ -5156,7 +5553,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     getShowShipDrawing(id: string, shipType: EShipType, factionType: EFaction | null = null): IDrawable<Ship> {
-        const original: Ship = new Ship(shipType);
+        const original: Ship = new Ship(this, shipType);
         original.id = id;
         if (factionType) {
             const faction = Object.values(this.factions).find(f => f.id === factionType);
