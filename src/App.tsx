@@ -252,6 +252,10 @@ interface ICargoItem {
      * to resolve the trade deficit.
      */
     resourceType: EResourceType;
+    /**
+     * If the cargo was pirated.
+     */
+    pirated: boolean;
 }
 
 /**
@@ -270,6 +274,10 @@ export enum EOrderType {
      * Trade with a planet to collect luxuries.
      */
     TRADE = "TRADE",
+    /**
+     * Find and destroy an enemy ship, then return the cargo.
+     */
+    PIRATE = "PIRATE",
 }
 
 /**
@@ -355,7 +363,7 @@ class LuxuryBuff {
      * @param resourceType
      * @constructor
      */
-    public static CalculateBuff(app: App, faction: Faction, resourceType: EResourceType) {
+    public static CalculateGoldBuff(app: App, faction: Faction, resourceType: EResourceType) {
         const totalLuxuries: number = Object.values(app.factions).reduce((acc: number, f) => {
             return acc + f.luxuryBuffs.reduce((acc2: number, l) => {
                 if (l.resourceType === resourceType) {
@@ -374,9 +382,16 @@ class LuxuryBuff {
         }, 0);
         const averageLuxuryConsumption: number = totalLuxuries / Object.values(app.factions).length;
 
+        // get the price multiplier of the item
+        let basePrice: number = 1;
+        const itemData = ITEM_DATA.find(item => item.resourceType === resourceType);
+        if (itemData) {
+            basePrice = itemData.basePrice;
+        }
+
         // calculate the gold exchange based on luxuries
         if (totalLuxuries > 0) {
-            faction.gold += (factionLuxuries / totalLuxuries) - averageLuxuryConsumption;
+            faction.gold += ((factionLuxuries / totalLuxuries) - averageLuxuryConsumption) * basePrice;
         }
     }
 
@@ -397,10 +412,26 @@ class LuxuryBuff {
     }
 
     /**
-     * Reset the buff timer.
+     * Reset the buff timer. Returns an amount replenished. Replenishing will reward the captain with money.
      */
     public replenish() {
+        const percentReplenished: number = this.ticks / this.expires;
         this.ticks = 0;
+        return percentReplenished;
+    }
+
+    /**
+     * The total value of the luxury buff.
+     */
+    public goldValue(): number {
+        if (CAPITAL_GOODS.includes(this.resourceType)) {
+            return 0;
+        }
+        const itemData = ITEM_DATA.find(item => item.resourceType === this.resourceType);
+        if (itemData) {
+            return this.expires * itemData.basePrice;
+        }
+        return this.expires;
     }
 
     /**
@@ -438,7 +469,7 @@ export class Faction {
     /**
      * The id of the faction.
      */
-    public id: string;
+    public id: EFaction;
     /**
      * The color of the faction.
      */
@@ -468,7 +499,7 @@ export class Faction {
     /**
      * THe number of gold accumulated by the faction, used to pay captains.
      */
-    public gold: number = 10000;
+    public gold: number = 100000;
     /**
      * The list of planet priorities for exploration.
      * @private
@@ -490,7 +521,7 @@ export class Faction {
      * @param factionColor The color of the faction.
      * @param homeWorldPlanetId The home world of the faction.
      */
-    constructor(instance: App, id: string, factionColor: string, homeWorldPlanetId: string) {
+    constructor(instance: App, id: EFaction, factionColor: string, homeWorldPlanetId: string) {
         this.instance = instance;
         this.id = id;
         this.factionColor = factionColor;
@@ -529,13 +560,18 @@ export class Faction {
 
     /**
      * Apply a new luxury buff to a faction.
+     * @param account A gold holding account which increases after trading.
      * @param resourceType The resource type affects the buff.
      * @param planetId The source world of the goods.
      */
-    public applyLuxuryBuff(resourceType: EResourceType, planetId: string) {
+    public applyLuxuryBuff(account: IGoldAccount, resourceType: EResourceType, planetId: string) {
         const oldLuxuryBuff = this.luxuryBuffs.find(l => l.matches(resourceType, planetId));
         if (oldLuxuryBuff) {
-            oldLuxuryBuff.replenish();
+            const percentReplenished = oldLuxuryBuff.replenish();
+            const goldProfit = Math.floor(oldLuxuryBuff.goldValue() * percentReplenished);
+            const goldBonus = Math.floor(goldProfit * 0.2);
+            this.gold -= goldBonus;
+            account.gold += goldBonus;
         } else {
             this.luxuryBuffs.push(new LuxuryBuff(this.instance, this, resourceType, planetId));
         }
@@ -559,7 +595,8 @@ export class Faction {
      */
     public handleFactionLoop() {
         // pay captains to buy new ships
-        this.instance.gold += 0.2;
+        this.gold -= 0.1;
+        this.instance.gold += 0.1;
 
         // captain new AI ships
         const factionNextShipType = this.getFactionNextShipType();
@@ -660,8 +697,12 @@ export class Faction {
 
     public handleShipDestroyed(ship: Ship) {
         // remove ship from exploration graph
-        if (ship.order && ship.order.planetId) {
-            const node = this.explorationGraph[ship.order.planetId];
+        for (const order of ship.orders) {
+            if (!order.planetId) {
+                continue;
+            }
+
+            const node = this.explorationGraph[order.planetId];
             const settlerIndex = node.settlerShipIds.findIndex(s => s === ship.id);
             if (settlerIndex >= 0) {
                 node.settlerShipIds.splice(settlerIndex, 1);
@@ -2470,11 +2511,18 @@ export class Planet implements ICameraState {
         let goodsToOffer: EResourceType[] = [];
 
         // different levels of settlements take different goods
-        if (this.settlementLevel === ESettlementLevel.OUTPOST) {
+        if (this.settlementLevel === ESettlementLevel.UNTAMED) {
+            goodsToTake = CAPITAL_GOODS;
+            goodsToOffer = [];
+        } else if (this.settlementLevel === ESettlementLevel.OUTPOST) {
             goodsToTake = CAPITAL_GOODS;
             goodsToOffer = this.resources;
         } else if (this.settlementLevel === ESettlementLevel.CAPITAL) {
-            goodsToTake = OUTPOST_GOODS;
+            // the capital will take outpost goods an pirated goods
+            goodsToTake = Array.from(new Set([
+                ...OUTPOST_GOODS,
+                ...ship.cargo.filter(c => c.pirated).map(c => c.resourceType)
+            ]));
             goodsToOffer = this.resources;
         }
 
@@ -2484,7 +2532,7 @@ export class Planet implements ICameraState {
             if (boughtGood) {
                 const faction = Object.values(this.instance.factions).find(f => f.homeWoldPlanetId === this.id);
                 if (faction) {
-                    faction.applyLuxuryBuff(goodToTake, boughtGood.sourcePlanetId);
+                    faction.applyLuxuryBuff(this.instance, goodToTake, boughtGood.sourcePlanetId);
                 }
             }
         }
@@ -2580,7 +2628,7 @@ export class Order {
             this.owner.pathFinding.points = nearestNode.pathToObject(homeWorld.pathingNode);
         } else if (this.stage === 2 && this.owner.pathFinding.points.length === 0) {
             // end order
-            this.owner.order = null;
+            this.owner.removeOrder(this);
         }
     }
 
@@ -2606,19 +2654,26 @@ export class Order {
         if (this.stage === 0 && this.owner.pathFinding.points.length === 0) {
             this.stage += 1;
 
+            // return to home world
+            const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
+            const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
+            this.owner.pathFinding.points = nearestNode.pathToObject(homeWorld.pathingNode);
+        } else if (this.stage === 1 && this.owner.pathFinding.points.length === 0) {
+            this.stage += 1;
+
+            // trade with homeWorld
+            homeWorld.trade(this.owner);
+
             // find colony world
             const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
             const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
             this.owner.pathFinding.points = nearestNode.pathToObject(colonyWorld.pathingNode);
-        } else if (this.stage === 1 && this.owner.pathFinding.points.length === 0) {
+        } else if (this.stage === 2 && this.owner.pathFinding.points.length === 0) {
             this.stage += 1
 
             // update settlement progress
             const wasSettledByAnotherFactionYet = Object.values(this.app.factions).some(f => {
-                if (this.planetId && f.planetIds.includes(this.planetId) && f.id !== this.faction.id) {
-                    return true;
-                }
-                return false;
+                return !!(this.planetId && f.planetIds.includes(this.planetId) && f.id !== this.faction.id);
             });
             if (!wasSettledByAnotherFactionYet) {
                 colonyWorld.settlementProgress = (
@@ -2630,19 +2685,22 @@ export class Order {
                 if (!this.faction.planetIds.includes(this.planetId)) {
                     this.faction.planetIds.push(this.planetId);
                 }
+
+                // trade with homeWorld
+                colonyWorld.trade(this.owner);
             }
 
             // return to home world
             const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
             const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
             this.owner.pathFinding.points = nearestNode.pathToObject(homeWorld.pathingNode);
-        } else if (this.stage === 2 && this.owner.pathFinding.points.length === 0) {
+        } else if (this.stage === 3 && this.owner.pathFinding.points.length === 0) {
             // end order
             const index = this.faction.explorationGraph[this.planetId].settlerShipIds.findIndex(s => s === this.owner.id);
             if (index >= 0) {
                 this.faction.explorationGraph[this.planetId].settlerShipIds.splice(index, 1);
             }
-            this.owner.order = null;
+            this.owner.removeOrder(this);
         }
     }
 
@@ -2663,6 +2721,13 @@ export class Order {
         if (this.stage === 0 && this.owner.pathFinding.points.length === 0) {
             this.stage += 1;
 
+            // return to home world
+            const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
+            const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
+            this.owner.pathFinding.points = nearestNode.pathToObject(homeWorld.pathingNode);
+        } else if (this.stage === 1 && this.owner.pathFinding.points.length === 0) {
+            this.stage += 1;
+
             // trade with homeWorld
             homeWorld.trade(this.owner);
 
@@ -2670,7 +2735,7 @@ export class Order {
             const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
             const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
             this.owner.pathFinding.points = nearestNode.pathToObject(colonyWorld.pathingNode);
-        } else if (this.stage === 1 && this.owner.pathFinding.points.length === 0) {
+        } else if (this.stage === 2 && this.owner.pathFinding.points.length === 0) {
             this.stage += 1;
 
             // trade with colony world
@@ -2680,7 +2745,7 @@ export class Order {
             const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
             const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
             this.owner.pathFinding.points = nearestNode.pathToObject(homeWorld.pathingNode);
-        } else if (this.stage === 2 && this.owner.pathFinding.points.length === 0) {
+        } else if (this.stage === 3 && this.owner.pathFinding.points.length === 0) {
             // check if order expired
             if (this.runningTicks >= this.expireTicks) {
                 // end order
@@ -2688,11 +2753,41 @@ export class Order {
                 if (index >= 0) {
                     this.faction.explorationGraph[this.planetId].traderShipIds.splice(index, 1);
                 }
-                this.owner.order = null;
+                this.owner.removeOrder(this);
             } else {
                 // reset order
                 this.stage = 0;
             }
+        }
+    }
+
+    /**
+     * An order automatically created after destroying a ship and picking up its cargo. The order is to return to
+     * the home world to deliver the pirated cargo.
+     * @private
+     */
+    private pirate() {
+        const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWoldPlanetId);
+        if (!homeWorld || !homeWorld.pathingNode) {
+            throw new Error("Could not find home world for pathing back to home world (PIRATE)");
+        }
+
+        // fly to a specific planet
+        if (this.stage === 0 && this.owner.pathFinding.points.length === 0) {
+            this.stage += 1;
+
+            // return to home world
+            const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
+            const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
+            this.owner.pathFinding.points = nearestNode.pathToObject(homeWorld.pathingNode);
+        } else if (this.stage === 1 && this.owner.pathFinding.points.length === 0) {
+            this.stage += 1;
+
+            // trade with homeWorld
+            homeWorld.trade(this.owner);
+
+            // end order
+            this.owner.removeOrder(this);
         }
     }
 
@@ -2703,6 +2798,8 @@ export class Order {
             this.settle();
         } else if (this.orderType === EOrderType.TRADE) {
             this.trade();
+        } else if (this.orderType === EOrderType.PIRATE) {
+            this.pirate();
         }
         this.runningTicks += 1;
     }
@@ -2710,6 +2807,7 @@ export class Order {
 
 interface ICollidable extends ICameraState {
     size: number;
+    factionId: EFaction | null;
 }
 
 export class Crate implements ICameraState, ICargoItem, IExpirableTicks, ICollidable {
@@ -2722,8 +2820,10 @@ export class Crate implements ICameraState, ICargoItem, IExpirableTicks, ICollid
     public orientationVelocity: Quaternion = Quaternion.ONE;
     public resourceType: EResourceType;
     public sourcePlanetId: string;
+    public pirated: boolean = false;
     public maxLife: number = 10 * 60;
     public life: number = 0;
+    public factionId: EFaction | null = null;
 
     constructor(resourceType: EResourceType, sourcePlanetId: string) {
         this.resourceType = resourceType;
@@ -2743,7 +2843,7 @@ export class Ship implements IAutomatedShip {
     public cannonLoading?: Date = undefined;
     public activeKeys: string[] = [];
     public pathFinding: PathFinder<Ship> = new PathFinder<Ship>(this);
-    public order: Order | null = null;
+    public orders: Order[] = [];
     public health: number = 1;
     public maxHealth: number = 1;
     public cargo: ICargoItem[] = [];
@@ -2768,6 +2868,17 @@ export class Ship implements IAutomatedShip {
     }
 
     /**
+     * Remove an order from the ship.
+     * @param Order The order to remove.
+     */
+    public removeOrder(order: Order) {
+        const index = this.orders.findIndex(o => o === order);
+        if (index >= 0) {
+            this.orders.splice(index, 1);
+        }
+    }
+
+    /**
      * Add cargo to a ship.
      * @param crate
      */
@@ -2780,6 +2891,7 @@ export class Ship implements IAutomatedShip {
             const cargoItem: ICargoItem = {
                 resourceType: crate.resourceType,
                 sourcePlanetId: crate.sourcePlanetId,
+                pirated: true
             };
             this.cargo.push(cargoItem);
         }
@@ -2838,7 +2950,8 @@ export class Ship implements IAutomatedShip {
         if (this.cargo.length < shipData.cargoSize) {
             this.cargo.push({
                 resourceType,
-                sourcePlanetId
+                sourcePlanetId,
+                pirated: false,
             });
             return true;
         } else {
@@ -2869,6 +2982,14 @@ export class CannonBall implements ICameraState, IExpirableTicks, ICollidable {
     public size: number = 1;
     public maxLife: number = 10 * 5;
     public life: number = 0;
+    /**
+     * Cannon balls have a faction, to avoid team killing teammates.
+     */
+    public factionId: EFaction | null;
+
+    constructor(faction: EFaction) {
+        this.factionId = faction;
+    }
 }
 
 interface ICameraState {
@@ -3001,7 +3122,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     public smokeClouds: SmokeCloud[] = [];
     public cannonBalls: CannonBall[] = [];
     public luxuryBuffs: LuxuryBuff[] = [];
-    public gold: number = 100000;
+    public gold: number = 2000;
 
     /**
      * Velocity step size of ships.
@@ -3932,7 +4053,8 @@ export class App extends React.Component<IAppProps, IAppState> {
             cannonLoading: cameraCannonLoading,
             shipType,
             health,
-            maxHealth
+            maxHealth,
+            faction
         } = this.ships[shipIndex];
         const shipData = SHIP_DATA.find(i => i.shipType === shipType);
         if (!shipData) {
@@ -4027,7 +4149,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         if (activeKeys.includes(" ") && !cameraCannonLoading) {
             cameraCannonLoading = new Date(Date.now());
         }
-        if (!activeKeys.includes(" ") && cameraCannonLoading) {
+        if (!activeKeys.includes(" ") && cameraCannonLoading && faction) {
             // cannon fire
             cameraCannonLoading = undefined;
 
@@ -4041,7 +4163,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 const jitter = Quaternion.fromBetweenVectors([0, 0, 1], jitterPoint).pow(App.VELOCITY_STEP * 60);
 
                 // create a cannon ball
-                const cannonBall = new CannonBall();
+                const cannonBall = new CannonBall(faction.id);
                 cannonBall.id = `${cameraId}-${Math.floor(Math.random() * 100000000)}`;
                 cannonBall.position = cameraPosition.clone();
                 cannonBall.positionVelocity = cameraPosition.clone().inverse()
@@ -4236,7 +4358,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                 }
 
                 // apply damage
-                if (bestHit && bestShip) {
+                const teamDamage = bestShip && bestShip.faction && entity.factionId && bestShip.faction.id === entity.factionId;
+                if (bestHit && bestShip && !teamDamage) {
                     collideFn(bestShip, entity);
                     entitiesToRemove.push(entity);
                 }
@@ -4277,13 +4400,23 @@ export class App extends React.Component<IAppProps, IAppState> {
             }
 
             // handle ship orders
-            if (!ship.order) {
+            // handle automatic piracy orders
+            const hasPiracyOrder: boolean = ship.orders.some(o => o.orderType === EOrderType.PIRATE);
+            const hasPirateCargo: boolean = ship.cargo.some(c => c.pirated);
+            if (!hasPiracyOrder && hasPirateCargo && ship.faction) {
+                const piracyOrder = new Order(this, ship, ship.faction);
+                piracyOrder.orderType = EOrderType.PIRATE;
+                ship.orders.splice(0, 0, piracyOrder);
+            }
+            // get new orders from faction
+            if (ship.orders.length === 0) {
                 const faction = Object.values(this.factions).find(f => f.shipIds.includes(this.ships[i].id));
                 if (faction) {
-                    ship.order = faction.getOrder(ship);
+                    ship.orders.push(faction.getOrder(ship));
                 }
             }
-            const shipOrder = ship.order;
+            // handle first priority order
+            const shipOrder = ship.orders[0];
             if (shipOrder) {
                 shipOrder.handleOrderLoop();
             }
@@ -4313,9 +4446,9 @@ export class App extends React.Component<IAppProps, IAppState> {
         }
 
         // handle luxury buffs
-        for (const resourceType of Object.values(EResourceType)) {
+        for (const resourceType of Object.values(OUTPOST_GOODS)) {
             for (const faction of Object.values(this.factions)) {
-                LuxuryBuff.CalculateBuff(this, faction, resourceType);
+                LuxuryBuff.CalculateGoldBuff(this, faction, resourceType);
             }
         }
 
@@ -4725,7 +4858,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             ) :
             0;
 
-        const order = this.playerShip && this.playerShip.order;
+        const order = this.playerShip && this.playerShip.orders[0];
         const orderType = order ? order.orderType : "NONE";
 
         if (numPathingNodes) {
@@ -4791,6 +4924,18 @@ export class App extends React.Component<IAppProps, IAppState> {
                     <text x="0" y="45" fontSize={8} color="black">Gold: {faction.gold}</text>
                     <text x="0" y="60" fontSize={8} color="black">Planet{faction.planetIds.length > 1 ? "s" : ""}: {faction.planetIds.length}</text>
                     <text x="0" y="75" fontSize={8} color="black">Ship{faction.shipIds.length > 1 ? "s" : ""}: {faction.shipIds.length}</text>
+                </g>
+            );
+        } else {
+            return null;
+        }
+    }
+
+    private renderPlayerStatus() {
+        if (this.playerShip) {
+            return (
+                <g key="player-status" id="player-status" transform={`translate(0,${this.state.height - 80})`}>
+                    <text x="0" y="45" fontSize={8} color="black">Gold: {this.gold}</text>
                 </g>
             );
         } else {
@@ -5656,7 +5801,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                             <li>Make cannon balls damage merchant ships. -- DONE 4/27/2021</li>
                             <li>Add upgradable buildings to island planets, so they can spend profit to make the island planet better.</li>
                             <li>Add tax trading and construction trading between colonies and capitals.</li>
-                            <li>Add ability to pirate merchants and raid colonies.</li>
+                            <li>Add ability to pirate merchants and raid colonies. -- DONE 4/30/2021</li>
                             <li>Add ability for AI to aim at player.</li>
                             <li>Add AI pirates and pirate hunters.</li>
                             <li>Improve Voronoi generation to improve AI movement.</li>
@@ -5765,6 +5910,9 @@ export class App extends React.Component<IAppProps, IAppState> {
                     }
                     {
                         this.renderFactionStatus()
+                    }
+                    {
+                        this.renderPlayerStatus()
                     }
                 </svg>
             </div>

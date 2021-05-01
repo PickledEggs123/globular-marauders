@@ -203,7 +203,7 @@ describe('Collision Detection', () => {
     it('cannon ball hits ship', () => {
       const ship = new Ship(EShipType.HIND);
       ship.id = "test-ship";
-      const cannonBall = new CannonBall();
+      const cannonBall = new CannonBall(EFaction.ENGLISH);
       cannonBall.position = Quaternion.fromBetweenVectors(
           [0, 0, 1],
           DelaunayGraph.normalize([0, 1 - PHYSICS_SCALE * 10, 1])
@@ -220,7 +220,7 @@ describe('Collision Detection', () => {
     it('cannon ball misses ship (too slow)', () => {
       const ship = new Ship(EShipType.HIND);
       ship.id = "test-ship";
-      const cannonBall = new CannonBall();
+      const cannonBall = new CannonBall(EFaction.ENGLISH);
       cannonBall.position = Quaternion.fromBetweenVectors(
           [0, 0, 1],
           DelaunayGraph.normalize([0, 1 - PHYSICS_SCALE * 10, 1])
@@ -240,7 +240,7 @@ describe('Collision Detection', () => {
     it('cannon ball misses ship (opposite direction)', () => {
       const ship = new Ship(EShipType.HIND);
       ship.id = "test-ship";
-      const cannonBall = new CannonBall();
+      const cannonBall = new CannonBall(EFaction.ENGLISH);
       cannonBall.position = Quaternion.fromBetweenVectors(
           [0, 0, 1],
           DelaunayGraph.normalize([0, 1 - PHYSICS_SCALE * 10, 1])
@@ -257,7 +257,7 @@ describe('Collision Detection', () => {
     it('cannon ball misses ship (parallel direction)', () => {
       const ship = new Ship(EShipType.HIND);
       ship.id = "test-ship";
-      const cannonBall = new CannonBall();
+      const cannonBall = new CannonBall(EFaction.ENGLISH);
       cannonBall.position = Quaternion.fromBetweenVectors(
           [0, 0, 1],
           DelaunayGraph.normalize([0, 1 - PHYSICS_SCALE * 10, 1])
@@ -279,7 +279,7 @@ describe('Collision Detection', () => {
           DelaunayGraph.normalize([0, 1 - PHYSICS_SCALE * 10, 1])
       );
       ship.positionVelocity = Quaternion.fromBetweenVectors([0, 0, 1], [0, -1, 0]);
-      const cannonBall = new CannonBall();
+      const cannonBall = new CannonBall(EFaction.ENGLISH);
       const hit = App.cannonBallCollision(cannonBall, ship);
       expect(hit).toEqual({
         success: true,
