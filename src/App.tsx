@@ -407,7 +407,7 @@ const SHIP_DATA: IShipData[] = [{
     settlementProgressFactor: 4,
     cargoSize: 3,
     hull: HindHull,
-    hullStrength: 40,
+    hullStrength: 400,
     cannons: {
         numCannons: 8,
         numCannonades: 4,
@@ -422,10 +422,10 @@ const SHIP_DATA: IShipData[] = [{
     settlementProgressFactor: 2,
     cargoSize: 2,
     hull: CorvetteHull,
-    hullStrength: 20,
+    hullStrength: 200,
     cannons: {
         numCannons: 4,
-        numCannonades: 10,
+        numCannonades: 4,
         startY: 15,
         endY: -15,
         leftWall: 6,
@@ -437,10 +437,10 @@ const SHIP_DATA: IShipData[] = [{
     settlementProgressFactor: 1,
     cargoSize: 1,
     hull: SloopHull,
-    hullStrength: 10,
+    hullStrength: 100,
     cannons: {
         numCannons: 2,
-        numCannonades: 4,
+        numCannonades: 2,
         startY: 10,
         endY: -10,
         leftWall: 4,
@@ -546,6 +546,7 @@ interface IExplorationGraphData {
     distance: number;
     settlerShipIds: string[];
     traderShipIds: string[];
+    pirateShipIds: string[];
     planet: Planet;
 }
 
@@ -770,6 +771,7 @@ export class Faction {
                         distance,
                         settlerShipIds: [],
                         traderShipIds: [],
+                        pirateShipIds: [],
                         planet
                     };
                 }
@@ -854,6 +856,23 @@ export class Faction {
         const entries = Object.entries(this.explorationGraph)
             .sort((a, b) => a[1].distance - b[1].distance);
 
+        // find worlds to pirate
+        const pirateWorldEntry = entries.find(entry => {
+            // settle new worlds which have not been settled yet
+            const roomToPirate = entry[1].pirateShipIds.length > 0;
+            const isSettledEnoughToTrade = entry[1].planet.settlementLevel >= ESettlementLevel.OUTPOST;
+            const isOwnedByEnemy = Object.values(this.instance.factions).every(faction => {
+                if (faction.id === this.id) {
+                    // skip the faction itself
+                    return false;
+                } else {
+                    // the faction should pirate other factions
+                    return faction.planetIds.includes(entry[0]);
+                }
+            });
+            return roomToPirate && isSettledEnoughToTrade && isOwnedByEnemy;
+        });
+
         // find worlds to trade
         const tradeWorldEntry = entries.find(entry => {
             // settle new worlds which have not been settled yet
@@ -889,7 +908,16 @@ export class Faction {
             return roomToSettleMore && notSettledYet;
         });
 
-        if (tradeWorldEntry && shipData.cannons.numCannons <= 4) {
+        if (pirateWorldEntry && shipData.cannons.numCannons > 4) {
+            // found a piracy slot, add ship to pirate
+            pirateWorldEntry[1].pirateShipIds.push(ship.id);
+
+            const order = new Order(this.instance, ship, this);
+            order.orderType = EOrderType.PIRATE;
+            order.planetId = pirateWorldEntry[0];
+            order.expireTicks = 10 * 60 * 20; // pirate for 20 minutes before signing a new contract
+            return order;
+        } else if (tradeWorldEntry && shipData.cannons.numCannons <= 4) {
             // found a trade slot, add ship to trade
             tradeWorldEntry[1].traderShipIds.push(ship.id);
 
@@ -929,6 +957,10 @@ export class Faction {
             const traderIndex = node.traderShipIds.findIndex(s => s === ship.id);
             if (traderIndex >= 0) {
                 node.traderShipIds.splice(traderIndex, 1);
+            }
+            const pirateIndex = node.pirateShipIds.findIndex(s => s === ship.id);
+            if (pirateIndex >= 0) {
+                node.pirateShipIds.splice(pirateIndex, 1);
             }
         }
 
@@ -2356,6 +2388,9 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
 interface IAutomatedShip extends ICameraState {
     activeKeys: string[];
     app: App;
+    isInMissionArea(): boolean;
+    hasPirateOrder(): boolean;
+    hasPirateCargo(): boolean
 }
 
 /**
@@ -2519,6 +2554,7 @@ export class FireControl<T extends IAutomatedShip> {
     public owner: T;
     public targetShipId: string | null = null;
     public coolDown: number = 0;
+    public retargetCoolDown: number = 0;
     public isAttacking: boolean = false;
     public lastStepShouldRotate: boolean = false;
 
@@ -2528,25 +2564,14 @@ export class FireControl<T extends IAutomatedShip> {
     }
 
     /**
-     * Handle the fire control of the ship. Will aim at ships, ect...
+     * Get a cone hit solution towards target ship.
+     * @param target
      */
-    public fireControlLoop() {
-        const target = this.app.ships.find(s => s.id === this.targetShipId);
-        if (!target) {
-            // no targets, cancel attack
-            this.targetShipId = null;
-            this.owner.activeKeys.splice(0, this.owner.activeKeys.length);
-            this.isAttacking = false;
-            return;
-        }
-
-        // there are targets, begin attack
-        //
-        // compute moving projectile path to hit target
+    public getConeHit(target: Ship): IConeHitTest {
         const shipPositionPoint = this.owner.orientation.clone().inverse()
-            .mul(this.owner.position.clone().inverse())
-            .mul(target.position.clone())
-            .rotateVector([0, 0, 1]);
+        .mul(this.owner.position.clone().inverse())
+        .mul(target.position.clone())
+        .rotateVector([0, 0, 1]);
         const shipPosition: [number, number] = [
             shipPositionPoint[0],
             shipPositionPoint[1]
@@ -2561,12 +2586,95 @@ export class FireControl<T extends IAutomatedShip> {
             shipDirectionPoint[1] - shipPosition[1]
         ];
         const projectileSpeed = App.PROJECTILE_SPEED / this.app.worldScale;
-        const coneHit = computeConeLineIntersection(shipPosition, shipDirection, projectileSpeed);
+        return computeConeLineIntersection(shipPosition, shipDirection, projectileSpeed);
+    }
+
+    /**
+     * Compute unit vector towards target ship.
+     */
+    public getTargetVector(): [number, number, number] | null {
+        const target = this.app.ships.find(s => s.id === this.targetShipId);
+        if (!target) {
+            return null;
+        }
+        const coneHit = this.getConeHit(target);
+        if (!(coneHit.success && coneHit.point && coneHit.time && coneHit.time < 60)) {
+            // target is moving too fast, cannot hit it
+            return null;
+        }
+        return DelaunayGraph.normalize([
+            coneHit.point[0],
+            coneHit.point[1],
+            0
+        ]);
+    }
+
+    /**
+     * Handle the fire control of the ship. Will aim at ships, ect...
+     */
+    public fireControlLoop() {
+        // retarget another ship occasionally
+        if (!this.targetShipId) {
+            this.retargetCoolDown = 10;
+        } else {
+            if (this.retargetCoolDown > 0) {
+                this.retargetCoolDown -= 1;
+            } else {
+                this.retargetCoolDown = 10;
+            }
+        }
+
+        const target = this.app.ships.find(s => s.id === this.targetShipId);
+        if (!target) {
+            // no targets, cancel attack
+            this.targetShipId = null;
+            this.owner.activeKeys.splice(0, this.owner.activeKeys.length);
+            this.isAttacking = false;
+            return;
+        }
+
+        const isInMissionArea = this.owner.isInMissionArea();
+        if (!isInMissionArea) {
+            // outside of mission area, cancel attack to return to mission area
+            this.owner.activeKeys.splice(0, this.owner.activeKeys.length);
+            this.isAttacking = false;
+            return;
+        }
+
+        const hasPirateOrder = this.owner.hasPirateOrder();
+        const nearByPirateCrate = this.app.crates.find(c => {
+            const cratePosition = c.position.clone().rotateVector([0, 0, 1]);
+            const shipPosition = this.owner.position.clone().rotateVector([0, 0, 1]);
+            const distance = VoronoiGraph.angularDistance(cratePosition, shipPosition, this.app.worldScale);
+            return distance < App.PROJECTILE_SPEED / this.app.worldScale * 60;
+        });
+        const hasPirateCargo = this.owner.hasPirateCargo();
+        if (hasPirateOrder && hasPirateCargo) {
+            // has pirate cargo, return to home base, cancel attack
+            this.owner.activeKeys.splice(0, this.owner.activeKeys.length);
+            this.isAttacking = false;
+            return;
+        }
+        if (nearByPirateCrate && hasPirateOrder && this.owner.pathFinding) {
+            // nearby pirate cargo, get the cargo.
+            this.owner.pathFinding.points = [
+                nearByPirateCrate.position.clone().rotateVector([0, 0, 1])
+            ];
+            this.isAttacking = false;
+            return;
+        }
+
+        // there are targets, begin attack
+        //
+        // compute moving projectile path to hit target
+        const coneHit = this.getConeHit(target);
         if (!(coneHit.success && coneHit.point && coneHit.time && coneHit.time < 60)) {
             // target is moving too fast, cannot hit it
             this.isAttacking = false;
             return;
         }
+
+        // all cancel attack parameters are false, begin attack
         this.isAttacking = true;
 
         // compute rotation towards target
@@ -2913,8 +3021,9 @@ export class Planet implements ICameraState {
     /**
      * The planet will trade with a ship.
      * @param ship
+     * @param unload if the ship will not take cargo
      */
-    trade(ship: Ship) {
+    trade(ship: Ship, unload: boolean = false) {
         // a list of items to buy from ship and sell to ship
         let goodsToTake: EResourceType[] = [];
         let goodsToOffer: EResourceType[] = [];
@@ -2933,6 +3042,11 @@ export class Planet implements ICameraState {
                 ...ship.cargo.filter(c => c.pirated).map(c => c.resourceType)
             ]));
             goodsToOffer = this.resources;
+        }
+
+        // do not take cargo, because the ship is beginning a piracy mission
+        if (unload) {
+            goodsToOffer = [];
         }
 
         // trade with the ship
@@ -3123,7 +3237,7 @@ export class Order {
         }
         const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWoldPlanetId);
         if (!homeWorld || !homeWorld.pathingNode) {
-            throw new Error("Could not find home world for pathing back to home world (ROAM)");
+            throw new Error("Could not find home world for pathing back to home world (TRADE)");
         }
 
         // fly to a specific planet
@@ -3176,9 +3290,27 @@ export class Order {
      * @private
      */
     private pirate() {
+        // pirated cargo is a shortcut to piracy, skipping the assigned planet piracy
+        const hasPiratedCargo = this.owner.hasPirateCargo();
+
+        // pirates will wait until the expiration time to pirate ships
+        const pirateOrderExpired = this.runningTicks >= this.expireTicks;
+
+        if (!this.planetId && !hasPiratedCargo) {
+            throw new Error("Could not find planetId to path to (PIRATE)");
+        }
+        const colonyWorld = this.app.planets.find(planet => this.planetId && planet.id === this.planetId);
+        if ((!colonyWorld || !colonyWorld.pathingNode) && !hasPiratedCargo) {
+            throw new Error("Could not find home world for pathing back to home world (PIRATE)");
+        }
         const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWoldPlanetId);
         if (!homeWorld || !homeWorld.pathingNode) {
             throw new Error("Could not find home world for pathing back to home world (PIRATE)");
+        }
+
+        // shortcut to returning pirated cargo, required by the player since the player can shortcut the piracy mission
+        if (hasPiratedCargo && this.stage < 2) {
+            this.stage = 2;
         }
 
         // fly to a specific planet
@@ -3193,14 +3325,39 @@ export class Order {
             this.stage += 1;
 
             // trade with homeWorld
-            homeWorld.trade(this.owner);
+            homeWorld.trade(this.owner, true);
+
+            // find colony world
+            if (colonyWorld && colonyWorld.pathingNode) {
+                const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
+                const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
+                this.owner.pathFinding.points = nearestNode.pathToObject(colonyWorld.pathingNode);
+            }
+        } else if (this.stage === 2 && (hasPiratedCargo || pirateOrderExpired)) {
+            this.stage += 1;
+
+            // wait at colony world
+            // get cargo
+
+            // return to home world
+            const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
+            const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
+            this.owner.pathFinding.points = nearestNode.pathToObject(homeWorld.pathingNode);
+        } else if (this.stage === 3 && this.owner.pathFinding.points.length === 0) {
+            this.stage += 1;
+
+            // trade with homeWorld
+            homeWorld.trade(this.owner, true);
 
             // end order
             this.owner.removeOrder(this);
         }
     }
 
-    handleOrderLoop() {
+    /**
+     * Determine what a ship should do.
+     */
+    public handleOrderLoop() {
         if (this.orderType === EOrderType.ROAM) {
             this.roam();
         } else if (this.orderType === EOrderType.SETTLE) {
@@ -3211,6 +3368,63 @@ export class Order {
             this.pirate();
         }
         this.runningTicks += 1;
+    }
+
+    /**
+     * Determine if the ship is in the mission area.
+     */
+    public isInMissionArea(): boolean {
+        switch (this.orderType) {
+            case EOrderType.SETTLE:
+            case EOrderType.TRADE: {
+                // trade and settler ships are suppose to be between the colony world and home world, trading
+                const colonyWorld = this.app.planets.find(planet => planet.id === this.planetId);
+                if (!colonyWorld || !colonyWorld.pathingNode) {
+                    throw new Error("Could not find home world for pathing back to home world (MISSION AREA)");
+                }
+                const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWoldPlanetId);
+                if (!homeWorld || !homeWorld.pathingNode) {
+                    throw new Error("Could not find home world for pathing back to home world (MISSION AREA)");
+                }
+
+                const homeWorldPosition = homeWorld.position.clone().rotateVector([0, 0, 1]);
+                const colonyWorldPosition = colonyWorld.position.clone().rotateVector([0, 0, 1]);
+                const shipPosition = this.owner.position.clone().rotateVector([0, 0, 1]);
+                const distanceOfTradeRoute = VoronoiGraph.angularDistance(homeWorldPosition, colonyWorldPosition, this.app.worldScale);
+                const distanceToHomeWorld = VoronoiGraph.angularDistance(homeWorldPosition, shipPosition, this.app.worldScale);
+                const distanceToColonyWorld = VoronoiGraph.angularDistance(shipPosition, colonyWorldPosition, this.app.worldScale);
+                return distanceToHomeWorld + distanceToColonyWorld < distanceOfTradeRoute * 1.5;
+            }
+            case EOrderType.PIRATE: {
+                // pirate cargo mission area is the home world
+                if (this.owner.hasPirateCargo()) {
+                    return false;
+                }
+
+                // pirates are suppose to be near the colony world, to attack weak trade ships
+                const colonyWorld = this.app.planets.find(planet => planet.id === this.planetId);
+                if (!colonyWorld || !colonyWorld.pathingNode) {
+                    throw new Error("Could not find home world for pathing back to home world (MISSION AREA)");
+                }
+                const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWoldPlanetId);
+                if (!homeWorld || !homeWorld.pathingNode) {
+                    throw new Error("Could not find home world for pathing back to home world (MISSION AREA)");
+                }
+
+                const homeWorldPosition = homeWorld.position.clone().rotateVector([0, 0, 1]);
+                const colonyWorldPosition = colonyWorld.position.clone().rotateVector([0, 0, 1]);
+                const shipPosition = this.owner.position.clone().rotateVector([0, 0, 1]);
+                const distanceOfTradeRoute = VoronoiGraph.angularDistance(homeWorldPosition, colonyWorldPosition, this.app.worldScale);
+                const distanceToHomeWorld = VoronoiGraph.angularDistance(homeWorldPosition, shipPosition, this.app.worldScale);
+                const distanceToColonyWorld = VoronoiGraph.angularDistance(shipPosition, colonyWorldPosition, this.app.worldScale);
+                return distanceToHomeWorld + distanceToColonyWorld < distanceOfTradeRoute * 1.5 && distanceToColonyWorld > distanceToHomeWorld;
+            }
+            case EOrderType.ROAM:
+            default: {
+                // roaming and default is always in mission area
+                return true;
+            }
+        }
     }
 }
 
@@ -3251,6 +3465,8 @@ export class Ship implements IAutomatedShip {
     public orientation: Quaternion = Quaternion.ONE;
     public orientationVelocity: Quaternion = Quaternion.ONE;
     public cannonLoading?: Date = undefined;
+    public cannonCoolDown: number = 0;
+    public cannonadeCoolDown: number[];
     public activeKeys: string[] = [];
     public pathFinding: PathFinder<Ship> = new PathFinder<Ship>(this);
     public fireControl: FireControl<Ship>;
@@ -3270,6 +3486,35 @@ export class Ship implements IAutomatedShip {
         }
         this.health = shipData.hullStrength;
         this.maxHealth = shipData.hullStrength;
+        this.cannonadeCoolDown = new Array(shipData.cannons.numCannonades).fill(0);
+    }
+
+    /**
+     * Determine if the ship is in the mission area.
+     */
+    isInMissionArea(): boolean {
+        const order = this.orders[0];
+        if (order) {
+            // has an order, check first order mission area
+            return order.isInMissionArea();
+        } else {
+            // no orders, is in mission area
+            return true;
+        }
+    }
+
+    /**
+     * Determine if the ship has piracy orders.
+     */
+    hasPirateOrder(): boolean {
+        return this.orders.some(o => o.orderType === EOrderType.PIRATE);
+    }
+
+    /**
+     * Determine if the ship has pirate cargo.
+     */
+    hasPirateCargo(): boolean {
+        return this.cargo.some(c => c.pirated);
     }
 
     /**
@@ -3277,12 +3522,12 @@ export class Ship implements IAutomatedShip {
      * @param cannonBall
      */
     public applyDamage(cannonBall: CannonBall) {
-        this.health = Math.max(0, this.health - 1);
+        this.health = Math.max(0, this.health - cannonBall.damage);
     }
 
     /**
      * Remove an order from the ship.
-     * @param Order The order to remove.
+     * @param order The order to remove.
      */
     public removeOrder(order: Order) {
         const index = this.orders.findIndex(o => o === order);
@@ -3393,6 +3638,7 @@ export class CannonBall implements ICameraState, IExpirableTicks, ICollidable {
     public orientation: Quaternion = Quaternion.ONE;
     public orientationVelocity: Quaternion = Quaternion.ONE;
     public size: number = 1;
+    public damage: number = 10;
     public maxLife: number = 10 * 5;
     public life: number = 0;
     /**
@@ -3966,8 +4212,6 @@ export class App extends React.Component<IAppProps, IAppState> {
     /**
      * Draw a physics hull.
      * @param planetDrawing
-     * @param size
-     * @param hullPoints
      * @private
      */
     private renderPhysicsHull(planetDrawing: IDrawable<Ship>) {
@@ -4470,6 +4714,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             orientation: cameraOrientation,
             orientationVelocity: cameraOrientationVelocity,
             cannonLoading: cameraCannonLoading,
+            cannonCoolDown,
             shipType,
             health,
             maxHealth,
@@ -4565,12 +4810,15 @@ export class App extends React.Component<IAppProps, IAppState> {
             smokeCloudRight.size = 2;
             smokeClouds.push(smokeCloudRight);
         }
-        if (activeKeys.includes(" ") && !cameraCannonLoading) {
+
+        // handle main cannons
+        if (activeKeys.includes(" ") && !cameraCannonLoading && cannonCoolDown <= 0) {
             cameraCannonLoading = new Date(Date.now());
         }
-        if (!activeKeys.includes(" ") && cameraCannonLoading && faction) {
+        if (!activeKeys.includes(" ") && cameraCannonLoading && faction && cannonCoolDown <= 0) {
             // cannon fire
             cameraCannonLoading = undefined;
+            cannonCoolDown = 20;
 
             // fire cannons
             for (let i = 0; i < shipData.cannons.numCannons; i++) {
@@ -4589,12 +4837,61 @@ export class App extends React.Component<IAppProps, IAppState> {
                 cannonBall.positionVelocity = fireVelocity.clone();
                 cannonBall.position = cannonBall.position.clone().mul(cannonBall.positionVelocity.pow(3))
                 cannonBall.size = 10;
+                cannonBall.damage = 10;
                 cannonBalls.push(cannonBall);
             }
         }
         if (activeKeys.includes(" ") && cameraCannonLoading && Date.now() - +cameraCannonLoading > 3000) {
             // cancel cannon fire
             cameraCannonLoading = undefined;
+        }
+
+        // handle automatic cannonades
+        for (let i = 0; i < this.ships[shipIndex].cannonadeCoolDown.length; i++) {
+            const cannonadeCoolDown = this.ships[shipIndex].cannonadeCoolDown[i];
+            if (cannonadeCoolDown <= 0) {
+                // find nearby ship
+                const targetVector = this.ships[shipIndex].fireControl.getTargetVector();
+                if (!targetVector) {
+                    continue;
+                }
+
+                // aim at ship with slight jitter
+                const angle = Math.atan2(targetVector[1], targetVector[0]);
+                const jitter = (Math.random() * 2 - 1) * 5 * Math.PI / 180;
+                const jitterPoint: [number, number, number] = [
+                    Math.cos(jitter + angle),
+                    Math.sin(jitter + angle),
+                    0
+                ];
+                const fireDirection = cameraOrientation.clone().rotateVector(jitterPoint);
+                const fireVelocity = Quaternion.fromBetweenVectors([0, 0, 1], fireDirection).pow(App.PROJECTILE_SPEED / this.worldScale);
+
+                // no faction, no cannon balls
+                if (!faction) {
+                    continue;
+                }
+
+                // roll a dice to have random cannonade fire
+                if (Math.random() > 0.1) {
+                    continue;
+                }
+
+                // create a cannon ball
+                const cannonBall = new CannonBall(faction.id);
+                cannonBall.id = `${cameraId}-${Math.floor(Math.random() * 100000000)}`;
+                cannonBall.position = cameraPosition.clone();
+                cannonBall.positionVelocity = fireVelocity.clone();
+                cannonBall.position = cannonBall.position.clone().mul(cannonBall.positionVelocity.pow(3))
+                cannonBall.size = 3;
+                cannonBall.damage = 2;
+                cannonBalls.push(cannonBall);
+
+                // apply a cool down to the cannonades
+                this.ships[shipIndex].cannonadeCoolDown[i] = 45;
+            } else if (cannonadeCoolDown > 0) {
+                this.ships[shipIndex].cannonadeCoolDown[i] = this.ships[shipIndex].cannonadeCoolDown[i] - 1;
+            }
         }
 
         // if (activeKeys.some(key => ["a", "s", "d", "w", " "].includes(key)) && !isAutomated) {
@@ -4612,12 +4909,16 @@ export class App extends React.Component<IAppProps, IAppState> {
             const diffQuaternion = this.ships[shipIndex].position.clone().inverse().mul(cameraPosition.clone());
             cameraOrientation = cameraOrientation.clone().mul(diffQuaternion);
         }
+        if (cannonCoolDown > 0) {
+            cannonCoolDown -= 1;
+        }
 
         this.ships[shipIndex].position = cameraPosition;
         this.ships[shipIndex].orientation = cameraOrientation;
         this.ships[shipIndex].positionVelocity = cameraPositionVelocity;
         this.ships[shipIndex].orientationVelocity = cameraOrientationVelocity;
         this.ships[shipIndex].cannonLoading = cameraCannonLoading;
+        this.ships[shipIndex].cannonCoolDown = cannonCoolDown;
         if (clearPathFindingPoints) {
             this.ships[shipIndex].pathFinding.points = [];
         }
@@ -4818,8 +5119,8 @@ export class App extends React.Component<IAppProps, IAppState> {
 
             // handle ship orders
             // handle automatic piracy orders
-            const hasPiracyOrder: boolean = ship.orders.some(o => o.orderType === EOrderType.PIRATE);
-            const hasPirateCargo: boolean = ship.cargo.some(c => c.pirated);
+            const hasPiracyOrder: boolean = ship.hasPirateOrder();
+            const hasPirateCargo: boolean = ship.hasPirateCargo();
             if (!hasPiracyOrder && hasPirateCargo && ship.faction) {
                 const piracyOrder = new Order(this, ship, ship.faction);
                 piracyOrder.orderType = EOrderType.PIRATE;
@@ -4871,20 +5172,41 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         for (const ship of this.ships) {
             // handle detecting ships to shoot at
-            if (!ship.fireControl.targetShipId) {
+            if (!ship.fireControl.targetShipId || ship.fireControl.retargetCoolDown) {
+                // get a list of nearby ships
                 const shipPosition = ship.position.clone().rotateVector([0, 0, 1]);
                 const nearByShips = Array.from(this.voronoiShips.listItems(shipPosition));
+                const nearByEnemyShips: Ship[] = [];
                 for (const nearByShip of nearByShips) {
                     if (!(nearByShip.faction && ship.faction && nearByShip.faction.id === ship.faction.id)) {
                         if (VoronoiGraph.angularDistance(
                             nearByShip.position.clone().rotateVector([0, 0, 1]),
-                            ship.position.clone().rotateVector([0, 0, 1]),
+                            shipPosition,
                             this.worldScale
                         ) < App.PROJECTILE_SPEED / this.worldScale * 100) {
-                            ship.fireControl.targetShipId = nearByShip.id;
+                            nearByEnemyShips.push(nearByShip);
                         }
-                        break;
                     }
+                }
+
+                // find closest target
+                let closestTarget: Ship | null = null;
+                let closestDistance: number | null = null;
+                for (const nearByEnemyShip of nearByEnemyShips) {
+                    const distance = VoronoiGraph.angularDistance(
+                        shipPosition,
+                        nearByEnemyShip.position.clone().rotateVector([0, 0, 1]),
+                        this.worldScale
+                    );
+                    if (!closestDistance || distance < closestDistance) {
+                        closestDistance = distance;
+                        closestTarget = nearByEnemyShip;
+                    }
+                }
+
+                // set closest target
+                if (closestTarget) {
+                    ship.fireControl.targetShipId = closestTarget.id;
                 }
             }
         }
