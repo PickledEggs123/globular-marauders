@@ -2554,7 +2554,7 @@ export class FireControl<T extends IAutomatedShip> {
         const shipDirectionPoint = this.owner.orientation.clone().inverse()
             .mul(this.owner.position.clone().inverse())
             .mul(target.position.clone())
-            .mul(target.positionVelocity.clone())
+            .mul(target.positionVelocity.clone().pow(target.health / target.maxHealth))
             .rotateVector([0, 0, 1]);
         const shipDirection: [number, number] = [
             shipDirectionPoint[0] - shipPosition[0],
@@ -2577,8 +2577,8 @@ export class FireControl<T extends IAutomatedShip> {
         ];
         targetOrientationPoint = DelaunayGraph.normalize(targetOrientationPoint);
         let orientationDiffAngle = targetOrientationPoint[0] >= 0 ?
-            Math.atan2(targetOrientationPoint[1], -targetOrientationPoint[0]) :
-            Math.atan2(-targetOrientationPoint[1], targetOrientationPoint[0]);
+            Math.atan2(-targetOrientationPoint[1], -targetOrientationPoint[0]) :
+            Math.atan2(targetOrientationPoint[1], targetOrientationPoint[0]);
         orientationDiffAngle = (orientationDiffAngle - Math.PI / 2) % (Math.PI * 2);
         const orientationSpeed = VoronoiGraph.angularDistanceQuaternion(this.owner.orientationVelocity, 1) * (orientationDiffAngle > 0 ? 1 : -1);
         const desiredOrientationSpeed = Math.max(-App.ROTATION_STEP * 10, Math.min(Math.round(
@@ -4579,17 +4579,14 @@ export class App extends React.Component<IAppProps, IAppState> {
                 // apply random jitter
                 jitterPoint[1] += DelaunayGraph.randomInt() * 0.15;
                 jitterPoint = DelaunayGraph.normalize(jitterPoint);
-                const jitter = Quaternion.fromBetweenVectors([0, 0, 1], jitterPoint).pow(App.PROJECTILE_SPEED / this.worldScale);
+                const fireDirection = cameraOrientation.clone().rotateVector(jitterPoint);
+                const fireVelocity = Quaternion.fromBetweenVectors([0, 0, 1], fireDirection).pow(App.PROJECTILE_SPEED / this.worldScale);
 
                 // create a cannon ball
                 const cannonBall = new CannonBall(faction.id);
                 cannonBall.id = `${cameraId}-${Math.floor(Math.random() * 100000000)}`;
                 cannonBall.position = cameraPosition.clone();
-                cannonBall.positionVelocity = cameraOrientation.clone()
-                    .mul(cameraPosition.clone())
-                    .mul(jitter.clone())
-                    .mul(cameraPosition.clone().inverse())
-                    .mul(cameraOrientation.clone().inverse());
+                cannonBall.positionVelocity = fireVelocity.clone();
                 cannonBall.position = cannonBall.position.clone().mul(cannonBall.positionVelocity.pow(3))
                 cannonBall.size = 10;
                 cannonBalls.push(cannonBall);
