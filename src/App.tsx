@@ -33,7 +33,8 @@ import * as Tone from "tone";
 
 export class MusicPlayer {
     synth: Tone.PolySynth | null = null;
-    synthPart: Tone.Sequence | null = null;
+    synthPart1: Tone.Sequence | null = null;
+    synthPart2: Tone.Sequence | null = null;
 
     public start() {
         this.startTone().catch(err => {
@@ -42,45 +43,162 @@ export class MusicPlayer {
     }
 
     public stop() {
-        if (this.synthPart) {
-            this.synthPart.stop();
-            this.synthPart = null;
+        if (this.synthPart1) {
+            this.synthPart1.stop();
+            this.synthPart1.dispose();
+            this.synthPart1 = null;
+        }
+        if (this.synthPart2) {
+            this.synthPart2.stop();
+            this.synthPart2.dispose();
+            this.synthPart2 = null;
         }
         Tone.Transport.stop();
-        if (this.synth) {
-            this.synth.dispose();
-            this.synth = null;
-        }
+    }
+
+    setupFirstMelody() {
+        const notes1 = [
+            // stanza 1
+            "C3",
+            ["C3", "C3"],
+            null,
+            ["G3", "A#3"],
+            null,
+            ["A3", "G3"],
+            null,
+            null,
+
+            // stanza 2
+            "C3",
+            ["C3", "C3"],
+            null,
+            ["G3", "A#3"],
+            null,
+            ["A3", "G3"],
+            null,
+            null,
+
+            // stanza 3
+            "A#3",
+            ["A#3", "A3"],
+            null,
+            ["F3", "G3"],
+            null,
+            ["C2", "C2"],
+            null,
+            null,
+
+            // stanza 4
+            "A#3",
+            ["A#3", "A3"],
+            null,
+            ["F3", "G3"],
+            null,
+            ["C2", "C2"],
+            null,
+            null,
+            "END"
+        ];
+        this.synthPart1 = new Tone.Sequence(
+            (time, note) => {
+                if (note === "END") {
+                    this.setupSecondMelody();
+                    if (this.synthPart2) {
+                        this.synthPart2.start(Tone.Transport.seconds);
+                    }
+                    return;
+                }
+                if (this.synth && note) {
+                    this.synth.triggerAttackRelease(note, "10hz", time);
+                }
+            },
+            notes1,
+            "4n"
+        );
+        this.synthPart1.loop = false;
+    }
+
+    setupSecondMelody() {
+        // second melody
+        const notes2 = [
+            // stanza 1
+            "C3",
+            "D3",
+            "E#3",
+            null,
+
+            // stanza 2
+            "G3",
+            "E#3",
+            "D3",
+            null,
+
+            // stanza 3
+            "E#3",
+            "D3",
+            "C3",
+            null,
+
+            // stanza 4
+            "A2",
+            "A#2",
+            "C3",
+            null,
+
+            // stanza 1
+            "C3",
+            "D3",
+            "E#3",
+            null,
+
+            // stanza 2
+            "G3",
+            "E#3",
+            "D3",
+            null,
+
+            // stanza 3
+            "E#3",
+            "D3",
+            "C3",
+            null,
+
+            // stanza 4
+            "A2",
+            "A#2",
+            "C3",
+            null,
+            "END"
+        ];
+        this.synthPart2 = new Tone.Sequence(
+            (time, note) => {
+                if (note === "END") {
+                    this.setupFirstMelody();
+                    if (this.synthPart1) {
+                        this.synthPart1.start(Tone.Transport.seconds);
+                    }
+                    return;
+                }
+                if (this.synth && note) {
+                    this.synth.triggerAttackRelease(note, "10hz", time);
+                }
+            },
+            notes2,
+            "4n"
+        );
+        this.synthPart2.loop = false;
     }
 
     async startTone() {
         await Tone.start();
 
         this.synth = new Tone.PolySynth(Tone.Synth).toDestination();
-        const notes = [
-            "C3", null,
-            "D3", "E3",
-            null, null,
-            "E3", null,
-            "D3", "C3",
-            null, null,
-            "D3", null,
-            "B3", "A3",
-            null, null,
-            "G3", null,
-            "E3", "G3",
-            null, null
-        ];
-        this.synthPart = new Tone.Sequence(
-            (time, note) => {
-                if (this.synth && note) {
-                    this.synth.triggerAttackRelease(note, "10hz", time);
-                }
-            },
-            notes,
-            "4n"
-        );
-        this.synthPart.start();
+
+        // first melody
+        this.setupFirstMelody();
+        if (this.synthPart1) {
+            this.synthPart1.start(Tone.Transport.seconds);
+        }
         Tone.Transport.start();
     }
 }
