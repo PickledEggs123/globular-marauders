@@ -1,21 +1,14 @@
 import React from 'react';
-import App, {
-  CannonBall,
-  CAPITAL_GOODS,
-  DelaunayGraph,
-  EFaction,
-  EOrderType,
-  EShipType,
-  OUTPOST_GOODS,
-  PathFinder,
-  PHYSICS_SCALE,
-  Ship,
-  VoronoiGraph,
-  computeConeLineIntersection
-} from './App';
+import App from './App';
 import {shallow} from "enzyme";
 import Quaternion from "quaternion";
 import sinon from 'sinon';
+import {computeConeLineIntersection} from "./Intersection";
+import {CAPITAL_GOODS, OUTPOST_GOODS} from "./Resource";
+import {EFaction, EShipType, PHYSICS_SCALE, Ship} from "./Ship";
+import {EOrderType} from "./Order";
+import {DelaunayGraph, PathFinder, VoronoiGraph} from "./Graph";
+import {CannonBall} from "./Item";
 
 const setupPathingTest = (points: Array<[number, number, number]>, numMinutes: number = 2) => {
   // setup wrapper to run test
@@ -130,7 +123,7 @@ const setupTradingTest = (numMinutes: number = 2) => {
   }
 };
 
-describe.skip('test AI Pathing', () => {
+describe('test AI Pathing', () => {
   describe('test pathing from all 360 degrees', () => {
     for (let angle = 0; angle < 360; angle += 5) {
       it(`test pathing form angle ${angle}`, () => {
