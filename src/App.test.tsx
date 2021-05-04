@@ -14,6 +14,7 @@ const setupPathingTest = (points: Array<[number, number, number]>, numMinutes: n
   // setup wrapper to run test
   const wrapper = shallow<App>(<App />);
   const app = wrapper.instance();
+  app.worldScale = 1;
   app.forceUpdate = () => undefined;
 
   // setup test ship and nav point
@@ -50,6 +51,7 @@ const setupTradingTest = (numMinutes: number = 2) => {
   // setup wrapper to run test
   const wrapper = shallow<App>(<App />);
   const app = wrapper.instance();
+  app.worldScale = 1;
   app.forceUpdate = () => undefined;
 
   // setup test ship and nav point

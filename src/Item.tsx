@@ -2,6 +2,7 @@ import {ICameraState, ICollidable, IExpirable, IExpirableTicks} from "./Interfac
 import Quaternion from "quaternion";
 import {EFaction} from "./Ship";
 import {EResourceType, ICargoItem} from "./Resource";
+import App from "./App";
 
 export class Crate implements ICameraState, ICargoItem, IExpirableTicks, ICollidable {
     public id: string = "";
@@ -45,7 +46,7 @@ export class CannonBall implements ICameraState, IExpirableTicks, ICollidable {
     public orientationVelocity: Quaternion = Quaternion.ONE;
     public size: number = 1;
     public damage: number = 10;
-    public maxLife: number = 10 * 5;
+    public maxLife: number = App.PROJECTILE_LIFE;
     public life: number = 0;
     /**
      * Cannon balls have a faction, to avoid team killing teammates.

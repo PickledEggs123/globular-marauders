@@ -33,8 +33,7 @@ import * as Tone from "tone";
 
 export class MusicPlayer {
     synth: Tone.PolySynth | null = null;
-    synthPart1: Tone.Sequence | null = null;
-    synthPart2: Tone.Sequence | null = null;
+    synthPart: Tone.Sequence | null = null;
 
     public start() {
         this.startTone().catch(err => {
@@ -43,150 +42,199 @@ export class MusicPlayer {
     }
 
     public stop() {
-        if (this.synthPart1) {
-            this.synthPart1.stop();
-            this.synthPart1.dispose();
-            this.synthPart1 = null;
-        }
-        if (this.synthPart2) {
-            this.synthPart2.stop();
-            this.synthPart2.dispose();
-            this.synthPart2 = null;
+        if (this.synthPart) {
+            this.synthPart.stop();
+            this.synthPart.dispose();
+            this.synthPart = null;
         }
         Tone.Transport.stop();
     }
 
-    setupFirstMelody() {
-        const notes1 = [
-            // stanza 1
-            "C3",
-            ["C3", "C3"],
-            null,
-            ["G3", "A#3"],
-            null,
-            ["A3", "G3"],
-            null,
-            null,
+    public static firstMelody = [
+        // stanza 1
+        "C3",
+        ["C3", "C3"],
+        null,
+        ["G3", "A#3"],
+        null,
+        ["A3", "G3"],
+        null,
+        null,
 
-            // stanza 2
-            "C3",
-            ["C3", "C3"],
-            null,
-            ["G3", "A#3"],
-            null,
-            ["A3", "G3"],
-            null,
-            null,
+        // stanza 2
+        "C3",
+        ["C3", "C3"],
+        null,
+        ["G3", "A#3"],
+        null,
+        ["A3", "G3"],
+        null,
+        null,
 
-            // stanza 3
-            "A#3",
-            ["A#3", "A3"],
-            null,
-            ["F3", "G3"],
-            null,
-            ["C2", "C2"],
-            null,
-            null,
+        // stanza 3
+        "A#3",
+        ["A#3", "A3"],
+        null,
+        ["F3", "G3"],
+        null,
+        ["C2", "C2"],
+        null,
+        null,
 
-            // stanza 4
-            "A#3",
-            ["A#3", "A3"],
-            null,
-            ["F3", "G3"],
-            null,
-            ["C2", "C2"],
-            null,
-            null,
-            "END"
-        ];
-        this.synthPart1 = new Tone.Sequence(
-            (time, note) => {
-                if (note === "END") {
-                    this.setupSecondMelody();
-                    if (this.synthPart2) {
-                        this.synthPart2.start(Tone.Transport.seconds);
-                    }
-                    return;
-                }
-                if (this.synth && note) {
-                    this.synth.triggerAttackRelease(note, "10hz", time);
-                }
-            },
-            notes1,
-            "4n"
-        );
-        this.synthPart1.loop = false;
+        // stanza 4
+        "A#3",
+        ["A#3", "A3"],
+        null,
+        ["F3", "G3"],
+        null,
+        ["C2", "C2"],
+        null,
+        null,
+        "END"
+    ];
+    public static secondMelody = [
+        // stanza 1
+        "C3",
+        "D3",
+        "Eb3",
+        null,
+
+        // stanza 2
+        "Eb3",
+        null,
+        "D3",
+        null,
+
+        // stanza 3
+        "Eb3",
+        "D3",
+        "C3",
+        null,
+
+        // stanza 4
+        "A2",
+        null,
+        "A#2",
+        null,
+
+        // stanza 1
+        "C3",
+        "D3",
+        "Eb3",
+        null,
+
+        // stanza 2
+        "Eb3",
+        null,
+        "D3",
+        null,
+
+        // stanza 3
+        "Eb3",
+        "D3",
+        "C3",
+        null,
+
+        // stanza 4
+        "A2",
+        null,
+        "A#2",
+        null,
+        "END"
+    ];
+    public static thirdMelody = [
+        // stanza 1
+        "G3",
+        "E3",
+        "G3",
+        "Eb3",
+
+        // stanza 2
+        "G3",
+        "D3",
+        "G3",
+        "C3",
+
+        // stanza 3
+        "G3",
+        "B2",
+        "G3",
+        "A2",
+
+        // stanza 4
+        "G3",
+        "Ab2",
+        "G3",
+        "A2",
+        "END"
+    ];
+
+    public melodyMap: Array<{
+        id: string,
+        next: string,
+        notes: Array<string | null | Array<string | null>>
+    }> = [{
+        id: "main",
+        next: "main2",
+        notes: MusicPlayer.firstMelody
+    }, {
+        id: "main2",
+        next: "main3",
+        notes: MusicPlayer.secondMelody
+    }, {
+        id: "main3",
+        next: "main",
+        notes: MusicPlayer.thirdMelody
+    }];
+    public currentMelody: string = "";
+    public getNextMelody(): Array<string | null | Array<string | null>> {
+        const melodyNode = this.melodyMap.find(m => m.id === this.currentMelody);
+        if (melodyNode) {
+            const nextMelodyNode = this.melodyMap.find(m => m.id === melodyNode.next);
+            if (nextMelodyNode) {
+                this.currentMelody = nextMelodyNode.id;
+                return nextMelodyNode.notes;
+            }
+        }
+        const firstMelodyNode = this.melodyMap[0];
+        if (firstMelodyNode) {
+            this.currentMelody = firstMelodyNode.id;
+            return firstMelodyNode.notes;
+        }
+        throw new Error("Could not find melody node to play next sound");
     }
 
-    setupSecondMelody() {
-        // second melody
-        const notes2 = [
-            // stanza 1
-            "C3",
-            "D3",
-            "E#3",
-            null,
+    /**
+     * Handle the playing of music and the transition between melodies.
+     * @param time
+     * @param note
+     */
+    handleToneSequenceCallback = (time: number, note: any) => {
+        if (note === "END") {
+            this.setupMelody(this.getNextMelody());
+            if (this.synthPart) {
+                this.synthPart.start(Tone.Transport.seconds);
+            }
+            return;
+        }
+        if (this.synth && note) {
+            this.synth.triggerAttackRelease(note, "10hz", time);
+        }
+    };
 
-            // stanza 2
-            "G3",
-            "E#3",
-            "D3",
-            null,
-
-            // stanza 3
-            "E#3",
-            "D3",
-            "C3",
-            null,
-
-            // stanza 4
-            "A2",
-            "A#2",
-            "C3",
-            null,
-
-            // stanza 1
-            "C3",
-            "D3",
-            "E#3",
-            null,
-
-            // stanza 2
-            "G3",
-            "E#3",
-            "D3",
-            null,
-
-            // stanza 3
-            "E#3",
-            "D3",
-            "C3",
-            null,
-
-            // stanza 4
-            "A2",
-            "A#2",
-            "C3",
-            null,
-            "END"
-        ];
-        this.synthPart2 = new Tone.Sequence(
-            (time, note) => {
-                if (note === "END") {
-                    this.setupFirstMelody();
-                    if (this.synthPart1) {
-                        this.synthPart1.start(Tone.Transport.seconds);
-                    }
-                    return;
-                }
-                if (this.synth && note) {
-                    this.synth.triggerAttackRelease(note, "10hz", time);
-                }
-            },
-            notes2,
+    setupMelody(notes: Array<string | null | Array<string | null>>) {
+        // clean up old synth parts
+        if (this.synthPart) {
+            this.synthPart.stop();
+            this.synthPart.dispose();
+            this.synthPart = null;
+        }
+        this.synthPart = new Tone.Sequence(
+            this.handleToneSequenceCallback,
+            notes,
             "4n"
         );
-        this.synthPart2.loop = false;
+        this.synthPart.loop = false;
     }
 
     async startTone() {
@@ -195,9 +243,9 @@ export class MusicPlayer {
         this.synth = new Tone.PolySynth(Tone.Synth).toDestination();
 
         // first melody
-        this.setupFirstMelody();
-        if (this.synthPart1) {
-            this.synthPart1.start(Tone.Transport.seconds);
+        this.setupMelody(this.getNextMelody());
+        if (this.synthPart) {
+            this.synthPart.start(Tone.Transport.seconds);
         }
         Tone.Transport.start();
     }
@@ -272,6 +320,8 @@ export class App extends React.Component<IAppProps, IAppState> {
     public gold: number = 2000;
     public worldScale: number = 2;
     public music: MusicPlayer = new MusicPlayer();
+    public demoAttackingShipId: string | null = null;
+    public lastDemoAttackingShipTime: Date = new Date();
 
     /**
      * Velocity step size of ships.
@@ -280,7 +330,15 @@ export class App extends React.Component<IAppProps, IAppState> {
     /**
      * The speed of the cannon ball projectiles.
      */
-    public static PROJECTILE_SPEED: number = App.VELOCITY_STEP * 60;
+    public static PROJECTILE_SPEED: number = App.VELOCITY_STEP * 80;
+    /**
+     * How long a cannon ball will live for in ticks.
+     */
+    public static PROJECTILE_LIFE: number = 50;
+    /**
+     * The enemy detection range.
+     */
+    public static PROJECTILE_DETECTION_RANGE: number = App.PROJECTILE_SPEED * App.PROJECTILE_LIFE * 1.2;
     /**
      * Rotation step size of ships.
      */
@@ -322,8 +380,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             return App.GetCameraState(ship);
         }
 
-        const tempShip = new Ship(this, EShipType.SLOOP);
-        tempShip.id = "ghost-ship";
+        // show latest faction ship
         if (this.state.faction) {
             // faction selected, orbit the faction's home world
             const faction = Object.values(this.factions).find(f => f.id === this.state.faction);
@@ -333,7 +390,17 @@ export class App extends React.Component<IAppProps, IAppState> {
             }
         }
 
+        // show latest attacking ship
+        const attackingAIShip = this.ships.find(s => s.id === this.demoAttackingShipId);
+        if (attackingAIShip) {
+            return App.GetCameraState(attackingAIShip);
+        } else {
+            this.demoAttackingShipId = null;
+        }
+
         // no faction selected, orbit the world
+        const tempShip = new Ship(this, EShipType.SLOOP);
+        tempShip.id = "ghost-ship";
         const numSecondsToCircle = 120 * this.worldScale;
         const millisecondsPerSecond = 1000;
         const circleSlice = numSecondsToCircle * millisecondsPerSecond;
@@ -505,6 +572,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                             key={`${planetDrawing.id}-settlement-progress`}
                             transform={`translate(${x * this.state.width},${(1 - y) * this.state.height})`}
                             fill={factionColor}
+                            style={{opacity: 0.8}}
                             points={`0,0 ${this.getPointsOfAngularProgress.call(this, planetDrawing.original.settlementProgress, size * (this.state.zoom * this.worldScale) * 1.35)}`}
                         />
                     )
@@ -1672,7 +1740,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                             nearByShip.position.clone().rotateVector([0, 0, 1]),
                             shipPosition,
                             this.worldScale
-                        ) < App.PROJECTILE_SPEED / this.worldScale * 100) {
+                        ) < App.PROJECTILE_DETECTION_RANGE / this.worldScale) {
                             nearByEnemyShips.push(nearByShip);
                         }
                     }
@@ -1696,6 +1764,10 @@ export class App extends React.Component<IAppProps, IAppState> {
                 // set closest target
                 if (closestTarget) {
                     ship.fireControl.targetShipId = closestTarget.id;
+                    if (!this.demoAttackingShipId || +this.lastDemoAttackingShipTime + 30 * 1000 < +new Date()) {
+                        this.demoAttackingShipId = ship.id;
+                        this.lastDemoAttackingShipTime = new Date();
+                    }
                 }
             }
         }
@@ -1891,11 +1963,13 @@ export class App extends React.Component<IAppProps, IAppState> {
         planet.orientation = Quaternion.fromAxisAngle([0, 0, 1], Math.random() * 2 * Math.PI);
         const colorValue = Math.random();
         if (colorValue > 0.75)
-            planet.color = "red";
+            planet.color = "#ff8888";
         else if (colorValue > 0.5)
-            planet.color = "green";
+            planet.color = "#88ff88";
         else if (colorValue > 0.25)
-            planet.color = "tan";
+            planet.color = "#ffff88";
+        else
+            planet.color = "#8888ff";
         if (planetI < 5) {
             planet.size = 10;
             planet.settlementProgress = 1;
@@ -1909,10 +1983,10 @@ export class App extends React.Component<IAppProps, IAppState> {
     componentDidMount() {
         // initialize 3d terrain stuff
         this.delaunayGraph.initialize();
-        for (let i = 0; i < 20 * Math.pow(2, this.worldScale); i++) {
+        for (let i = 0; i < 20 * Math.pow(1.5, this.worldScale); i++) {
             this.delaunayGraph.incrementalInsert();
         }
-        for (let step = 0; step < 10 * Math.pow(2, this.worldScale); step++) {
+        for (let step = 0; step < 10 * Math.pow(1.5, this.worldScale); step++) {
             this.voronoiGraph = this.delaunayGraph.getVoronoiGraph();
             const lloydPoints = this.voronoiGraph.lloydRelaxation();
             this.delaunayGraph = new DelaunayGraph<Planet>(this);
@@ -2111,7 +2185,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
     private renderGameControls() {
         return (
-            <g key="game-controls" id="game-controls">
+            <g key="game-controls">
                 <text x="0" y="30" fill="black">Zoom</text>
                 <rect x="0" y="45" width="20" height="20" fill="grey" onClick={this.decrementZoom.bind(this)}/>
                 <text x="25" y="60" textAnchor="center">{(this.state.zoom * this.worldScale)}</text>
@@ -2145,7 +2219,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         if (numPathingNodes) {
             return (
-                <g key="game-status" id="game-status" transform={`translate(${this.state.width - 80},0)`}>
+                <g key="game-status" transform={`translate(${this.state.width - 80},0)`}>
                     <text x="0" y="30" fontSize={8} color="black">Node{numPathingNodes > 1 ? "s" : ""}: {numPathingNodes}</text>
                     <text x="0" y="45" fontSize={8} color="black">Distance: {Math.round(distanceToNode * 100000 / Math.PI) / 100}</text>
                     <text x="0" y="60" fontSize={8} color="black">Order: {orderType}</text>
@@ -2168,7 +2242,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             const cargos = this.playerShip.cargo;
             const cargoSize = shipData.cargoSize;
             return (
-                <g key="cargo-status" id="cargo-status" transform={`translate(${this.state.width / 2},${this.state.height - 50})`}>
+                <g key="cargo-status" transform={`translate(${this.state.width / 2},${this.state.height - 50})`}>
                     {
                         new Array(shipData.cargoSize).fill(0).map((v, i) => {
                             const cargo = cargos[i];
@@ -2201,7 +2275,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         const faction = Object.values(this.factions).find(f => this.playerShip && f.shipIds.includes(this.playerShip.id));
         if (faction) {
             return (
-                <g key="faction-status" id="faction-status" transform={`translate(${this.state.width - 80},${this.state.height - 80})`}>
+                <g key="faction-status" transform={`translate(${this.state.width - 80},${this.state.height - 80})`}>
                     <text x="0" y="30" fontSize={8} color="black">Faction: {faction.id}</text>
                     <text x="0" y="45" fontSize={8} color="black">Gold: {faction.gold}</text>
                     <text x="0" y="60" fontSize={8} color="black">Planet{faction.planetIds.length > 1 ? "s" : ""}: {faction.planetIds.length}</text>
@@ -2216,7 +2290,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     private renderPlayerStatus() {
         if (this.playerShip) {
             return (
-                <g key="player-status" id="player-status" transform={`translate(0,${this.state.height - 80})`}>
+                <g key="player-status" transform={`translate(0,${this.state.height - 80})`}>
                     <text x="0" y="45" fontSize={8} color="black">Gold: {this.gold}</text>
                 </g>
             );
@@ -2235,7 +2309,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
     private renderMainMenu() {
         return (
-            <g key="main-menu" id="main-menu">
+            <g key="main-menu">
                 <text fontSize="28"
                       fill="white"
                       x={this.state.width / 2}
@@ -2361,7 +2435,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             }
         }
         return (
-            <g key="spawn-menu" id="spawn-menu">
+            <g key="spawn-menu">
                 <text
                     fill="white"
                     fontSize="28"
@@ -2376,11 +2450,12 @@ export class App extends React.Component<IAppProps, IAppState> {
                                 <rect
                                     key={`${spawnLocation.id}-spawn-location-rect`}
                                     stroke="white"
-                                    fill="transparent"
+                                    fill="black"
                                     x={x * (index + 0.5) - width / 2}
                                     y={y - 20 - 50}
                                     width={width}
                                     height={height + 50}
+                                    style={{opacity: 0.3}}
                                     onClick={this.beginSpawnShip.bind(this, spawnLocation.id, spawnLocation.shipType)}
                                 />
                                 {

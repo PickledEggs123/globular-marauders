@@ -367,7 +367,7 @@ export class FireControl<T extends IAutomatedShip> {
             return null;
         }
         const coneHit = this.getConeHit(target);
-        if (!(coneHit.success && coneHit.point && coneHit.time && coneHit.time < 60)) {
+        if (!(coneHit.success && coneHit.point && coneHit.time && coneHit.time < App.PROJECTILE_LIFE)) {
             // target is moving too fast, cannot hit it
             return null;
         }
@@ -376,6 +376,11 @@ export class FireControl<T extends IAutomatedShip> {
             coneHit.point[1],
             0
         ]);
+    }
+
+    public integrateOrientationSpeedFrames(orientationSpeed: number): number {
+        const n = Math.floor(orientationSpeed / App.ROTATION_STEP / 2);
+        return Math.max(8, (n * (n - 1)) / 2 * 0.8);
     }
 
     /**
@@ -437,9 +442,21 @@ export class FireControl<T extends IAutomatedShip> {
         //
         // compute moving projectile path to hit target
         const coneHit = this.getConeHit(target);
-        if (!(coneHit.success && coneHit.point && coneHit.time && coneHit.time < 60)) {
+        if (!(coneHit.success && coneHit.point && coneHit.time && coneHit.time < App.PROJECTILE_DETECTION_RANGE / App.PROJECTILE_SPEED / this.app.worldScale)) {
             // target is moving too fast, cannot hit it
             this.isAttacking = false;
+
+            // move closer to target to attack it
+            if (this.owner.pathFinding) {
+                if (this.owner.pathFinding.points.length > 1) {
+                    this.owner.pathFinding.points.shift();
+                    this.owner.pathFinding.points.unshift(target.position.rotateVector([0, 0, 1]));
+                } else if (this.owner.pathFinding.points.length === 1) {
+                    this.owner.pathFinding.points.unshift(target.position.rotateVector([0, 0, 1]));
+                } else {
+                    this.owner.pathFinding.points.push(target.position.rotateVector([0, 0, 1]));
+                }
+            }
             return;
         }
 
@@ -469,7 +486,7 @@ export class FireControl<T extends IAutomatedShip> {
             Math.abs(orientationDiffAngle) > 2 / 180 * Math.PI || Math.abs(desiredOrientationSpeed) >= App.ROTATION_STEP :
             Math.abs(orientationDiffAngle) > 5 / 180 * Math.PI || Math.abs(desiredOrientationSpeed) >= App.ROTATION_STEP;
         this.lastStepShouldRotate = shouldRotate;
-        const willReachTargetRotation = Math.abs(orientationDiffAngle) / Math.abs(orientationSpeed) < 5;
+        const willReachTargetRotation = Math.abs(orientationDiffAngle) / Math.abs(orientationSpeed) < this.integrateOrientationSpeedFrames(orientationSpeed);
         if (shouldRotate && desiredOrientationSpeed > orientationSpeed && !willReachTargetRotation && !this.owner.activeKeys.includes("a")) {
             // press a to rotate left
             this.owner.activeKeys.push("a");

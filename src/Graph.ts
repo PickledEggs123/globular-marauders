@@ -992,6 +992,11 @@ export class PathFinder<T extends IAutomatedShip> {
             distance < App.VELOCITY_STEP * this.owner.app.worldScale * Math.PI / 2 * 100;
     }
 
+    public integrateOrientationSpeedFrames(orientationSpeed: number): number {
+        const n = Math.floor(orientationSpeed / App.ROTATION_STEP / 2);
+        return Math.max(8, (n * (n - 1)) / 2 * 0.8);
+    }
+
     public pathFindingLoop(isAttacking: boolean = false) {
         // disable pathing which is bad
         if (this.points.length >= 2) {
@@ -1020,7 +1025,7 @@ export class PathFinder<T extends IAutomatedShip> {
             targetOrientationPoint[2] = 0;
             targetOrientationPoint = DelaunayGraph.normalize(targetOrientationPoint);
             const orientationDiffAngle = Math.atan2(targetOrientationPoint[0], targetOrientationPoint[1]);
-            const orientationSpeed = VoronoiGraph.angularDistanceQuaternion(this.owner.orientationVelocity, this.owner.app.worldScale) * (orientationDiffAngle > 0 ? 1 : -1);
+            const orientationSpeed = VoronoiGraph.angularDistanceQuaternion(this.owner.orientationVelocity, 1) * (orientationDiffAngle > 0 ? 1 : -1);
             const desiredOrientationSpeed = Math.max(-App.ROTATION_STEP * 10, Math.min(Math.round(
                 -5 / Math.PI * orientationDiffAngle
             ), App.ROTATION_STEP * 10));
@@ -1040,7 +1045,7 @@ export class PathFinder<T extends IAutomatedShip> {
             if (!shouldRotate) {
                 desiredSpeed = 5;
             }
-            const willReachTargetRotation = Math.abs(orientationDiffAngle) / Math.abs(orientationSpeed) < 5;
+            const willReachTargetRotation = Math.abs(orientationDiffAngle) / Math.abs(orientationSpeed) < this.integrateOrientationSpeedFrames(orientationSpeed);
             const shouldSlowDown = speed > desiredSpeed || shouldRotate;
             const shouldSpeedUp = speed < desiredSpeed + 1 && !shouldRotate;
             if (shouldRotate && desiredOrientationSpeed > orientationSpeed && !willReachTargetRotation && !this.owner.activeKeys.includes("a")) {
