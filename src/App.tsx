@@ -2061,7 +2061,9 @@ export class App extends React.Component<IAppProps, IAppState> {
             }
         }
 
-        this.rotateCameraInterval = setInterval(this.gameLoop.bind(this), 100);
+        if (!this.props.isTestMode) {
+            this.rotateCameraInterval = setInterval(this.gameLoop.bind(this), 100);
+        }
         this.keyDownHandlerInstance = this.handleKeyDown.bind(this);
         this.keyUpHandlerInstance = this.handleKeyUp.bind(this);
         document.addEventListener("keydown", this.keyDownHandlerInstance);

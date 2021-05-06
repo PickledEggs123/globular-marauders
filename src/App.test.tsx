@@ -5,7 +5,7 @@ import Quaternion from "quaternion";
 import sinon from 'sinon';
 import {computeConeLineIntersection} from "./Intersection";
 import {CAPITAL_GOODS, OUTPOST_GOODS} from "./Resource";
-import {EFaction, EShipType, PHYSICS_SCALE, Ship} from "./Ship";
+import {EFaction, EShipType, PHYSICS_SCALE, Ship, SHIP_DATA} from "./Ship";
 import {EOrderType} from "./Order";
 import {DelaunayGraph, PathFinder, VoronoiGraph} from "./Graph";
 import {CannonBall} from "./Item";
@@ -13,8 +13,6 @@ import {CannonBall} from "./Item";
 const getTestShip = (app: App, wrapper: ShallowWrapper<any>) => {
   // setup test ship and nav point
   // select faction
-  clearInterval(app.rotateCameraInterval);
-  app.rotateCameraInterval = null;
   app.selectFaction(EFaction.DUTCH);
   wrapper.update();
 
@@ -77,8 +75,11 @@ const setupPathingTest = (points: Array<[number, number, number]>, numMinutes: n
   const {
     testShip
   } = getTestShip(app, wrapper);
+  testShip.position = Quaternion.ONE;
+  testShip.positionVelocity = Quaternion.ONE;
+  testShip.orientation = Quaternion.ONE;
+  testShip.orientationVelocity = Quaternion.ONE;
   testShip.pathFinding = new PathFinder<Ship>(testShip);
-  testShip.pathFinding.points = points;
 
   // test the ship navigation to nav point
   const numStepsPerSecond = 10;
@@ -87,6 +88,7 @@ const setupPathingTest = (points: Array<[number, number, number]>, numMinutes: n
   let successfullyReachedDestination = false;
   for (let step = 0; step < numSteps; step++) {
     app.gameLoop.call(app);
+    expect(testShip.fireControl.isAttacking).toBeFalsy();
     if (testShip.pathFinding.points.length === 0) {
       // ship has successfully reached destination
       successfullyReachedDestination = true;
@@ -98,11 +100,11 @@ const setupPathingTest = (points: Array<[number, number, number]>, numMinutes: n
   expect(successfullyReachedDestination).toBeTruthy();
 };
 
-const setupTradingTest = (numMinutes: number = 2) => {
+const setupTradingTest = (numMinutes: number = 10) => {
   // setup wrapper to run test
   const wrapper = shallow<App>(<App isTestMode />);
   const app = wrapper.instance();
-  app.worldScale = 1;
+  app.worldScale = 0.25;
   app.forceUpdate = () => undefined;
 
   // remove all ships
@@ -131,7 +133,7 @@ const setupTradingTest = (numMinutes: number = 2) => {
     app.gameLoop.call(app);
     if (getOrder.callCount !== lastCallCount) {
       lastCallCount = getOrder.callCount;
-      if (lastCallCount === 7) {
+      if (lastCallCount === 22) {
         successfullyReachedDestination = true;
         break;
       }
@@ -145,14 +147,13 @@ const setupTradingTest = (numMinutes: number = 2) => {
   }
 
   expect(successfullyReachedDestination).toBeTruthy();
-  expect(getOrder.returnValues[0].orderType).toBe(EOrderType.SETTLE);
-  expect(getOrder.returnValues[1].orderType).toBe(EOrderType.SETTLE);
-  expect(getOrder.returnValues[2].orderType).toBe(EOrderType.SETTLE);
-  expect(getOrder.returnValues[3].orderType).toBe(EOrderType.SETTLE);
-  expect(getOrder.returnValues[4].orderType).toBe(EOrderType.SETTLE);
+  const numberOfTripsToColonizePlanet = 20;
+  for (let i = 0; i < numberOfTripsToColonizePlanet; i++) {
+    expect(getOrder.returnValues[i].orderType).toBe(EOrderType.SETTLE);
+  }
 
   // expect ship to trade with second planet
-  expect(getOrder.returnValues[5].orderType).toBe(EOrderType.TRADE);
+  expect(getOrder.returnValues[numberOfTripsToColonizePlanet].orderType).toBe(EOrderType.TRADE);
   expect(colonyWorldTradeItem.spy.callCount).toBeGreaterThan(0);
   let buyGoodCall = 0;
   for (let step = 0; step < colonyWorldTradeItem.spy.callCount; step++) {
