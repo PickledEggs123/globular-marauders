@@ -219,9 +219,32 @@ export class Ship implements IAutomatedShip {
      * @param order The order to remove.
      */
     public removeOrder(order: Order) {
-        const index = this.orders.findIndex(o => o === order);
-        if (index >= 0) {
-            this.orders.splice(index, 1);
+        // clean faction data
+        if (this.faction && order.planetId) {
+            if (order.orderType === EOrderType.SETTLE) {
+                const index = this.faction.explorationGraph[order.planetId].settlerShipIds.findIndex(s => s === this.id);
+                if (index >= 0) {
+                    this.faction.explorationGraph[order.planetId].settlerShipIds.splice(index, 1);
+                }
+            }
+            if (order.orderType === EOrderType.TRADE) {
+                const index = this.faction.explorationGraph[order.planetId].traderShipIds.findIndex(s => s === this.id);
+                if (index >= 0) {
+                    this.faction.explorationGraph[order.planetId].traderShipIds.splice(index, 1);
+                }
+            }
+            if (order.orderType === EOrderType.PIRATE) {
+                const index = this.faction.explorationGraph[order.planetId].pirateShipIds.findIndex(s => s === this.id);
+                if (index >= 0) {
+                    this.faction.explorationGraph[order.planetId].pirateShipIds.splice(index, 1);
+                }
+            }
+        }
+
+        // clean ship data
+        const index2 = this.orders.findIndex(o => o === order);
+        if (index2 >= 0) {
+            this.orders.splice(index2, 1);
         }
     }
 
@@ -380,7 +403,7 @@ export class FireControl<T extends IAutomatedShip> {
 
     public integrateOrientationSpeedFrames(orientationSpeed: number): number {
         const n = Math.floor(orientationSpeed / App.ROTATION_STEP / 2);
-        return Math.max(8, (n * (n - 1)) / 2 * 0.8);
+        return Math.max(5, (n * (n - 1)) / 2 * 0.8);
     }
 
     /**

@@ -43,36 +43,67 @@ export class Order {
         this.faction = faction;
     }
 
-    private roam() {
-        const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWoldPlanetId);
-        if (!homeWorld || !homeWorld.pathingNode) {
-            throw new Error("Could not find home world for pathing back to home world (ROAM)");
-        }
-
-        // pick random planets
-        if (this.stage === 0 && this.owner.pathFinding.points.length === 0) {
-            this.stage += 1;
-
-            // explore a random planet
-            const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
-            const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
-            const nodes = Object.values(this.app.delaunayGraph.pathingNodes);
-            const randomTarget = nodes[Math.floor(Math.random() * nodes.length)];
-            this.owner.pathFinding.points = nearestNode.pathToObject(randomTarget);
-        } else if (this.stage === 1 && this.owner.pathFinding.points.length === 0) {
-            this.stage += 1;
-
-            // return to home world
-            const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
-            const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
-            this.owner.pathFinding.points = nearestNode.pathToObject(homeWorld.pathingNode);
-        } else if (this.stage === 2 && this.owner.pathFinding.points.length === 0) {
-            // end order
-            this.owner.removeOrder(this);
-        }
+    public pickRandomPlanet() {
+        const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
+        const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
+        const nodes = Object.values(this.app.delaunayGraph.pathingNodes);
+        const randomTarget = nodes[Math.floor(Math.random() * nodes.length)];
+        this.owner.pathFinding.points = nearestNode.pathToObject(randomTarget);
     }
 
-    private settle() {
+    public returnToHomeWorld() {
+        const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWoldPlanetId);
+        if (!homeWorld || !homeWorld.pathingNode) {
+            throw new Error("Could not find home world for pathing back to home world (RETURN TO HOME WORLD)");
+        }
+
+        const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
+        const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
+        this.owner.pathFinding.points = nearestNode.pathToObject(homeWorld.pathingNode);
+    }
+
+    public goToColonyWorld() {
+        if (!this.planetId) {
+            throw new Error("Could not find planetId to path to (GO TO COLONY)");
+        }
+        const colonyWorld = this.app.planets.find(planet => planet.id === this.planetId);
+        if (!colonyWorld || !colonyWorld.pathingNode) {
+            throw new Error("Could not find home world for pathing back to home world (GO TO COLONY)");
+        }
+
+        const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
+        const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
+        this.owner.pathFinding.points = nearestNode.pathToObject(colonyWorld.pathingNode);
+    }
+
+    public beginSettlementMission() {
+        const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWoldPlanetId);
+        if (!homeWorld || !homeWorld.pathingNode) {
+            throw new Error("Could not find home world for pathing back to home world (SETTLE)");
+        }
+
+        homeWorld.trade(this.owner);
+    }
+
+    public beginTradeMission() {
+        const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWoldPlanetId);
+        if (!homeWorld || !homeWorld.pathingNode) {
+            throw new Error("Could not find home world for pathing back to home world (TRADE)");
+        }
+
+        homeWorld.trade(this.owner);
+    }
+
+    public beginPirateMission() {
+        const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWoldPlanetId);
+        if (!homeWorld || !homeWorld.pathingNode) {
+            throw new Error("Could not find home world for pathing back to home world (PIRATE)");
+        }
+
+        homeWorld.trade(this.owner, true);
+    }
+
+    public updateSettlementProgress() {
         const shipData = SHIP_DATA.find(s => s.shipType === this.owner.shipType);
         if (!shipData) {
             throw new Error("Could not find ship type");
@@ -85,66 +116,27 @@ export class Order {
         if (!colonyWorld || !colonyWorld.pathingNode) {
             throw new Error("Could not find home world for pathing back to home world (SETTLE)");
         }
-        const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWoldPlanetId);
-        if (!homeWorld || !homeWorld.pathingNode) {
-            throw new Error("Could not find home world for pathing back to home world (SETTLE)");
-        }
 
-        // fly to a specific planet
-        if (this.stage === 0 && this.owner.pathFinding.points.length === 0) {
-            this.stage += 1;
-
-            // return to home world
-            const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
-            const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
-            this.owner.pathFinding.points = nearestNode.pathToObject(homeWorld.pathingNode);
-        } else if (this.stage === 1 && this.owner.pathFinding.points.length === 0) {
-            this.stage += 1;
+        const wasSettledByAnotherFactionYet = Object.values(this.app.factions).some(f => {
+            return !!(this.planetId && f.planetIds.includes(this.planetId) && f.id !== this.faction.id);
+        });
+        if (!wasSettledByAnotherFactionYet) {
+            colonyWorld.settlementProgress = (
+                Math.round(colonyWorld.settlementProgress * Planet.NUM_SETTLEMENT_PROGRESS_STEPS) + shipData.settlementProgressFactor
+            ) / Planet.NUM_SETTLEMENT_PROGRESS_STEPS;
+            if (colonyWorld.settlementProgress === 1) {
+                colonyWorld.settlementLevel = ESettlementLevel.OUTPOST;
+            }
+            if (!this.faction.planetIds.includes(this.planetId)) {
+                this.faction.planetIds.push(this.planetId);
+            }
 
             // trade with homeWorld
-            homeWorld.trade(this.owner);
-
-            // find colony world
-            const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
-            const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
-            this.owner.pathFinding.points = nearestNode.pathToObject(colonyWorld.pathingNode);
-        } else if (this.stage === 2 && this.owner.pathFinding.points.length === 0) {
-            this.stage += 1
-
-            // update settlement progress
-            const wasSettledByAnotherFactionYet = Object.values(this.app.factions).some(f => {
-                return !!(this.planetId && f.planetIds.includes(this.planetId) && f.id !== this.faction.id);
-            });
-            if (!wasSettledByAnotherFactionYet) {
-                colonyWorld.settlementProgress = (
-                    Math.round(colonyWorld.settlementProgress * Planet.NUM_SETTLEMENT_PROGRESS_STEPS) + shipData.settlementProgressFactor
-                ) / Planet.NUM_SETTLEMENT_PROGRESS_STEPS;
-                if (colonyWorld.settlementProgress === 1) {
-                    colonyWorld.settlementLevel = ESettlementLevel.OUTPOST;
-                }
-                if (!this.faction.planetIds.includes(this.planetId)) {
-                    this.faction.planetIds.push(this.planetId);
-                }
-
-                // trade with homeWorld
-                colonyWorld.trade(this.owner);
-            }
-
-            // return to home world
-            const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
-            const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
-            this.owner.pathFinding.points = nearestNode.pathToObject(homeWorld.pathingNode);
-        } else if (this.stage === 3 && this.owner.pathFinding.points.length === 0) {
-            // end order
-            const index = this.faction.explorationGraph[this.planetId].settlerShipIds.findIndex(s => s === this.owner.id);
-            if (index >= 0) {
-                this.faction.explorationGraph[this.planetId].settlerShipIds.splice(index, 1);
-            }
-            this.owner.removeOrder(this);
+            colonyWorld.trade(this.owner);
         }
     }
 
-    private trade() {
+    public tradeWithColony() {
         if (!this.planetId) {
             throw new Error("Could not find planetId to path to (TRADE)");
         }
@@ -152,47 +144,91 @@ export class Order {
         if (!colonyWorld || !colonyWorld.pathingNode) {
             throw new Error("Could not find home world for pathing back to home world (TRADE)");
         }
-        const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWoldPlanetId);
-        if (!homeWorld || !homeWorld.pathingNode) {
-            throw new Error("Could not find home world for pathing back to home world (TRADE)");
-        }
 
+        colonyWorld.trade(this.owner);
+    }
+
+    private roam() {
+        // pick random planets
+        if (this.stage === 0 && this.owner.pathFinding.points.length === 0) {
+            this.stage += 1;
+
+            // return to home world
+            this.returnToHomeWorld();
+        } else  if (this.stage === 1 && this.owner.pathFinding.points.length === 0) {
+            this.stage += 1;
+
+            this.beginPirateMission();
+
+            // explore a random planet
+            this.pickRandomPlanet();
+        } else if (this.stage === 2 && this.owner.pathFinding.points.length === 0) {
+            this.stage += 1;
+
+            // return to home world
+            this.returnToHomeWorld();
+        } else if (this.stage === 3 && this.owner.pathFinding.points.length === 0) {
+            // end order
+            this.owner.removeOrder(this);
+        }
+    }
+
+    private settle() {
         // fly to a specific planet
         if (this.stage === 0 && this.owner.pathFinding.points.length === 0) {
             this.stage += 1;
 
             // return to home world
-            const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
-            const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
-            this.owner.pathFinding.points = nearestNode.pathToObject(homeWorld.pathingNode);
+            this.returnToHomeWorld();
         } else if (this.stage === 1 && this.owner.pathFinding.points.length === 0) {
             this.stage += 1;
 
             // trade with homeWorld
-            homeWorld.trade(this.owner);
+            this.beginSettlementMission();
 
             // find colony world
-            const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
-            const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
-            this.owner.pathFinding.points = nearestNode.pathToObject(colonyWorld.pathingNode);
+            this.goToColonyWorld();
+        } else if (this.stage === 2 && this.owner.pathFinding.points.length === 0) {
+            this.stage += 1
+
+            // update settlement progress
+            this.updateSettlementProgress();
+
+            // return to home world
+            this.returnToHomeWorld();
+        } else if (this.stage === 3 && this.owner.pathFinding.points.length === 0) {
+            // end order
+            this.owner.removeOrder(this);
+        }
+    }
+
+    private trade() {
+        // fly to a specific planet
+        if (this.stage === 0 && this.owner.pathFinding.points.length === 0) {
+            this.stage += 1;
+
+            // return to home world
+            this.returnToHomeWorld();
+        } else if (this.stage === 1 && this.owner.pathFinding.points.length === 0) {
+            this.stage += 1;
+
+            // trade with homeWorld
+            this.beginTradeMission();
+
+            // find colony world
+            this.goToColonyWorld();
         } else if (this.stage === 2 && this.owner.pathFinding.points.length === 0) {
             this.stage += 1;
 
             // trade with colony world
-            colonyWorld.trade(this.owner);
+            this.tradeWithColony();
 
             // return to home world
-            const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
-            const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
-            this.owner.pathFinding.points = nearestNode.pathToObject(homeWorld.pathingNode);
+            this.returnToHomeWorld();
         } else if (this.stage === 3 && this.owner.pathFinding.points.length === 0) {
             // check if order expired
             if (this.runningTicks >= this.expireTicks) {
                 // end order
-                const index = this.faction.explorationGraph[this.planetId].traderShipIds.findIndex(s => s === this.owner.id);
-                if (index >= 0) {
-                    this.faction.explorationGraph[this.planetId].traderShipIds.splice(index, 1);
-                }
                 this.owner.removeOrder(this);
             } else {
                 // reset order
@@ -213,18 +249,6 @@ export class Order {
         // pirates will wait until the expiration time to pirate ships
         const pirateOrderExpired = this.runningTicks >= this.expireTicks;
 
-        if (!this.planetId && !hasPiratedCargo) {
-            throw new Error("Could not find planetId to path to (PIRATE)");
-        }
-        const colonyWorld = this.app.planets.find(planet => this.planetId && planet.id === this.planetId);
-        if ((!colonyWorld || !colonyWorld.pathingNode) && !hasPiratedCargo) {
-            throw new Error("Could not find home world for pathing back to home world (PIRATE)");
-        }
-        const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWoldPlanetId);
-        if (!homeWorld || !homeWorld.pathingNode) {
-            throw new Error("Could not find home world for pathing back to home world (PIRATE)");
-        }
-
         // shortcut to returning pirated cargo, required by the player since the player can shortcut the piracy mission
         if (hasPiratedCargo && this.stage < 2) {
             this.stage = 2;
@@ -235,21 +259,15 @@ export class Order {
             this.stage += 1;
 
             // return to home world
-            const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
-            const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
-            this.owner.pathFinding.points = nearestNode.pathToObject(homeWorld.pathingNode);
+            this.returnToHomeWorld();
         } else if (this.stage === 1 && this.owner.pathFinding.points.length === 0) {
             this.stage += 1;
 
             // trade with homeWorld
-            homeWorld.trade(this.owner, true);
+            this.beginPirateMission();
 
             // find colony world
-            if (colonyWorld && colonyWorld.pathingNode) {
-                const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
-                const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
-                this.owner.pathFinding.points = nearestNode.pathToObject(colonyWorld.pathingNode);
-            }
+            this.goToColonyWorld();
         } else if (this.stage === 2 && (hasPiratedCargo || pirateOrderExpired)) {
             this.stage += 1;
 
@@ -257,14 +275,12 @@ export class Order {
             // get cargo
 
             // return to home world
-            const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
-            const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
-            this.owner.pathFinding.points = nearestNode.pathToObject(homeWorld.pathingNode);
+            this.returnToHomeWorld();
         } else if (this.stage === 3 && this.owner.pathFinding.points.length === 0) {
             this.stage += 1;
 
             // trade with homeWorld
-            homeWorld.trade(this.owner, true);
+            this.beginPirateMission();
 
             // end order
             this.owner.removeOrder(this);
@@ -295,6 +311,7 @@ export class Order {
             case EOrderType.SETTLE:
             case EOrderType.TRADE: {
                 // trade and settler ships are suppose to be between the colony world and home world, trading
+                // attack only when between colony world and home world
                 const colonyWorld = this.app.planets.find(planet => planet.id === this.planetId);
                 if (!colonyWorld || !colonyWorld.pathingNode) {
                     throw new Error("Could not find home world for pathing back to home world (MISSION AREA)");
@@ -313,32 +330,17 @@ export class Order {
                 return distanceToHomeWorld + distanceToColonyWorld < distanceOfTradeRoute * 1.5;
             }
             case EOrderType.PIRATE: {
-                // pirate cargo mission area is the home world
+                // pirate has cargo, do not attack
                 if (this.owner.hasPirateCargo()) {
                     return false;
                 }
 
-                // pirates are suppose to be near the colony world, to attack weak trade ships
-                const colonyWorld = this.app.planets.find(planet => planet.id === this.planetId);
-                if (!colonyWorld || !colonyWorld.pathingNode) {
-                    throw new Error("Could not find home world for pathing back to home world (MISSION AREA)");
-                }
-                const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWoldPlanetId);
-                if (!homeWorld || !homeWorld.pathingNode) {
-                    throw new Error("Could not find home world for pathing back to home world (MISSION AREA)");
-                }
-
-                const homeWorldPosition = homeWorld.position.clone().rotateVector([0, 0, 1]);
-                const colonyWorldPosition = colonyWorld.position.clone().rotateVector([0, 0, 1]);
-                const shipPosition = this.owner.position.clone().rotateVector([0, 0, 1]);
-                const distanceOfTradeRoute = VoronoiGraph.angularDistance(homeWorldPosition, colonyWorldPosition, this.app.worldScale);
-                const distanceToHomeWorld = VoronoiGraph.angularDistance(homeWorldPosition, shipPosition, this.app.worldScale);
-                const distanceToColonyWorld = VoronoiGraph.angularDistance(shipPosition, colonyWorldPosition, this.app.worldScale);
-                return distanceToHomeWorld + distanceToColonyWorld < distanceOfTradeRoute * 1.5 && distanceToColonyWorld > distanceToHomeWorld;
+                // pirates can attack at any time
+                return true;
             }
             case EOrderType.ROAM:
             default: {
-                // roaming and default is always in mission area
+                // roaming and default, attacking is allowed anywhere
                 return true;
             }
         }

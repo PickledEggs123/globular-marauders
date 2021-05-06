@@ -257,6 +257,10 @@ interface ITargetLineData {
 }
 
 interface IAppProps {
+    /**
+     * If the app is in test mode.
+     */
+    isTestMode?: boolean;
 }
 
 interface IAppState {
@@ -2040,7 +2044,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         for (const factionData of factionDataList) {
             this.factions[factionData.id] = new Faction(this, factionData.id, factionData.color, factionData.planetId);
             const planet = this.planets.find(p => p.id === factionData.planetId);
-            if (planet) {
+            if (planet && !this.props.isTestMode) {
                 for (let numShipsToStartWith = 0; numShipsToStartWith < 10; numShipsToStartWith++) {
                     const shipType = planet.shipyard.getNextShipTypeToBuild();
                     const shipData = SHIP_DATA.find(s => s.shipType === shipType);

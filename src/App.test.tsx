@@ -1,6 +1,6 @@
 import React from 'react';
 import App from './App';
-import {shallow} from "enzyme";
+import {shallow, ShallowWrapper} from "enzyme";
 import Quaternion from "quaternion";
 import sinon from 'sinon';
 import {computeConeLineIntersection} from "./Intersection";
@@ -10,24 +10,75 @@ import {EOrderType} from "./Order";
 import {DelaunayGraph, PathFinder, VoronoiGraph} from "./Graph";
 import {CannonBall} from "./Item";
 
+const getTestShip = (app: App, wrapper: ShallowWrapper<any>) => {
+  // setup test ship and nav point
+  // select faction
+  clearInterval(app.rotateCameraInterval);
+  app.rotateCameraInterval = null;
+  app.selectFaction(EFaction.DUTCH);
+  wrapper.update();
+
+  // get planets
+  const faction = app.factions[EFaction.DUTCH];
+  const getOrder = sinon.spy(faction, "getOrder");
+  const colonyWorldTrades = app.planets.map(p => ({ id: p.id, spy: sinon.spy(p, "trade"), planet: p }));
+  const homeWorldTradeItem = colonyWorldTrades.find(c => c.id === faction.homeWoldPlanetId);
+  if (!homeWorldTradeItem) {
+    throw new Error("Could not find home world trade");
+  }
+
+  // remove ships at all factions
+  for (const faction of Object.values(app.factions)) {
+    const homeWorld = colonyWorldTrades.find(c => c.id === faction.homeWoldPlanetId);
+    if (!homeWorld) {
+      throw new Error("Could not find faction home world");
+    }
+    homeWorld.planet.shipyard.docks = [];
+  }
+
+  // create ship at home world
+  homeWorldTradeItem.planet.wood += 600;
+  homeWorldTradeItem.planet.shipyard.buildShip(EShipType.SLOOP);
+  homeWorldTradeItem.planet.shipyard.docks[0].progress += 600;
+  homeWorldTradeItem.planet.shipyard.handleShipyardLoop();
+
+  // spawn at home world
+  app.beginSpawnShip(homeWorldTradeItem.planet.id, EShipType.SLOOP);
+  wrapper.update();
+
+  if (app.playerShip === null) {
+    throw new Error("NULL PLAYER SHIP");
+  }
+
+  return {
+    testShip: app.playerShip,
+    faction,
+    getOrder,
+    colonyWorldTrades,
+    homeWorldTradeItem
+  };
+}
 const setupPathingTest = (points: Array<[number, number, number]>, numMinutes: number = 2) => {
   // setup wrapper to run test
-  const wrapper = shallow<App>(<App />);
+  const wrapper = shallow<App>(<App isTestMode />);
   const app = wrapper.instance();
   app.worldScale = 1;
   app.forceUpdate = () => undefined;
 
+  // remove all ships
+  for (const faction of Object.values(app.factions)) {
+    faction.handleFactionLoop = () => undefined;
+  }
+  for (const planet of app.planets) {
+    planet.handlePlanetLoop = () => undefined;
+  }
+
   // setup test ship and nav point
-  const testShip = new Ship(app, EShipType.HIND);
-  testShip.id = "ship-0";
-  testShip.position = Quaternion.ONE;
-  testShip.orientation = Quaternion.ONE;
-  testShip.positionVelocity = Quaternion.ONE;
-  testShip.orientationVelocity = Quaternion.ONE;
+  const {
+    testShip
+  } = getTestShip(app, wrapper);
   testShip.pathFinding = new PathFinder<Ship>(testShip);
   testShip.pathFinding.points = points;
-  app.ships = [testShip];
-  app.playerShip = testShip;
 
   // test the ship navigation to nav point
   const numStepsPerSecond = 10;
@@ -49,35 +100,24 @@ const setupPathingTest = (points: Array<[number, number, number]>, numMinutes: n
 
 const setupTradingTest = (numMinutes: number = 2) => {
   // setup wrapper to run test
-  const wrapper = shallow<App>(<App />);
+  const wrapper = shallow<App>(<App isTestMode />);
   const app = wrapper.instance();
   app.worldScale = 1;
   app.forceUpdate = () => undefined;
 
-  // setup test ship and nav point
-  // select faction
-  clearInterval(app.rotateCameraInterval);
-  app.rotateCameraInterval = null;
-  app.selectFaction(EFaction.DUTCH);
-  wrapper.update();
-
-  // get planets
-  const faction = app.factions[EFaction.DUTCH];
-  const getOrder = sinon.spy(faction, "getOrder");
-  const colonyWorldTrades = app.planets.map(p => ({ id: p.id, spy: sinon.spy(p, "trade"), planet: p }));
-  const homeWorldTradeItem = colonyWorldTrades.find(c => c.id === faction.homeWoldPlanetId);
-  if (!homeWorldTradeItem) {
-    throw new Error("Could not find home world trade");
+  // remove all ships
+  for (const faction of Object.values(app.factions)) {
+    faction.handleFactionLoop = () => undefined;
+  }
+  for (const planet of app.planets) {
+    planet.handlePlanetLoop = () => undefined;
   }
 
-  // spawn at home world
-  app.beginSpawnShip(homeWorldTradeItem.planet.id, EShipType.HIND);
-  wrapper.update();
-
-  if (app.playerShip === null) {
-    throw new Error("NULL PLAYER SHIP");
-  }
-  const testShip = app.playerShip;
+  const {
+    testShip,
+    getOrder,
+    colonyWorldTrades,
+  } = getTestShip(app, wrapper);
   const buyGoodFromShip = sinon.spy(testShip, "buyGoodFromShip");
 
   // test the ship navigation to nav point
@@ -136,17 +176,6 @@ describe('test AI Pathing', () => {
             0
           ]
         ]);
-      });
-    }
-  });
-  describe.skip('test random points',  () => {
-    for (let test = 0; test < 10; test++) {
-      it(`test pathing with random data ${test}`, () => {
-        setupPathingTest(new Array(10).fill(1).map((): [number, number, number] => DelaunayGraph.normalize([
-          Math.random() * 2 - 1,
-          Math.random() * 2 - 1,
-          Math.random() * 2 - 1
-        ])), 80);
       });
     }
   });

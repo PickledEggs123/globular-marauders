@@ -158,7 +158,7 @@ export class Shipyard {
         // spawn the ship
         const doneDockIndex = this.docks.findIndex(d => d.isDone() && d.shipType === shipType);
         const dock = this.docks[doneDockIndex];
-        if (!dock.shipType) {
+        if (!(dock && dock.shipType)) {
             throw new Error("Dock must have ship type to be done");
         }
         this.docks.splice(doneDockIndex, 1);
