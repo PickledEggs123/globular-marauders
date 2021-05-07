@@ -285,7 +285,7 @@ export class Planet implements ICameraState {
         for (const goodToTake of goodsToTake) {
             const boughtGood = ship.buyGoodFromShip(goodToTake);
             if (boughtGood) {
-                const faction = Object.values(this.instance.factions).find(f => f.homeWoldPlanetId === this.id);
+                const faction = Object.values(this.instance.factions).find(f => f.homeWorldPlanetId === this.id);
                 if (faction) {
                     faction.applyLuxuryBuff(this.instance, goodToTake, boughtGood.sourcePlanetId);
                 }

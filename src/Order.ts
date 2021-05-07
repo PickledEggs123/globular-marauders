@@ -52,7 +52,7 @@ export class Order {
     }
 
     public returnToHomeWorld() {
-        const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWoldPlanetId);
+        const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWorldPlanetId);
         if (!homeWorld || !homeWorld.pathingNode) {
             throw new Error("Could not find home world for pathing back to home world (RETURN TO HOME WORLD)");
         }
@@ -77,7 +77,7 @@ export class Order {
     }
 
     public beginSettlementMission() {
-        const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWoldPlanetId);
+        const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWorldPlanetId);
         if (!homeWorld || !homeWorld.pathingNode) {
             throw new Error("Could not find home world for pathing back to home world (SETTLE)");
         }
@@ -86,7 +86,7 @@ export class Order {
     }
 
     public beginTradeMission() {
-        const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWoldPlanetId);
+        const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWorldPlanetId);
         if (!homeWorld || !homeWorld.pathingNode) {
             throw new Error("Could not find home world for pathing back to home world (TRADE)");
         }
@@ -95,7 +95,7 @@ export class Order {
     }
 
     public beginPirateMission() {
-        const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWoldPlanetId);
+        const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWorldPlanetId);
         if (!homeWorld || !homeWorld.pathingNode) {
             throw new Error("Could not find home world for pathing back to home world (PIRATE)");
         }
@@ -316,7 +316,7 @@ export class Order {
                 if (!colonyWorld || !colonyWorld.pathingNode) {
                     throw new Error("Could not find home world for pathing back to home world (MISSION AREA)");
                 }
-                const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWoldPlanetId);
+                const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWorldPlanetId);
                 if (!homeWorld || !homeWorld.pathingNode) {
                     throw new Error("Could not find home world for pathing back to home world (MISSION AREA)");
                 }

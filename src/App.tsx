@@ -261,6 +261,10 @@ interface IAppProps {
      * If the app is in test mode.
      */
     isTestMode?: boolean;
+    /**
+     * The size of the world, initially
+     */
+    worldScale?: number;
 }
 
 interface IAppState {
@@ -1985,6 +1989,11 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     componentDidMount() {
+        // set initial world scale
+        if (typeof(this.props.worldScale) === "number") {
+            this.worldScale = this.props.worldScale;
+        }
+
         // initialize 3d terrain stuff
         this.delaunayGraph.initialize();
         for (let i = 0; i < 20 * Math.pow(1.5, this.worldScale); i++) {

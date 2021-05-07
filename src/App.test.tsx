@@ -5,11 +5,17 @@ import Quaternion from "quaternion";
 import sinon from 'sinon';
 import {computeConeLineIntersection} from "./Intersection";
 import {CAPITAL_GOODS, OUTPOST_GOODS} from "./Resource";
-import {EFaction, EShipType, PHYSICS_SCALE, Ship, SHIP_DATA} from "./Ship";
+import {EFaction, EShipType, PHYSICS_SCALE, Ship} from "./Ship";
 import {EOrderType} from "./Order";
 import {DelaunayGraph, PathFinder, VoronoiGraph} from "./Graph";
 import {CannonBall} from "./Item";
+import {Faction} from "./Faction";
 
+/**
+ * Get a test ship from the app.
+ * @param app The app containing a blank world.
+ * @param wrapper The wrapper containing the app.
+ */
 const getTestShip = (app: App, wrapper: ShallowWrapper<any>) => {
   // setup test ship and nav point
   // select faction
@@ -20,14 +26,14 @@ const getTestShip = (app: App, wrapper: ShallowWrapper<any>) => {
   const faction = app.factions[EFaction.DUTCH];
   const getOrder = sinon.spy(faction, "getOrder");
   const colonyWorldTrades = app.planets.map(p => ({ id: p.id, spy: sinon.spy(p, "trade"), planet: p }));
-  const homeWorldTradeItem = colonyWorldTrades.find(c => c.id === faction.homeWoldPlanetId);
+  const homeWorldTradeItem = colonyWorldTrades.find(c => c.id === faction.homeWorldPlanetId);
   if (!homeWorldTradeItem) {
     throw new Error("Could not find home world trade");
   }
 
   // remove ships at all factions
   for (const faction of Object.values(app.factions)) {
-    const homeWorld = colonyWorldTrades.find(c => c.id === faction.homeWoldPlanetId);
+    const homeWorld = colonyWorldTrades.find(c => c.id === faction.homeWorldPlanetId);
     if (!homeWorld) {
       throw new Error("Could not find faction home world");
     }
@@ -55,12 +61,50 @@ const getTestShip = (app: App, wrapper: ShallowWrapper<any>) => {
     colonyWorldTrades,
     homeWorldTradeItem
   };
-}
+};
+
+/**
+ * Check for valid faction data.
+ * @param faction The faction to check for valid data.
+ */
+const assertFactionData = (faction: Faction) => {
+  // get faction home world
+  const homeWorld = faction.instance.planets.find(p => p.id === faction.homeWorldPlanetId);
+  if (!homeWorld) {
+    throw new Error("Could not find faction's home world");
+  }
+
+  // for each planet
+  for (const planet of faction.instance.planets) {
+    // ignore home world
+    if (planet.id === faction.homeWorldPlanetId) {
+      continue;
+    }
+
+    // validate faction's data about each planet
+    expect(faction.explorationGraph).toHaveProperty(planet.id);
+    const expectedDistance = VoronoiGraph.angularDistance(
+      homeWorld.position.rotateVector([0, 0, 1]),
+      planet.position.rotateVector([0, 0, 1]),
+      faction.instance.worldScale
+    );
+    expect(faction.explorationGraph[planet.id].distance).toBe(expectedDistance);
+    expect(faction.explorationGraph[planet.id].planet).toBe(planet);
+  }
+};
+
+/**
+ * Setup unit tests around pathing.
+ * @param points The list of target points to travel to.
+ * @param numMinutes The number of minutes for the test to take.
+ * The ship shouldn't take more than 2 minutes of game time to travel from the north pole
+ * to the equator. The 1 unit scaled world should take 4 minutes to travel half way around
+ * the world and 8 minutes to circumnavigate.
+ */
 const setupPathingTest = (points: Array<[number, number, number]>, numMinutes: number = 2) => {
   // setup wrapper to run test
-  const wrapper = shallow<App>(<App isTestMode />);
+  const wrapper = shallow<App>(<App isTestMode worldScale={1} />);
   const app = wrapper.instance();
-  app.worldScale = 1;
   app.forceUpdate = () => undefined;
 
   // remove all ships
@@ -69,6 +113,11 @@ const setupPathingTest = (points: Array<[number, number, number]>, numMinutes: n
   }
   for (const planet of app.planets) {
     planet.handlePlanetLoop = () => undefined;
+  }
+
+  // validate data
+  for (const faction of Object.values(app.factions)) {
+    assertFactionData(faction);
   }
 
   // setup test ship and nav point
@@ -100,11 +149,15 @@ const setupPathingTest = (points: Array<[number, number, number]>, numMinutes: n
   expect(successfullyReachedDestination).toBeTruthy();
 };
 
-const setupTradingTest = (numMinutes: number = 10) => {
+/**
+ * Setup settling and trading tests. The ship should settle the planet first then trade with it.
+ * The smallest ship, SLOOP, should take 20 trips to settle the planet by itself, then trade two times.
+ * @param numMinutes This test should take 20 minutes of game time.
+ */
+const setupTradingTest = (numMinutes: number = 20) => {
   // setup wrapper to run test
-  const wrapper = shallow<App>(<App isTestMode />);
+  const wrapper = shallow<App>(<App isTestMode worldScale={1} />);
   const app = wrapper.instance();
-  app.worldScale = 0.25;
   app.forceUpdate = () => undefined;
 
   // remove all ships
@@ -113,6 +166,11 @@ const setupTradingTest = (numMinutes: number = 10) => {
   }
   for (const planet of app.planets) {
     planet.handlePlanetLoop = () => undefined;
+  }
+
+  // validate data
+  for (const faction of Object.values(app.factions)) {
+    assertFactionData(faction);
   }
 
   const {
@@ -139,6 +197,10 @@ const setupTradingTest = (numMinutes: number = 10) => {
       }
     }
   }
+
+  // expect ship to complete it's mission.
+  expect(lastCallCount).toBe(22);
+  expect(successfullyReachedDestination).toBeTruthy();
 
   // expect the ship to successfully colonize land
   const colonyWorldTradeItem = colonyWorldTrades.find(c => c.id === getOrder.returnValues[4].planetId);

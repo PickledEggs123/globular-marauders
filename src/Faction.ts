@@ -1,7 +1,7 @@
 import {CAPITAL_GOODS, EResourceType, ITEM_DATA} from "./Resource";
 import {EFaction, EShipType, Ship, SHIP_DATA} from "./Ship";
 import {ESettlementLevel, IExplorationGraphData, IGoldAccount} from "./Interface";
-import {VoronoiGraph} from "./Graph";
+import {DelaunayGraph, VoronoiGraph} from "./Graph";
 import {EOrderType, Order} from "./Order";
 import App from "./App";
 import {Planet} from "./Planet";
@@ -145,7 +145,7 @@ export class Faction {
     /**
      * The home world planet id.
      */
-    public homeWoldPlanetId: string;
+    public homeWorldPlanetId: string;
     /**
      * A list of planet ids of planets owned by this faction.
      */
@@ -193,22 +193,41 @@ export class Faction {
         this.instance = instance;
         this.id = id;
         this.factionColor = factionColor;
-        this.homeWoldPlanetId = homeWorldPlanetId;
+        this.homeWorldPlanetId = homeWorldPlanetId;
         this.planetIds.push(homeWorldPlanetId);
 
         // build exploration graph for which planets to explore and in what order
-        const homeWorld = instance.planets.find(planet => planet.id === homeWorldPlanetId);
+        this.buildExplorationGraph();
+    }
+
+    /**
+     * Build a map of the world from the faction's point of view.
+     */
+    buildExplorationGraph() {
+        const homeWorld = this.instance.planets.find(planet => planet.id === this.homeWorldPlanetId);
         if (homeWorld) {
-            for (const planet of instance.planets) {
+            for (const planet of this.instance.planets) {
                 if (planet.pathingNode && homeWorld.pathingNode && planet.id !== homeWorld.id) {
-                    const path = planet.pathingNode.pathToObject(homeWorld.pathingNode);
-                    const distance = path.reduce((acc: {
+                    const path = homeWorld.pathingNode.pathToObject(planet.pathingNode);
+                    if (path.length === 0) {
+                        throw new Error("Found 0 length path, could not build AI map to world");
+                    }
+                    const distance = path.slice(-1).reduce((acc: {
                         lastPosition: [number, number, number],
                         totalDistance: number
                     }, vertex) => {
+                        // detect duplicate point, or the same point twice.
+                        if (DelaunayGraph.distanceFormula(acc.lastPosition, vertex) < 0.00001) {
+                            return {
+                                lastPosition: vertex,
+                                totalDistance: acc.totalDistance
+                            };
+                        }
+
+                        const segmentDistance = VoronoiGraph.angularDistance(acc.lastPosition, vertex, this.instance.worldScale);
                         return {
                             lastPosition: vertex,
-                            totalDistance: acc.totalDistance + VoronoiGraph.angularDistance(acc.lastPosition, vertex, this.instance.worldScale)
+                            totalDistance: acc.totalDistance + segmentDistance
                         };
                     }, {
                         lastPosition: homeWorld.position.rotateVector([0, 0, 1]),
