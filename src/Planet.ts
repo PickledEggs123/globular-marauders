@@ -36,11 +36,10 @@ export class ShipyardDock {
         // handle ship building progress
         if (this.progress < this.shipCost) {
             this.progress += 1;
-
-            if (this.progress >= this.shipCost) {
-                // ship is done
-                this.shipyard.dockIsDone(this);
-            }
+        }
+        if (this.progress >= this.shipCost) {
+            // ship is done
+            this.shipyard.dockIsDone(this);
         }
     }
 

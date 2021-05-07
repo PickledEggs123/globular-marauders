@@ -2397,7 +2397,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         }
     }
 
-    private returnToMainMenu() {
+    public returnToMainMenu() {
         this.setState({
             showSpawnMenu: false,
             showMainMenu: true,

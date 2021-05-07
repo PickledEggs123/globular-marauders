@@ -2,30 +2,36 @@ import React from 'react';
 import App from './App';
 import {shallow, ShallowWrapper} from "enzyme";
 import Quaternion from "quaternion";
-import sinon from 'sinon';
+import sinon, {SinonSpy, SinonSpyStatic} from 'sinon';
 import {computeConeLineIntersection} from "./Intersection";
 import {CAPITAL_GOODS, OUTPOST_GOODS} from "./Resource";
-import {EFaction, EShipType, PHYSICS_SCALE, Ship} from "./Ship";
-import {EOrderType} from "./Order";
+import {EFaction, EShipType, PHYSICS_SCALE, Ship, SHIP_DATA} from "./Ship";
+import {EOrderType, Order} from "./Order";
 import {DelaunayGraph, PathFinder, VoronoiGraph} from "./Graph";
 import {CannonBall} from "./Item";
 import {Faction} from "./Faction";
+import {Planet} from "./Planet";
+import {ESettlementLevel} from "./Interface";
 
 /**
  * Get a test ship from the app.
  * @param app The app containing a blank world.
  * @param wrapper The wrapper containing the app.
+ * @param colonyWorldTrades The list of colony worlds containing trade references.
+ * @param factionType The faction of the ship to spawn.
+ * @param shipType The type of ship to spawn.
  */
-const getTestShip = (app: App, wrapper: ShallowWrapper<any>) => {
+const getTestShip = (app: App, wrapper: ShallowWrapper<any>, colonyWorldTrades: Array<{
+  id: string, spy: sinon.SinonSpy<[ship: Ship, unloaded?: boolean | undefined], void>, planet: Planet
+}>, factionType: EFaction, shipType: EShipType) => {
   // setup test ship and nav point
   // select faction
-  app.selectFaction(EFaction.DUTCH);
+  app.selectFaction(factionType);
   wrapper.update();
 
   // get planets
-  const faction = app.factions[EFaction.DUTCH];
+  const faction = app.factions[factionType];
   const getOrder = sinon.spy(faction, "getOrder");
-  const colonyWorldTrades = app.planets.map(p => ({ id: p.id, spy: sinon.spy(p, "trade"), planet: p }));
   const homeWorldTradeItem = colonyWorldTrades.find(c => c.id === faction.homeWorldPlanetId);
   if (!homeWorldTradeItem) {
     throw new Error("Could not find home world trade");
@@ -41,13 +47,18 @@ const getTestShip = (app: App, wrapper: ShallowWrapper<any>) => {
   }
 
   // create ship at home world
-  homeWorldTradeItem.planet.wood += 600;
-  homeWorldTradeItem.planet.shipyard.buildShip(EShipType.SLOOP);
-  homeWorldTradeItem.planet.shipyard.docks[0].progress += 600;
+  const shipData = SHIP_DATA.find(s => s.shipType === shipType);
+  if (!shipData) {
+    throw new Error("Could not find ship type");
+  }
+  homeWorldTradeItem.planet.wood += shipData.cost;
+  homeWorldTradeItem.planet.shipyard.buildShip(shipType);
+  homeWorldTradeItem.planet.shipyard.docks[0].progress += shipData.cost;
   homeWorldTradeItem.planet.shipyard.handleShipyardLoop();
+  app.gold += homeWorldTradeItem.planet.shipyard.quoteShip(shipType);
 
   // spawn at home world
-  app.beginSpawnShip(homeWorldTradeItem.planet.id, EShipType.SLOOP);
+  app.beginSpawnShip(homeWorldTradeItem.planet.id, shipType);
   wrapper.update();
 
   if (app.playerShip === null) {
@@ -58,7 +69,6 @@ const getTestShip = (app: App, wrapper: ShallowWrapper<any>) => {
     testShip: app.playerShip,
     faction,
     getOrder,
-    colonyWorldTrades,
     homeWorldTradeItem
   };
 };
@@ -121,9 +131,10 @@ const setupPathingTest = (points: Array<[number, number, number]>, numMinutes: n
   }
 
   // setup test ship and nav point
+  const colonyWorldTrades = app.planets.map(p => ({ id: p.id, spy: sinon.spy(p, "trade"), planet: p }));
   const {
     testShip
-  } = getTestShip(app, wrapper);
+  } = getTestShip(app, wrapper, colonyWorldTrades, EFaction.DUTCH, EShipType.SLOOP);
   testShip.position = Quaternion.ONE;
   testShip.positionVelocity = Quaternion.ONE;
   testShip.orientation = Quaternion.ONE;
@@ -173,12 +184,19 @@ const setupTradingTest = (numMinutes: number = 20) => {
     assertFactionData(faction);
   }
 
+  const colonyWorldTrades = app.planets.map(p => ({ id: p.id, spy: sinon.spy(p, "trade"), planet: p }));
   const {
     testShip,
     getOrder,
-    colonyWorldTrades,
-  } = getTestShip(app, wrapper);
+  } = getTestShip(app, wrapper, colonyWorldTrades, EFaction.DUTCH, EShipType.SLOOP);
   const buyGoodFromShip = sinon.spy(testShip, "buyGoodFromShip");
+
+  // determine number of trips
+  const shipData = SHIP_DATA.find(s => s.shipType === EShipType.SLOOP);
+  if (!shipData) {
+    throw new Error("Could not find ship type");
+  }
+  const numberOfTripsToColonizePlanet = 20 / shipData.settlementProgressFactor;
 
   // test the ship navigation to nav point
   const numStepsPerSecond = 10;
@@ -191,7 +209,7 @@ const setupTradingTest = (numMinutes: number = 20) => {
     app.gameLoop.call(app);
     if (getOrder.callCount !== lastCallCount) {
       lastCallCount = getOrder.callCount;
-      if (lastCallCount === 22) {
+      if (lastCallCount === numberOfTripsToColonizePlanet + 2) {
         successfullyReachedDestination = true;
         break;
       }
@@ -199,7 +217,7 @@ const setupTradingTest = (numMinutes: number = 20) => {
   }
 
   // expect ship to complete it's mission.
-  expect(lastCallCount).toBe(22);
+  expect(lastCallCount).toBe(numberOfTripsToColonizePlanet + 2);
   expect(successfullyReachedDestination).toBeTruthy();
 
   // expect the ship to successfully colonize land
@@ -209,7 +227,6 @@ const setupTradingTest = (numMinutes: number = 20) => {
   }
 
   expect(successfullyReachedDestination).toBeTruthy();
-  const numberOfTripsToColonizePlanet = 20;
   for (let i = 0; i < numberOfTripsToColonizePlanet; i++) {
     expect(getOrder.returnValues[i].orderType).toBe(EOrderType.SETTLE);
   }
@@ -228,8 +245,140 @@ const setupTradingTest = (numMinutes: number = 20) => {
   }
 };
 
+/**
+ * Setup piracy test. An English SLOOP should trade with a planet and a Dutch HIND should attack the English SLOOP.
+ * @param numMinutes This test should take 20 minutes of game time.
+ */
+const setupPiracyTest = (numMinutes: number = 20) => {
+  // setup wrapper to run test
+  const wrapper = shallow<App>(<App isTestMode worldScale={1} />);
+  const app = wrapper.instance();
+  app.forceUpdate = () => undefined;
+
+  // remove all ships
+  for (const faction of Object.values(app.factions)) {
+    faction.handleFactionLoop = () => undefined;
+  }
+  for (const planet of app.planets) {
+    planet.handlePlanetLoop = () => undefined;
+  }
+
+  // validate data
+  for (const faction of Object.values(app.factions)) {
+    assertFactionData(faction);
+  }
+
+  // give English faction a colony, so they can trade with it, and also be pirated
+  const englishFaction = app.factions[EFaction.ENGLISH];
+  if (!englishFaction) {
+    throw new Error("Could not find English Faction");
+  }
+  const closestEnglishPlanet = Object.values(englishFaction.explorationGraph).reduce((acc, n) => {
+    if (!acc || (acc && n.distance < acc.distance)) {
+      return {
+        distance: n.distance,
+        planet: n.planet
+      };
+    } else {
+      return acc;
+    }
+  }, null as null | {
+    distance: number,
+    planet: Planet
+  });
+  if (!closestEnglishPlanet) {
+    throw new Error("Could not find closest English Planet");
+  }
+  closestEnglishPlanet.planet.settlementProgress = 1;
+  closestEnglishPlanet.planet.settlementLevel = ESettlementLevel.OUTPOST;
+  englishFaction.planetIds.push(closestEnglishPlanet.planet.id);
+
+  // create english ship to be pirated
+  const colonyWorldTrades = app.planets.map(p => ({ id: p.id, spy: sinon.spy(p, "trade"), planet: p }));
+  const {
+    testShip: englishMerchantShip,
+    getOrder: englishMerchantShipGetOrder,
+  } = getTestShip(app, wrapper, colonyWorldTrades, EFaction.ENGLISH, EShipType.SLOOP);
+
+  // create dutch ship to pirate
+  app.returnToMainMenu();
+  wrapper.update();
+  const {
+    testShip: dutchPirateShip,
+    getOrder: dutchPirateShipGetOrder,
+  } = getTestShip(app, wrapper, colonyWorldTrades, EFaction.DUTCH, EShipType.HIND);
+
+  // test conditions to test for
+  let englishBegunTrading: boolean = false;
+  let dutchBegunPirating: boolean = false;
+  let returningToHomeWorldToBeginPiracyMission: boolean = false;
+  let beginningPiracyMission: boolean = false;
+  let goingToEnemyColonyToPirate: boolean = false;
+  let englishMerchantShipDestroyed: boolean = false;
+  let dutchPiratePickUpCargo: boolean = false;
+  let returningToHomeWorldWithLoot: boolean = false;
+  let endingPirateContract: boolean = false;
+  let dutchPirateOrder: Order | null = null;
+  let returnToHomeWorldSpy: SinonSpy<any> | null = null;
+  let beginPirateMissionSpy: SinonSpy<any> | null = null;
+  let goToColonyWorldSpy: SinonSpy<any> | null = null;
+
+  // test the ship navigation to nav point
+  const numStepsPerSecond = 10;
+  const numSecondsPerMinute = 60;
+  const numSteps = numStepsPerSecond * numSecondsPerMinute * numMinutes;
+  for (let step = 0; step < numSteps; step++) {
+    Object.values(app.planets).forEach(p => p.wood = 0);
+    app.gameLoop.call(app);
+    if (englishMerchantShipGetOrder.called && !englishBegunTrading) {
+      expect(englishMerchantShipGetOrder.returnValues[0].orderType).toBe(EOrderType.TRADE);
+      englishBegunTrading = true;
+    }
+    if (dutchPirateShipGetOrder.called && !dutchBegunPirating) {
+      expect(dutchPirateShipGetOrder.returnValues[0].orderType).toBe(EOrderType.PIRATE);
+      dutchBegunPirating = true;
+      dutchPirateOrder = dutchPirateShipGetOrder.returnValues[0];
+      returnToHomeWorldSpy = sinon.spy(dutchPirateOrder, "returnToHomeWorld");
+      beginPirateMissionSpy = sinon.spy(dutchPirateOrder, "beginPirateMission");
+      goToColonyWorldSpy = sinon.spy(dutchPirateOrder, "goToColonyWorld");
+    }
+    if (returnToHomeWorldSpy && returnToHomeWorldSpy.callCount === 1) {
+      returningToHomeWorldToBeginPiracyMission = true;
+    }
+    if (beginPirateMissionSpy && beginPirateMissionSpy.callCount === 1) {
+      beginningPiracyMission = true;
+    }
+    if (goToColonyWorldSpy && goToColonyWorldSpy.callCount === 1) {
+      goingToEnemyColonyToPirate = true;
+    }
+    if (englishMerchantShip.health <= 0 && !englishMerchantShipDestroyed) {
+      englishMerchantShipDestroyed = true;
+    }
+    if (dutchPirateShip.hasPirateCargo() && !dutchPiratePickUpCargo) {
+      dutchPiratePickUpCargo = true;
+    }
+    if (returnToHomeWorldSpy && returnToHomeWorldSpy.callCount === 2) {
+      returningToHomeWorldWithLoot = true;
+    }
+    if (beginPirateMissionSpy && beginPirateMissionSpy.callCount === 2) {
+      endingPirateContract = true;
+    }
+  }
+
+  // expect both ships to complete it's mission.
+  expect(englishBegunTrading).toBeTruthy();
+  expect(dutchBegunPirating).toBeTruthy();
+  expect(returningToHomeWorldToBeginPiracyMission).toBeTruthy();
+  expect(beginningPiracyMission).toBeTruthy();
+  expect(goingToEnemyColonyToPirate).toBeTruthy();
+  expect(englishMerchantShipDestroyed).toBeTruthy();
+  expect(dutchPiratePickUpCargo).toBeTruthy();
+  expect(returningToHomeWorldWithLoot).toBeTruthy();
+  expect(endingPirateContract).toBeTruthy();
+};
+
 describe('test AI Pathing', () => {
-  describe('test pathing from all 360 degrees', () => {
+  describe.skip('test pathing from all 360 degrees', () => {
     for (let angle = 0; angle < 360; angle += 5) {
       it(`test pathing form angle ${angle}`, () => {
         setupPathingTest([
@@ -242,10 +391,17 @@ describe('test AI Pathing', () => {
       });
     }
   });
-  describe('test settling points',  () => {
+  describe.skip('test settling and trading',  () => {
     for (let test = 0; test < 10; test++) {
-      it(`test settling with random data ${test}`, () => {
+      it(`test settling and trading with random data ${test}`, () => {
         setupTradingTest(60);
+      });
+    }
+  });
+  describe('test piracy missions',  () => {
+    for (let test = 0; test < 10; test++) {
+      it(`test piracy missions with random data ${test}`, () => {
+        setupPiracyTest(60);
       });
     }
   });

@@ -326,9 +326,10 @@ export class Faction {
         // find worlds to pirate
         const pirateWorldEntry = entries.find(entry => {
             // settle new worlds which have not been settled yet
-            const roomToPirate = entry[1].pirateShipIds.length > 0;
-            const isSettledEnoughToTrade = entry[1].planet.settlementLevel >= ESettlementLevel.OUTPOST;
-            const isOwnedByEnemy = Object.values(this.instance.factions).every(faction => {
+            const roomToPirate = entry[1].pirateShipIds.length === 0;
+            const isSettledEnoughToTrade = entry[1].planet.settlementLevel >= ESettlementLevel.OUTPOST &&
+                entry[1].planet.settlementLevel <= ESettlementLevel.TERRITORY;
+            const isOwnedByEnemy = Object.values(this.instance.factions).some(faction => {
                 if (faction.id === this.id) {
                     // skip the faction itself
                     return false;
