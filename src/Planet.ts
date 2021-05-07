@@ -12,6 +12,7 @@ export class ShipyardDock {
     public progress: number = 0;
     public shipCost: number = 0;
     public shipType: EShipType | null = null;
+    private sentDoneSignal: boolean = false;
 
     constructor(instance: App, planet: Planet, shipyard: Shipyard) {
         this.instance = instance;
@@ -37,9 +38,10 @@ export class ShipyardDock {
         if (this.progress < this.shipCost) {
             this.progress += 1;
         }
-        if (this.progress >= this.shipCost) {
+        if (this.progress >= this.shipCost && !this.sentDoneSignal) {
             // ship is done
             this.shipyard.dockIsDone(this);
+            this.sentDoneSignal = true;
         }
     }
 
