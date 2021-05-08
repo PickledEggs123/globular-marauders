@@ -3,6 +3,7 @@ import App from "./App";
 import {PathFinder} from "./Graph";
 import {EFaction} from "./Ship";
 import {Planet} from "./Planet";
+import {Crate} from "./Item";
 
 export interface IExpirableTicks {
     life: number;
@@ -16,6 +17,8 @@ export interface IAutomatedShip extends ICameraState {
     isInMissionArea(): boolean;
 
     hasPirateOrder(): boolean;
+
+    nearPirateCrate(): Crate | null;
 
     hasPirateCargo(): boolean
 }

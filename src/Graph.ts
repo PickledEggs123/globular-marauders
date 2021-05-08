@@ -994,7 +994,7 @@ export class PathFinder<T extends IAutomatedShip> {
 
     public integrateOrientationSpeedFrames(orientationSpeed: number): number {
         const n = Math.floor(orientationSpeed / App.ROTATION_STEP / 2);
-        return Math.max(8, (n * (n - 1)) / 2 * 0.8);
+        return Math.max(5, (n * (n - 1)) / 2 * 0.8);
     }
 
     public pathFindingLoop(isAttacking: boolean = false) {
@@ -1027,7 +1027,7 @@ export class PathFinder<T extends IAutomatedShip> {
             const orientationDiffAngle = Math.atan2(targetOrientationPoint[0], targetOrientationPoint[1]);
             const orientationSpeed = VoronoiGraph.angularDistanceQuaternion(this.owner.orientationVelocity, 1) * (orientationDiffAngle > 0 ? 1 : -1);
             const desiredOrientationSpeed = Math.max(-App.ROTATION_STEP * 10, Math.min(Math.round(
-                -5 / Math.PI * orientationDiffAngle
+                -(360 / 4) / Math.PI * orientationDiffAngle
             ), App.ROTATION_STEP * 10));
 
             // compute speed towards target

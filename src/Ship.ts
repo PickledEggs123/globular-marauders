@@ -199,6 +199,20 @@ export class Ship implements IAutomatedShip {
         return this.orders.some(o => o.orderType === EOrderType.PIRATE);
     }
 
+    nearPirateCrate(): Crate | null {
+        const crate = this.app.crates.find(c => {
+            const cratePosition = c.position.clone().rotateVector([0, 0, 1]);
+            const shipPosition = this.position.clone().rotateVector([0, 0, 1]);
+            const distance = VoronoiGraph.angularDistance(cratePosition, shipPosition, this.app.worldScale);
+            return distance < App.PROJECTILE_SPEED / this.app.worldScale * 60;
+        });
+        if (crate) {
+            return crate;
+        } else {
+            return null;
+        }
+    }
+
     /**
      * Determine if the ship has pirate cargo.
      */
@@ -439,12 +453,7 @@ export class FireControl<T extends IAutomatedShip> {
         }
 
         const hasPirateOrder = this.owner.hasPirateOrder();
-        const nearByPirateCrate = this.app.crates.find(c => {
-            const cratePosition = c.position.clone().rotateVector([0, 0, 1]);
-            const shipPosition = this.owner.position.clone().rotateVector([0, 0, 1]);
-            const distance = VoronoiGraph.angularDistance(cratePosition, shipPosition, this.app.worldScale);
-            return distance < App.PROJECTILE_SPEED / this.app.worldScale * 60;
-        });
+        const nearByPirateCrate = this.owner.nearPirateCrate();
         const hasPirateCargo = this.owner.hasPirateCargo();
         if (hasPirateOrder && hasPirateCargo) {
             // has pirate cargo, return to home base, cancel attack
@@ -465,7 +474,12 @@ export class FireControl<T extends IAutomatedShip> {
         //
         // compute moving projectile path to hit target
         const coneHit = this.getConeHit(target);
-        if (!(coneHit.success && coneHit.point && coneHit.time && coneHit.time < App.PROJECTILE_DETECTION_RANGE / App.PROJECTILE_SPEED / this.app.worldScale)) {
+        let detectionConeSizeInTicks = App.PROJECTILE_DETECTION_RANGE / App.PROJECTILE_SPEED / this.app.worldScale;
+        if (this.owner.hasPirateOrder()) {
+            // pirates get close to attack
+            detectionConeSizeInTicks *= 0.1;
+        }
+        if (!(coneHit.success && coneHit.point && coneHit.time && coneHit.time < detectionConeSizeInTicks)) {
             // target is moving too fast, cannot hit it
             this.isAttacking = false;
 
@@ -499,7 +513,7 @@ export class FireControl<T extends IAutomatedShip> {
         orientationDiffAngle = (orientationDiffAngle - Math.PI / 2) % (Math.PI * 2);
         const orientationSpeed = VoronoiGraph.angularDistanceQuaternion(this.owner.orientationVelocity, 1) * (orientationDiffAngle > 0 ? 1 : -1);
         const desiredOrientationSpeed = Math.max(-App.ROTATION_STEP * 10, Math.min(Math.round(
-            -5 / Math.PI * orientationDiffAngle
+            -(360 / 4) / Math.PI * orientationDiffAngle
         ), App.ROTATION_STEP * 10));
 
         // perform rotation and speed up

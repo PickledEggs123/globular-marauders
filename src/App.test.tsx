@@ -311,9 +311,11 @@ const setupPiracyTest = (numMinutes: number = 20) => {
   // test conditions to test for
   let englishBegunTrading: boolean = false;
   let dutchBegunPirating: boolean = false;
-  let returningToHomeWorldToBeginPiracyMission: boolean = false;
   let beginningPiracyMission: boolean = false;
   let goingToEnemyColonyToPirate: boolean = false;
+  let englishMerchantShipClosestApproach: number = Math.PI * app.worldScale;
+  let dutchPirateShipClosestApproach: number = Math.PI * app.worldScale;
+  let dutchPirateShipBegunAttacking: boolean = false;
   let englishMerchantShipDestroyed: boolean = false;
   let dutchPiratePickUpCargo: boolean = false;
   let returningToHomeWorldWithLoot: boolean = false;
@@ -330,47 +332,78 @@ const setupPiracyTest = (numMinutes: number = 20) => {
   for (let step = 0; step < numSteps; step++) {
     Object.values(app.planets).forEach(p => p.wood = 0);
     app.gameLoop.call(app);
-    if (englishMerchantShipGetOrder.called && !englishBegunTrading) {
+
+    // test begin mission conditions
+    if (!englishBegunTrading && englishMerchantShipGetOrder.called) {
       expect(englishMerchantShipGetOrder.returnValues[0].orderType).toBe(EOrderType.TRADE);
       englishBegunTrading = true;
     }
-    if (dutchPirateShipGetOrder.called && !dutchBegunPirating) {
+    if (!dutchBegunPirating && dutchPirateShipGetOrder.called) {
       expect(dutchPirateShipGetOrder.returnValues[0].orderType).toBe(EOrderType.PIRATE);
+      expect(dutchPirateShipGetOrder.returnValues[0].planetId).toBe(closestEnglishPlanet.planet.id);
       dutchBegunPirating = true;
       dutchPirateOrder = dutchPirateShipGetOrder.returnValues[0];
       returnToHomeWorldSpy = sinon.spy(dutchPirateOrder, "returnToHomeWorld");
       beginPirateMissionSpy = sinon.spy(dutchPirateOrder, "beginPirateMission");
       goToColonyWorldSpy = sinon.spy(dutchPirateOrder, "goToColonyWorld");
     }
-    if (returnToHomeWorldSpy && returnToHomeWorldSpy.callCount === 1) {
-      returningToHomeWorldToBeginPiracyMission = true;
-    }
-    if (beginPirateMissionSpy && beginPirateMissionSpy.callCount === 1) {
+    if (!beginningPiracyMission && beginPirateMissionSpy && beginPirateMissionSpy.callCount === 1) {
       beginningPiracyMission = true;
     }
-    if (goToColonyWorldSpy && goToColonyWorldSpy.callCount === 1) {
+    if (!goingToEnemyColonyToPirate && goToColonyWorldSpy && goToColonyWorldSpy.callCount === 1) {
       goingToEnemyColonyToPirate = true;
+      expect(dutchPirateShip.pathFinding.points.length).toBeGreaterThan(0);
+      expect(DelaunayGraph.distanceFormula(
+          dutchPirateShip.pathFinding.points[dutchPirateShip.pathFinding.points.length - 1],
+          closestEnglishPlanet.planet.position.rotateVector([0, 0, 1])
+      )).toBeLessThan(0.0005);
     }
-    if (englishMerchantShip.health <= 0 && !englishMerchantShipDestroyed) {
+
+    // test attack conditions
+    const englishClosestApproachToColony = VoronoiGraph.angularDistance(
+        englishMerchantShip.position.rotateVector([0, 0, 1]),
+        closestEnglishPlanet.planet.position.rotateVector([0, 0, 1]),
+        app.worldScale
+    );
+    if (englishClosestApproachToColony < englishMerchantShipClosestApproach) {
+      englishMerchantShipClosestApproach = englishClosestApproachToColony;
+    }
+    const dutchClosestApproachToColony = VoronoiGraph.angularDistance(
+        dutchPirateShip.position.rotateVector([0, 0, 1]),
+        closestEnglishPlanet.planet.position.rotateVector([0, 0, 1]),
+        app.worldScale
+    );
+    if (dutchClosestApproachToColony < dutchPirateShipClosestApproach) {
+      dutchPirateShipClosestApproach = dutchClosestApproachToColony;
+    }
+    if (!dutchPirateShipBegunAttacking && dutchPirateShip.fireControl.isAttacking) {
+      dutchPirateShipBegunAttacking = true;
+    }
+    if (!englishMerchantShipDestroyed && englishMerchantShip.health <= 0) {
       englishMerchantShipDestroyed = true;
     }
-    if (dutchPirateShip.hasPirateCargo() && !dutchPiratePickUpCargo) {
+    if (!dutchPiratePickUpCargo && dutchPirateShip.hasPirateCargo()) {
       dutchPiratePickUpCargo = true;
     }
-    if (returnToHomeWorldSpy && returnToHomeWorldSpy.callCount === 2) {
+
+    // test end mission conditions
+    if (!returningToHomeWorldWithLoot && returnToHomeWorldSpy && returnToHomeWorldSpy.callCount === 1) {
       returningToHomeWorldWithLoot = true;
     }
-    if (beginPirateMissionSpy && beginPirateMissionSpy.callCount === 2) {
+    if (!endingPirateContract && beginPirateMissionSpy && beginPirateMissionSpy.callCount === 2) {
       endingPirateContract = true;
+      break;
     }
   }
 
   // expect both ships to complete it's mission.
   expect(englishBegunTrading).toBeTruthy();
   expect(dutchBegunPirating).toBeTruthy();
-  expect(returningToHomeWorldToBeginPiracyMission).toBeTruthy();
   expect(beginningPiracyMission).toBeTruthy();
   expect(goingToEnemyColonyToPirate).toBeTruthy();
+  expect(englishMerchantShipClosestApproach).toBeLessThan(App.VELOCITY_STEP * 400 * app.worldScale);
+  expect(dutchPirateShipClosestApproach).toBeLessThan(App.PROJECTILE_DETECTION_RANGE * app.worldScale * 1.2);
+  expect(dutchPirateShipBegunAttacking).toBeTruthy();
   expect(englishMerchantShipDestroyed).toBeTruthy();
   expect(dutchPiratePickUpCargo).toBeTruthy();
   expect(returningToHomeWorldWithLoot).toBeTruthy();
@@ -378,7 +411,7 @@ const setupPiracyTest = (numMinutes: number = 20) => {
 };
 
 describe('test AI Pathing', () => {
-  describe.skip('test pathing from all 360 degrees', () => {
+  describe('test pathing from all 360 degrees', () => {
     for (let angle = 0; angle < 360; angle += 5) {
       it(`test pathing form angle ${angle}`, () => {
         setupPathingTest([
@@ -391,7 +424,7 @@ describe('test AI Pathing', () => {
       });
     }
   });
-  describe.skip('test settling and trading',  () => {
+  describe('test settling and trading',  () => {
     for (let test = 0; test < 10; test++) {
       it(`test settling and trading with random data ${test}`, () => {
         setupTradingTest(60);
@@ -401,7 +434,7 @@ describe('test AI Pathing', () => {
   describe('test piracy missions',  () => {
     for (let test = 0; test < 10; test++) {
       it(`test piracy missions with random data ${test}`, () => {
-        setupPiracyTest(60);
+        setupPiracyTest(20);
       });
     }
   });

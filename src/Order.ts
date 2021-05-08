@@ -49,6 +49,7 @@ export class Order {
         const nodes = Object.values(this.app.delaunayGraph.pathingNodes);
         const randomTarget = nodes[Math.floor(Math.random() * nodes.length)];
         this.owner.pathFinding.points = nearestNode.pathToObject(randomTarget);
+        this.owner.activeKeys.splice(0, this.owner.activeKeys.length);
     }
 
     public returnToHomeWorld() {
@@ -60,6 +61,7 @@ export class Order {
         const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
         const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
         this.owner.pathFinding.points = nearestNode.pathToObject(homeWorld.pathingNode);
+        this.owner.activeKeys.splice(0, this.owner.activeKeys.length);
     }
 
     public goToColonyWorld() {
@@ -74,6 +76,7 @@ export class Order {
         const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
         const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
         this.owner.pathFinding.points = nearestNode.pathToObject(colonyWorld.pathingNode);
+        this.owner.activeKeys.splice(0, this.owner.activeKeys.length);
     }
 
     public beginSettlementMission() {
@@ -245,6 +248,7 @@ export class Order {
     private pirate() {
         // pirated cargo is a shortcut to piracy, skipping the assigned planet piracy
         const hasPiratedCargo = this.owner.hasPirateCargo();
+        const isNearPirateCrate = !!this.owner.nearPirateCrate();
 
         // pirates will wait until the expiration time to pirate ships
         const pirateOrderExpired = this.runningTicks >= this.expireTicks;
@@ -268,14 +272,19 @@ export class Order {
 
             // find colony world
             this.goToColonyWorld();
-        } else if (this.stage === 2 && (hasPiratedCargo || pirateOrderExpired)) {
-            this.stage += 1;
+        } else if (this.stage === 2) {
+            if (hasPiratedCargo || pirateOrderExpired) {
+                this.stage += 1;
 
-            // wait at colony world
-            // get cargo
+                // wait at colony world
+                // get cargo
 
-            // return to home world
-            this.returnToHomeWorld();
+                // return to home world
+                this.returnToHomeWorld();
+            } else if (!this.owner.fireControl.isAttacking && !isNearPirateCrate && this.owner.pathFinding.points.length === 0) {
+                // wait at colony world
+                this.goToColonyWorld();
+            }
         } else if (this.stage === 3 && this.owner.pathFinding.points.length === 0) {
             this.stage += 1;
 
