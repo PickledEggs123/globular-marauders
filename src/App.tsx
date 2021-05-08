@@ -1742,14 +1742,17 @@ export class App extends React.Component<IAppProps, IAppState> {
                 const shipPosition = ship.position.clone().rotateVector([0, 0, 1]);
                 const nearByShips = Array.from(this.voronoiShips.listItems(shipPosition));
                 const nearByEnemyShips: Ship[] = [];
+                const nearByFriendlyShips: Ship[] = [];
                 for (const nearByShip of nearByShips) {
-                    if (!(nearByShip.faction && ship.faction && nearByShip.faction.id === ship.faction.id)) {
-                        if (VoronoiGraph.angularDistance(
-                            nearByShip.position.clone().rotateVector([0, 0, 1]),
-                            shipPosition,
-                            this.worldScale
-                        ) < App.PROJECTILE_DETECTION_RANGE / this.worldScale) {
+                    if (VoronoiGraph.angularDistance(
+                        nearByShip.position.clone().rotateVector([0, 0, 1]),
+                        shipPosition,
+                        this.worldScale
+                    ) < App.PROJECTILE_DETECTION_RANGE / this.worldScale) {
+                        if (!(nearByShip.faction && ship.faction && nearByShip.faction.id === ship.faction.id)) {
                             nearByEnemyShips.push(nearByShip);
+                        } else {
+                            nearByFriendlyShips.push(nearByShip);
                         }
                     }
                 }
@@ -1757,6 +1760,9 @@ export class App extends React.Component<IAppProps, IAppState> {
                 // find closest target
                 let closestTarget: Ship | null = null;
                 let closestDistance: number | null = null;
+                // also count the number of cannons
+                let numEnemyCannons: number = 0;
+                let numFriendlyCannons: number = 0;
                 for (const nearByEnemyShip of nearByEnemyShips) {
                     const distance = VoronoiGraph.angularDistance(
                         shipPosition,
@@ -1767,6 +1773,19 @@ export class App extends React.Component<IAppProps, IAppState> {
                         closestDistance = distance;
                         closestTarget = nearByEnemyShip;
                     }
+
+                    const shipData = SHIP_DATA.find(s => s.shipType === nearByEnemyShip.shipType);
+                    if (!shipData) {
+                        throw new Error("Could not find ship type");
+                    }
+                    numEnemyCannons += shipData.cannons.numCannons;
+                }
+                for (const nearByFriendlyShip of nearByFriendlyShips) {
+                    const shipData = SHIP_DATA.find(s => s.shipType === nearByFriendlyShip.shipType);
+                    if (!shipData) {
+                        throw new Error("Could not find ship type");
+                    }
+                    numFriendlyCannons += shipData.cannons.numCannons;
                 }
 
                 // set closest target
@@ -1775,6 +1794,18 @@ export class App extends React.Component<IAppProps, IAppState> {
                     if (!this.demoAttackingShipId || +this.lastDemoAttackingShipTime + 30 * 1000 < +new Date()) {
                         this.demoAttackingShipId = ship.id;
                         this.lastDemoAttackingShipTime = new Date();
+                    }
+                }
+
+                // if too many ships, cancel order and stop attacking
+                const currentShipData = SHIP_DATA.find(s => s.shipType === ship.shipType);
+                if (!currentShipData) {
+                    throw new Error("Could not find ship type");
+                }
+                if (numEnemyCannons > numFriendlyCannons * 1.5 && ship.hasPirateOrder()) {
+                    for (const order of ship.orders) {
+                        order.cancelOrder(numEnemyCannons);
+                        ship.fireControl.isAttacking = false;
                     }
                 }
             }

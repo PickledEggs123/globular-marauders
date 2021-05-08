@@ -2,7 +2,7 @@ import {IAutomatedShip} from "./Interface";
 import Quaternion from "quaternion";
 import {EResourceType, ICargoItem} from "./Resource";
 import App from "./App";
-import {EOrderType, Order} from "./Order";
+import {EOrderResult, EOrderType, Order} from "./Order";
 import {DelaunayGraph, PathFinder, VoronoiGraph} from "./Graph";
 import {computeConeLineIntersection, IConeHitTest} from "./Intersection";
 import {Faction} from "./Faction";
@@ -235,23 +235,33 @@ export class Ship implements IAutomatedShip {
     public removeOrder(order: Order) {
         // clean faction data
         if (this.faction && order.planetId) {
+            // clean up settle order
             if (order.orderType === EOrderType.SETTLE) {
                 const index = this.faction.explorationGraph[order.planetId].settlerShipIds.findIndex(s => s === this.id);
                 if (index >= 0) {
                     this.faction.explorationGraph[order.planetId].settlerShipIds.splice(index, 1);
                 }
             }
+
+            // clean up trade order
             if (order.orderType === EOrderType.TRADE) {
                 const index = this.faction.explorationGraph[order.planetId].traderShipIds.findIndex(s => s === this.id);
                 if (index >= 0) {
                     this.faction.explorationGraph[order.planetId].traderShipIds.splice(index, 1);
                 }
             }
+
+            // clean up pirate order
             if (order.orderType === EOrderType.PIRATE) {
                 const index = this.faction.explorationGraph[order.planetId].pirateShipIds.findIndex(s => s === this.id);
                 if (index >= 0) {
                     this.faction.explorationGraph[order.planetId].pirateShipIds.splice(index, 1);
                 }
+            }
+
+            // handle retreated orders by not sending another ship towards that area for a while
+            if (order.orderResult === EOrderResult.RETREAT) {
+                this.faction.explorationGraph[order.planetId].enemyStrength = order.enemyStrength;
             }
         }
 
@@ -294,7 +304,7 @@ export class Ship implements IAutomatedShip {
             const crate = new Crate(cargo.resourceType, cargo.sourcePlanetId);
             crate.id = `${this.id}-crate-${Math.floor(Math.random() * 100000)}`;
             crate.position = this.position;
-            crate.positionVelocity = this.positionVelocity.clone().pow(1 / 10).mul(randomVelocity);
+            crate.positionVelocity = this.positionVelocity.clone().pow(1 / 50).mul(randomVelocity);
             crate.orientation = Quaternion.fromAxisAngle([0, 0, 1], Math.random() * 2 * Math.PI - Math.PI);
             crate.orientationVelocity = Quaternion.fromAxisAngle([0, 0, 1], Math.random() > 0 ? App.ROTATION_STEP : -App.ROTATION_STEP);
             crates.push(crate);

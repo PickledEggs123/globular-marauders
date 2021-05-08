@@ -173,6 +173,7 @@ export class Faction {
      * @private
      */
     public explorationGraph: Record<string, IExplorationGraphData> = {};
+    public enemyPresenceTick: number = 10 * 30;
     /**
      * A list of luxuryBuffs which improves the faction.
      */
@@ -180,6 +181,16 @@ export class Faction {
 
     public getShipAutoIncrement(): number {
         return this.shipIdAutoIncrement++;
+    }
+
+    public isEnemyPresenceTick(): boolean {
+        if (this.enemyPresenceTick <= 0) {
+            this.enemyPresenceTick = 10 * 30;
+            return true;
+        } else {
+            this.enemyPresenceTick -= 1;
+            return false;
+        }
     }
 
     /**
@@ -239,6 +250,7 @@ export class Faction {
                         settlerShipIds: [],
                         traderShipIds: [],
                         pirateShipIds: [],
+                        enemyStrength: 0,
                         planet
                     };
                 }
@@ -308,6 +320,15 @@ export class Faction {
         for (const expiredLuxuryBuff of expiredLuxuryBuffs) {
             expiredLuxuryBuff.remove();
         }
+
+        // handle enemy presence loop
+        if (this.isEnemyPresenceTick()) {
+            for (const node of Object.values(this.explorationGraph)) {
+                if (node.enemyStrength > 0) {
+                    node.enemyStrength -= 1;
+                }
+            }
+        }
     }
 
     /**
@@ -327,6 +348,7 @@ export class Faction {
         const pirateWorldEntry = entries.find(entry => {
             // settle new worlds which have not been settled yet
             const roomToPirate = entry[1].pirateShipIds.length === 0;
+            const weakEnemyPresence = entry[1].enemyStrength <= 0;
             const isSettledEnoughToTrade = entry[1].planet.settlementLevel >= ESettlementLevel.OUTPOST &&
                 entry[1].planet.settlementLevel <= ESettlementLevel.TERRITORY;
             const isOwnedByEnemy = Object.values(this.instance.factions).some(faction => {
@@ -338,7 +360,7 @@ export class Faction {
                     return faction.planetIds.includes(entry[0]);
                 }
             });
-            return roomToPirate && isSettledEnoughToTrade && isOwnedByEnemy;
+            return roomToPirate && weakEnemyPresence && isSettledEnoughToTrade && isOwnedByEnemy;
         });
 
         // find worlds to trade

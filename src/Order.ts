@@ -3,11 +3,14 @@
  */
 import {Ship, SHIP_DATA} from "./Ship";
 import App from "./App";
-import {VoronoiGraph} from "./Graph";
+import {DelaunayGraph, VoronoiGraph} from "./Graph";
 import {ESettlementLevel} from "./Interface";
 import {Faction} from "./Faction";
 import {Planet} from "./Planet";
 
+/**
+ * Different type of orders a faction can issue its ships.
+ */
 export enum EOrderType {
     /**
      * Explore space randomly.
@@ -27,11 +30,27 @@ export enum EOrderType {
     PIRATE = "PIRATE",
 }
 
+/**
+ * Different results of an order a ship can report back to it's faction.
+ */
+export enum EOrderResult {
+    /**
+     * The order completed successfully without issue.
+     */
+    SUCCESS = "SUCCESS",
+    /**
+     * The order failed because of too many enemy ships.
+     */
+    RETREAT = "RETREAT",
+}
+
 export class Order {
     public app: App;
     public owner: Ship;
     public faction: Faction;
     public orderType: EOrderType = EOrderType.ROAM;
+    public orderResult: EOrderResult = EOrderResult.SUCCESS;
+    public enemyStrength: number = 0;
     public planetId: string | null = null;
     public expireTicks: number = 0;
     private stage: number = 0;
@@ -41,6 +60,15 @@ export class Order {
         this.app = app;
         this.owner = owner;
         this.faction = faction;
+    }
+
+    public cancelOrder(enemyStrength: number) {
+        this.orderResult = EOrderResult.RETREAT;
+        this.enemyStrength = enemyStrength;
+    }
+
+    public isOrderCancelled(): boolean {
+        return this.orderResult === EOrderResult.RETREAT;
     }
 
     public pickRandomPlanet() {
@@ -70,12 +98,45 @@ export class Order {
         }
         const colonyWorld = this.app.planets.find(planet => planet.id === this.planetId);
         if (!colonyWorld || !colonyWorld.pathingNode) {
-            throw new Error("Could not find home world for pathing back to home world (GO TO COLONY)");
+            throw new Error("Could not find colony world for pathing back to colony world (GO TO COLONY)");
         }
 
         const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
         const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
         this.owner.pathFinding.points = nearestNode.pathToObject(colonyWorld.pathingNode);
+        this.owner.activeKeys.splice(0, this.owner.activeKeys.length);
+    }
+
+    public goToColonyWorldToPirate() {
+        if (!this.planetId) {
+            throw new Error("Could not find planetId to path to (PIRATE COLONY)");
+        }
+        const colonyWorld = this.app.planets.find(planet => planet.id === this.planetId);
+        if (!colonyWorld || !colonyWorld.pathingNode) {
+            throw new Error("Could not find colony world for pathing to enemy colony world (PIRATE COLONY)");
+        }
+        const enemyFaction = Object.values(this.app.factions).find(f => f.planetIds.includes(colonyWorld.id));
+        if (!enemyFaction) {
+            throw new Error("Could not find enemy faction that owns the colony (PIRATE COLONY)")
+        }
+        const enemyHomeWorld = this.app.planets.find(planet => planet.id === enemyFaction.homeWorldPlanetId);
+        if (!enemyHomeWorld || !enemyHomeWorld.pathingNode) {
+            throw new Error("Could not find enemy home world (PIRATE COLONY)");
+        }
+
+        // compute hiding spot of the pirate
+        const hidingSpot = DelaunayGraph.normalize(App.lerp(
+            colonyWorld.position.rotateVector([0, 0, 1]),
+            enemyHomeWorld.position.rotateVector([0, 0, 1]),
+            0.25
+        ));
+
+        const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
+        const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
+        this.owner.pathFinding.points = [
+            ...nearestNode.pathToObject(colonyWorld.pathingNode),
+            hidingSpot
+        ];
         this.owner.activeKeys.splice(0, this.owner.activeKeys.length);
     }
 
@@ -152,6 +213,14 @@ export class Order {
     }
 
     private roam() {
+        // cancel order by going back to home world
+        if (this.isOrderCancelled()) {
+            this.stage = 3;
+
+            // return to home world
+            this.returnToHomeWorld();
+        }
+
         // pick random planets
         if (this.stage === 0 && this.owner.pathFinding.points.length === 0) {
             this.stage += 1;
@@ -177,6 +246,14 @@ export class Order {
     }
 
     private settle() {
+        // cancel order by going back to home world
+        if (this.isOrderCancelled()) {
+            this.stage = 3;
+
+            // return to home world
+            this.returnToHomeWorld();
+        }
+
         // fly to a specific planet
         if (this.stage === 0 && this.owner.pathFinding.points.length === 0) {
             this.stage += 1;
@@ -206,6 +283,14 @@ export class Order {
     }
 
     private trade() {
+        // cancel order by going back to home world
+        if (this.isOrderCancelled()) {
+            this.stage = 3;
+
+            // return to home world
+            this.returnToHomeWorld();
+        }
+
         // fly to a specific planet
         if (this.stage === 0 && this.owner.pathFinding.points.length === 0) {
             this.stage += 1;
@@ -230,7 +315,7 @@ export class Order {
             this.returnToHomeWorld();
         } else if (this.stage === 3 && this.owner.pathFinding.points.length === 0) {
             // check if order expired
-            if (this.runningTicks >= this.expireTicks) {
+            if (this.runningTicks >= this.expireTicks || this.isOrderCancelled()) {
                 // end order
                 this.owner.removeOrder(this);
             } else {
@@ -246,6 +331,14 @@ export class Order {
      * @private
      */
     private pirate() {
+        // cancel order by going back to home world
+        if (this.isOrderCancelled()) {
+            this.stage = 3;
+
+            // return to home world
+            this.returnToHomeWorld();
+        }
+
         // pirated cargo is a shortcut to piracy, skipping the assigned planet piracy
         const hasPiratedCargo = this.owner.hasPirateCargo();
         const isNearPirateCrate = !!this.owner.nearPirateCrate();
@@ -271,7 +364,7 @@ export class Order {
             this.beginPirateMission();
 
             // find colony world
-            this.goToColonyWorld();
+            this.goToColonyWorldToPirate();
         } else if (this.stage === 2) {
             if (hasPiratedCargo || pirateOrderExpired) {
                 this.stage += 1;
@@ -283,7 +376,7 @@ export class Order {
                 this.returnToHomeWorld();
             } else if (!this.owner.fireControl.isAttacking && !isNearPirateCrate && this.owner.pathFinding.points.length === 0) {
                 // wait at colony world
-                this.goToColonyWorld();
+                this.goToColonyWorldToPirate();
             }
         } else if (this.stage === 3 && this.owner.pathFinding.points.length === 0) {
             this.stage += 1;

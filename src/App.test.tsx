@@ -273,6 +273,10 @@ const setupPiracyTest = (numMinutes: number = 20) => {
   if (!englishFaction) {
     throw new Error("Could not find English Faction");
   }
+  const englishHomeWorld = app.planets.find(p => p.id === englishFaction.homeWorldPlanetId);
+  if (!englishHomeWorld) {
+    throw new Error("Could not find English Home World");
+  }
   const closestEnglishPlanet = Object.values(englishFaction.explorationGraph).reduce((acc, n) => {
     if (!acc || (acc && n.distance < acc.distance)) {
       return {
@@ -323,7 +327,7 @@ const setupPiracyTest = (numMinutes: number = 20) => {
   let dutchPirateOrder: Order | null = null;
   let returnToHomeWorldSpy: SinonSpy<any> | null = null;
   let beginPirateMissionSpy: SinonSpy<any> | null = null;
-  let goToColonyWorldSpy: SinonSpy<any> | null = null;
+  let goToColonyWorldToPirateSpy: SinonSpy<any> | null = null;
 
   // test the ship navigation to nav point
   const numStepsPerSecond = 10;
@@ -345,17 +349,21 @@ const setupPiracyTest = (numMinutes: number = 20) => {
       dutchPirateOrder = dutchPirateShipGetOrder.returnValues[0];
       returnToHomeWorldSpy = sinon.spy(dutchPirateOrder, "returnToHomeWorld");
       beginPirateMissionSpy = sinon.spy(dutchPirateOrder, "beginPirateMission");
-      goToColonyWorldSpy = sinon.spy(dutchPirateOrder, "goToColonyWorld");
+      goToColonyWorldToPirateSpy = sinon.spy(dutchPirateOrder, "goToColonyWorldToPirate");
     }
     if (!beginningPiracyMission && beginPirateMissionSpy && beginPirateMissionSpy.callCount === 1) {
       beginningPiracyMission = true;
     }
-    if (!goingToEnemyColonyToPirate && goToColonyWorldSpy && goToColonyWorldSpy.callCount === 1) {
+    if (!goingToEnemyColonyToPirate && goToColonyWorldToPirateSpy && goToColonyWorldToPirateSpy.callCount === 1) {
       goingToEnemyColonyToPirate = true;
       expect(dutchPirateShip.pathFinding.points.length).toBeGreaterThan(0);
       expect(DelaunayGraph.distanceFormula(
           dutchPirateShip.pathFinding.points[dutchPirateShip.pathFinding.points.length - 1],
-          closestEnglishPlanet.planet.position.rotateVector([0, 0, 1])
+          DelaunayGraph.normalize(App.lerp(
+              closestEnglishPlanet.planet.position.rotateVector([0, 0, 1]),
+              englishHomeWorld.position.rotateVector([0, 0, 1]),
+              0.25
+          ))
       )).toBeLessThan(0.0005);
     }
 
@@ -370,7 +378,11 @@ const setupPiracyTest = (numMinutes: number = 20) => {
     }
     const dutchClosestApproachToColony = VoronoiGraph.angularDistance(
         dutchPirateShip.position.rotateVector([0, 0, 1]),
-        closestEnglishPlanet.planet.position.rotateVector([0, 0, 1]),
+        DelaunayGraph.normalize(App.lerp(
+            closestEnglishPlanet.planet.position.rotateVector([0, 0, 1]),
+            englishHomeWorld.position.rotateVector([0, 0, 1]),
+            0.25
+        )),
         app.worldScale
     );
     if (dutchClosestApproachToColony < dutchPirateShipClosestApproach) {
@@ -434,7 +446,7 @@ describe('test AI Pathing', () => {
   describe('test piracy missions',  () => {
     for (let test = 0; test < 10; test++) {
       it(`test piracy missions with random data ${test}`, () => {
-        setupPiracyTest(20);
+        setupPiracyTest(60);
       });
     }
   });

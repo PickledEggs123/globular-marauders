@@ -158,5 +158,6 @@ export interface IExplorationGraphData {
     settlerShipIds: string[];
     traderShipIds: string[];
     pirateShipIds: string[];
+    enemyStrength: number;
     planet: Planet;
 }
