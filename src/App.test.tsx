@@ -2,7 +2,7 @@ import React from 'react';
 import App from './App';
 import {shallow, ShallowWrapper} from "enzyme";
 import Quaternion from "quaternion";
-import sinon, {SinonSpy, SinonSpyStatic} from 'sinon';
+import sinon, {SinonSpy} from 'sinon';
 import {computeConeLineIntersection} from "./Intersection";
 import {CAPITAL_GOODS, OUTPOST_GOODS} from "./Resource";
 import {EFaction, EShipType, PHYSICS_SCALE, Ship, SHIP_DATA} from "./Ship";
@@ -414,7 +414,7 @@ const setupPiracyTest = (numMinutes: number = 20) => {
   expect(beginningPiracyMission).toBeTruthy();
   expect(goingToEnemyColonyToPirate).toBeTruthy();
   expect(englishMerchantShipClosestApproach).toBeLessThan(App.VELOCITY_STEP * 400 * app.worldScale);
-  expect(dutchPirateShipClosestApproach).toBeLessThan(App.PROJECTILE_DETECTION_RANGE * app.worldScale * 1.2);
+  expect(dutchPirateShipClosestApproach).toBeLessThan(App.PROJECTILE_DETECTION_RANGE);
   expect(dutchPirateShipBegunAttacking).toBeTruthy();
   expect(englishMerchantShipDestroyed).toBeTruthy();
   expect(dutchPiratePickUpCargo).toBeTruthy();

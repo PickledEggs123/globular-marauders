@@ -338,15 +338,35 @@ export class App extends React.Component<IAppProps, IAppState> {
     /**
      * The speed of the cannon ball projectiles.
      */
-    public static PROJECTILE_SPEED: number = App.VELOCITY_STEP * 80;
+    public static PROJECTILE_SPEED: number = App.VELOCITY_STEP * 100;
     /**
      * How long a cannon ball will live for in ticks.
      */
-    public static PROJECTILE_LIFE: number = 50;
+    public static PROJECTILE_LIFE: number = 40;
     /**
      * The enemy detection range.
      */
     public static PROJECTILE_DETECTION_RANGE: number = App.PROJECTILE_SPEED * App.PROJECTILE_LIFE * 1.2;
+    /**
+     * The number of burn ticks.
+     */
+    public static NUM_BURN_TICKS: number = 10;
+    /**
+     * The number of repair ticks.
+     */
+    public static NUM_REPAIR_TICKS: number = 10;
+    /**
+     * The number of ticks between each health tick event.
+     */
+    public static HEALTH_TICK_COOL_DOWN: number = 3 * 10;
+    /**
+     * The amount of damage that is burn damage.
+     */
+    public static BURN_DAMAGE_RATIO: number = 0.5;
+    /**
+     * The amount of damage that is repairable damage.
+     */
+    public static REPAIR_DAMAGE_RATIO: number = 0.8;
     /**
      * Rotation step size of ships.
      */
@@ -1281,14 +1301,13 @@ export class App extends React.Component<IAppProps, IAppState> {
             cannonLoading: cameraCannonLoading,
             cannonCoolDown,
             shipType,
-            health,
-            maxHealth,
             faction
         } = this.ships[shipIndex];
         const shipData = SHIP_DATA.find(i => i.shipType === shipType);
         if (!shipData) {
             throw new Error("Could not find Ship Type");
         }
+        const speedFactor = this.ships[shipIndex].getSpeedFactor();
         const smokeClouds = [
             ...this.smokeClouds.slice(-20)
         ];
@@ -1299,6 +1318,8 @@ export class App extends React.Component<IAppProps, IAppState> {
         let clearPathFindingPoints: boolean = false;
 
         const activeKeys = getActiveKeys();
+
+        // handle movement
         if (activeKeys.includes("a")) {
             const rotation = Quaternion.fromAxisAngle([0, 0, 1], Math.PI).pow(App.ROTATION_STEP);
             const rotationDrag = cameraOrientationVelocity.pow(App.ROTATION_DRAG).inverse();
@@ -1448,8 +1469,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                 cannonBall.position = cameraPosition.clone();
                 cannonBall.positionVelocity = fireVelocity.clone();
                 cannonBall.position = cannonBall.position.clone().mul(cannonBall.positionVelocity.pow(3))
-                cannonBall.size = 3;
-                cannonBall.damage = 2;
+                cannonBall.size = 10;
+                cannonBall.damage = 10;
                 cannonBalls.push(cannonBall);
 
                 // apply a cool down to the cannonades
@@ -1465,18 +1486,21 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         // apply velocity
         if (cameraPositionVelocity !== Quaternion.ONE) {
-            cameraPosition = cameraPosition.clone().mul(cameraPositionVelocity.clone().pow(health / maxHealth));
+            cameraPosition = cameraPosition.clone().mul(cameraPositionVelocity.clone().pow(speedFactor));
         }
         if (cameraOrientationVelocity !== Quaternion.ONE) {
-            cameraOrientation = cameraOrientation.clone().mul(cameraOrientationVelocity.clone().pow(health / maxHealth));
+            cameraOrientation = cameraOrientation.clone().mul(cameraOrientationVelocity.clone().pow(speedFactor));
         }
         if (cameraPosition !== this.ships[shipIndex].position && false) {
             const diffQuaternion = this.ships[shipIndex].position.clone().inverse().mul(cameraPosition.clone());
             cameraOrientation = cameraOrientation.clone().mul(diffQuaternion);
         }
+
+        // handle cool downs
         if (cannonCoolDown > 0) {
             cannonCoolDown -= 1;
         }
+        this.ships[shipIndex].handleHealthTick();
 
         this.ships[shipIndex].position = cameraPosition;
         this.ships[shipIndex].orientation = cameraOrientation;
@@ -1748,7 +1772,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                         nearByShip.position.clone().rotateVector([0, 0, 1]),
                         shipPosition,
                         this.worldScale
-                    ) < App.PROJECTILE_DETECTION_RANGE / this.worldScale) {
+                    ) < App.PROJECTILE_DETECTION_RANGE) {
                         if (!(nearByShip.faction && ship.faction && nearByShip.faction.id === ship.faction.id)) {
                             nearByEnemyShips.push(nearByShip);
                         } else {

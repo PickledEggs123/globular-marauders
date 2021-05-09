@@ -1,4 +1,4 @@
-import {IAutomatedShip} from "./Interface";
+import {IAutomatedShip, ICameraState} from "./Interface";
 import Quaternion from "quaternion";
 import {EResourceType, ICargoItem} from "./Resource";
 import App from "./App";
@@ -102,10 +102,10 @@ export const SHIP_DATA: IShipData[] = [{
     settlementProgressFactor: 4,
     cargoSize: 3,
     hull: HindHull,
-    hullStrength: 400,
+    hullStrength: 480,
     cannons: {
-        numCannons: 8,
-        numCannonades: 4,
+        numCannons: 14,
+        numCannonades: 6,
         startY: 20,
         endY: -20,
         leftWall: 10,
@@ -117,9 +117,9 @@ export const SHIP_DATA: IShipData[] = [{
     settlementProgressFactor: 2,
     cargoSize: 2,
     hull: CorvetteHull,
-    hullStrength: 200,
+    hullStrength: 240,
     cannons: {
-        numCannons: 4,
+        numCannons: 8,
         numCannonades: 4,
         startY: 15,
         endY: -15,
@@ -132,9 +132,9 @@ export const SHIP_DATA: IShipData[] = [{
     settlementProgressFactor: 1,
     cargoSize: 1,
     hull: SloopHull,
-    hullStrength: 100,
+    hullStrength: 120,
     cannons: {
-        numCannons: 2,
+        numCannons: 4,
         numCannonades: 2,
         startY: 10,
         endY: -10,
@@ -163,6 +163,9 @@ export class Ship implements IAutomatedShip {
     public health: number = 1;
     public maxHealth: number = 1;
     public cargo: ICargoItem[] = [];
+    public burnTicks: number[] = new Array(App.NUM_BURN_TICKS).fill(0);
+    public repairTicks: number[] = new Array(App.NUM_REPAIR_TICKS).fill(0);
+    public healthTickCoolDown = App.HEALTH_TICK_COOL_DOWN;
 
     constructor(app: App, shipType: EShipType) {
         this.app = app;
@@ -176,6 +179,21 @@ export class Ship implements IAutomatedShip {
         this.health = shipData.hullStrength;
         this.maxHealth = shipData.hullStrength;
         this.cannonadeCoolDown = new Array(shipData.cannons.numCannonades).fill(0);
+    }
+
+    getSpeedFactor(): number {
+        const shipData = SHIP_DATA.find(s => s.shipType);
+        if (!shipData) {
+            throw new Error("Could not find ship type");
+        }
+
+        // health affects speed proportionally
+        const healthSpeedFactor = this.health / this.maxHealth;
+        // cargo slows the ship down to half speed, with full cargo.
+        const cargoSpeedFactor = 0.6 + 0.4 * (1 - (this.cargo.length / shipData.cargoSize));
+
+        // combine speed factors
+        return healthSpeedFactor * cargoSpeedFactor;
     }
 
     /**
@@ -204,7 +222,7 @@ export class Ship implements IAutomatedShip {
             const cratePosition = c.position.clone().rotateVector([0, 0, 1]);
             const shipPosition = this.position.clone().rotateVector([0, 0, 1]);
             const distance = VoronoiGraph.angularDistance(cratePosition, shipPosition, this.app.worldScale);
-            return distance < App.PROJECTILE_SPEED / this.app.worldScale * 60;
+            return distance < App.PROJECTILE_DETECTION_RANGE;
         });
         if (crate) {
             return crate;
@@ -225,7 +243,49 @@ export class Ship implements IAutomatedShip {
      * @param cannonBall
      */
     public applyDamage(cannonBall: CannonBall) {
-        this.health = Math.max(0, this.health - cannonBall.damage);
+        // compute damage properties
+        const physicalDamage = cannonBall.damage * (1 - App.BURN_DAMAGE_RATIO);
+        const burnDamage = cannonBall.damage * App.BURN_DAMAGE_RATIO;
+        const repairDamage = cannonBall.damage * App.REPAIR_DAMAGE_RATIO;
+
+        // apply instant physical damage
+        this.health = Math.max(0, this.health - physicalDamage);
+
+        // queue burn damage
+        const burnTickDamage = burnDamage / this.burnTicks.length;
+        for (let i = 0; i < this.burnTicks.length; i++) {
+            this.burnTicks[i] += burnTickDamage;
+        }
+
+        // queue repair damage
+        const repairTickDamage = repairDamage / this.repairTicks.length;
+        for (let i = 0; i < this.repairTicks.length; i++) {
+            this.repairTicks[i] += repairTickDamage;
+        }
+    }
+
+    /**
+     * Handle the health tick of the ship.
+     */
+    public handleHealthTick() {
+        if (this.healthTickCoolDown <= 0) {
+            // apply health tick
+            this.healthTickCoolDown = App.HEALTH_TICK_COOL_DOWN;
+
+            const shouldApplyBurnDamage = this.burnTicks.some(n => n > 0);
+            if (shouldApplyBurnDamage) {
+                // ship is burning, do not repair, only burn
+                this.health = Math.max(0, this.health - this.burnTicks.unshift());
+                this.burnTicks.push(0);
+            } else {
+                // ship is not burning, begin repairs
+                this.health = Math.min(this.maxHealth, this.health + this.repairTicks.unshift());
+                this.repairTicks.push(0);
+            }
+        } else {
+            // wait to apply health tick
+            this.healthTickCoolDown -= 1;
+        }
     }
 
     /**
@@ -380,7 +440,7 @@ export class FireControl<T extends IAutomatedShip> {
     }
 
     /**
-     * Get a cone hit solution towards target ship.
+     * Get a cone hit solution towards target ship. This is where to aim to hit a moving ship.
      * @param target
      */
     public getConeHit(target: Ship): IConeHitTest {
@@ -395,7 +455,7 @@ export class FireControl<T extends IAutomatedShip> {
         const shipDirectionPoint = this.owner.orientation.clone().inverse()
             .mul(this.owner.position.clone().inverse())
             .mul(target.position.clone())
-            .mul(target.positionVelocity.clone().pow(target.health / target.maxHealth))
+            .mul(target.positionVelocity.clone().pow(target.getSpeedFactor()))
             .rotateVector([0, 0, 1]);
         const shipDirection: [number, number] = [
             shipDirectionPoint[0] - shipPosition[0],
@@ -403,6 +463,47 @@ export class FireControl<T extends IAutomatedShip> {
         ];
         const projectileSpeed = App.PROJECTILE_SPEED / this.app.worldScale;
         return computeConeLineIntersection(shipPosition, shipDirection, projectileSpeed);
+    }
+
+    /**
+     * Get an intercept cone hit solution towards target ship. This is where to go, to be close to a moving ship.
+     * @param target
+     */
+    public getInterceptConeHit(target: ICameraState): [number, number, number] | null {
+        const shipPositionPoint = this.owner.orientation.clone().inverse()
+            .mul(this.owner.position.clone().inverse())
+            .mul(target.position.clone())
+            .rotateVector([0, 0, 1]);
+        const shipPosition: [number, number] = [
+            shipPositionPoint[0],
+            shipPositionPoint[1]
+        ];
+        const shipDirectionPoint = this.owner.orientation.clone().inverse()
+            .mul(this.owner.position.clone().inverse())
+            .mul(target.position.clone())
+            .mul(target.positionVelocity.clone().pow(target.getSpeedFactor ? target.getSpeedFactor() : 1))
+            .rotateVector([0, 0, 1]);
+        const shipDirection: [number, number] = [
+            shipDirectionPoint[0] - shipPosition[0],
+            shipDirectionPoint[1] - shipPosition[1]
+        ];
+        const attackingShipSpeed = App.VELOCITY_STEP / App.VELOCITY_DRAG * this.owner.getSpeedFactor();
+        const interceptConeHit = computeConeLineIntersection(shipPosition, shipDirection, attackingShipSpeed);
+
+        // handle cone hit result
+        if (interceptConeHit.success && interceptConeHit.point && interceptConeHit.time && interceptConeHit.time < App.PROJECTILE_DETECTION_RANGE) {
+            // convert cone hit into world reference frame
+            const localReferenceFrame: [number, number, number] = [
+                interceptConeHit.point[0],
+                interceptConeHit.point[1],
+                Math.sqrt(1 - Math.pow(interceptConeHit.point[0], 2) - Math.pow(interceptConeHit.point[1], 2))
+            ];
+            return this.owner.orientation.clone()
+                .mul(this.owner.position.clone())
+                .rotateVector(localReferenceFrame);
+        } else {
+            return null;
+        }
     }
 
     /**
@@ -473,10 +574,13 @@ export class FireControl<T extends IAutomatedShip> {
         }
         if (nearByPirateCrate && hasPirateOrder && this.owner.pathFinding) {
             // nearby pirate cargo, get the cargo.
-            this.owner.pathFinding.points = [
-                nearByPirateCrate.position.clone().rotateVector([0, 0, 1])
-            ];
-            this.isAttacking = false;
+            const targetPosition = this.getInterceptConeHit(nearByPirateCrate);
+            if (targetPosition) {
+                this.owner.pathFinding.points = [
+                    targetPosition
+                ];
+                this.isAttacking = false;
+            }
             return;
         }
 
@@ -484,10 +588,10 @@ export class FireControl<T extends IAutomatedShip> {
         //
         // compute moving projectile path to hit target
         const coneHit = this.getConeHit(target);
-        let detectionConeSizeInTicks = App.PROJECTILE_DETECTION_RANGE / App.PROJECTILE_SPEED / this.app.worldScale;
+        let detectionConeSizeInTicks = App.PROJECTILE_LIFE;
         if (this.owner.hasPirateOrder()) {
             // pirates get close to attack
-            detectionConeSizeInTicks *= 0.1;
+            detectionConeSizeInTicks *= 0.5;
         }
         if (!(coneHit.success && coneHit.point && coneHit.time && coneHit.time < detectionConeSizeInTicks)) {
             // target is moving too fast, cannot hit it
@@ -495,13 +599,26 @@ export class FireControl<T extends IAutomatedShip> {
 
             // move closer to target to attack it
             if (this.owner.pathFinding) {
-                if (this.owner.pathFinding.points.length > 1) {
-                    this.owner.pathFinding.points.shift();
-                    this.owner.pathFinding.points.unshift(target.position.rotateVector([0, 0, 1]));
-                } else if (this.owner.pathFinding.points.length === 1) {
-                    this.owner.pathFinding.points.unshift(target.position.rotateVector([0, 0, 1]));
+                // get target position to attack enemy ship
+                let targetPosition: [number, number, number] | null = null;
+                if (this.owner.hasPirateOrder()) {
+                    // pirate ships will try to intercept the target, getting close as possible before attacking
+                    targetPosition = this.getInterceptConeHit(target);
                 } else {
-                    this.owner.pathFinding.points.push(target.position.rotateVector([0, 0, 1]));
+                    // defensive ships will move closer to target to aim, but not too closely
+                    targetPosition = target.position.rotateVector([0, 0, 1]);
+                }
+
+                // update target position if it exists
+                if (targetPosition) {
+                    if (this.owner.pathFinding.points.length > 1) {
+                        this.owner.pathFinding.points.shift();
+                        this.owner.pathFinding.points.unshift(targetPosition);
+                    } else if (this.owner.pathFinding.points.length === 1) {
+                        this.owner.pathFinding.points.unshift(targetPosition);
+                    } else {
+                        this.owner.pathFinding.points.push(targetPosition);
+                    }
                 }
             }
             return;

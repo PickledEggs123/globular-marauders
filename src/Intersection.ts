@@ -17,8 +17,9 @@ export interface IConeHitTest {
  * @param shipPosition The position of the ship right now.
  * @param shipDirection The direction of the ship right now, will extrapolate a target angle
  * @param projectileSpeed The projectile speed will affect the target angle
+ * @param tOffset The offset of the t value.
  */
-export const computeConeLineIntersection = (shipPosition: [number, number], shipDirection: [number, number], projectileSpeed: number): IConeHitTest => {
+export const computeConeLineIntersection = (shipPosition: [number, number], shipDirection: [number, number], projectileSpeed: number, tOffset: number = 0): IConeHitTest => {
     // line cone intersection equations
     // https://www.geometrictools.com/Documentation/IntersectionLineCone.pdf
     // cone - origin V direction D angle Y
@@ -185,13 +186,13 @@ export const computeConeLineIntersection = (shipPosition: [number, number], ship
             // do nothing, no collision possible
         } else if (root === 0) {
             const t = -b / (2 * a);
-            timeValues.push(t);
+            timeValues.push(t + tOffset);
         } else {
             // the pdf contained the wrong quadratic formula, it's not perfectly correct
             const t1 = (-b - Math.sqrt(root)) / (2 * a);
             const t2 = (-b + Math.sqrt(root)) / (2 * a);
-            timeValues.push(t1);
-            timeValues.push(t2);
+            timeValues.push(t1 + tOffset);
+            timeValues.push(t2 + tOffset);
         }
     }
 

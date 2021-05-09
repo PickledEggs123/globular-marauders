@@ -20,7 +20,9 @@ export interface IAutomatedShip extends ICameraState {
 
     nearPirateCrate(): Crate | null;
 
-    hasPirateCargo(): boolean
+    hasPirateCargo(): boolean;
+
+    getSpeedFactor(): number;
 }
 
 export interface ICollidable extends ICameraState {
@@ -65,6 +67,10 @@ export interface ICameraState {
      * The size of the object.
      */
     size?: number;
+    /**
+     * The speed factor of the object.
+     */
+    getSpeedFactor?(): number;
 }
 
 /**
