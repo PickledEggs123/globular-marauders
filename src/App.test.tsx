@@ -395,8 +395,8 @@ const setupPiracyTest = (numMinutes: number = 20) => {
     if (!dutchPirateShipBegunAttacking) {
       if (dutchPirateShip.fireControl.isAttacking) {
         dutchPirateShipBegunAttacking = true;
-        // the pirate has 60 seconds to destroy the enemy
-        stageTimer = 60 * 10;
+        // the pirate has 120 seconds to destroy the enemy
+        stageTimer = 2 * 60 * 10;
       } else {
         stageTimer -= 1;
         if (stageTimer <= 0) {

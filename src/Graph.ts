@@ -71,10 +71,10 @@ export class VoronoiGraph<T extends ICameraState> {
      * @param worldScale The size of the world.
      */
     public static angularDistance(a: [number, number, number], b: [number, number, number], worldScale: number): number {
-        return Math.acos(DelaunayGraph.dotProduct(
+        return Math.acos(Math.max(-1, Math.min(DelaunayGraph.dotProduct(
             DelaunayGraph.normalize(a),
             DelaunayGraph.normalize(b)
-        )) * worldScale;
+        ), 1))) * worldScale;
     }
 
     /**
@@ -83,7 +83,7 @@ export class VoronoiGraph<T extends ICameraState> {
      * @param worldScale the size of the world.
      */
     public static angularDistanceQuaternion(a: Quaternion, worldScale: number): number {
-        return Math.acos(a.w) * 2 * worldScale;
+        return Math.acos(Math.max(-1, Math.min(a.w, 1))) * 2 * worldScale;
     }
 
     /**
