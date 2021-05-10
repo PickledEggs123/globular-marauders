@@ -19,7 +19,12 @@ export interface IConeHitTest {
  * @param projectileSpeed The projectile speed will affect the target angle
  * @param tOffset The offset of the t value.
  */
-export const computeConeLineIntersection = (shipPosition: [number, number], shipDirection: [number, number], projectileSpeed: number, tOffset: number = 0): IConeHitTest => {
+export const computeConeLineIntersection = (
+    shipPosition: [number, number],
+    shipDirection: [number, number],
+    projectileSpeed: number,
+    tOffset: number = 0
+): IConeHitTest => {
     // line cone intersection equations
     // https://www.geometrictools.com/Documentation/IntersectionLineCone.pdf
     // cone - origin V direction D angle Y

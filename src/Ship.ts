@@ -102,7 +102,7 @@ export const SHIP_DATA: IShipData[] = [{
     settlementProgressFactor: 4,
     cargoSize: 3,
     hull: HindHull,
-    hullStrength: 480,
+    hullStrength: 640,
     cannons: {
         numCannons: 14,
         numCannonades: 6,
@@ -117,7 +117,7 @@ export const SHIP_DATA: IShipData[] = [{
     settlementProgressFactor: 2,
     cargoSize: 2,
     hull: CorvetteHull,
-    hullStrength: 240,
+    hullStrength: 320,
     cannons: {
         numCannons: 8,
         numCannonades: 4,
@@ -132,7 +132,7 @@ export const SHIP_DATA: IShipData[] = [{
     settlementProgressFactor: 1,
     cargoSize: 1,
     hull: SloopHull,
-    hullStrength: 120,
+    hullStrength: 160,
     cannons: {
         numCannons: 4,
         numCannonades: 2,
@@ -222,7 +222,7 @@ export class Ship implements IAutomatedShip {
             const cratePosition = c.position.clone().rotateVector([0, 0, 1]);
             const shipPosition = this.position.clone().rotateVector([0, 0, 1]);
             const distance = VoronoiGraph.angularDistance(cratePosition, shipPosition, this.app.worldScale);
-            return distance < App.PROJECTILE_DETECTION_RANGE;
+            return distance < App.PROJECTILE_DETECTION_RANGE * 1.4;
         });
         if (crate) {
             return crate;
@@ -275,11 +275,13 @@ export class Ship implements IAutomatedShip {
             const shouldApplyBurnDamage = this.burnTicks.some(n => n > 0);
             if (shouldApplyBurnDamage) {
                 // ship is burning, do not repair, only burn
-                this.health = Math.max(0, this.health - this.burnTicks.unshift());
+                this.health = Math.max(0, this.health - this.burnTicks[0]);
+                this.burnTicks.shift();
                 this.burnTicks.push(0);
             } else {
                 // ship is not burning, begin repairs
-                this.health = Math.min(this.maxHealth, this.health + this.repairTicks.unshift());
+                this.health = Math.min(this.maxHealth, this.health + this.repairTicks[0]);
+                this.repairTicks.shift();
                 this.repairTicks.push(0);
             }
         } else {
@@ -365,8 +367,11 @@ export class Ship implements IAutomatedShip {
             crate.id = `${this.id}-crate-${Math.floor(Math.random() * 100000)}`;
             crate.position = this.position;
             crate.positionVelocity = this.positionVelocity.clone().pow(1 / 50).mul(randomVelocity);
+            crate.positionVelocity = Quaternion.ONE;
             crate.orientation = Quaternion.fromAxisAngle([0, 0, 1], Math.random() * 2 * Math.PI - Math.PI);
             crate.orientationVelocity = Quaternion.fromAxisAngle([0, 0, 1], Math.random() > 0 ? App.ROTATION_STEP : -App.ROTATION_STEP);
+            crate.maxLife = 2 * 60 * 10;
+            crate.size = 100;
             crates.push(crate);
         }
 
@@ -454,6 +459,7 @@ export class FireControl<T extends IAutomatedShip> {
         ];
         const shipDirectionPoint = this.owner.orientation.clone().inverse()
             .mul(this.owner.position.clone().inverse())
+            .mul(this.owner.positionVelocity.clone().inverse().pow(this.owner.getSpeedFactor()))
             .mul(target.position.clone())
             .mul(target.positionVelocity.clone().pow(target.getSpeedFactor()))
             .rotateVector([0, 0, 1]);
@@ -480,6 +486,7 @@ export class FireControl<T extends IAutomatedShip> {
         ];
         const shipDirectionPoint = this.owner.orientation.clone().inverse()
             .mul(this.owner.position.clone().inverse())
+            .mul(this.owner.positionVelocity.clone().inverse().pow(this.owner.getSpeedFactor()))
             .mul(target.position.clone())
             .mul(target.positionVelocity.clone().pow(target.getSpeedFactor ? target.getSpeedFactor() : 1))
             .rotateVector([0, 0, 1]);
@@ -488,10 +495,10 @@ export class FireControl<T extends IAutomatedShip> {
             shipDirectionPoint[1] - shipPosition[1]
         ];
         const attackingShipSpeed = App.VELOCITY_STEP / App.VELOCITY_DRAG * this.owner.getSpeedFactor();
-        const interceptConeHit = computeConeLineIntersection(shipPosition, shipDirection, attackingShipSpeed);
+        const interceptConeHit = computeConeLineIntersection(shipPosition, shipDirection, attackingShipSpeed, 0);
 
         // handle cone hit result
-        if (interceptConeHit.success && interceptConeHit.point && interceptConeHit.time && interceptConeHit.time < App.PROJECTILE_DETECTION_RANGE) {
+        if (interceptConeHit.success && interceptConeHit.point && interceptConeHit.time && interceptConeHit.time < 60 * 10) {
             // convert cone hit into world reference frame
             const localReferenceFrame: [number, number, number] = [
                 interceptConeHit.point[0],
@@ -574,13 +581,11 @@ export class FireControl<T extends IAutomatedShip> {
         }
         if (nearByPirateCrate && hasPirateOrder && this.owner.pathFinding) {
             // nearby pirate cargo, get the cargo.
-            const targetPosition = this.getInterceptConeHit(nearByPirateCrate);
-            if (targetPosition) {
-                this.owner.pathFinding.points = [
-                    targetPosition
-                ];
-                this.isAttacking = false;
-            }
+            const targetPosition = nearByPirateCrate.position.rotateVector([0, 0, 1]);
+            this.owner.pathFinding.points = [
+                targetPosition
+            ];
+            this.isAttacking = false;
             return;
         }
 
@@ -589,10 +594,14 @@ export class FireControl<T extends IAutomatedShip> {
         // compute moving projectile path to hit target
         const coneHit = this.getConeHit(target);
         let detectionConeSizeInTicks = App.PROJECTILE_LIFE;
-        if (this.owner.hasPirateOrder()) {
-            // pirates get close to attack
-            detectionConeSizeInTicks *= 0.5;
-        }
+        // if (this.owner.hasPirateOrder()) {
+        //     // pirates get close to attack
+        //     if (this.isAttacking) {
+        //         detectionConeSizeInTicks *= 0.8;
+        //     } else {
+        //         detectionConeSizeInTicks *= 0.4;
+        //     }
+        // }
         if (!(coneHit.success && coneHit.point && coneHit.time && coneHit.time < detectionConeSizeInTicks)) {
             // target is moving too fast, cannot hit it
             this.isAttacking = false;
@@ -600,25 +609,16 @@ export class FireControl<T extends IAutomatedShip> {
             // move closer to target to attack it
             if (this.owner.pathFinding) {
                 // get target position to attack enemy ship
-                let targetPosition: [number, number, number] | null = null;
-                if (this.owner.hasPirateOrder()) {
-                    // pirate ships will try to intercept the target, getting close as possible before attacking
-                    targetPosition = this.getInterceptConeHit(target);
-                } else {
-                    // defensive ships will move closer to target to aim, but not too closely
-                    targetPosition = target.position.rotateVector([0, 0, 1]);
-                }
+                const targetPosition = target.position.rotateVector([0, 0, 1]);
 
                 // update target position if it exists
-                if (targetPosition) {
-                    if (this.owner.pathFinding.points.length > 1) {
-                        this.owner.pathFinding.points.shift();
-                        this.owner.pathFinding.points.unshift(targetPosition);
-                    } else if (this.owner.pathFinding.points.length === 1) {
-                        this.owner.pathFinding.points.unshift(targetPosition);
-                    } else {
-                        this.owner.pathFinding.points.push(targetPosition);
-                    }
+                if (this.owner.pathFinding.points.length > 1) {
+                    this.owner.pathFinding.points.shift();
+                    this.owner.pathFinding.points.unshift(targetPosition);
+                } else if (this.owner.pathFinding.points.length === 1) {
+                    this.owner.pathFinding.points.unshift(targetPosition);
+                } else {
+                    this.owner.pathFinding.points.push(targetPosition);
                 }
             }
             return;

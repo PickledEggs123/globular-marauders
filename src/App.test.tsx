@@ -313,6 +313,9 @@ const setupPiracyTest = (numMinutes: number = 20) => {
   } = getTestShip(app, wrapper, colonyWorldTrades, EFaction.DUTCH, EShipType.HIND);
 
   // test conditions to test for
+  // a count down time for each stage of the journey
+  // 24 minutes until the pirate finds the enemy
+  let stageTimer: number = 24 * 60 * 10;
   let englishBegunTrading: boolean = false;
   let dutchBegunPirating: boolean = false;
   let beginningPiracyMission: boolean = false;
@@ -321,6 +324,7 @@ const setupPiracyTest = (numMinutes: number = 20) => {
   let dutchPirateShipClosestApproach: number = Math.PI * app.worldScale;
   let dutchPirateShipBegunAttacking: boolean = false;
   let englishMerchantShipDestroyed: boolean = false;
+  let dutchPirateShipCargoApproach: number = Math.PI * app.worldScale;
   let dutchPiratePickUpCargo: boolean = false;
   let returningToHomeWorldWithLoot: boolean = false;
   let endingPirateContract: boolean = false;
@@ -388,23 +392,67 @@ const setupPiracyTest = (numMinutes: number = 20) => {
     if (dutchClosestApproachToColony < dutchPirateShipClosestApproach) {
       dutchPirateShipClosestApproach = dutchClosestApproachToColony;
     }
-    if (!dutchPirateShipBegunAttacking && dutchPirateShip.fireControl.isAttacking) {
-      dutchPirateShipBegunAttacking = true;
+    if (!dutchPirateShipBegunAttacking) {
+      if (dutchPirateShip.fireControl.isAttacking) {
+        dutchPirateShipBegunAttacking = true;
+        // the pirate has 60 seconds to destroy the enemy
+        stageTimer = 60 * 10;
+      } else {
+        stageTimer -= 1;
+        if (stageTimer <= 0) {
+          throw new Error("Timed out while looking for merchant ship");
+        }
+      }
     }
-    if (!englishMerchantShipDestroyed && englishMerchantShip.health <= 0) {
-      englishMerchantShipDestroyed = true;
+    if (!englishMerchantShipDestroyed) {
+      if (englishMerchantShip.health <= 0) {
+        englishMerchantShipDestroyed = true;
+        // 120 seconds to pick up cargo
+        stageTimer = 2 * 60 * 10;
+      } else if (dutchPirateShipBegunAttacking) {
+        stageTimer -= 1;
+        if (stageTimer <= 0) {
+          throw new Error("Timed out while attacking merchant ship");
+        }
+      }
     }
-    if (!dutchPiratePickUpCargo && dutchPirateShip.hasPirateCargo()) {
-      dutchPiratePickUpCargo = true;
+    if (app.crates.length > 0) {
+      const dutchClosestApproachToCargo = VoronoiGraph.angularDistance(
+          dutchPirateShip.position.rotateVector([0, 0, 1]),
+          app.crates[0].position.rotateVector([0, 0, 1]),
+          app.worldScale
+      );
+      if (dutchClosestApproachToCargo < dutchPirateShipCargoApproach) {
+        dutchPirateShipCargoApproach = dutchClosestApproachToCargo;
+      }
+    }
+    if (!dutchPiratePickUpCargo) {
+      if (dutchPirateShip.hasPirateCargo()) {
+        dutchPiratePickUpCargo = true;
+        // 6 minutes to return home
+        stageTimer = 6 * 60 * 10;
+      } else if (englishMerchantShipDestroyed) {
+        stageTimer -= 1;
+        if (stageTimer <= 0) {
+          throw new Error("Timed out while picking up pirated cargo: distance of " + dutchPirateShipCargoApproach / Math.PI * 1000 + "; health of " + dutchPirateShip.health / dutchPirateShip.maxHealth);
+        }
+      }
     }
 
     // test end mission conditions
     if (!returningToHomeWorldWithLoot && returnToHomeWorldSpy && returnToHomeWorldSpy.callCount === 1) {
       returningToHomeWorldWithLoot = true;
     }
-    if (!endingPirateContract && beginPirateMissionSpy && beginPirateMissionSpy.callCount === 2) {
-      endingPirateContract = true;
-      break;
+    if (!endingPirateContract) {
+      if (beginPirateMissionSpy && beginPirateMissionSpy.callCount === 2) {
+        endingPirateContract = true;
+        break;
+      } else if (dutchPiratePickUpCargo) {
+        stageTimer -= 1;
+        if (stageTimer <= 0) {
+          throw new Error("Timed out while returning home");
+        }
+      }
     }
   }
 

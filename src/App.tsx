@@ -144,28 +144,36 @@ export class MusicPlayer {
     ];
     public static thirdMelody = [
         // stanza 1
-        "G3",
-        "E3",
-        "G3",
-        "Eb3",
+        "C3",
+        "G2",
+        "A2",
+        "A#2",
+        "A2",
+        "G2",
 
         // stanza 2
-        "G3",
-        "D3",
-        "G3",
         "C3",
+        "G2",
+        "A2",
+        "A#2",
+        "A2",
+        "G2",
 
         // stanza 3
-        "G3",
-        "B2",
-        "G3",
+        "C3",
+        "G2",
         "A2",
+        "A#2",
+        "A2",
+        "G2",
 
         // stanza 4
-        "G3",
-        "Ab2",
-        "G3",
         "A2",
+        "G2",
+        "F2",
+        "G2",
+        "C2",
+        "C2",
         "END"
     ];
 
@@ -178,12 +186,16 @@ export class MusicPlayer {
         next: "main2",
         notes: MusicPlayer.firstMelody
     }, {
-        id: "main2",
-        next: "main3",
+        id: "main4",
+        next: "main",
         notes: MusicPlayer.secondMelody
     }, {
+        id: "main2",
+        next: "main3",
+        notes: MusicPlayer.thirdMelody
+    }, {
         id: "main3",
-        next: "main",
+        next: "main4",
         notes: MusicPlayer.thirdMelody
     }];
     public currentMelody: string = "";
@@ -1421,8 +1433,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                 cannonBall.id = `${cameraId}-${Math.floor(Math.random() * 100000000)}`;
                 cannonBall.position = cameraPosition.clone();
                 cannonBall.positionVelocity = fireVelocity.clone();
-                cannonBall.position = cannonBall.position.clone().mul(cannonBall.positionVelocity.pow(3))
-                cannonBall.size = 10;
+                cannonBall.position = cannonBall.position.clone().mul(cannonBall.positionVelocity.pow(3));
+                cannonBall.size = 15;
                 cannonBall.damage = 10;
                 cannonBalls.push(cannonBall);
             }
@@ -1469,7 +1481,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 cannonBall.position = cameraPosition.clone();
                 cannonBall.positionVelocity = fireVelocity.clone();
                 cannonBall.position = cannonBall.position.clone().mul(cannonBall.positionVelocity.pow(3))
-                cannonBall.size = 10;
+                cannonBall.size = 15;
                 cannonBall.damage = 10;
                 cannonBalls.push(cannonBall);
 
@@ -1634,19 +1646,22 @@ export class App extends React.Component<IAppProps, IAppState> {
         // handle physics and collision detection
         const collidableArrays: Array<{
             arr: ICollidable[],
-            collideFn: (ship: Ship, entity: ICollidable) => void
+            collideFn: (ship: Ship, entity: ICollidable) => void,
+            useRayCast: boolean
         }> = [{
             arr: this.cannonBalls,
             collideFn(ship: Ship, entity: ICollidable) {
                 ship.applyDamage(entity as CannonBall);
-            }
+            },
+            useRayCast: true
         }, {
             arr: this.crates,
             collideFn(ship: Ship, entity: ICollidable) {
                 ship.pickUpCargo(entity as Crate);
-            }
+            },
+            useRayCast: false
         }];
-        for (const { arr: collidableArray, collideFn } of collidableArrays) {
+        for (const { arr: collidableArray, collideFn, useRayCast } of collidableArrays) {
             const entitiesToRemove = [];
             for (const entity of collidableArray) {
                 // get nearby ships
@@ -1657,10 +1672,28 @@ export class App extends React.Component<IAppProps, IAppState> {
                 let bestHit: IHitTest | null = null;
                 let bestShip: Ship | null = null;
                 for (const nearByShip of nearByShips) {
-                    const hit = App.cannonBallCollision(entity, nearByShip, this.worldScale);
-                    if (hit.success && hit.time && (!bestHit || (bestHit && bestHit.time && hit.time < bestHit.time))) {
-                        bestHit = hit;
-                        bestShip = nearByShip;
+                    if (useRayCast) {
+                        const hit = App.cannonBallCollision(entity, nearByShip, this.worldScale);
+                        if (hit.success && hit.time && (!bestHit || (bestHit && bestHit.time && hit.time < bestHit.time))) {
+                            bestHit = hit;
+                            bestShip = nearByShip;
+                        }
+                    } else {
+                        const point = nearByShip.position.rotateVector([0, 0, 1]);
+                        const distance = VoronoiGraph.angularDistance(
+                            point,
+                            position,
+                            this.worldScale
+                        );
+                        if (distance < PHYSICS_SCALE * (entity.size || 1) && (!bestHit || (bestHit && bestHit.distance && distance < bestHit.distance))) {
+                            bestHit = {
+                                success: true,
+                                distance,
+                                time: 0,
+                                point
+                            };
+                            bestShip = nearByShip;
+                        }
                     }
                 }
 
@@ -1826,7 +1859,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 if (!currentShipData) {
                     throw new Error("Could not find ship type");
                 }
-                if (numEnemyCannons > numFriendlyCannons * 1.5 && ship.hasPirateOrder()) {
+                if (numEnemyCannons > (numFriendlyCannons + currentShipData.cannons.numCannons) * 1.5 && ship.hasPirateOrder()) {
                     for (const order of ship.orders) {
                         order.cancelOrder(numEnemyCannons);
                         ship.fireControl.isAttacking = false;
@@ -3234,9 +3267,10 @@ export class App extends React.Component<IAppProps, IAppState> {
                             <li>Add tax trading and construction trading between colonies and capitals.</li>
                             <li>Add ability to pirate merchants and raid colonies. -- DONE 4/30/2021</li>
                             <li>Add ability for AI to aim at player. -- DONE 5/1/2021</li>
-                            <li>Add AI pirates and pirate hunters.</li>
+                            <li>Add AI pirates. -- DONE 5/9/2021</li>
+                            <li>Pirate hunters.</li>
                             <li>Improve Voronoi generation to improve AI movement.</li>
-                            <li>Factions will plan invasions of enemy colonies, merchants, and capitals.</li>
+                            <li>Factions will plan invasions of enemy colonies and capitals.</li>
                             <li>Add multiplayer...</li>
                             <li>Break game into client and server.</li>
                             <li>Add multiple clients.</li>

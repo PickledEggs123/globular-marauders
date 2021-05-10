@@ -7,7 +7,7 @@ import App from "./App";
 export class Crate implements ICameraState, ICargoItem, IExpirableTicks, ICollidable {
     public id: string = "";
     public color: string = "brown";
-    public size: number = 1;
+    public size: number = 100;
     public position: Quaternion = Quaternion.ONE;
     public positionVelocity: Quaternion = Quaternion.ONE;
     public orientation: Quaternion = Quaternion.ONE;
