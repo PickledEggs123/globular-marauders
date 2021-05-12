@@ -54,11 +54,86 @@ export class ShipyardDock {
 }
 
 /**
- * A shipyard which spawns ships.
+ * The different types of upgradable buildings.
  */
-export class Shipyard {
+export enum EBuildingType {
+    /**
+     * A building which produces wood.
+     */
+    FORESTRY = "FORESTRY",
+    /**
+     * A building which produces iron.
+     */
+    MINE = "MINE",
+    /**
+     * A building which produces tools and weapons.
+     */
+    BLACKSMITH = "BLACKSMITH",
+    /**
+     * The building which produces new ships
+     */
+    SHIPYARD = "SHIPYARD",
+}
+
+/**
+ * A building on a planet which can produce resources, to help the island planet function.
+ */
+export abstract class Building {
     public instance: App;
     public planet: Planet;
+    /**
+     * The type of a building.
+     */
+    public abstract buildingType: EBuildingType;
+    /**
+     * The level of the building.
+     */
+    public buildingLevel: number = 1;
+    /**
+     * The upgrade progress of a building.
+     */
+    public upgradeProgress: number = 0;
+    /**
+     * Handle the basic function of the building.
+     */
+    public handleBuildingLoop(): void {
+        // basic upgrade loop
+        if (this.upgradeProgress > 0) {
+            this.upgradeProgress -= 1;
+            if (this.upgradeProgress <= 0) {
+                this.buildingLevel += 1;
+            }
+        }
+    }
+    /**
+     * The upgrade cost of the building.
+     */
+    public abstract getUpgradeCost(): number;
+    /**
+     * Begin the upgrade of a building.
+     */
+    public upgrade(): void {
+        // do not upgrade a building that is already upgrading
+        if (this.upgradeProgress > 0) {
+            return;
+        }
+
+        // five minutes to upgrade
+        const upgradeCost = this.getUpgradeCost();
+        this.planet.woodConstruction -= upgradeCost;
+        this.upgradeProgress = upgradeCost;
+    }
+
+    constructor(instance: App, planet: Planet) {
+        this.instance = instance;
+        this.planet = planet;
+    }
+}
+
+/**
+ * A shipyard which spawns ships.
+ */
+export class Shipyard extends Building {
     public docks: ShipyardDock[] = [];
     public numberOfDocks: number = 10;
     public numShipsAvailable: number = 0;
@@ -73,25 +148,39 @@ export class Shipyard {
         [EShipType.HIND]: 0
     };
 
-    constructor(instance: App, planet: Planet) {
-        this.instance = instance;
-        this.planet = planet;
+    buildingType: EBuildingType = EBuildingType.SHIPYARD;
+
+    getUpgradeCost(): number {
+        // 5 minutes to begin upgrade
+        return 5 * 60 * 10 * Math.pow(this.buildingLevel, Math.sqrt(2));
     }
 
     public getNextShipTypeToBuild(): EShipType {
-        if (this.shipsAvailable.SLOOP + this.shipsBuilding.SLOOP < 3) {
+        if (this.shipsAvailable.SLOOP + this.shipsBuilding.SLOOP < this.numberOfDocks * 3 / 10) {
             return EShipType.SLOOP;
         }
-        if (this.shipsAvailable.CORVETTE + this.shipsBuilding.CORVETTE < 3) {
+        if (this.shipsAvailable.CORVETTE + this.shipsBuilding.CORVETTE < this.numberOfDocks * 3 / 10) {
             return EShipType.CORVETTE;
         }
         return EShipType.HIND;
     }
 
+    public getNumberOfDocksAtUpgradeLevel(): number {
+        return this.buildingLevel * 10;
+    }
+
     /**
      * Build a new ship once in a while.
      */
-    public handleShipyardLoop() {
+    public handleBuildingLoop() {
+        super.handleBuildingLoop();
+
+        // handle dock upgrades
+        const nextNumberOfDocks = this.getNumberOfDocksAtUpgradeLevel();
+        if (this.numberOfDocks !== nextNumberOfDocks) {
+            this.numberOfDocks = nextNumberOfDocks;
+        }
+
         const nextShipTypeToBuild = this.getNextShipTypeToBuild();
         const shipData = SHIP_DATA.find(i => i.shipType === nextShipTypeToBuild);
         if (!shipData) {
@@ -99,7 +188,12 @@ export class Shipyard {
         }
 
         // build ship when there is enough wood and enough room
-        if (this.planet.wood >= shipData.cost && this.docks.length < this.numberOfDocks) {
+        if (
+            this.planet.wood >= shipData.cost &&
+            this.planet.cannons >= shipData.cannons.numCannons &&
+            this.planet.cannonades >= shipData.cannons.numCannonades &&
+            this.docks.length < this.numberOfDocks
+        ) {
             this.buildShip(shipData.shipType);
         }
 
@@ -120,6 +214,8 @@ export class Shipyard {
 
         // give wood to dock and begin building of ship.
         this.planet.wood -= shipData.cost;
+        this.planet.cannons -= shipData.cannons.numCannons;
+        this.planet.cannonades -= shipData.cannons.numCannonades;
         const dock = new ShipyardDock(this.instance, this.planet, this);
         this.docks.push(dock);
         dock.beginBuildingOfShip(shipType);
@@ -184,8 +280,104 @@ export class Shipyard {
 
         const priceCeiling = Math.ceil(shipData.cost * 3);
         const priceFloor = 0;
-        const price = Math.ceil(shipData.cost * (3 / (this.shipsAvailable[shipData.shipType])));
+        const price = Math.ceil(shipData.cost * (3 / (this.shipsAvailable[shipData.shipType] / this.getNumberOfDocksAtUpgradeLevel() * 10)));
         return Math.max(priceFloor, Math.min(price, priceCeiling));
+    }
+}
+
+/**
+ * A building which produces wood.
+ */
+export class Forestry extends Building {
+    buildingType: EBuildingType = EBuildingType.FORESTRY;
+
+    getUpgradeCost(): number {
+        // forestry requires 2 minutes to begin upgrade
+        return 2 * 60 * 10 * Math.pow(this.buildingLevel, Math.sqrt(2));
+    }
+
+    handleBuildingLoop() {
+        super.handleBuildingLoop();
+
+        // add wood proportional to building level
+        this.planet.wood += this.buildingLevel;
+        this.planet.woodConstruction += this.buildingLevel;
+
+        // TODO: add mahogany wood for luxury furniture
+    }
+}
+
+/**
+ * A building which produces minerals.
+ */
+export class Mine extends Building {
+    buildingType: EBuildingType = EBuildingType.MINE;
+
+    getUpgradeCost(): number {
+        // mine requires 2 minutes to begin upgrade
+        return 2 * 60 * 10 * Math.pow(this.buildingLevel, Math.sqrt(2));
+    }
+
+    handleBuildingLoop() {
+        super.handleBuildingLoop();
+
+        // add iron proportional to building level
+        this.planet.iron += this.buildingLevel;
+        this.planet.ironConstruction += this.buildingLevel;
+
+        // add coal for steel forging
+        this.planet.coal += this.buildingLevel;
+        this.planet.coalConstruction += this.buildingLevel;
+
+        // TODO: add add gems for jewelry, each island will have its own specific gem
+        /**
+         * Gems and Jewelry is required for treasure hunting. Islands will gather a specific gem, specific to each island.
+         * Gems can be sold to jeweler who will create jewelry which will be stored into treasure piles. Treasure can
+         * be traded or sold on market.
+         *
+         * Pirates will raid islands for Jewelry, gold, and resources.
+         */
+
+        // TODO: add marble
+    }
+}
+
+/**
+ * A building which produces wood.
+ */
+export class Blacksmith extends Building {
+    buildingType: EBuildingType = EBuildingType.BLACKSMITH;
+
+    getUpgradeCost(): number {
+        // blacksmith currently is not upgradable
+        return Number.MAX_VALUE;
+    }
+
+    handleBuildingLoop() {
+        super.handleBuildingLoop();
+
+        // convert iron into iron cannon balls, weapons
+        if (this.planet.cannons < 10 && this.planet.iron >= 40 && this.planet.coal >= 40) {
+            this.planet.iron -= 40;
+            this.planet.coal -= 40;
+            this.planet.cannons += 1;
+        } else if (this.planet.cannonades < 10 && this.planet.iron >= 10 && this.planet.coal >= 10) {
+            this.planet.iron -= 10;
+            this.planet.coal -= 10;
+            this.planet.cannonades += 1;
+        } else if (this.planet.cannons < 100 && this.planet.iron >= 40 && this.planet.coal >= 40) {
+            this.planet.iron -= 40;
+            this.planet.coal -= 40;
+            this.planet.cannons += 1;
+        } else if (this.planet.cannonades < 100 && this.planet.iron >= 10 && this.planet.coal >= 10) {
+            this.planet.iron -= 10;
+            this.planet.coal -= 10;
+            this.planet.cannonades += 1;
+        } else if (this.planet.cannons < 300 && this.planet.iron >= 40 && this.planet.coal >= 40) {
+            this.planet.iron -= 40;
+            this.planet.coal -= 40;
+            this.planet.cannons += 1;
+        }
     }
 }
 
@@ -202,10 +394,36 @@ export class Planet implements ICameraState {
     public settlementLevel: ESettlementLevel = ESettlementLevel.UNTAMED;
     public pathingNode: PathingNode<DelaunayGraph<Planet>> | null = null;
     public resources: EResourceType[];
+    // the amount of wood available to build ships
     public wood: number = 0;
+    // the amount of wood available to build buildings
+    public woodConstruction: number = 0;
+    // the amount of iron available to build ships
+    public iron: number = 0;
+    // the amount of iron available to build buildings
+    public ironConstruction: number = 0;
+    // the amount of coal available to build ships
+    public coal: number = 0;
+    // the amount of coal available to build buildings
+    public coalConstruction: number = 0;
+    // the number of cannons for building ships
+    public cannons: number = 0;
+    // the number of cannonades for building ships
+    public cannonades: number = 0;
+    // the amount of gold to spend
     public gold: number = 0;
+    // the amount of taxes to send back to the capital
     public taxes: number = 0;
+    // a building which builds ships
     public shipyard: Shipyard;
+    // a building which chops down trees for wood
+    public forestry: Forestry;
+    // a building which mines iron, coal, gems, and marble
+    public mine: Mine;
+    // a building which produces weapons and tools
+    public blacksmith: Blacksmith;
+    // a list of buildings to upgrade
+    private readonly buildings: Building[];
     private resourceCycle: number = 0;
 
     /**
@@ -234,8 +452,17 @@ export class Planet implements ICameraState {
             }
         }
 
-        // initialize the shipyard
+        // initialize buildings
         this.shipyard = new Shipyard(this.instance, this);
+        this.forestry = new Forestry(this.instance, this);
+        this.mine = new Mine(this.instance, this);
+        this.blacksmith = new Blacksmith(this.instance, this);
+        this.buildings = [
+            this.shipyard,
+            this.forestry,
+            this.mine,
+            this.blacksmith,
+        ];
     }
 
     public handlePlanetLoop() {
@@ -244,11 +471,50 @@ export class Planet implements ICameraState {
             return;
         }
 
-        // collect wood
-        this.wood += (this.settlementLevel / 5);
+        // handle buildings
+        for (const building of this.buildings) {
+            building.handleBuildingLoop();
+        }
 
-        // handle ship building
-        this.shipyard.handleShipyardLoop();
+        // handle upgrades of buildings
+        const {
+            nextBuilding,
+            nextBuildingCost
+        } = this.getNextBuildingUpgrade();
+        if (this.woodConstruction >= nextBuildingCost) {
+            nextBuilding.upgrade();
+        }
+    }
+
+    /**
+     * Determine the next building to upgrade.
+     */
+    getNextBuildingUpgrade(): {
+        nextBuilding: Building,
+        nextBuildingCost: number
+    } {
+        // find cheapest building to upgrade
+        let nextBuilding: Building | null = null;
+        let nextBuildingCost: number | null = null;
+        for (const building of this.buildings) {
+            // skip buildings which are upgrading.
+            if (building.upgradeProgress > 0) {
+                continue;
+            }
+            const buildingCost = building.getUpgradeCost();
+            if (!nextBuildingCost || (nextBuildingCost && buildingCost < nextBuildingCost)) {
+                nextBuilding = building;
+                nextBuildingCost = buildingCost;
+            }
+        }
+        if (nextBuilding && nextBuildingCost) {
+            return {
+                nextBuilding,
+                nextBuildingCost
+            };
+        } else {
+            throw new Error("Could not find a building to get upgrade costs");
+        }
     }
 
     /**

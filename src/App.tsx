@@ -186,17 +186,21 @@ export class MusicPlayer {
         next: "main2",
         notes: MusicPlayer.firstMelody
     }, {
-        id: "main4",
-        next: "main",
-        notes: MusicPlayer.secondMelody
-    }, {
         id: "main2",
         next: "main3",
-        notes: MusicPlayer.thirdMelody
+        notes: MusicPlayer.secondMelody
     }, {
         id: "main3",
         next: "main4",
         notes: MusicPlayer.thirdMelody
+    }, {
+        id: "main4",
+        next: "main5",
+        notes: MusicPlayer.thirdMelody
+    }, {
+        id: "main5",
+        next: "main",
+        notes: MusicPlayer.secondMelody
     }];
     public currentMelody: string = "";
     public getNextMelody(): Array<string | null | Array<string | null>> {
@@ -1433,7 +1437,6 @@ export class App extends React.Component<IAppProps, IAppState> {
                 cannonBall.id = `${cameraId}-${Math.floor(Math.random() * 100000000)}`;
                 cannonBall.position = cameraPosition.clone();
                 cannonBall.positionVelocity = fireVelocity.clone();
-                cannonBall.position = cannonBall.position.clone().mul(cannonBall.positionVelocity.pow(3));
                 cannonBall.size = 15;
                 cannonBall.damage = 10;
                 cannonBalls.push(cannonBall);
@@ -1480,7 +1483,6 @@ export class App extends React.Component<IAppProps, IAppState> {
                 cannonBall.id = `${cameraId}-${Math.floor(Math.random() * 100000000)}`;
                 cannonBall.position = cameraPosition.clone();
                 cannonBall.positionVelocity = fireVelocity.clone();
-                cannonBall.position = cannonBall.position.clone().mul(cannonBall.positionVelocity.pow(3))
                 cannonBall.size = 15;
                 cannonBall.damage = 10;
                 cannonBalls.push(cannonBall);
@@ -2149,6 +2151,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                         throw new Error("Could not find ship type");
                     }
                     planet.wood += shipData.cost;
+                    planet.cannons += shipData.cannons.numCannons;
+                    planet.cannonades += shipData.cannons.numCannonades;
                     planet.shipyard.buildShip(shipType);
                     const dock = planet.shipyard.docks[planet.shipyard.docks.length - 1];
                     if (dock) {

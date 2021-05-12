@@ -54,7 +54,7 @@ const getTestShip = (app: App, wrapper: ShallowWrapper<any>, colonyWorldTrades: 
   homeWorldTradeItem.planet.wood += shipData.cost;
   homeWorldTradeItem.planet.shipyard.buildShip(shipType);
   homeWorldTradeItem.planet.shipyard.docks[0].progress += shipData.cost;
-  homeWorldTradeItem.planet.shipyard.handleShipyardLoop();
+  homeWorldTradeItem.planet.shipyard.handleBuildingLoop();
   app.gold += homeWorldTradeItem.planet.shipyard.quoteShip(shipType);
 
   // spawn at home world
@@ -101,6 +101,58 @@ const assertFactionData = (faction: Faction) => {
     expect(faction.explorationGraph[planet.id].distance).toBe(expectedDistance);
     expect(faction.explorationGraph[planet.id].planet).toBe(planet);
   }
+};
+
+/**
+ * Setup unit tests around upgrading buildings on a planet.
+ * Each building on a planet should upgrade except for the blacksmith.
+ */
+const setupPlanetBuildingUpgradingTest = (numMinutes: number = 60) => {
+  // setup wrapper to run test
+  const wrapper = shallow<App>(<App isTestMode worldScale={1} />);
+  const app = wrapper.instance();
+  app.forceUpdate = () => undefined;
+
+  // remove all ships
+  for (const faction of Object.values(app.factions)) {
+    faction.handleFactionLoop = () => undefined;
+  }
+
+  // validate data
+  for (const faction of Object.values(app.factions)) {
+    assertFactionData(faction);
+  }
+
+  // setup test ship and nav point
+  const colonyWorldTrades = app.planets.map(p => ({ id: p.id, spy: sinon.spy(p, "trade"), planet: p }));
+  const dutchHomeWorld = colonyWorldTrades.find(i => i.id === app.factions[EFaction.DUTCH].homeWorldPlanetId);
+  if (!dutchHomeWorld) {
+    throw new Error("Could not find Dutch home world");
+  }
+
+  const upgradeShipyard = sinon.spy(dutchHomeWorld.planet.shipyard, "upgrade");
+  const upgradeForestry = sinon.spy(dutchHomeWorld.planet.forestry, "upgrade");
+  const upgradeMine = sinon.spy(dutchHomeWorld.planet.mine, "upgrade");
+  const upgradeBlacksmith = sinon.spy(dutchHomeWorld.planet.blacksmith, "upgrade");
+
+  // test the ship navigation to nav point
+  const numStepsPerSecond = 10;
+  const numSecondsPerMinute = 60;
+  const numSteps = numStepsPerSecond * numSecondsPerMinute * numMinutes;
+  for (let step = 0; step < numSteps; step++) {
+    app.gameLoop.call(app);
+    for (const planet of app.planets) {
+      planet.wood = 0;
+    }
+  }
+
+  // expect the planet to successfully upgrade its stuff
+  expect(upgradeShipyard.callCount).toBe(3);
+  expect(upgradeForestry.callCount).toBe(5);
+  expect(upgradeMine.callCount).toBe(5);
+  expect(upgradeBlacksmith.callCount).toBe(0);
+  expect(dutchHomeWorld.planet.cannons).toBeGreaterThan(0);
+  expect(dutchHomeWorld.planet.cannonades).toBeGreaterThan(0);
 };
 
 /**
@@ -163,7 +215,7 @@ const setupPathingTest = (points: Array<[number, number, number]>, numMinutes: n
 /**
  * Setup settling and trading tests. The ship should settle the planet first then trade with it.
  * The smallest ship, SLOOP, should take 20 trips to settle the planet by itself, then trade two times.
- * @param numMinutes This test should take 20 minutes of game time.
+ * @param numMinutes This test should take 60 minutes of game time.
  */
 const setupTradingTest = (numMinutes: number = 20) => {
   // setup wrapper to run test
@@ -470,7 +522,7 @@ const setupPiracyTest = (numMinutes: number = 20) => {
   expect(endingPirateContract).toBeTruthy();
 };
 
-describe('test AI Pathing', () => {
+describe('test AI', () => {
   describe('test pathing from all 360 degrees', () => {
     for (let angle = 0; angle < 360; angle += 5) {
       it(`test pathing form angle ${angle}`, () => {
@@ -497,6 +549,9 @@ describe('test AI Pathing', () => {
         setupPiracyTest(60);
       });
     }
+  });
+  it('test planet building upgrades', () => {
+    setupPlanetBuildingUpgradingTest();
   });
 });
 describe('Collision Detection', () => {
