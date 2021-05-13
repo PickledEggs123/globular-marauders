@@ -10,7 +10,7 @@ import {EOrderType, Order} from "./Order";
 import {DelaunayGraph, PathFinder, VoronoiGraph} from "./Graph";
 import {CannonBall} from "./Item";
 import {Faction} from "./Faction";
-import {Planet} from "./Planet";
+import {EBuildingType, Planet} from "./Planet";
 import {ESettlementLevel} from "./Interface";
 
 /**
@@ -130,6 +130,17 @@ const setupPlanetBuildingUpgradingTest = (numMinutes: number = 60) => {
     throw new Error("Could not find Dutch home world");
   }
 
+  // remove plantations to not mess up the unit tests since plantations are random
+  while (true) {
+    const index = dutchHomeWorld.planet.buildings.findIndex(b => b.buildingType === EBuildingType.PLANTATION);
+    if (index >= 0) {
+      dutchHomeWorld.planet.buildings.splice(index, 1);
+    } else {
+      break;
+    }
+  }
+
+
   const upgradeShipyard = sinon.spy(dutchHomeWorld.planet.shipyard, "upgrade");
   const upgradeForestry = sinon.spy(dutchHomeWorld.planet.forestry, "upgrade");
   const upgradeMine = sinon.spy(dutchHomeWorld.planet.mine, "upgrade");
@@ -141,6 +152,7 @@ const setupPlanetBuildingUpgradingTest = (numMinutes: number = 60) => {
   const numSteps = numStepsPerSecond * numSecondsPerMinute * numMinutes;
   for (let step = 0; step < numSteps; step++) {
     app.gameLoop.call(app);
+    // remove wood to prevent additional ships
     for (const planet of app.planets) {
       planet.wood = 0;
     }
@@ -173,9 +185,6 @@ const setupPathingTest = (points: Array<[number, number, number]>, numMinutes: n
   for (const faction of Object.values(app.factions)) {
     faction.handleFactionLoop = () => undefined;
   }
-  for (const planet of app.planets) {
-    planet.handlePlanetLoop = () => undefined;
-  }
 
   // validate data
   for (const faction of Object.values(app.factions)) {
@@ -200,6 +209,12 @@ const setupPathingTest = (points: Array<[number, number, number]>, numMinutes: n
   let successfullyReachedDestination = false;
   for (let step = 0; step < numSteps; step++) {
     app.gameLoop.call(app);
+
+    // remove wood to prevent additional ships
+    for (const planet of app.planets) {
+      planet.wood = 0;
+    }
+
     expect(testShip.fireControl.isAttacking).toBeFalsy();
     if (testShip.pathFinding.points.length === 0) {
       // ship has successfully reached destination
@@ -226,9 +241,6 @@ const setupTradingTest = (numMinutes: number = 20) => {
   // remove all ships
   for (const faction of Object.values(app.factions)) {
     faction.handleFactionLoop = () => undefined;
-  }
-  for (const planet of app.planets) {
-    planet.handlePlanetLoop = () => undefined;
   }
 
   // validate data
@@ -257,8 +269,13 @@ const setupTradingTest = (numMinutes: number = 20) => {
   let successfullyReachedDestination = false;
   let lastCallCount: number = 0;
   for (let step = 0; step < numSteps; step++) {
-    Object.values(app.planets).forEach(p => p.wood = 0);
     app.gameLoop.call(app);
+
+    // remove wood to prevent additional ships
+    for (const planet of app.planets) {
+      planet.wood = 0;
+    }
+
     if (getOrder.callCount !== lastCallCount) {
       lastCallCount = getOrder.callCount;
       if (lastCallCount === numberOfTripsToColonizePlanet + 2) {
@@ -311,9 +328,6 @@ const setupPiracyTest = (numMinutes: number = 20) => {
   for (const faction of Object.values(app.factions)) {
     faction.handleFactionLoop = () => undefined;
   }
-  for (const planet of app.planets) {
-    planet.handlePlanetLoop = () => undefined;
-  }
 
   // validate data
   for (const faction of Object.values(app.factions)) {
@@ -348,6 +362,9 @@ const setupPiracyTest = (numMinutes: number = 20) => {
   closestEnglishPlanet.planet.settlementProgress = 1;
   closestEnglishPlanet.planet.settlementLevel = ESettlementLevel.OUTPOST;
   englishFaction.planetIds.push(closestEnglishPlanet.planet.id);
+
+  // run a game loop to help the planets build their plantation resources
+  app.gameLoop.call(app);
 
   // create english ship to be pirated
   const colonyWorldTrades = app.planets.map(p => ({ id: p.id, spy: sinon.spy(p, "trade"), planet: p }));
@@ -390,8 +407,12 @@ const setupPiracyTest = (numMinutes: number = 20) => {
   const numSecondsPerMinute = 60;
   const numSteps = numStepsPerSecond * numSecondsPerMinute * numMinutes;
   for (let step = 0; step < numSteps; step++) {
-    Object.values(app.planets).forEach(p => p.wood = 0);
     app.gameLoop.call(app);
+
+    // remove wood to prevent additional ships
+    for (const planet of app.planets) {
+      planet.wood = 0;
+    }
 
     // test begin mission conditions
     if (!englishBegunTrading && englishMerchantShipGetOrder.called) {

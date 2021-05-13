@@ -5,6 +5,11 @@ import {CAPITAL_GOODS, EResourceType, OUTPOST_GOODS} from "./Resource";
 import {EShipType, Ship, SHIP_DATA} from "./Ship";
 import App from "./App";
 
+export interface IResourceExported {
+    resourceType: EResourceType;
+    amount: number;
+}
+
 export class ShipyardDock {
     public instance: App;
     public planet: Planet;
@@ -61,6 +66,10 @@ export enum EBuildingType {
      * A building which produces wood.
      */
     FORESTRY = "FORESTRY",
+    /**
+     * A building which produces a natural resource.
+     */
+    PLANTATION = "PLANTATION",
     /**
      * A building which produces iron.
      */
@@ -302,8 +311,41 @@ export class Forestry extends Building {
         // add wood proportional to building level
         this.planet.wood += this.buildingLevel;
         this.planet.woodConstruction += this.buildingLevel;
+    }
+}
 
-        // TODO: add mahogany wood for luxury furniture
+/**
+ * A building which produces natural resources.
+ */
+export class Plantation extends Building {
+    buildingType: EBuildingType = EBuildingType.PLANTATION;
+    resourceType: EResourceType;
+
+    constructor(instance: App, planet: Planet, resourceType: EResourceType) {
+        super(instance, planet);
+        this.resourceType = resourceType;
+    }
+
+    getUpgradeCost(): number {
+        // forestry requires 2 minutes to begin upgrade
+        return 2 * 60 * 10 * Math.pow(this.buildingLevel, Math.sqrt(2));
+    }
+
+    handleBuildingLoop() {
+        super.handleBuildingLoop();
+
+        // add wood proportional to building level
+        const oldResource = this.planet.resources.find(r => r.resourceType === this.resourceType);
+        if (oldResource) {
+            // upgrade resources array
+            oldResource.amount = this.buildingLevel;
+        } else {
+            // add new resources array
+            this.planet.resources.push({
+                resourceType: this.resourceType,
+                amount: this.buildingLevel
+            });
+        }
     }
 }
 
@@ -393,7 +435,10 @@ export class Planet implements ICameraState {
     public settlementProgress: number = 0;
     public settlementLevel: ESettlementLevel = ESettlementLevel.UNTAMED;
     public pathingNode: PathingNode<DelaunayGraph<Planet>> | null = null;
-    public resources: EResourceType[];
+    // resources which are exported from the island
+    public resources: Array<IResourceExported>;
+    // the resources the island can produce
+    public naturalResources: EResourceType[];
     // the amount of wood available to build ships
     public wood: number = 0;
     // the amount of wood available to build buildings
@@ -423,7 +468,7 @@ export class Planet implements ICameraState {
     // a building which produces weapons and tools
     public blacksmith: Blacksmith;
     // a list of buildings to upgrade
-    private readonly buildings: Building[];
+    public readonly buildings: Building[];
     private resourceCycle: number = 0;
 
     /**
@@ -443,12 +488,13 @@ export class Planet implements ICameraState {
 
         // initialize the natural resources
         this.resources = [];
+        this.naturalResources = [];
         const numResources = Math.floor(Math.random() * 2 + 1);
         const resourceValues = Object.values(OUTPOST_GOODS);
-        for (let i = 0; i < 100 && this.resources.length < numResources; i++) {
+        for (let i = 0; i < 100 && this.naturalResources.length < numResources; i++) {
             const randomResource = resourceValues[Math.floor(Math.random() * resourceValues.length)];
-            if (!this.resources.includes(randomResource)) {
-                this.resources.push(randomResource);
+            if (!this.naturalResources.includes(randomResource)) {
+                this.naturalResources.push(randomResource);
             }
         }
 
@@ -461,19 +507,31 @@ export class Planet implements ICameraState {
             this.shipyard,
             this.forestry,
             this.mine,
-            this.blacksmith,
+            this.blacksmith
         ];
     }
 
+    public buildInitialResourceBuildings() {
+        this.buildings.push(
+            ...this.naturalResources.map(naturalResource => new Plantation(this.instance, this, naturalResource))
+        );
+    }
+
     public handlePlanetLoop() {
-        if (this.settlementLevel <= ESettlementLevel.OUTPOST) {
+        if (this.settlementLevel < ESettlementLevel.OUTPOST) {
             // planets smaller than colonies do nothing
             return;
         }
 
         // handle buildings
         for (const building of this.buildings) {
-            building.handleBuildingLoop();
+            if (this.settlementLevel >= ESettlementLevel.OUTPOST && building.buildingType === EBuildingType.PLANTATION) {
+                // outposts have working plantations but no shipyards or other general infrastructure
+                building.handleBuildingLoop();
+            } else if (this.settlementLevel >= ESettlementLevel.COLONY) {
+                // colonies and larger settlements have general infrastructure
+                building.handleBuildingLoop();
+            }
         }
 
         // handle upgrades of buildings
@@ -501,6 +559,10 @@ export class Planet implements ICameraState {
             if (building.upgradeProgress > 0) {
                 continue;
             }
+            // skip buildings which are not plantation if the settlement is smaller than a colony
+            if (building.buildingType === EBuildingType.PLANTATION && this.settlementLevel < ESettlementLevel.COLONY) {
+                continue;
+            }
             const buildingCost = building.getUpgradeCost();
             if (!nextBuildingCost || (nextBuildingCost && buildingCost < nextBuildingCost)) {
                 nextBuilding = building;
@@ -525,7 +587,7 @@ export class Planet implements ICameraState {
     trade(ship: Ship, unload: boolean = false) {
         // a list of items to buy from ship and sell to ship
         let goodsToTake: EResourceType[] = [];
-        let goodsToOffer: EResourceType[] = [];
+        let goodsToOffer: IResourceExported[] = [];
 
         // different levels of settlements take different goods
         if (this.settlementLevel === ESettlementLevel.UNTAMED) {
@@ -554,7 +616,7 @@ export class Planet implements ICameraState {
             if (boughtGood) {
                 const faction = Object.values(this.instance.factions).find(f => f.homeWorldPlanetId === this.id);
                 if (faction) {
-                    faction.applyLuxuryBuff(this.instance, goodToTake, boughtGood.sourcePlanetId);
+                    faction.applyLuxuryBuff(this.instance, goodToTake, boughtGood.sourcePlanetId, boughtGood.amount);
                 }
             }
         }

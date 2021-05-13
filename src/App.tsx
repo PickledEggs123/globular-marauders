@@ -27,7 +27,7 @@ import {
 } from "./Graph";
 import {VoronoiTree} from "./VoronoiTree";
 import {Faction, LuxuryBuff} from "./Faction";
-import {Planet} from "./Planet";
+import {EBuildingType, Planet, Plantation} from "./Planet";
 import {CannonBall, Crate, SmokeCloud} from "./Item";
 import * as Tone from "tone";
 
@@ -176,6 +176,40 @@ export class MusicPlayer {
         "C2",
         "END"
     ];
+    public static forthMelody = [
+        // stanza 1
+        "C3",
+        null,
+        "G3",
+        "G3",
+        null,
+        null,
+
+        // stanza 2
+        "F3",
+        null,
+        "Eb3",
+        "C3",
+        null,
+        null,
+
+        // stanza 3
+        "D3",
+        null,
+        "Eb3",
+        "D3",
+        null,
+        null,
+
+        // stanza 4
+        "C3",
+        null,
+        "B2",
+        "C3",
+        null,
+        null,
+        "END"
+    ];
 
     public melodyMap: Array<{
         id: string,
@@ -199,8 +233,16 @@ export class MusicPlayer {
         notes: MusicPlayer.thirdMelody
     }, {
         id: "main5",
-        next: "main",
+        next: "main6",
         notes: MusicPlayer.secondMelody
+    }, {
+        id: "main6",
+        next: "main7",
+        notes: MusicPlayer.forthMelody
+    }, {
+        id: "main7",
+        next: "main",
+        notes: MusicPlayer.forthMelody
     }];
     public currentMelody: string = "";
     public getNextMelody(): Array<string | null | Array<string | null>> {
@@ -642,7 +684,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                                 fontSize="6"
                             >{planetTitle}</text>
                             {
-                                planetDrawing.original.resources.map((resource, index) => {
+                                planetDrawing.original.buildings.filter(b => b.buildingType === EBuildingType.PLANTATION).map((building, index) => {
                                     return (
                                         <text
                                             key={`${planetDrawing.id}-planet-resource-${index}`}
@@ -650,7 +692,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                                             y={planetY + (index + 1) * 10}
                                             fill="white"
                                             fontSize="6"
-                                        >{resource}</text>
+                                        >{(building as Plantation).resourceType} ({building.buildingLevel})</text>
                                     );
                                 })
                             }
@@ -2072,7 +2114,10 @@ export class App extends React.Component<IAppProps, IAppState> {
             planet.size = 10;
             planet.settlementProgress = 1;
             planet.settlementLevel = ESettlementLevel.CAPITAL;
-            planet.resources = [...CAPITAL_GOODS];
+            planet.naturalResources = [...CAPITAL_GOODS];
+            planet.resources.push(...CAPITAL_GOODS.map(resourceType => ({resourceType, amount: 1})));
+        } else {
+            planet.buildInitialResourceBuildings();
         }
         planet.pathingNode = this.delaunayGraph.createPathingNode(planet.position.rotateVector([0, 0, 1]));
         return planet;

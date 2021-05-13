@@ -14,14 +14,16 @@ export class Crate implements ICameraState, ICargoItem, IExpirableTicks, ICollid
     public orientationVelocity: Quaternion = Quaternion.ONE;
     public resourceType: EResourceType;
     public sourcePlanetId: string;
+    public amount: number;
     public pirated: boolean = false;
     public maxLife: number = 10 * 60;
     public life: number = 0;
     public factionId: EFaction | null = null;
 
-    constructor(resourceType: EResourceType, sourcePlanetId: string) {
+    constructor(resourceType: EResourceType, sourcePlanetId: string, amount: number) {
         this.resourceType = resourceType;
         this.sourcePlanetId = sourcePlanetId;
+        this.amount = amount;
     }
 }
 

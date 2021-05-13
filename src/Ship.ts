@@ -7,6 +7,7 @@ import {DelaunayGraph, PathFinder, VoronoiGraph} from "./Graph";
 import {computeConeLineIntersection, IConeHitTest} from "./Intersection";
 import {Faction} from "./Faction";
 import {CannonBall, Crate} from "./Item";
+import {IResourceExported} from "./Planet";
 
 /**
  * The scale of the graphics engine to physics. All graphics is a plane scaled down by this factor, then projected
@@ -347,6 +348,7 @@ export class Ship implements IAutomatedShip {
             const cargoItem: ICargoItem = {
                 resourceType: crate.resourceType,
                 sourcePlanetId: crate.sourcePlanetId,
+                amount: crate.amount,
                 pirated: true
             };
             this.cargo.push(cargoItem);
@@ -363,7 +365,7 @@ export class Ship implements IAutomatedShip {
                 .rotateVector([1, 0, 0]);
             const randomVelocity = Quaternion.fromBetweenVectors([0, 0, 1], randomDirection).pow(App.VELOCITY_STEP / this.app.worldScale * 0.1);
 
-            const crate = new Crate(cargo.resourceType, cargo.sourcePlanetId);
+            const crate = new Crate(cargo.resourceType, cargo.sourcePlanetId, cargo.amount);
             crate.id = `${this.id}-crate-${Math.floor(Math.random() * 100000)}`;
             crate.position = this.position;
             crate.positionVelocity = this.positionVelocity.clone().pow(1 / 50).mul(randomVelocity);
@@ -401,14 +403,19 @@ export class Ship implements IAutomatedShip {
      * @param resourceType The type of resource.
      * @param sourcePlanetId The source of the resource.
      */
-    public sellGoodToShip(resourceType: EResourceType, sourcePlanetId: string): boolean {
+    public sellGoodToShip(resourceExported: IResourceExported, sourcePlanetId: string): boolean {
         const shipData = SHIP_DATA.find(s => s.shipType === this.shipType);
         if (!shipData) {
             throw new Error("Could not find ship type");
         }
         if (this.cargo.length < shipData.cargoSize) {
+            const {
+                resourceType,
+                amount,
+            } = resourceExported;
             this.cargo.push({
                 resourceType,
+                amount,
                 sourcePlanetId,
                 pirated: false,
             });

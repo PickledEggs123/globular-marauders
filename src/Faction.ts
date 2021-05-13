@@ -14,14 +14,16 @@ export class LuxuryBuff {
     public faction: Faction;
     public resourceType: EResourceType;
     public planetId: string;
+    public amount: number;
     private expires: number = 10 * 60 * 10;
     private ticks: number = 0;
 
-    constructor(instance: App, faction: Faction, resourceType: EResourceType, planetId: string) {
+    constructor(instance: App, faction: Faction, resourceType: EResourceType, planetId: string, amount: number) {
         this.instance = instance;
         this.faction = faction;
         this.resourceType = resourceType;
         this.planetId = planetId;
+        this.amount = amount;
     }
 
     /**
@@ -97,7 +99,7 @@ export class LuxuryBuff {
         }
         const itemData = ITEM_DATA.find(item => item.resourceType === this.resourceType);
         if (itemData) {
-            return this.expires * itemData.basePrice;
+            return this.expires * itemData.basePrice * this.amount;
         }
         return this.expires;
     }
@@ -263,17 +265,19 @@ export class Faction {
      * @param account A gold holding account which increases after trading.
      * @param resourceType The resource type affects the buff.
      * @param planetId The source world of the goods.
+     * @param amount The amount multiplier of the resource.
      */
-    public applyLuxuryBuff(account: IGoldAccount, resourceType: EResourceType, planetId: string) {
+    public applyLuxuryBuff(account: IGoldAccount, resourceType: EResourceType, planetId: string, amount: number) {
         const oldLuxuryBuff = this.luxuryBuffs.find(l => l.matches(resourceType, planetId));
         if (oldLuxuryBuff) {
             const percentReplenished = oldLuxuryBuff.replenish();
+            oldLuxuryBuff.amount = amount;
             const goldProfit = Math.floor(oldLuxuryBuff.goldValue() * percentReplenished);
             const goldBonus = Math.floor(goldProfit * 0.2);
             this.gold -= goldBonus;
             account.gold += goldBonus;
         } else {
-            this.luxuryBuffs.push(new LuxuryBuff(this.instance, this, resourceType, planetId));
+            this.luxuryBuffs.push(new LuxuryBuff(this.instance, this, resourceType, planetId, amount));
         }
     }
 

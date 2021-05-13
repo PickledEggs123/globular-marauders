@@ -86,6 +86,10 @@ export interface ICargoItem {
      */
     resourceType: EResourceType;
     /**
+     * The amount or multiplier of a resource.
+     */
+    amount: number;
+    /**
      * If the cargo was pirated.
      */
     pirated: boolean;
