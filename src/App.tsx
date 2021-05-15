@@ -320,6 +320,10 @@ interface IAppProps {
      */
     isTestMode?: boolean;
     /**
+     * If the app is in voronoi test mode.
+     */
+    isVoronoiTestMode?: boolean;
+    /**
      * The size of the world, initially
      */
     worldScale?: number;
@@ -478,7 +482,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         // show latest attacking ship
         const attackingAIShip = this.ships.find(s => s.id === this.demoAttackingShipId);
-        if (attackingAIShip) {
+        if (attackingAIShip && !this.props.isVoronoiTestMode) {
             return App.GetCameraState(attackingAIShip);
         } else {
             this.demoAttackingShipId = null;
@@ -502,9 +506,6 @@ export class App extends React.Component<IAppProps, IAppState> {
             orientation: cameraOrientation,
         } = this.getPlayerShip();
         const pointToQuaternion = (v: [number, number, number]): Quaternion => {
-            if (v[2] < -0.99) {
-                return Quaternion.fromAxisAngle([0, 1, 0], Math.PI * 0.99);
-            }
             const q = Quaternion.fromBetweenVectors([0, 0, 1], v);
             return cameraOrientation.clone().inverse()
                 .mul(cameraPosition.clone().inverse())
@@ -512,14 +513,18 @@ export class App extends React.Component<IAppProps, IAppState> {
         };
         const vertices = triangle.vertices.map(pointToQuaternion);
         let color: string = "red";
-        if (index % 4 === 0) {
+        if (index % 6 === 0) {
             color = "red";
-        } else if (index % 4 === 1) {
-            color = "green";
-        } else if (index % 4 === 2) {
-            color = "blue";
-        } else if (index % 4 === 3) {
+        } else if (index % 6 === 1) {
+            color = "orange";
+        } else if (index % 6 === 2) {
             color = "yellow";
+        } else if (index % 6 === 3) {
+            color = "green";
+        } else if (index % 6 === 4) {
+            color = "blue";
+        } else if (index % 6 === 5) {
+            color = "purple";
         }
 
         const tile = new DelaunayTile();
@@ -1171,7 +1176,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         ];
     }
 
-    private static MAX_TESSELLATION: number = 4;
+    private static MAX_TESSELLATION: number = 3;
 
     private *getDelaunayTileTessellation(centroid: Quaternion, vertices: Quaternion[], maxStep: number = App.MAX_TESSELLATION, step: number = 0): Generator<ITessellatedTriangle> {
         if (step === maxStep) {
@@ -1209,7 +1214,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                     a.rotateVector([0, 0, 1]),
                     b.rotateVector([0, 0, 1]),
                     0.5
-                );
+                )
                 if (DelaunayGraph.distanceFormula(lerpPoint, [0, 0, 0]) < 0.01) {
                     lerpPoint = App.lerp(
                         a.rotateVector([0, 0, 1]),
@@ -1414,7 +1419,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             const rotation = Quaternion.fromBetweenVectors([0, 0, 1], forward).pow(App.VELOCITY_STEP / this.worldScale);
             const rotationDrag = cameraPositionVelocity.pow(App.VELOCITY_DRAG / this.worldScale).inverse();
             cameraPositionVelocity = cameraPositionVelocity.clone().mul(rotation).mul(rotationDrag);
-            if (VoronoiGraph.angularDistanceQuaternion(cameraPositionVelocity, this.worldScale) < Math.PI / 2 * App.VELOCITY_STEP / this.worldScale) {
+            if (VoronoiGraph.angularDistanceQuaternion(cameraPositionVelocity, this.worldScale) < Math.PI / 2 * App.VELOCITY_STEP * this.worldScale) {
                 cameraPositionVelocity = Quaternion.ONE;
             }
 
@@ -1433,7 +1438,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         if (activeKeys.includes("s")) {
             const rotation = cameraPositionVelocity.clone().inverse().pow(App.BRAKE_POWER / this.worldScale);
             cameraPositionVelocity = cameraPositionVelocity.clone().mul(rotation);
-            if (VoronoiGraph.angularDistanceQuaternion(cameraPositionVelocity, this.worldScale) < Math.PI / 2 * App.VELOCITY_STEP / this.worldScale) {
+            if (VoronoiGraph.angularDistanceQuaternion(cameraPositionVelocity, this.worldScale) < Math.PI / 2 * App.VELOCITY_STEP * this.worldScale) {
                 cameraPositionVelocity = Quaternion.ONE;
             }
 
@@ -2145,18 +2150,38 @@ export class App extends React.Component<IAppProps, IAppState> {
         }
 
         // initialize 3d terrain stuff
-        this.delaunayGraph.initialize();
-        for (let i = 0; i < 20 * Math.pow(1.5, this.worldScale); i++) {
-            this.delaunayGraph.incrementalInsert();
-        }
-        for (let step = 0; step < 10 * Math.pow(1.5, this.worldScale); step++) {
+        if (this.props.isVoronoiTestMode) {
+            // initialize voronoi test
+            this.worldScale = 1;
+            this.delaunayGraph.initialize();
+            const tetrahedronAngle = 120 / 180 * Math.PI;
+            this.delaunayGraph.incrementalInsert([
+                Math.cos(tetrahedronAngle * 0.5) * Math.sin(tetrahedronAngle * 0.5),
+                Math.sin(tetrahedronAngle * 0.5) * Math.sin(tetrahedronAngle * 0.5),
+                Math.cos(tetrahedronAngle * 0.5)
+            ]);
+            this.delaunayGraph.incrementalInsert([
+                Math.cos(tetrahedronAngle * 1.5) * Math.sin(tetrahedronAngle * 0.5),
+                Math.sin(tetrahedronAngle * 1.5) * Math.sin(tetrahedronAngle * 0.5),
+                Math.cos(tetrahedronAngle * 1.5)
+            ]);
+            this.delaunayData = Array.from(this.delaunayGraph.GetTriangles());
             this.voronoiGraph = this.delaunayGraph.getVoronoiGraph();
-            const lloydPoints = this.voronoiGraph.lloydRelaxation();
-            this.delaunayGraph = new DelaunayGraph<Planet>(this);
-            this.delaunayGraph.initializeWithPoints(lloydPoints);
+        } else {
+            // initialize regular 3d terrain
+            this.delaunayGraph.initialize();
+            for (let i = 0; i < 20 * Math.pow(1.5, this.worldScale); i++) {
+                this.delaunayGraph.incrementalInsert();
+            }
+            for (let step = 0; step < 10 * Math.pow(1.5, this.worldScale); step++) {
+                this.voronoiGraph = this.delaunayGraph.getVoronoiGraph();
+                const lloydPoints = this.voronoiGraph.lloydRelaxation();
+                this.delaunayGraph = new DelaunayGraph<Planet>(this);
+                this.delaunayGraph.initializeWithPoints(lloydPoints);
+            }
+            this.delaunayData = Array.from(this.delaunayGraph.GetTriangles());
+            this.voronoiGraph = this.delaunayGraph.getVoronoiGraph();
         }
-        this.delaunayData = Array.from(this.delaunayGraph.GetTriangles());
-        this.voronoiGraph = this.delaunayGraph.getVoronoiGraph();
         const planetPoints = this.voronoiGraph.lloydRelaxation();
 
         // initialize stars
@@ -3337,7 +3362,6 @@ export class App extends React.Component<IAppProps, IAppState> {
                             <li>Add ship building economy for each planet. DONE 4/24/2021</li>
                             <li>Planets will sell ships using dutch auction, 50% will go to faction as tax, 50% will go to island renovation. DONE 4/24/2021</li>
                             <li>Make cannon balls damage merchant ships. -- DONE 4/27/2021</li>
-                            <li>Add upgradable buildings to island planets, so they can spend profit to make the island planet better.</li>
                             <li>Add tax trading where planets will pay taxes to the capital.</li>
                             <li>Construction and upgrade of buildings in capitals and colonies. -- DONE 5/15/2021</li>
                             <li>Add Imperial/Colonial empire design, the capital will upgrade certain locations into high level planets.</li>
