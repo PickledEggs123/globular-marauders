@@ -3338,7 +3338,9 @@ export class App extends React.Component<IAppProps, IAppState> {
                             <li>Planets will sell ships using dutch auction, 50% will go to faction as tax, 50% will go to island renovation. DONE 4/24/2021</li>
                             <li>Make cannon balls damage merchant ships. -- DONE 4/27/2021</li>
                             <li>Add upgradable buildings to island planets, so they can spend profit to make the island planet better.</li>
-                            <li>Add tax trading and construction trading between colonies and capitals.</li>
+                            <li>Add tax trading where planets will pay taxes to the capital.</li>
+                            <li>Construction and upgrade of buildings in capitals and colonies. -- DONE 5/15/2021</li>
+                            <li>Add Imperial/Colonial empire design, the capital will upgrade certain locations into high level planets.</li>
                             <li>Add ability to pirate merchants and raid colonies. -- DONE 4/30/2021</li>
                             <li>Add ability for AI to aim at player. -- DONE 5/1/2021</li>
                             <li>Add AI pirates. -- DONE 5/9/2021</li>
