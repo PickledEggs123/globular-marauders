@@ -27,7 +27,7 @@ import {
 } from "./Graph";
 import {VoronoiTree} from "./VoronoiTree";
 import {Faction, LuxuryBuff} from "./Faction";
-import {EBuildingType, Planet, Plantation} from "./Planet";
+import {EBuildingType, Manufactory, Planet, Plantation} from "./Planet";
 import {CannonBall, Crate, SmokeCloud} from "./Item";
 import * as Tone from "tone";
 
@@ -620,7 +620,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         }).join(" ");
     }
 
-    private drawPlanet(planetDrawing: IDrawable<Planet>) {
+    private drawPlanet(uiPass: boolean, planetDrawing: IDrawable<Planet>) {
         const isReverseSide = planetDrawing.rotatedPosition[2] < 0;
         const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
         const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
@@ -653,7 +653,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         return (
             <>
                 {
-                    planetDrawing.original.settlementProgress > 0 && factionColor && (
+                    !uiPass && planetDrawing.original.settlementProgress > 0 && factionColor && (
                         <polygon
                             key={`${planetDrawing.id}-settlement-progress`}
                             transform={`translate(${x * this.state.width},${(1 - y) * this.state.height})`}
@@ -663,36 +663,43 @@ export class App extends React.Component<IAppProps, IAppState> {
                         />
                     )
                 }
-                <circle
-                    key={`${planetDrawing.id}-planet`}
-                    cx={x * this.state.width}
-                    cy={(1 - y) * this.state.height}
-                    r={size * (this.state.zoom * this.worldScale)}
-                    fill={planetDrawing.color}
-                    stroke="grey"
-                    strokeWidth={0.2 * size * (this.state.zoom * this.worldScale)}
-                    style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
-                />
                 {
-                    planetVisible && (
+                    !uiPass && (
+                        <circle
+                            key={`${planetDrawing.id}-planet`}
+                            cx={x * this.state.width}
+                            cy={(1 - y) * this.state.height}
+                            r={size * (this.state.zoom * this.worldScale)}
+                            fill={planetDrawing.color}
+                            stroke="grey"
+                            strokeWidth={0.2 * size * (this.state.zoom * this.worldScale)}
+                            style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
+                        />
+                    )
+                }
+                {
+                    uiPass && planetVisible && (
                         <>
                             <text
                                 key={`${planetDrawing.id}-planet-title`}
                                 x={planetX + size * (this.state.zoom * this.worldScale) + 10}
                                 y={planetY}
                                 fill="white"
-                                fontSize="6"
+                                fontSize="8"
                             >{planetTitle}</text>
                             {
-                                planetDrawing.original.buildings.filter(b => b.buildingType === EBuildingType.PLANTATION).map((building, index) => {
+                                planetDrawing.original.buildings.filter(b => {
+                                    return b.buildingType === EBuildingType.PLANTATION || b.buildingType === EBuildingType.MANUFACTORY;
+                                }).map((building, index) => {
+                                    const resourceType: EResourceType = building.buildingType === EBuildingType.PLANTATION ? (building as Plantation).resourceType : (building as Manufactory).recipe.products[0].resourceType;
                                     return (
                                         <text
                                             key={`${planetDrawing.id}-planet-resource-${index}`}
                                             x={planetX + size * (this.state.zoom * this.worldScale) + 10}
                                             y={planetY + (index + 1) * 10}
                                             fill="white"
-                                            fontSize="6"
-                                        >{(building as Plantation).resourceType} ({building.buildingLevel})</text>
+                                            fontSize="8"
+                                        >{resourceType} ({building.buildingLevel})</text>
                                     );
                                 })
                             }
@@ -1117,7 +1124,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         );
     }
 
-    private drawCrate(planetDrawing: IDrawable<Crate>) {
+    private drawCrate(uiPass: boolean, planetDrawing: IDrawable<Crate>) {
         const isReverseSide = planetDrawing.rotatedPosition[2] > 0;
         const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
         const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
@@ -1125,21 +1132,29 @@ export class App extends React.Component<IAppProps, IAppState> {
         const size = 0.1 * Math.max(0, 2 * Math.atan(planetDrawing.original.size / (2 * distance)));
         return (
             <g
-                key={planetDrawing.id}
+                key={`${planetDrawing.id}${uiPass ? "-ui" : ""}`}
                 transform={`translate(${x * this.state.width},${(1 - y) * this.state.height})`}
             >
-                <g transform={`scale(0.2)`}>
-                    {
-                        this.renderItem(planetDrawing.original.resourceType)
-                    }
-                </g>
-                <text
-                    stroke="white"
-                    x={size * (this.state.zoom * this.worldScale) + 10}
-                    y={0}
-                >
-                    {planetDrawing.original.resourceType}
-                </text>
+                {
+                    !uiPass && (
+                        <g transform={`scale(0.2)`}>
+                            {
+                                this.renderItem(planetDrawing.original.resourceType)
+                            }
+                        </g>
+                    )
+                }
+                {
+                    uiPass && (
+                        <text
+                            stroke="white"
+                            x={size * (this.state.zoom * this.worldScale) + 10}
+                            y={0}
+                        >
+                            {planetDrawing.original.resourceType}
+                        </text>
+                    )
+                }
             </g>
         );
     }
@@ -2115,10 +2130,10 @@ export class App extends React.Component<IAppProps, IAppState> {
             planet.settlementProgress = 1;
             planet.settlementLevel = ESettlementLevel.CAPITAL;
             planet.naturalResources = [...CAPITAL_GOODS];
-            planet.resources.push(...CAPITAL_GOODS.map(resourceType => ({resourceType, amount: 1})));
         } else {
             planet.buildInitialResourceBuildings();
         }
+        planet.recomputeResources();
         planet.pathingNode = this.delaunayGraph.createPathingNode(planet.position.rotateVector([0, 0, 1]));
         return planet;
     }
@@ -2303,7 +2318,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 {
                     (this.planets.map(this.rotatePlanet.bind(this))
                         .map(this.convertToDrawable.bind(this, "-planet", 1)) as Array<IDrawable<Planet>>)
-                        .map(this.drawPlanet.bind(this))
+                        .map(this.drawPlanet.bind(this, false))
                 }
                 {
                     (this.smokeClouds.map(App.applyKinematics.bind(this))
@@ -2319,12 +2334,22 @@ export class App extends React.Component<IAppProps, IAppState> {
                 {
                     (this.crates.map(this.rotatePlanet.bind(this))
                         .map(this.convertToDrawable.bind(this, "-crates", 1)) as Array<IDrawable<Crate>>)
-                        .map(this.drawCrate.bind(this))
+                        .map(this.drawCrate.bind(this, false))
                 }
                 {
                     (this.ships.map(this.rotatePlanet.bind(this))
                         .map(this.convertToDrawable.bind(this, "-ships", 1)) as Array<IDrawable<Ship>>)
                         .map(this.drawShip.bind(this))
+                }
+                {
+                    (this.planets.map(this.rotatePlanet.bind(this))
+                        .map(this.convertToDrawable.bind(this, "-planet", 1)) as Array<IDrawable<Planet>>)
+                        .map(this.drawPlanet.bind(this, true))
+                }
+                {
+                    (this.crates.map(this.rotatePlanet.bind(this))
+                        .map(this.convertToDrawable.bind(this, "-crates", 1)) as Array<IDrawable<Crate>>)
+                        .map(this.drawCrate.bind(this, true))
                 }
                 {/*{*/}
                 {/*    (this.ships.map(this.rotatePlanet.bind(this))*/}

@@ -4,7 +4,7 @@ import {shallow, ShallowWrapper} from "enzyme";
 import Quaternion from "quaternion";
 import sinon, {SinonSpy} from 'sinon';
 import {computeConeLineIntersection} from "./Intersection";
-import {CAPITAL_GOODS, OUTPOST_GOODS} from "./Resource";
+import {CAPITAL_GOODS, EResourceType, ITEM_RECIPES, OUTPOST_GOODS} from "./Resource";
 import {EFaction, EShipType, PHYSICS_SCALE, Ship, SHIP_DATA} from "./Ship";
 import {EOrderType, Order} from "./Order";
 import {DelaunayGraph, PathFinder, VoronoiGraph} from "./Graph";
@@ -159,12 +159,128 @@ const setupPlanetBuildingUpgradingTest = (numMinutes: number = 60) => {
   }
 
   // expect the planet to successfully upgrade its stuff
-  expect(upgradeShipyard.callCount).toBe(3);
-  expect(upgradeForestry.callCount).toBe(5);
-  expect(upgradeMine.callCount).toBe(5);
+  expect(upgradeShipyard.callCount).toBe(2);
+  expect(upgradeForestry.callCount).toBe(4);
+  expect(upgradeMine.callCount).toBe(4);
   expect(upgradeBlacksmith.callCount).toBe(0);
   expect(dutchHomeWorld.planet.cannons).toBeGreaterThan(0);
   expect(dutchHomeWorld.planet.cannonades).toBeGreaterThan(0);
+};
+
+/**
+ * Setup unit tests around plantation and manufactory buildings on a planet.
+ * Each building on a planet should upgrade the plantation and the manufactory to produce more output.
+ */
+const setupPlanetManufactoryTest = (numMinutes: number = 60) => {
+  // setup wrapper to run test
+  const wrapper = shallow<App>(<App isTestMode worldScale={1} />);
+  const app = wrapper.instance();
+  app.forceUpdate = () => undefined;
+
+  // remove all ships
+  for (const faction of Object.values(app.factions)) {
+    faction.handleFactionLoop = () => undefined;
+  }
+
+  // validate data
+  for (const faction of Object.values(app.factions)) {
+    assertFactionData(faction);
+  }
+
+  // setup test ship and nav point
+  const englishFaction = app.factions[EFaction.ENGLISH];
+  const englishHomeWorld = app.planets.find(p => p.id === englishFaction.homeWorldPlanetId);
+  if (!englishHomeWorld) {
+    throw new Error("Could not find English Home World");
+  }
+  const closestEnglishPlanet = Object.values(englishFaction.explorationGraph).reduce((acc, n) => {
+    if (!acc || (acc && n.distance < acc.distance)) {
+      return {
+        distance: n.distance,
+        planet: n.planet
+      };
+    } else {
+      return acc;
+    }
+  }, null as null | {
+    distance: number,
+    planet: Planet
+  });
+  if (!closestEnglishPlanet) {
+    throw new Error("Could not find closest English Planet");
+  }
+  closestEnglishPlanet.planet.settlementProgress = 1;
+  closestEnglishPlanet.planet.settlementLevel = ESettlementLevel.OUTPOST;
+  englishFaction.planetIds.push(closestEnglishPlanet.planet.id);
+
+  // remove plantations to not mess up the unit tests since plantations are random
+  while (true) {
+    const index = closestEnglishPlanet.planet.buildings.findIndex(b => b.buildingType === EBuildingType.PLANTATION);
+    if (index >= 0) {
+      closestEnglishPlanet.planet.buildings.splice(index, 1);
+    } else {
+      break;
+    }
+  }
+
+  // set sugar cane to test sugar cane -> molasses -> rum manufactory pipeline.
+  closestEnglishPlanet.planet.naturalResources = [EResourceType.SUGAR_CANE];
+  closestEnglishPlanet.planet.buildInitialResourceBuildings();
+
+  const upgradeShipyard = sinon.spy(closestEnglishPlanet.planet.shipyard, "upgrade");
+  const upgradeForestry = sinon.spy(closestEnglishPlanet.planet.forestry, "upgrade");
+  const upgradeMine = sinon.spy(closestEnglishPlanet.planet.mine, "upgrade");
+  const upgradeBlacksmith = sinon.spy(closestEnglishPlanet.planet.blacksmith, "upgrade");
+  const plantationBuilding = closestEnglishPlanet.planet.buildings[closestEnglishPlanet.planet.buildings.length - 1];
+  expect(plantationBuilding.buildingType).toBe(EBuildingType.PLANTATION);
+  const upgradePlantation = sinon.spy(plantationBuilding, "upgrade");
+
+  // run a game loop to help the planets build their plantation resources
+  app.gameLoop.call(app);
+  // run a game loop to help copy produced resources into resources
+  app.gameLoop.call(app);
+
+  // test the ship navigation to nav point
+  const numStepsPerSecond = 10;
+  const numSecondsPerMinute = 60;
+  const numSteps = numStepsPerSecond * numSecondsPerMinute * numMinutes;
+  for (let step = 0; step < numSteps; step++) {
+    app.gameLoop.call(app);
+    // remove wood to prevent additional ships
+    for (const planet of app.planets) {
+      planet.wood = 0;
+    }
+  }
+
+  // expect the planet to successfully upgrade its stuff
+  expect(upgradeShipyard.callCount).toBe(1);
+  expect(upgradeForestry.callCount).toBe(3);
+  expect(upgradeMine.callCount).toBe(1);
+  expect(upgradePlantation.callCount).toBe(3);
+  expect(upgradeBlacksmith.callCount).toBe(0);
+
+  // expect there to be manufactory for molasses and rum
+  const secondLastBuilding = closestEnglishPlanet.planet.buildings[closestEnglishPlanet.planet.buildings.length - 2];
+  const lastBuilding = closestEnglishPlanet.planet.buildings[closestEnglishPlanet.planet.buildings.length - 1];
+  expect(secondLastBuilding).toEqual(expect.objectContaining({
+    buildingLevel: 2,
+    buildingType: EBuildingType.MANUFACTORY,
+    recipe: ITEM_RECIPES.find(r => r.products.some(p => p.resourceType === EResourceType.MOLASSES))
+  }));
+  expect(lastBuilding).toEqual(expect.objectContaining({
+    buildingLevel: 1,
+    buildingType: EBuildingType.MANUFACTORY,
+    recipe: ITEM_RECIPES.find(r => r.products.some(p => p.resourceType === EResourceType.RUM))
+  }));
+  expect(closestEnglishPlanet.planet.resources).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        resourceType: EResourceType.RUM
+      })
+  ]));
+
+  // expect no cannons on an output
+  expect(closestEnglishPlanet.planet.cannons).toBe(0);
+  expect(closestEnglishPlanet.planet.cannonades).toBe(0);
 };
 
 /**
@@ -364,6 +480,8 @@ const setupPiracyTest = (numMinutes: number = 20) => {
   englishFaction.planetIds.push(closestEnglishPlanet.planet.id);
 
   // run a game loop to help the planets build their plantation resources
+  app.gameLoop.call(app);
+  // run a game loop to help copy produced resources into resources
   app.gameLoop.call(app);
 
   // create english ship to be pirated
@@ -573,6 +691,9 @@ describe('test AI', () => {
   });
   it('test planet building upgrades', () => {
     setupPlanetBuildingUpgradingTest();
+  });
+  it('test planet manufactory upgrades', () => {
+    setupPlanetManufactoryTest();
   });
 });
 describe('Collision Detection', () => {

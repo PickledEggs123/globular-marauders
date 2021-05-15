@@ -1,12 +1,24 @@
 import {ESettlementLevel, ICameraState, IGoldAccount} from "./Interface";
 import Quaternion from "quaternion";
 import {DelaunayGraph, PathingNode} from "./Graph";
-import {CAPITAL_GOODS, EResourceType, OUTPOST_GOODS} from "./Resource";
+import {
+    CAPITAL_GOODS,
+    EResourceType,
+    ICargoItem,
+    IItemRecipe,
+    ITEM_RECIPES,
+    NATURAL_RESOURCES,
+    OUTPOST_GOODS
+} from "./Resource";
 import {EShipType, Ship, SHIP_DATA} from "./Ship";
 import App from "./App";
 
 export interface IResourceExported {
     resourceType: EResourceType;
+    amount: number;
+}
+
+export interface IResourceProduced extends IItemRecipe {
     amount: number;
 }
 
@@ -71,6 +83,10 @@ export enum EBuildingType {
      */
     PLANTATION = "PLANTATION",
     /**
+     * A building which produces a refined product.
+     */
+    MANUFACTORY = "MANUFACTORY",
+    /**
      * A building which produces iron.
      */
     MINE = "MINE",
@@ -111,6 +127,7 @@ export abstract class Building {
             this.upgradeProgress -= 1;
             if (this.upgradeProgress <= 0) {
                 this.buildingLevel += 1;
+                this.planet.recomputeResources();
             }
         }
     }
@@ -161,7 +178,7 @@ export class Shipyard extends Building {
 
     getUpgradeCost(): number {
         // 5 minutes to begin upgrade
-        return 5 * 60 * 10 * Math.pow(this.buildingLevel, Math.sqrt(2));
+        return 5 * 60 * 10 * Math.pow(this.buildingLevel + 1, Math.sqrt(2));
     }
 
     public getNextShipTypeToBuild(): EShipType {
@@ -302,7 +319,7 @@ export class Forestry extends Building {
 
     getUpgradeCost(): number {
         // forestry requires 2 minutes to begin upgrade
-        return 2 * 60 * 10 * Math.pow(this.buildingLevel, Math.sqrt(2));
+        return 2 * 60 * 10 * Math.pow(this.buildingLevel + 1, Math.sqrt(2));
     }
 
     handleBuildingLoop() {
@@ -328,21 +345,72 @@ export class Plantation extends Building {
 
     getUpgradeCost(): number {
         // forestry requires 2 minutes to begin upgrade
-        return 2 * 60 * 10 * Math.pow(this.buildingLevel, Math.sqrt(2));
+        return 2 * 60 * 10 * Math.pow(this.buildingLevel + 1, Math.sqrt(2));
     }
 
     handleBuildingLoop() {
         super.handleBuildingLoop();
 
         // add wood proportional to building level
-        const oldResource = this.planet.resources.find(r => r.resourceType === this.resourceType);
-        if (oldResource) {
+        const oldProducedResource = this.planet.producedResources.find(r => r.resourceType === this.resourceType);
+        if (oldProducedResource) {
             // upgrade resources array
-            oldResource.amount = this.buildingLevel;
+            oldProducedResource.amount = this.buildingLevel;
         } else {
             // add new resources array
-            this.planet.resources.push({
+            this.planet.producedResources.push({
                 resourceType: this.resourceType,
+                amount: this.buildingLevel
+            });
+        }
+    }
+}
+
+/**
+ * A building which produces manufactured resources.
+ */
+export class Manufactory extends Building {
+    buildingType: EBuildingType = EBuildingType.MANUFACTORY;
+    recipe: IItemRecipe;
+
+    constructor(instance: App, planet: Planet, recipe: IItemRecipe) {
+        super(instance, planet);
+        this.recipe = recipe;
+        this.buildingLevel = 0;
+    }
+
+    getUpgradeCost(): number {
+        // check for available room to upgrade
+        const hasRoomToUpgradeManufacturing = this.recipe.ingredients.every(ingredient => {
+            let amount = 0;
+            for (const resource of this.planet.resources) {
+                if (resource.resourceType === ingredient.resourceType) {
+                    amount += resource.amount;
+                }
+            }
+            return amount >= ingredient.amount * (this.buildingLevel + 1);
+        });
+
+        if (hasRoomToUpgradeManufacturing) {
+            // factory requires 5 minutes to begin upgrade
+            return 5 * 60 * 10 * Math.pow(this.buildingLevel + 1, Math.sqrt(2));
+        } else {
+            return Number.MAX_VALUE;
+        }
+    }
+
+    handleBuildingLoop() {
+        super.handleBuildingLoop();
+
+        // add wood proportional to building level
+        const oldManufacturedResource = this.planet.manufacturedResources.find(r => r.id === this.recipe.id);
+        if (oldManufacturedResource) {
+            // upgrade resources array
+            oldManufacturedResource.amount = this.buildingLevel;
+        } else {
+            // add new resources array
+            this.planet.manufacturedResources.push({
+                ...this.recipe,
                 amount: this.buildingLevel
             });
         }
@@ -357,7 +425,7 @@ export class Mine extends Building {
 
     getUpgradeCost(): number {
         // mine requires 2 minutes to begin upgrade
-        return 2 * 60 * 10 * Math.pow(this.buildingLevel, Math.sqrt(2));
+        return 2 * 60 * 10 * Math.pow(this.buildingLevel + 1, Math.sqrt(2));
     }
 
     handleBuildingLoop() {
@@ -435,10 +503,15 @@ export class Planet implements ICameraState {
     public settlementProgress: number = 0;
     public settlementLevel: ESettlementLevel = ESettlementLevel.UNTAMED;
     public pathingNode: PathingNode<DelaunayGraph<Planet>> | null = null;
-    // resources which are exported from the island
-    public resources: Array<IResourceExported>;
     // the resources the island can produce
     public naturalResources: EResourceType[];
+    // the resources the island produces from its plantations
+    public producedResources: IResourceExported[] = [];
+    // the resources the island imports from trading
+    public importedResources: ICargoItem[] = [];
+    public manufacturedResources: IResourceProduced[] = [];
+    // resources which are exported from the island
+    public resources: Array<IResourceExported> = [];
     // the amount of wood available to build ships
     public wood: number = 0;
     // the amount of wood available to build buildings
@@ -470,6 +543,7 @@ export class Planet implements ICameraState {
     // a list of buildings to upgrade
     public readonly buildings: Building[];
     private resourceCycle: number = 0;
+    private numTicks: number = 0;
 
     /**
      * Number of settlements to colonize a planet.
@@ -487,10 +561,9 @@ export class Planet implements ICameraState {
         this.instance = instance;
 
         // initialize the natural resources
-        this.resources = [];
         this.naturalResources = [];
         const numResources = Math.floor(Math.random() * 2 + 1);
-        const resourceValues = Object.values(OUTPOST_GOODS);
+        const resourceValues = Object.values(NATURAL_RESOURCES);
         for (let i = 0; i < 100 && this.naturalResources.length < numResources; i++) {
             const randomResource = resourceValues[Math.floor(Math.random() * resourceValues.length)];
             if (!this.naturalResources.includes(randomResource)) {
@@ -517,15 +590,85 @@ export class Planet implements ICameraState {
         );
     }
 
+    // rebuild the resources array based on events such as less or more items
+    public recomputeResources() {
+        // update resources array
+        this.resources.splice(0, this.resources.length);
+        // start with capital goods
+        this.resources.push(...this.naturalResources.filter(r => CAPITAL_GOODS.includes(r)).map(resourceType => ({
+            resourceType,
+            amount: 1
+        })));
+        // start with produced resources
+        this.resources.push(...this.producedResources);
+        // insert imported resources
+        for (const importedResource of this.importedResources) {
+            const oldResource = this.resources.find(r => r.resourceType === importedResource.resourceType);
+            if (oldResource) {
+                oldResource.amount += importedResource.amount;
+            } else {
+                this.resources.push({
+                    resourceType: importedResource.resourceType,
+                    amount: importedResource.amount
+                });
+            }
+        }
+        // subtract manufactured resources
+        for (const manufacturedResource of this.manufacturedResources) {
+            // the amount of recipes that can be produced
+            let amount: number = Number.MAX_VALUE;
+            for (const ingredient of manufacturedResource.ingredients) {
+                const oldResource = this.resources.find(i => i.resourceType === ingredient.resourceType);
+                if (oldResource) {
+                    // compute recipe amount
+                    amount = Math.min(amount, Math.floor(oldResource.amount / (ingredient.amount * manufacturedResource.amount)));
+                } else {
+                    // resource not found, 0 recipe amount
+                    amount = 0;
+                }
+            }
+            // if there is at least one recipe amount
+            if (amount > 0) {
+                for (const ingredient of manufacturedResource.ingredients) {
+                    const oldResource = this.resources.find(i => i.resourceType === ingredient.resourceType);
+                    if (oldResource) {
+                        oldResource.amount -= ingredient.amount * amount;
+                    }
+                }
+                for (const product of manufacturedResource.products) {
+                    const oldResource = this.resources.find(i => i.resourceType === product.resourceType);
+                    if (oldResource) {
+                        oldResource.amount += product.amount * amount;
+                    } else {
+                        this.resources.push({
+                            resourceType: product.resourceType,
+                            amount: product.amount * amount
+                        });
+                    }
+                }
+            }
+        }
+    }
+
     public handlePlanetLoop() {
         if (this.settlementLevel < ESettlementLevel.OUTPOST) {
             // planets smaller than colonies do nothing
             return;
         }
 
+        // recompute resources for the first few ticks to initialize the planet economy
+        if (this.numTicks < 5) {
+            this.recomputeResources();
+        }
+        this.numTicks += 1;
+
         // handle buildings
         for (const building of this.buildings) {
-            if (this.settlementLevel >= ESettlementLevel.OUTPOST && building.buildingType === EBuildingType.PLANTATION) {
+            if (
+                (this.settlementLevel >= ESettlementLevel.OUTPOST && building.buildingType === EBuildingType.PLANTATION) ||
+                (this.settlementLevel >= ESettlementLevel.OUTPOST && building.buildingType === EBuildingType.MANUFACTORY) ||
+                (this.settlementLevel >= ESettlementLevel.OUTPOST && building.buildingType === EBuildingType.FORESTRY)
+            ) {
                 // outposts have working plantations but no shipyards or other general infrastructure
                 building.handleBuildingLoop();
             } else if (this.settlementLevel >= ESettlementLevel.COLONY) {
@@ -534,13 +677,19 @@ export class Planet implements ICameraState {
             }
         }
 
+        // handle construction of new buildings
+        const nextBuildingToBuild = this.getNextBuildingToBuild();
+        if (nextBuildingToBuild) {
+            this.buildings.push(nextBuildingToBuild)
+        }
+
         // handle upgrades of buildings
         const {
-            nextBuilding,
-            nextBuildingCost
+            nextBuilding: nextBuildingToUpgrade,
+            nextBuildingCost: nextUpgradeCost
         } = this.getNextBuildingUpgrade();
-        if (this.woodConstruction >= nextBuildingCost) {
-            nextBuilding.upgrade();
+        if (this.woodConstruction >= nextUpgradeCost) {
+            nextBuildingToUpgrade.upgrade();
         }
     }
 
@@ -560,7 +709,10 @@ export class Planet implements ICameraState {
                 continue;
             }
             // skip buildings which are not plantation if the settlement is smaller than a colony
-            if (building.buildingType === EBuildingType.PLANTATION && this.settlementLevel < ESettlementLevel.COLONY) {
+            if (
+                (building.buildingType === EBuildingType.PLANTATION && this.settlementLevel < ESettlementLevel.OUTPOST) ||
+                (building.buildingType === EBuildingType.MANUFACTORY && this.settlementLevel < ESettlementLevel.OUTPOST)
+            ) {
                 continue;
             }
             const buildingCost = building.getUpgradeCost();
@@ -576,6 +728,30 @@ export class Planet implements ICameraState {
             };
         } else {
             throw new Error("Could not find a building to get upgrade costs");
+        }
+    }
+
+    /**
+     * Determine the next building to build.
+     */
+    getNextBuildingToBuild(): Building | null {
+        // find next manufactory to build
+        const recipe = ITEM_RECIPES.find(recipe => {
+            return recipe.ingredients.every(ingredient => {
+                let amount = 0;
+                for (const resource of this.resources) {
+                    if (resource.resourceType === ingredient.resourceType) {
+                        amount += resource.amount;
+                    }
+                }
+                return amount >= ingredient.amount;
+            });
+        });
+        const existingBuilding = this.buildings.find(b => b.buildingType === EBuildingType.MANUFACTORY && (b as Manufactory).recipe === recipe);
+        if (recipe && !existingBuilding) {
+            return new Manufactory(this.instance, this, recipe);
+        } else {
+            return null;
         }
     }
 

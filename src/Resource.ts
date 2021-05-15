@@ -6,13 +6,20 @@ export enum EResourceType {
     COTTON = "COTTON",
     FLAX = "FLAX",
     TOBACCO = "TOBACCO",
-    MOLASSES = "MOLASSES",
-    RUM = "RUM",
+    SUGAR_CANE = "SUGAR_CANE",
     COFFEE = "COFFEE",
     CACAO = "CACAO",
     RUBBER = "RUBBER",
     FUR = "FUR",
     MAHOGANY = "MAHOGANY",
+    // manufactory goods
+    CLOTHING = "CLOTHING",
+    ROPE = "ROPE",
+    CIGAR = "CIGAR",
+    MOLASSES = "MOLASSES",
+    RUM = "RUM",
+    FUR_APPAREL = "FUR_APPAREL",
+    FURNITURE = "FURNITURE",
     // capital goods
     FIREARM = "FIREARM",
     GUNPOWDER = "GUNPOWDER",
@@ -20,20 +27,77 @@ export enum EResourceType {
     RATION = "RATION"
 }
 
+export interface IItemRecipeItem {
+    resourceType: EResourceType;
+    amount: number;
+}
+export interface IItemRecipe {
+    id: string;
+    ingredients: IItemRecipeItem[];
+    products: IItemRecipeItem[];
+}
+export interface IItemData {
+    resourceType: EResourceType;
+    basePrice: number;
+    makes?: EResourceType;
+    natural: boolean;
+}
+
+export const ITEM_DATA: IItemData[] = [
+    // outpost goods
+    {resourceType: EResourceType.COTTON, basePrice: 1, natural: true, makes: EResourceType.CLOTHING},
+    {resourceType: EResourceType.CLOTHING, basePrice: 3, natural: false},
+    {resourceType: EResourceType.FLAX, basePrice: 1, natural: true, makes: EResourceType.ROPE},
+    {resourceType: EResourceType.ROPE, basePrice: 3, natural: false},
+    {resourceType: EResourceType.TOBACCO, basePrice: 1, natural: true, makes: EResourceType.CIGAR},
+    {resourceType: EResourceType.CIGAR, basePrice: 3, natural: false},
+    {resourceType: EResourceType.SUGAR_CANE, basePrice: 1, natural: true, makes: EResourceType.MOLASSES},
+    {resourceType: EResourceType.MOLASSES, basePrice: 3, natural: false, makes: EResourceType.RUM},
+    {resourceType: EResourceType.RUM, basePrice: 5, natural: false},
+    {resourceType: EResourceType.COFFEE, basePrice: 2, natural: true},
+    {resourceType: EResourceType.CACAO, basePrice: 2, natural: true},
+    {resourceType: EResourceType.RUBBER, basePrice: 2, natural: true},
+    {resourceType: EResourceType.FUR, basePrice: 3, natural: true, makes: EResourceType.FUR_APPAREL},
+    {resourceType: EResourceType.FUR_APPAREL, basePrice: 5, natural: false},
+    {resourceType: EResourceType.MAHOGANY, basePrice: 3, natural: true, makes: EResourceType.FURNITURE},
+    {resourceType: EResourceType.FURNITURE, basePrice: 5, natural: false},
+    // capital goods
+    {resourceType: EResourceType.FIREARM, basePrice: 100, natural: false},
+    {resourceType: EResourceType.GUNPOWDER, basePrice: 100, natural: false},
+    {resourceType: EResourceType.IRON, basePrice: 50, natural: false},
+    {resourceType: EResourceType.RATION, basePrice: 10, natural: false},
+];
+
+/**
+ * A list of naturally occurring resources for plantations.
+ */
+export const NATURAL_RESOURCES: EResourceType[] = ITEM_DATA.reduce((resourceTypes, i) => {
+    if (i.natural) {
+        resourceTypes.push(i.resourceType);
+    }
+    return resourceTypes;
+}, [] as EResourceType[]);
+
 /**
  * A list of goods produced by outposts.
  */
 export const OUTPOST_GOODS: EResourceType[] = [
     EResourceType.COTTON,
+    EResourceType.CLOTHING,
     EResourceType.FLAX,
+    EResourceType.ROPE,
     EResourceType.TOBACCO,
+    EResourceType.CIGAR,
+    EResourceType.SUGAR_CANE,
     EResourceType.MOLASSES,
     EResourceType.RUM,
     EResourceType.COFFEE,
     EResourceType.CACAO,
     EResourceType.RUBBER,
     EResourceType.FUR,
+    EResourceType.FUR_APPAREL,
     EResourceType.MAHOGANY,
+    EResourceType.FURNITURE,
 ];
 /**
  * A list of goods produced by capitals.
@@ -45,29 +109,22 @@ export const CAPITAL_GOODS: EResourceType[] = [
     EResourceType.RATION,
 ];
 
-export interface IItemData {
-    resourceType: EResourceType;
-    basePrice: number;
-}
-
-export const ITEM_DATA: IItemData[] = [
-    // outpost goods
-    {resourceType: EResourceType.COTTON, basePrice: 1},
-    {resourceType: EResourceType.FLAX, basePrice: 1},
-    {resourceType: EResourceType.TOBACCO, basePrice: 3},
-    {resourceType: EResourceType.MOLASSES, basePrice: 1},
-    {resourceType: EResourceType.RUM, basePrice: 5},
-    {resourceType: EResourceType.COFFEE, basePrice: 2},
-    {resourceType: EResourceType.CACAO, basePrice: 2},
-    {resourceType: EResourceType.RUBBER, basePrice: 5},
-    {resourceType: EResourceType.FUR, basePrice: 5},
-    {resourceType: EResourceType.MAHOGANY, basePrice: 5},
-    // capital goods
-    {resourceType: EResourceType.FIREARM, basePrice: 100},
-    {resourceType: EResourceType.GUNPOWDER, basePrice: 100},
-    {resourceType: EResourceType.IRON, basePrice: 50},
-    {resourceType: EResourceType.RATION, basePrice: 10},
-];
+export const ITEM_RECIPES: IItemRecipe[] = ITEM_DATA.reduce((recipes, i) => {
+    if (i.makes) {
+        recipes.push({
+            id: `Produce${i.makes}From${i.resourceType}`,
+            ingredients: [{
+                resourceType: i.resourceType,
+                amount: 1
+            }],
+            products: [{
+                resourceType: i.makes,
+                amount: 1
+            }]
+        });
+    }
+    return recipes;
+}, [] as IItemRecipe[]);
 
 /**
  * An object which represents cargo.
