@@ -691,7 +691,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
             ];
 
             // determine if a flip is necessary based on the area ratio
-            const defaultAreaDiff = Math.max(
+            const defaultAreaDiff = Math.min(
                 Math.abs(Math.acos(DelaunayGraph.dotProduct(
                     DelaunayGraph.normalize(
                         DelaunayGraph.subtract(this.vertices[vertexIndices[0]], this.vertices[vertexIndices[1]])
@@ -741,7 +741,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                     )
                 )))
             );
-            const complementAreaDiff = Math.max(
+            const complementAreaDiff = Math.min(
                 Math.abs(Math.acos(DelaunayGraph.dotProduct(
                     DelaunayGraph.normalize(
                         DelaunayGraph.subtract(this.vertices[vertexIndices[1]], this.vertices[vertexIndices[2]])
@@ -791,7 +791,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                     )
                 )))
             );
-            const shouldFlip = defaultAreaDiff > complementAreaDiff;
+            const shouldFlip = defaultAreaDiff < complementAreaDiff;
 
             // perform lawson flip
             if (shouldFlip) {
@@ -824,9 +824,43 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
         } else {
             vertex = DelaunayGraph.randomPoint();
         }
-        triangleIndex = this.findTriangleIntersection(vertex);
+
+        // check for collinear points, avoid silver triangles or acute triangles
+        for (let i = 0; i < this.vertices.length; i++) {
+            for (let j = i + 1; j < this.vertices.length; j++) {
+                // get vertices
+                const a = this.vertices[i];
+                const b = this.vertices[j];
+
+                // check only near by points
+                const trianglePerimeter = VoronoiGraph.angularDistance(a, b, this.app.worldScale) +
+                    VoronoiGraph.angularDistance(b, vertex, this.app.worldScale) +
+                    VoronoiGraph.angularDistance(vertex, a, this.app.worldScale);
+                if (trianglePerimeter > Math.PI / 1000 * 100 / this.app.worldScale * 3) {
+                    // perimeter of triangle is less than 300 units in total, assuming 100 units from 3 points of an
+                    // equilateral triangle.
+                    continue;
+                }
+
+                // compute collinear factor
+                const normal = DelaunayGraph.normalize(DelaunayGraph.crossProduct(
+                    DelaunayGraph.normalize(DelaunayGraph.crossProduct(a, b)),
+                    DelaunayGraph.normalize(DelaunayGraph.crossProduct(b, vertex))
+                ));
+                if (normal.some(i => isNaN(i))) {
+                    // skip insertion if normal is NaN.
+                    return;
+                }
+                const d = normal[0] + normal[1] + normal[2];
+                if (Math.acos(d) < Math.PI / 180 * 10) {
+                    // skip insertion if collinear to 10 degrees with another point
+                    return;
+                }
+            }
+        }
 
         // add triangle incrementally
+        triangleIndex = this.findTriangleIntersection(vertex);
         this.buildInitialTriangleMeshForNewVertex(vertex, triangleIndex);
 
         // perform lawson's flip to balance triangles

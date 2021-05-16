@@ -1710,17 +1710,26 @@ export class App extends React.Component<IAppProps, IAppState> {
         // handle physics and collision detection
         const collidableArrays: Array<{
             arr: ICollidable[],
-            collideFn: (ship: Ship, entity: ICollidable) => void,
+            collideFn: (this: App, ship: Ship, entity: ICollidable, hit: IHitTest) => void,
             useRayCast: boolean
         }> = [{
             arr: this.cannonBalls,
-            collideFn(ship: Ship, entity: ICollidable) {
+            collideFn(this: App, ship: Ship, entity: ICollidable, hit: IHitTest) {
                 ship.applyDamage(entity as CannonBall);
+
+                // make collision smoke cloud
+                if (hit.point) {
+                    const smokeCloud = new SmokeCloud();
+                    smokeCloud.id = `${ship.id}-${Math.floor(Math.random() * 100000000)}`;
+                    smokeCloud.position = Quaternion.fromBetweenVectors([0, 0, 1], hit.point);
+                    smokeCloud.size = 2;
+                    this.smokeClouds.push(smokeCloud);
+                }
             },
             useRayCast: true
         }, {
             arr: this.crates,
-            collideFn(ship: Ship, entity: ICollidable) {
+            collideFn(this: App, ship: Ship, entity: ICollidable, hit: IHitTest) {
                 ship.pickUpCargo(entity as Crate);
             },
             useRayCast: false
@@ -1764,7 +1773,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 // apply damage
                 const teamDamage = bestShip && bestShip.faction && entity.factionId && bestShip.faction.id === entity.factionId;
                 if (bestHit && bestShip && !teamDamage) {
-                    collideFn(bestShip, entity);
+                    collideFn.call(this, bestShip, entity, bestHit);
                     entitiesToRemove.push(entity);
                 }
             }
@@ -2170,11 +2179,11 @@ export class App extends React.Component<IAppProps, IAppState> {
         } else {
             // initialize regular 3d terrain
             this.delaunayGraph.initialize();
-            const numItems = 20 * Math.pow(1.5, this.worldScale);
+            const numItems = 5 * Math.pow(1.5, this.worldScale);
             for (let i = 0; i < numItems; i++) {
                 this.delaunayGraph.incrementalInsert();
             }
-            const numSteps = 10 * Math.pow(1.5, this.worldScale);
+            const numSteps = 20 * Math.pow(1.5, this.worldScale);
             for (let step = 0; step < numSteps; step++) {
                 this.voronoiGraph = this.delaunayGraph.getVoronoiGraph();
                 const lloydPoints = this.voronoiGraph.lloydRelaxation();
