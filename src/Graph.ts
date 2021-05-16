@@ -856,31 +856,124 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
 
     public getVoronoiGraph(): VoronoiGraph<T> {
         const graph = new VoronoiGraph<T>(this.app);
-        // for each vertex which becomes a voronoi cell
-        // get vertex, center of a voronoi cell
-        for (let vertexIndex = 0; vertexIndex < this.vertices.length; vertexIndex++) {
+        // for each triangle which becomes a voronoi cell
+        // get triangle, center of a voronoi cell
+        const cellCenters: Array<[number, number, number]> = [];
+        for (let triangleIndex = 0; triangleIndex < this.triangles.length; triangleIndex++) {
+            // get vertices
+            const vertices: Array<[number, number, number]> = [];
+            for (const edgeIndex of this.triangles[triangleIndex]) {
+                const vertexIndex = this.edges[edgeIndex][0];
+                vertices.push(this.vertices[vertexIndex]);
+            }
+            if (vertices.length < 3) {
+                throw new Error("Could not find 3 points for triangle center algorithm");
+            }
+            const a = vertices[0];
+            const b = vertices[1];
+            const c = vertices[2];
+
+            // compute radius of circle
+            const normal = DelaunayGraph.normalize(DelaunayGraph.crossProduct(
+                DelaunayGraph.subtract(a, b),
+                DelaunayGraph.subtract(c, b)
+            ));
+            const radius = normal[0] + normal[1] + normal[2];
+
+            // compute right triangles
+            const midAB = DelaunayGraph.normalize(App.getAveragePoint([a, b]));
+            const midBC = DelaunayGraph.normalize(App.getAveragePoint([b, c]));
+            const verticalAB = radius / DelaunayGraph.dotProduct(midAB, b);
+            const verticalBC = radius / DelaunayGraph.dotProduct(midBC, b);
+
+            // compute intersection points
+            const points: Array<[number, number, number]> = [];
+            points.push(
+                Quaternion.fromAxisAngle(
+                    DelaunayGraph.normalize(DelaunayGraph.subtract(a, b)),
+                    verticalAB
+                ).rotateVector(midAB),
+                Quaternion.fromAxisAngle(
+                    DelaunayGraph.normalize(DelaunayGraph.subtract(a, b)),
+                    -verticalAB
+                ).rotateVector(midAB),
+                Quaternion.fromAxisAngle(
+                    DelaunayGraph.normalize(DelaunayGraph.subtract(b, c)),
+                    verticalBC
+                ).rotateVector(midBC),
+                Quaternion.fromAxisAngle(
+                    DelaunayGraph.normalize(DelaunayGraph.subtract(b, c)),
+                    -verticalBC
+                ).rotateVector(midBC)
+            );
+
+            // find two closest points
+            let bestA: [number, number, number] = points[0];
+            let bestB: [number, number, number] = points[1];
+            let bestDistance: number = VoronoiGraph.angularDistance(a, b, 1);
+            for (let i = 0; i < points.length; i++) {
+                for (let j = i + 1; j < points.length; j++) {
+                    const a = points[i];
+                    const b = points[j];
+                    if (a.some(i => isNaN(i)) || b.some(i => isNaN(i))) {
+                        continue;
+                    }
+                    const distance = VoronoiGraph.angularDistance(a, b, 1);
+                    if (distance < bestDistance) {
+                        bestA = a;
+                        bestB = b;
+                        bestDistance = distance;
+                    }
+                }
+            }
+
+            // create new cell center
+            if (bestA.some(i => isNaN(i)) || bestB.some(i => isNaN(i))) {
+                continue;
+            }
+            cellCenters.push(DelaunayGraph.normalize(App.getAveragePoint([bestA, bestB])));
+        }
+
+        // for each triangle, find neighboring triangle
+        for (let cellCenterIndex = 0; cellCenterIndex < cellCenters.length && cellCenterIndex < this.vertices.length; cellCenterIndex++) {
             // find edges which connect to the vertex
             let points: Array<[number, number, number]> = [];
             let edges: Array<{
                 thetaAngle: number,
                 a: [number, number, number],
-                b: [number, number, number]
+                b: [number, number, number],
+                vertex: [number, number, number]
             }> = [];
 
             // build edge data for algebra
-            for (let edgeIndex = 0; edgeIndex < this.edges.length; edgeIndex++) {
+            // for each edge of the triangle
+            for (const edgeIndex of this.triangles[cellCenterIndex]) {
                 const edge = this.edges[edgeIndex];
                 const aIndex = edge[0];
                 const bIndex = edge[1];
-                // skip edges which do not match the voronoi cell vertex/center
-                // we want edges starting at the vertex and leaving it
-                if (aIndex !== vertexIndex) {
-                    continue;
+
+                // find neighbor triangle
+                let neighboringTriangleIndex: number = -1;
+                for (let triangleIndex = 0; triangleIndex < this.triangles.length; triangleIndex++) {
+                    const triangleEdges = this.triangles[triangleIndex];
+                    for (const triangleEdgeIndex of triangleEdges) {
+                        const triangleEdge = this.edges[triangleEdgeIndex];
+                        if (triangleEdge[0] === bIndex && triangleEdge[1] === aIndex) {
+                            neighboringTriangleIndex = triangleIndex;
+                            break;
+                        }
+                    }
+                }
+                if (neighboringTriangleIndex < 0) {
+                    throw new Error("Could not find neighboring triangle");
                 }
 
                 // get point
-                const aVertex = this.vertices[aIndex];
-                const bVertex = this.vertices[bIndex];
+                const aVertex = cellCenters[cellCenterIndex];
+                const bVertex = cellCenters[neighboringTriangleIndex];
+                if (!aVertex || !bVertex) {
+                    continue;
+                }
 
                 // compute the theta angle to orient the edges counter clockwise
                 const polarRotation = Quaternion.fromBetweenVectors([0, 0, 1], aVertex);
@@ -898,11 +991,12 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                 edges.push({
                     a,
                     b,
-                    thetaAngle
+                    thetaAngle,
+                    vertex: bVertex
                 });
             }
 
-            if (edges.length > 0) {
+            if (edges.length >= 3) {
                 // sort counter clockwise, ascending order.
                 edges = edges.sort((a, b) => b.thetaAngle - a.thetaAngle);
 
@@ -932,7 +1026,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                 }
 
                 // sort points counter clockwise
-                const averagePoint = this.vertices[vertexIndex];
+                const averagePoint = cellCenters[cellCenterIndex];
                 const averageTransform = Quaternion.fromBetweenVectors([0, 0, 1], averagePoint).inverse();
                 const sortedPoints = points.sort((a, b): number => {
                     const aPoint = averageTransform.rotateVector(a);
@@ -945,7 +1039,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                 // create voronoi cell
                 const cell = new VoronoiCell();
                 cell.vertices.push(...sortedPoints);
-                cell.centroid = DelaunayGraph.normalize(VoronoiGraph.centroidOfCell(cell));
+                cell.centroid = averagePoint;
                 cell.radius = cell.vertices.reduce((acc: number, vertex): number => {
                     return Math.max(
                         acc,

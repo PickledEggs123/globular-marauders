@@ -1419,7 +1419,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             const rotation = Quaternion.fromBetweenVectors([0, 0, 1], forward).pow(App.VELOCITY_STEP / this.worldScale);
             const rotationDrag = cameraPositionVelocity.pow(App.VELOCITY_DRAG / this.worldScale).inverse();
             cameraPositionVelocity = cameraPositionVelocity.clone().mul(rotation).mul(rotationDrag);
-            if (VoronoiGraph.angularDistanceQuaternion(cameraPositionVelocity, this.worldScale) < Math.PI / 2 * App.VELOCITY_STEP * this.worldScale) {
+            if (VoronoiGraph.angularDistanceQuaternion(cameraPositionVelocity, this.worldScale) < Math.PI / 2 * App.VELOCITY_STEP / this.worldScale) {
                 cameraPositionVelocity = Quaternion.ONE;
             }
 
@@ -1438,7 +1438,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         if (activeKeys.includes("s")) {
             const rotation = cameraPositionVelocity.clone().inverse().pow(App.BRAKE_POWER / this.worldScale);
             cameraPositionVelocity = cameraPositionVelocity.clone().mul(rotation);
-            if (VoronoiGraph.angularDistanceQuaternion(cameraPositionVelocity, this.worldScale) < Math.PI / 2 * App.VELOCITY_STEP * this.worldScale) {
+            if (VoronoiGraph.angularDistanceQuaternion(cameraPositionVelocity, this.worldScale) < Math.PI / 2 * App.VELOCITY_STEP / this.worldScale) {
                 cameraPositionVelocity = Quaternion.ONE;
             }
 
@@ -2170,10 +2170,12 @@ export class App extends React.Component<IAppProps, IAppState> {
         } else {
             // initialize regular 3d terrain
             this.delaunayGraph.initialize();
-            for (let i = 0; i < 20 * Math.pow(1.5, this.worldScale); i++) {
+            const numItems = 20 * Math.pow(1.5, this.worldScale);
+            for (let i = 0; i < numItems; i++) {
                 this.delaunayGraph.incrementalInsert();
             }
-            for (let step = 0; step < 10 * Math.pow(1.5, this.worldScale); step++) {
+            const numSteps = 10 * Math.pow(1.5, this.worldScale);
+            for (let step = 0; step < numSteps; step++) {
                 this.voronoiGraph = this.delaunayGraph.getVoronoiGraph();
                 const lloydPoints = this.voronoiGraph.lloydRelaxation();
                 this.delaunayGraph = new DelaunayGraph<Planet>(this);
