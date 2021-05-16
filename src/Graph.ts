@@ -807,6 +807,8 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                     sortedComplementTriangleEdges[2],
                     sortedComplementTriangleEdges[1]
                 ];
+                this.lawsonFlip(triangleIndex);
+                this.lawsonFlip(complementTriangleIndex);
             }
         }
     }
@@ -825,6 +827,9 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
             vertex = DelaunayGraph.randomPoint();
         }
 
+        // find triangle index
+        triangleIndex = this.findTriangleIntersection(vertex);
+
         // check for collinear points, avoid silver triangles or acute triangles
         for (let i = 0; i < this.vertices.length; i++) {
             for (let j = i + 1; j < this.vertices.length; j++) {
@@ -836,7 +841,11 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                 const trianglePerimeter = VoronoiGraph.angularDistance(a, b, this.app.worldScale) +
                     VoronoiGraph.angularDistance(b, vertex, this.app.worldScale) +
                     VoronoiGraph.angularDistance(vertex, a, this.app.worldScale);
-                if (trianglePerimeter > Math.PI / 1000 * 100 / this.app.worldScale * 3) {
+                const isNearByPoint = trianglePerimeter <= Math.PI / 1000 * 100 / this.app.worldScale * 3;
+                const partOfTriangle = this.triangles[triangleIndex].some(edgeIndex => {
+                    return this.edges[edgeIndex].every(vertexIndex => [i, j].includes(vertexIndex));
+                });
+                if (!isNearByPoint && !partOfTriangle) {
                     // perimeter of triangle is less than 300 units in total, assuming 100 units from 3 points of an
                     // equilateral triangle.
                     continue;
@@ -860,7 +869,6 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
         }
 
         // add triangle incrementally
-        triangleIndex = this.findTriangleIntersection(vertex);
         this.buildInitialTriangleMeshForNewVertex(vertex, triangleIndex);
 
         // perform lawson's flip to balance triangles
