@@ -210,7 +210,14 @@ export class VoronoiGraph<T extends ICameraState> {
         const relaxedPoints: Array<[number, number, number]> = [];
         for (const cell of this.cells) {
             // the sum had a division, this is the final result
-            relaxedPoints.push(VoronoiGraph.centroidOfCell(cell));
+            if (cell.centroid.some(i => isNaN(i))) {
+                throw new Error("Bad cell centroid");
+            }
+            if (cell.vertices.some(v => v.some(i => isNaN(i)))) {
+                throw new Error("Bad cell vertex");
+            }
+            const point = VoronoiGraph.centroidOfCell(cell);
+            relaxedPoints.push(point);
         }
         return relaxedPoints;
     }
@@ -342,7 +349,8 @@ export class PathingNode<T extends IPathingGraph> implements IPathingNode<T> {
             }
             path.push(this.instance.vertices[start]);
         } else {
-            throw new Error("Could not find end node after building A* map, pathfinding failed.");
+            path.splice(0, path.length);
+            path.push(this.instance.vertices[end]);
         }
 
         // remove duplicate nodes
@@ -567,6 +575,12 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                 const start = this.vertices[startIndex];
                 const end = this.vertices[endIndex];
                 const normal = DelaunayGraph.normalize(DelaunayGraph.crossProduct(start, end));
+                if (start.some(i => isNaN(i)) || end.some(i => isNaN(i))) {
+                    throw new Error("Found bad vertex");
+                }
+                if (normal.some(i => isNaN(i))) {
+                    return false;
+                }
                 // check to see if point is on the correct side of the half plane
                 if (vertex[0] * normal[0] + vertex[1] * normal[1] + vertex[2] * normal[2] < 0) {
                     // incorrect side, return false, try next triangle
@@ -586,6 +600,9 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
      * @private
      */
     private buildInitialTriangleMeshForNewVertex(vertex: [number, number, number], triangleIndex: number) {
+        if (vertex.some(i => isNaN(i))) {
+            throw new Error("Stopped insertion of bad vertex");
+        }
         this.vertices.push(vertex);
         const threeEdgeIndices = this.triangles[triangleIndex];
         const threeVertexIndices = threeEdgeIndices.map((edgeIndex: number): number => {
@@ -602,215 +619,28 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
     }
 
     /**
-     * The average point of a triangle.
-     * @param triangleIndex The triangle index to find the average point for.
+     * Get the circumcircle of the 3 points on a sphere.
+     * @param a
+     * @param b
+     * @param c
      */
-    public getAveragePointOfTriangle(triangleIndex: number): [number, number, number] {
-        let vertexCount: number = 0;
-        let vertexSum: [number, number, number] = [0, 0, 0];
-        for (const edgeIndex of this.triangles[triangleIndex]) {
-            for (const vertexIndex of this.edges[edgeIndex]) {
-                const vertex = this.vertices[vertexIndex];
-                vertexSum = [
-                    vertexSum[0] + vertex[0],
-                    vertexSum[1] + vertex[1],
-                    vertexSum[2] + vertex[2],
-                ];
-                vertexCount += 1;
-            }
+    public getCircumcircleParameters(a: [number, number, number], b: [number, number, number], c: [number, number, number]): {
+        center: [number, number, number],
+        radius: number
+    } | null {
+        const center = DelaunayGraph.normalize(DelaunayGraph.crossProduct(
+            DelaunayGraph.normalize(DelaunayGraph.subtract(b, a)),
+            DelaunayGraph.normalize(DelaunayGraph.subtract(c, a))
+        ));
+        if (center.some(i => isNaN(i))) {
+            // skip insertion if normal is NaN.
+            return null;
         }
-        return DelaunayGraph.normalize([
-            vertexSum[0] / vertexCount,
-            vertexSum[1] / vertexCount,
-            vertexSum[2] / vertexCount,
-        ]);
-    }
-
-    private lawsonFlip(triangleIndex: number) {
-        // find complement triangle that's not newly created.
-        let complementTriangleIndex: number = -1;
-        let complementTriangleEdgeIndex: number = -1;
-        let triangleComplementEdgeIndex: number = -1;
-        for (let index = 0; index < this.triangles.length - 3; index++) {
-            const triangle = this.triangles[index];
-            for (const edgeIndex of triangle) {
-                let edgeIsReverseToTestTriangle = false;
-                for (let testTriangleEdgeIndex = 0; testTriangleEdgeIndex < triangle.length; testTriangleEdgeIndex++) {
-                    const testTriangleEdge = this.edges[triangle[testTriangleEdgeIndex]];
-                    const triangleEdge = this.edges[edgeIndex];
-                    const isComplementEdge = testTriangleEdge[0] === triangleEdge[1] && testTriangleEdge[1] === triangleEdge[0];
-                    if (isComplementEdge) {
-                        edgeIsReverseToTestTriangle = true;
-                        triangleComplementEdgeIndex = triangle[testTriangleEdgeIndex];
-                        break;
-                    }
-                }
-                if (edgeIsReverseToTestTriangle) {
-                    // found the complement triangle
-                    complementTriangleIndex = index;
-                    complementTriangleEdgeIndex = edgeIndex;
-                }
-            }
-        }
-
-        // detect if complement triangle was found
-        if (complementTriangleIndex >= 0 && complementTriangleEdgeIndex >= 0 && triangleComplementEdgeIndex >= 0) {
-            // try to sort the edges counter clockwise, starting with the complement edge
-            const triangle = this.triangles[triangleIndex];
-            const complementTriangle = this.triangles[complementTriangleIndex];
-            const sortedTriangleEdges: number[] = [];
-            const sortedComplementTriangleEdges: number[] = [];
-            /**
-             * Orient the triangle edges starting with complement edge, counter clockwise.
-             * @param triangle The triangle, list of edges to orient.
-             * @param sortedEdges The sorted list of edges.
-             */
-            const orientTriangleEdges = (triangle: number[], sortedEdges: number[]) => {
-                let startRecording: boolean = false;
-                for (let i = 0; i < triangle.length * 2; i++) {
-                    const edgeIndex = triangle[i % triangle.length];
-                    if (sortedEdges.length >= 3) {
-                        break;
-                    } else if (startRecording || edgeIndex === triangleComplementEdgeIndex) {
-                        if (!startRecording) {
-                            startRecording = true;
-                        }
-                        sortedEdges.push(edgeIndex);
-                    }
-                }
-            }
-            orientTriangleEdges(triangle, sortedTriangleEdges);
-            orientTriangleEdges(complementTriangle, sortedComplementTriangleEdges);
-
-            // get parallelogram vertex indices
-            const vertexIndices: number[] = [
-                this.edges[sortedTriangleEdges[0]][1],
-                this.edges[sortedTriangleEdges[1]][1],
-                this.edges[sortedComplementTriangleEdges[0]][1],
-                this.edges[sortedComplementTriangleEdges[1]][1],
-            ];
-
-            // determine if a flip is necessary based on the area ratio
-            const defaultAreaDiff = Math.min(
-                Math.abs(Math.acos(DelaunayGraph.dotProduct(
-                    DelaunayGraph.normalize(
-                        DelaunayGraph.subtract(this.vertices[vertexIndices[0]], this.vertices[vertexIndices[1]])
-                    ),
-                    DelaunayGraph.normalize(
-                        DelaunayGraph.subtract(this.vertices[vertexIndices[2]], this.vertices[vertexIndices[1]])
-                    )
-                ))),
-                Math.abs(Math.acos(DelaunayGraph.dotProduct(
-                    DelaunayGraph.normalize(
-                        DelaunayGraph.subtract(this.vertices[vertexIndices[2]], this.vertices[vertexIndices[3]])
-                    ),
-                    DelaunayGraph.normalize(
-                        DelaunayGraph.subtract(this.vertices[vertexIndices[0]], this.vertices[vertexIndices[3]])
-                    )
-                ))),
-                Math.abs(Math.acos(DelaunayGraph.dotProduct(
-                    DelaunayGraph.normalize(
-                        DelaunayGraph.subtract(this.vertices[vertexIndices[2]], this.vertices[vertexIndices[0]])
-                    ),
-                    DelaunayGraph.normalize(
-                        DelaunayGraph.subtract(this.vertices[vertexIndices[1]], this.vertices[vertexIndices[0]])
-                    )
-                ))),
-                Math.abs(Math.acos(DelaunayGraph.dotProduct(
-                    DelaunayGraph.normalize(
-                        DelaunayGraph.subtract(this.vertices[vertexIndices[2]], this.vertices[vertexIndices[0]])
-                    ),
-                    DelaunayGraph.normalize(
-                        DelaunayGraph.subtract(this.vertices[vertexIndices[3]], this.vertices[vertexIndices[0]])
-                    )
-                ))),
-                Math.abs(Math.acos(DelaunayGraph.dotProduct(
-                    DelaunayGraph.normalize(
-                        DelaunayGraph.subtract(this.vertices[vertexIndices[0]], this.vertices[vertexIndices[2]])
-                    ),
-                    DelaunayGraph.normalize(
-                        DelaunayGraph.subtract(this.vertices[vertexIndices[1]], this.vertices[vertexIndices[2]])
-                    )
-                ))),
-                Math.abs(Math.acos(DelaunayGraph.dotProduct(
-                    DelaunayGraph.normalize(
-                        DelaunayGraph.subtract(this.vertices[vertexIndices[0]], this.vertices[vertexIndices[2]])
-                    ),
-                    DelaunayGraph.normalize(
-                        DelaunayGraph.subtract(this.vertices[vertexIndices[3]], this.vertices[vertexIndices[2]])
-                    )
-                )))
-            );
-            const complementAreaDiff = Math.min(
-                Math.abs(Math.acos(DelaunayGraph.dotProduct(
-                    DelaunayGraph.normalize(
-                        DelaunayGraph.subtract(this.vertices[vertexIndices[1]], this.vertices[vertexIndices[2]])
-                    ),
-                    DelaunayGraph.normalize(
-                        DelaunayGraph.subtract(this.vertices[vertexIndices[3]], this.vertices[vertexIndices[2]])
-                    )
-                ))),
-                Math.abs(Math.acos(DelaunayGraph.dotProduct(
-                    DelaunayGraph.normalize(
-                        DelaunayGraph.subtract(this.vertices[vertexIndices[3]], this.vertices[vertexIndices[0]])
-                    ),
-                    DelaunayGraph.normalize(
-                        DelaunayGraph.subtract(this.vertices[vertexIndices[1]], this.vertices[vertexIndices[0]])
-                    )
-                ))),
-                Math.abs(Math.acos(DelaunayGraph.dotProduct(
-                    DelaunayGraph.normalize(
-                        DelaunayGraph.subtract(this.vertices[vertexIndices[1]], this.vertices[vertexIndices[1]])
-                    ),
-                    DelaunayGraph.normalize(
-                        DelaunayGraph.subtract(this.vertices[vertexIndices[3]], this.vertices[vertexIndices[1]])
-                    )
-                ))),
-                Math.abs(Math.acos(DelaunayGraph.dotProduct(
-                    DelaunayGraph.normalize(
-                        DelaunayGraph.subtract(this.vertices[vertexIndices[0]], this.vertices[vertexIndices[1]])
-                    ),
-                    DelaunayGraph.normalize(
-                        DelaunayGraph.subtract(this.vertices[vertexIndices[3]], this.vertices[vertexIndices[1]])
-                    )
-                ))),
-                Math.abs(Math.acos(DelaunayGraph.dotProduct(
-                    DelaunayGraph.normalize(
-                        DelaunayGraph.subtract(this.vertices[vertexIndices[1]], this.vertices[vertexIndices[3]])
-                    ),
-                    DelaunayGraph.normalize(
-                        DelaunayGraph.subtract(this.vertices[vertexIndices[2]], this.vertices[vertexIndices[3]])
-                    )
-                ))),
-                Math.abs(Math.acos(DelaunayGraph.dotProduct(
-                    DelaunayGraph.normalize(
-                        DelaunayGraph.subtract(this.vertices[vertexIndices[0]], this.vertices[vertexIndices[3]])
-                    ),
-                    DelaunayGraph.normalize(
-                        DelaunayGraph.subtract(this.vertices[vertexIndices[2]], this.vertices[vertexIndices[3]])
-                    )
-                )))
-            );
-            const shouldFlip = defaultAreaDiff < complementAreaDiff;
-
-            // perform lawson flip
-            if (shouldFlip) {
-                this.edges[triangleComplementEdgeIndex] = [vertexIndices[3], vertexIndices[1]];
-                this.triangles[triangleIndex] = [
-                    triangleComplementEdgeIndex,
-                    sortedTriangleEdges[2],
-                    sortedTriangleEdges[1]
-                ];
-                this.edges[complementTriangleEdgeIndex] = [vertexIndices[1], vertexIndices[3]];
-                this.triangles[complementTriangleIndex] = [
-                    complementTriangleEdgeIndex,
-                    sortedComplementTriangleEdges[2],
-                    sortedComplementTriangleEdges[1]
-                ];
-                this.lawsonFlip(triangleIndex);
-                this.lawsonFlip(complementTriangleIndex);
-            }
-        }
+        const radius = Math.acos(Math.abs(center[0] + center[1] + center[2]));
+        return {
+            center,
+            radius,
+        };
     }
 
     /**
@@ -820,7 +650,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
      */
     public incrementalInsert(point?: [number, number, number]) {
         let vertex: [number, number, number];
-        let triangleIndex: number;
+        let triangleIndex: number = -1;
         if (point) {
             vertex = point;
         } else {
@@ -828,53 +658,125 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
         }
 
         // find triangle index
-        triangleIndex = this.findTriangleIntersection(vertex);
+        for (let i = 0; i < 100; i++) {
+            triangleIndex = this.findTriangleIntersection(vertex);
+            if (triangleIndex < 0) {
+                const randomTriangleIndex = Math.floor(this.triangles.length * Math.random());
+                const triangle = this.triangles[randomTriangleIndex];
+                const triangleVertices = triangle.map(edgeIndex => this.vertices[this.edges[edgeIndex][0]]);
+                vertex = DelaunayGraph.normalize(App.getAveragePoint(triangleVertices));
+            } else {
+                break;
+            }
+        }
+        if (triangleIndex < 0) {
+            throw new Error("COULD NOT FIND TRIANGLE");
+        }
 
-        // check for collinear points, avoid silver triangles or acute triangles
-        for (let i = 0; i < this.vertices.length; i++) {
-            for (let j = i + 1; j < this.vertices.length; j++) {
-                // get vertices
-                const a = this.vertices[i];
-                const b = this.vertices[j];
+        // add triangle incrementally
+        // this.buildInitialTriangleMeshForNewVertex(vertex, triangleIndex);
 
-                // check only near by points
-                const trianglePerimeter = VoronoiGraph.angularDistance(a, b, this.app.worldScale) +
-                    VoronoiGraph.angularDistance(b, vertex, this.app.worldScale) +
-                    VoronoiGraph.angularDistance(vertex, a, this.app.worldScale);
-                const isNearByPoint = trianglePerimeter <= Math.PI / 1000 * 100 / this.app.worldScale * 3;
-                const partOfTriangle = this.triangles[triangleIndex].some(edgeIndex => {
-                    return this.edges[edgeIndex].every(vertexIndex => [i, j].includes(vertexIndex));
+        // perform bowyer watson to balance triangles
+        this.bowyerWatsonInsertion(vertex)
+    }
+
+    /**
+     * A Delaunay triangulation balancing scheme where bad triangles are replaced with good triangles.
+     * @param vertex The new vertex to insert.
+     * @private
+     */
+    private bowyerWatsonInsertion(vertex: [number, number, number]) {
+        // the new vertex index
+        this.vertices.push(vertex);
+        const newVertexIndex = this.vertices.length - 1;
+
+        // find bad triangles and good edges of bad triangles
+        let badTriangleIndices: number[] = [];
+        const goodEdgeIndicesOfBadTriangles: number[] = [];
+        const badEdgeIndicesOfBadTriangles: number[] = [];
+        for (let triangleIndex = 0; triangleIndex < this.triangles.length; triangleIndex++) {
+            // find bad triangle
+            const testTriangleVertices: Array<[number, number, number]> = this.triangles[triangleIndex].map(testEdgeIndex => {
+                return this.vertices[this.edges[testEdgeIndex][0]];
+            });
+            const circumcircle = this.getCircumcircleParameters(testTriangleVertices[0], testTriangleVertices[1], testTriangleVertices[2]);
+            if (circumcircle && VoronoiGraph.angularDistance(circumcircle.center, vertex, 1) < circumcircle.radius) {
+                badTriangleIndices.push(triangleIndex);
+            }
+        }
+        // find good edges
+        for (const triangleIndex of badTriangleIndices) {
+            // find good edges of bad triangles
+            for (const edgeIndex of this.triangles[triangleIndex]) {
+                const edge = this.edges[edgeIndex];
+                // find opposite edge
+                const complementOfBadTriangleEdgeIndex = this.edges.findIndex((testEdge) => {
+                    return testEdge[0] === edge[1] && testEdge[1] === edge[0];
                 });
-                if (!isNearByPoint && !partOfTriangle) {
-                    // perimeter of triangle is less than 300 units in total, assuming 100 units from 3 points of an
-                    // equilateral triangle.
-                    continue;
-                }
-
-                // compute collinear factor
-                const normal = DelaunayGraph.normalize(DelaunayGraph.crossProduct(
-                    DelaunayGraph.normalize(DelaunayGraph.crossProduct(a, b)),
-                    DelaunayGraph.normalize(DelaunayGraph.crossProduct(b, vertex))
-                ));
-                if (normal.some(i => isNaN(i))) {
-                    // skip insertion if normal is NaN.
-                    return;
-                }
-                const d = normal[0] + normal[1] + normal[2];
-                if (Math.acos(d) < Math.PI / 180 * 10) {
-                    // skip insertion if collinear to 10 degrees with another point
-                    return;
+                if (complementOfBadTriangleEdgeIndex >= 0) {
+                    // find if opposite edge is not in any bad triangles
+                    const isInsideGoodTriangle = badTriangleIndices.every(badTriangleIndex => {
+                        // for each bad triangle, complement edge is not in bad triangle
+                        return !this.triangles[badTriangleIndex].includes(complementOfBadTriangleEdgeIndex);
+                    });
+                    if (isInsideGoodTriangle) {
+                        // add good edge
+                        goodEdgeIndicesOfBadTriangles.push(edgeIndex);
+                    } else {
+                        badEdgeIndicesOfBadTriangles.push(edgeIndex);
+                    }
                 }
             }
         }
 
-        // add triangle incrementally
-        this.buildInitialTriangleMeshForNewVertex(vertex, triangleIndex);
+        // create good triangles
+        for (const edgeIndex of goodEdgeIndicesOfBadTriangles) {
+            // get points
+            const aIndex = this.edges[edgeIndex][0];
+            const bIndex = this.edges[edgeIndex][1];
 
-        // perform lawson's flip to balance triangles
-        for (let i = 0; i < 3; i++) {
-            const triangleIndex = this.triangles.length - 1 - i;
-            this.lawsonFlip(triangleIndex);
+            // create edge and triangle
+            this.edges.push([bIndex, newVertexIndex], [newVertexIndex, aIndex]);
+            const triangle = [
+                edgeIndex,
+                this.edges.length - 2,
+                this.edges.length - 1,
+            ];
+            this.triangles.push(triangle);
+
+            // validate triangle
+            let isOrientedCorrectly: boolean = true;
+            if (this.edges[triangle[0]][1] !== this.edges[triangle[1]][0]) {
+                isOrientedCorrectly = false;
+            }
+            if (this.edges[triangle[1]][1] !== this.edges[triangle[2]][0]) {
+                isOrientedCorrectly = false;
+            }
+            if (this.edges[triangle[2]][1] !== this.edges[triangle[0]][0]) {
+                isOrientedCorrectly = false;
+            }
+            if (!isOrientedCorrectly) {
+                throw new Error("Newly created triangle not oriented correctly");
+            }
+        }
+
+        // delete bad triangles
+        badTriangleIndices = badTriangleIndices.reverse();
+        for (const triangleIndex of badTriangleIndices) {
+            this.triangles.splice(triangleIndex, 1);
+        }
+
+        // delete bad triangle edges
+        badEdgeIndicesOfBadTriangles.reverse();
+        for (const edgeIndex of badEdgeIndicesOfBadTriangles) {
+            for (let triangleIndex = 0; triangleIndex < this.triangles.length; triangleIndex++) {
+                for (let i = 0; i < this.triangles[triangleIndex].length; i++) {
+                    if (this.triangles[triangleIndex][i] > edgeIndex) {
+                        this.triangles[triangleIndex][i] -= 1;
+                    }
+                }
+            }
+            this.edges.splice(edgeIndex, 1);
         }
     }
 
@@ -898,86 +800,9 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
 
     public getVoronoiGraph(): VoronoiGraph<T> {
         const graph = new VoronoiGraph<T>(this.app);
-        // for each triangle which becomes a voronoi cell
-        // get triangle, center of a voronoi cell
-        const cellCenters: Array<[number, number, number]> = [];
-        for (let triangleIndex = 0; triangleIndex < this.triangles.length; triangleIndex++) {
-            // get vertices
-            const vertices: Array<[number, number, number]> = [];
-            for (const edgeIndex of this.triangles[triangleIndex]) {
-                const vertexIndex = this.edges[edgeIndex][0];
-                vertices.push(this.vertices[vertexIndex]);
-            }
-            if (vertices.length < 3) {
-                throw new Error("Could not find 3 points for triangle center algorithm");
-            }
-            const a = vertices[0];
-            const b = vertices[1];
-            const c = vertices[2];
-
-            // compute radius of circle
-            const normal = DelaunayGraph.normalize(DelaunayGraph.crossProduct(
-                DelaunayGraph.subtract(a, b),
-                DelaunayGraph.subtract(c, b)
-            ));
-            const radius = normal[0] + normal[1] + normal[2];
-
-            // compute right triangles
-            const midAB = DelaunayGraph.normalize(App.getAveragePoint([a, b]));
-            const midBC = DelaunayGraph.normalize(App.getAveragePoint([b, c]));
-            const verticalAB = radius / DelaunayGraph.dotProduct(midAB, b);
-            const verticalBC = radius / DelaunayGraph.dotProduct(midBC, b);
-
-            // compute intersection points
-            const points: Array<[number, number, number]> = [];
-            points.push(
-                Quaternion.fromAxisAngle(
-                    DelaunayGraph.normalize(DelaunayGraph.subtract(a, b)),
-                    verticalAB
-                ).rotateVector(midAB),
-                Quaternion.fromAxisAngle(
-                    DelaunayGraph.normalize(DelaunayGraph.subtract(a, b)),
-                    -verticalAB
-                ).rotateVector(midAB),
-                Quaternion.fromAxisAngle(
-                    DelaunayGraph.normalize(DelaunayGraph.subtract(b, c)),
-                    verticalBC
-                ).rotateVector(midBC),
-                Quaternion.fromAxisAngle(
-                    DelaunayGraph.normalize(DelaunayGraph.subtract(b, c)),
-                    -verticalBC
-                ).rotateVector(midBC)
-            );
-
-            // find two closest points
-            let bestA: [number, number, number] = points[0];
-            let bestB: [number, number, number] = points[1];
-            let bestDistance: number = VoronoiGraph.angularDistance(a, b, 1);
-            for (let i = 0; i < points.length; i++) {
-                for (let j = i + 1; j < points.length; j++) {
-                    const a = points[i];
-                    const b = points[j];
-                    if (a.some(i => isNaN(i)) || b.some(i => isNaN(i))) {
-                        continue;
-                    }
-                    const distance = VoronoiGraph.angularDistance(a, b, 1);
-                    if (distance < bestDistance) {
-                        bestA = a;
-                        bestB = b;
-                        bestDistance = distance;
-                    }
-                }
-            }
-
-            // create new cell center
-            if (bestA.some(i => isNaN(i)) || bestB.some(i => isNaN(i))) {
-                continue;
-            }
-            cellCenters.push(DelaunayGraph.normalize(App.getAveragePoint([bestA, bestB])));
-        }
 
         // for each triangle, find neighboring triangle
-        for (let cellCenterIndex = 0; cellCenterIndex < cellCenters.length && cellCenterIndex < this.vertices.length; cellCenterIndex++) {
+        for (let vertexIndex = 0; vertexIndex < this.vertices.length; vertexIndex++) {
             // find edges which connect to the vertex
             let points: Array<[number, number, number]> = [];
             let edges: Array<{
@@ -988,34 +813,19 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
             }> = [];
 
             // build edge data for algebra
-            // for each edge of the triangle
-            for (const edgeIndex of this.triangles[cellCenterIndex]) {
+            for (let edgeIndex = 0; edgeIndex < this.edges.length; edgeIndex++) {
                 const edge = this.edges[edgeIndex];
                 const aIndex = edge[0];
                 const bIndex = edge[1];
-
-                // find neighbor triangle
-                let neighboringTriangleIndex: number = -1;
-                for (let triangleIndex = 0; triangleIndex < this.triangles.length; triangleIndex++) {
-                    const triangleEdges = this.triangles[triangleIndex];
-                    for (const triangleEdgeIndex of triangleEdges) {
-                        const triangleEdge = this.edges[triangleEdgeIndex];
-                        if (triangleEdge[0] === bIndex && triangleEdge[1] === aIndex) {
-                            neighboringTriangleIndex = triangleIndex;
-                            break;
-                        }
-                    }
-                }
-                if (neighboringTriangleIndex < 0) {
-                    throw new Error("Could not find neighboring triangle");
+                // skip edges which do not match the voronoi cell vertex/center
+                // we want edges starting at the vertex and leaving it
+                if (!(aIndex === vertexIndex && bIndex !== vertexIndex && aIndex !== bIndex)) {
+                    continue;
                 }
 
                 // get point
-                const aVertex = cellCenters[cellCenterIndex];
-                const bVertex = cellCenters[neighboringTriangleIndex];
-                if (!aVertex || !bVertex) {
-                    continue;
-                }
+                const aVertex = this.vertices[aIndex];
+                const bVertex = this.vertices[bIndex];
 
                 // compute the theta angle to orient the edges counter clockwise
                 const polarRotation = Quaternion.fromBetweenVectors([0, 0, 1], aVertex);
@@ -1030,12 +840,23 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                 const rotation = Quaternion.fromAxisAngle(averagePoint, Math.PI / 2);
                 const a = rotation.rotateVector(aVertex);
                 const b = rotation.rotateVector(bVertex);
-                edges.push({
-                    a,
-                    b,
-                    thetaAngle,
-                    vertex: bVertex
-                });
+                if (a.some(i => isNaN(i))) {
+                    throw new Error("a is Invalid");
+                }
+                if (b.some(i => isNaN(i))) {
+                    throw new Error("b is Invalid");
+                }
+                if (
+                    edges.every(edge => edge.thetaAngle !== thetaAngle && DelaunayGraph.distanceFormula(edge.b, b) > 0.0001) &&
+                    DelaunayGraph.distanceFormula(a, b) > 0.0001
+                ) {
+                    edges.push({
+                        a,
+                        b,
+                        thetaAngle,
+                        vertex: bVertex,
+                    });
+                }
             }
 
             if (edges.length >= 3) {
@@ -1048,16 +869,38 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                     const firstEdge = edges[i % edges.length];
                     const secondEdge = edges[(i + 1) % edges.length];
 
+                    if (firstEdge.a.some(i => isNaN(i))) {
+                        throw new Error("firstEdge.a is invalid");
+                    }
+                    if (firstEdge.b.some(i => isNaN(i))) {
+                        throw new Error("firstEdge.b is invalid");
+                    }
+                    if (secondEdge.a.some(i => isNaN(i))) {
+                        throw new Error("secondEdge.a is invalid");
+                    }
+                    if (secondEdge.b.some(i => isNaN(i))) {
+                        throw new Error("secondEdge.b is invalid");
+                    }
+
                     // compute intersection point
                     const firstNormal = DelaunayGraph.normalize(
                         DelaunayGraph.crossProduct(firstEdge.a, firstEdge.b)
                     );
+                    if (firstNormal.some(i => isNaN(i))) {
+                        throw new Error("firstNormal is invalid");
+                    }
                     const secondNormal = DelaunayGraph.normalize(
                         DelaunayGraph.crossProduct(secondEdge.a, secondEdge.b)
                     );
+                    if (secondNormal.some(i => isNaN(i))) {
+                        throw new Error("secondNormal is invalid");
+                    }
                     const line = DelaunayGraph.normalize(
                         DelaunayGraph.crossProduct(firstNormal, secondNormal)
                     );
+                    if (line.some(i => isNaN(i))) {
+                        throw new Error("line is invalid");
+                    }
                     const point1 = line;
                     const point2: [number, number, number] = [-line[0], -line[1], -line[2]];
                     if (DelaunayGraph.dotProduct(firstEdge.a, point1) < 0) {
@@ -1068,7 +911,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                 }
 
                 // sort points counter clockwise
-                const averagePoint = cellCenters[cellCenterIndex];
+                const averagePoint = DelaunayGraph.normalize(App.getAveragePoint(points));
                 const averageTransform = Quaternion.fromBetweenVectors([0, 0, 1], averagePoint).inverse();
                 const sortedPoints = points.sort((a, b): number => {
                     const aPoint = averageTransform.rotateVector(a);
@@ -1077,6 +920,14 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                     const bTheta = Math.atan2(bPoint[1], bPoint[0]);
                     return bTheta - aTheta;
                 });
+
+                // validate data
+                if (points.some(point => point.some(i => isNaN(i)))) {
+                    throw new Error("Some point is invalid");
+                }
+                if (averagePoint.some(i => isNaN(i))) {
+                    throw new Error("Average Point is Invalid");
+                }
 
                 // create voronoi cell
                 const cell = new VoronoiCell();

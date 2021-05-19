@@ -350,7 +350,7 @@ export class VoronoiTree<T extends ICameraState> implements IVoronoiTreeNodePare
         const nodes: Array<VoronoiTreeNode<T>> = [];
 
         // compute points
-        const goodPoints = this.app.generateGoodPoints(10);
+        const goodPoints = this.app.generateGoodPoints(15, 3);
         for (const point of goodPoints) {
             const node = new VoronoiTreeNode<T>(parent.app, point, 1, parent);
             node.radius = point.vertices.reduce((acc, v) => Math.max(

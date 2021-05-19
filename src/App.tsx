@@ -2084,14 +2084,14 @@ export class App extends React.Component<IAppProps, IAppState> {
         entity.orientation = Quaternion.fromAxisAngle([0, 0, 1], Math.random() * 2 * Math.PI);
     }
 
-    public generateGoodPoints<T extends ICameraState>(numPoints: number = 10): VoronoiCell[] {
+    public generateGoodPoints<T extends ICameraState>(numPoints: number, numSteps: number): VoronoiCell[] {
         let delaunayGraph = new DelaunayGraph<T>(this);
         let voronoiGraph = new VoronoiGraph<T>(this);
         delaunayGraph.initialize();
         for (let i = 0; i < numPoints; i++) {
             delaunayGraph.incrementalInsert();
         }
-        for (let step = 0; step < 10; step++) {
+        for (let step = 0; step < numSteps; step++) {
             voronoiGraph = delaunayGraph.getVoronoiGraph();
             const lloydPoints = voronoiGraph.lloydRelaxation();
             delaunayGraph = new DelaunayGraph<T>(this);
@@ -2179,11 +2179,11 @@ export class App extends React.Component<IAppProps, IAppState> {
         } else {
             // initialize regular 3d terrain
             this.delaunayGraph.initialize();
-            const numItems = 5 * Math.pow(1.5, this.worldScale);
+            const numItems = 20 * Math.pow(1.5, this.worldScale);
             for (let i = 0; i < numItems; i++) {
                 this.delaunayGraph.incrementalInsert();
             }
-            const numSteps = 20 * Math.pow(1.5, this.worldScale);
+            const numSteps = 3 * Math.pow(1.5, this.worldScale);
             for (let step = 0; step < numSteps; step++) {
                 this.voronoiGraph = this.delaunayGraph.getVoronoiGraph();
                 const lloydPoints = this.voronoiGraph.lloydRelaxation();
@@ -2196,7 +2196,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         const planetPoints = this.voronoiGraph.lloydRelaxation();
 
         // initialize stars
-        const starPoints = this.generateGoodPoints<Planet>(100);
+        const starPoints = this.generateGoodPoints<Planet>(50, 3);
         this.stars.push(...starPoints.map((cell, index) => this.buildStars.call(this, cell.centroid, index)));
         for (const star of this.stars) {
             this.voronoiGraph.addDrawable(star);
