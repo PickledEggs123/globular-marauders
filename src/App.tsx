@@ -25,7 +25,7 @@ import {
     VoronoiCell,
     VoronoiGraph
 } from "./Graph";
-import {VoronoiTree} from "./VoronoiTree";
+import {VoronoiTerrain, VoronoiTree} from "./VoronoiTree";
 import {Faction, LuxuryBuff} from "./Faction";
 import {EBuildingType, Manufactory, Planet, Plantation} from "./Planet";
 import {CannonBall, Crate, SmokeCloud} from "./Item";
@@ -378,6 +378,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     public voronoiGraph: VoronoiGraph<Planet> = new VoronoiGraph(this);
     public voronoiShips: VoronoiTree<Ship> = new VoronoiTree(this);
     public voronoiShipsCells: VoronoiCell[] = [];
+    public voronoiTerrain: VoronoiTerrain = new VoronoiTerrain(this);
     public factions: { [key: string]: Faction } = {};
     public ships: Ship[] = [];
     public playerShip: Ship | null = null;
@@ -2092,16 +2093,24 @@ export class App extends React.Component<IAppProps, IAppState> {
             delaunayGraph.incrementalInsert();
         }
         for (let step = 0; step < numSteps; step++) {
+            // this line is needed because inserting vertices could remove old vertices.
+            while (delaunayGraph.numRealVertices() < numPoints + 4) {
+                delaunayGraph.incrementalInsert();
+            }
             voronoiGraph = delaunayGraph.getVoronoiGraph();
             const lloydPoints = voronoiGraph.lloydRelaxation();
             delaunayGraph = new DelaunayGraph<T>(this);
             delaunayGraph.initializeWithPoints(lloydPoints.slice(4));
         }
+        // this line is needed because inserting vertices could remove old vertices.
+        while (delaunayGraph.numRealVertices() < numPoints + 4) {
+            delaunayGraph.incrementalInsert();
+        }
         voronoiGraph = delaunayGraph.getVoronoiGraph();
         return voronoiGraph.cells.slice(4);
     }
 
-    private buildStars(point: [number, number, number], index: number): Planet {
+    public buildStar(point: [number, number, number], index: number): Planet {
         const planet = new Planet(this);
         planet.id = `star-${index}`;
         planet.position = Quaternion.fromBetweenVectors([0, 0, 1], point);
@@ -2124,7 +2133,7 @@ export class App extends React.Component<IAppProps, IAppState> {
      * @param planetI The index of the planet.
      * @private
      */
-    private createPlanet(planetPoint: [number, number, number], planetI: number): Planet {
+    public createPlanet(planetPoint: [number, number, number], planetI: number): Planet {
         const planet = new Planet(this);
         planet.id = `planet-${planetI}`;
         planet.position = Quaternion.fromBetweenVectors([0, 0, 1], planetPoint);
@@ -2159,57 +2168,16 @@ export class App extends React.Component<IAppProps, IAppState> {
         }
 
         // initialize 3d terrain stuff
-        if (this.props.isVoronoiTestMode) {
-            // initialize voronoi test
-            this.worldScale = 1;
-            this.delaunayGraph.initialize();
-            const tetrahedronAngle = 120 / 180 * Math.PI;
-            this.delaunayGraph.incrementalInsert([
-                Math.cos(tetrahedronAngle * 0.5) * Math.sin(tetrahedronAngle * 0.5),
-                Math.sin(tetrahedronAngle * 0.5) * Math.sin(tetrahedronAngle * 0.5),
-                Math.cos(tetrahedronAngle * 0.5)
-            ]);
-            this.delaunayGraph.incrementalInsert([
-                Math.cos(tetrahedronAngle * 1.5) * Math.sin(tetrahedronAngle * 0.5),
-                Math.sin(tetrahedronAngle * 1.5) * Math.sin(tetrahedronAngle * 0.5),
-                Math.cos(tetrahedronAngle * 1.5)
-            ]);
-            this.delaunayData = Array.from(this.delaunayGraph.GetTriangles());
-            this.voronoiGraph = this.delaunayGraph.getVoronoiGraph();
-        } else {
-            // initialize regular 3d terrain
-            this.delaunayGraph.initialize();
-            const numItems = 20 * Math.pow(1.5, this.worldScale);
-            for (let i = 0; i < numItems; i++) {
-                this.delaunayGraph.incrementalInsert();
-            }
-            const numSteps = 3 * Math.pow(1.5, this.worldScale);
-            for (let step = 0; step < numSteps; step++) {
-                this.voronoiGraph = this.delaunayGraph.getVoronoiGraph();
-                const lloydPoints = this.voronoiGraph.lloydRelaxation();
-                this.delaunayGraph = new DelaunayGraph<Planet>(this);
-                this.delaunayGraph.initializeWithPoints(lloydPoints);
-            }
-            this.delaunayData = Array.from(this.delaunayGraph.GetTriangles());
-            this.voronoiGraph = this.delaunayGraph.getVoronoiGraph();
-        }
-        const planetPoints = this.voronoiGraph.lloydRelaxation();
+        this.delaunayGraph.initialize();
+        this.delaunayData = Array.from(this.delaunayGraph.GetTriangles());
+        this.voronoiGraph = this.delaunayGraph.getVoronoiGraph();
+        this.voronoiTerrain.generateTerrain();
 
         // initialize stars
-        const starPoints = this.generateGoodPoints<Planet>(50, 3);
-        this.stars.push(...starPoints.map((cell, index) => this.buildStars.call(this, cell.centroid, index)));
-        for (const star of this.stars) {
-            this.voronoiGraph.addDrawable(star);
-        }
+        this.stars = Array.from(this.voronoiTerrain.getStars());
 
         // initialize planets
-        const planets: Planet[] = [];
-        let planetI = 0;
-        for (const planetPoint of planetPoints) {
-            const planet = this.createPlanet(planetPoint, planetI++);
-            planets.push(planet);
-        }
-        this.planets = planets;
+        this.planets = Array.from(this.voronoiTerrain.getPlanets());
 
         // initialize factions
         const factionDataList = [{
