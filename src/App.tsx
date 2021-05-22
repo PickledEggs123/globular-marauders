@@ -2137,11 +2137,11 @@ export class App extends React.Component<IAppProps, IAppState> {
             delaunayGraph.initializeWithPoints(lloydPoints.slice(4));
         }
         // this line is needed because inserting vertices could remove old vertices.
-        while (delaunayGraph.numRealVertices() < numPoints + 4) {
+        while (delaunayGraph.numRealVertices() < numPoints - 4) {
             delaunayGraph.incrementalInsert();
         }
         voronoiGraph = delaunayGraph.getVoronoiGraph();
-        return voronoiGraph.cells.slice(4);
+        return voronoiGraph.cells;
     }
 
     public buildStar(point: [number, number, number], index: number): Star {
@@ -2241,7 +2241,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         this.voronoiData = this.voronoiGraph.cells;
         if (!this.props.isVoronoiTestMode) {
             this.voronoiTerrain.generateTerrain();
-            this.voronoiData = this.voronoiTerrain.kingdoms.slice(0, 1).reduce((acc, k) => [...acc, ...k.nodes.map(n => n.voronoiCell)], [] as VoronoiCell[]);
+            this.voronoiData = this.voronoiTerrain.kingdoms.reduce((acc, k) => [...acc, k.voronoiCell], [] as VoronoiCell[]);
         }
 
         // initialize stars

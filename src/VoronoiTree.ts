@@ -359,7 +359,7 @@ export class VoronoiTree<T extends ICameraState> implements IVoronoiTreeNodePare
     public app: App;
 
     public recursionNodeLevels(): number[] {
-        return [15, 15, 15];
+        return [20, 20, 20];
     }
 
     constructor(app: App) {
@@ -676,7 +676,7 @@ export class VoronoiKingdom extends VoronoiTreeNode<ICameraState> {
 export class VoronoiTerrain extends VoronoiTree<ICameraState> {
     kingdoms: VoronoiKingdom[] = [];
     recursionNodeLevels(): number[] {
-        return [15, 3, 4];
+        return [20, 3, 4];
     }
 
     planetId: number = 0;

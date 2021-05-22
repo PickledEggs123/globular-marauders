@@ -855,8 +855,11 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
 
     // create new triangles to keep a constant number of points of a delaunay graph.
     public numRealVertices(): number {
+        return this.getRealVertices().length;
+    }
+    public getRealVertices(): Array<[number, number, number]> {
         if (this.vertices.length > 100) {
-            return this.vertices.length;
+            return this.vertices;
         }
         const realVertexIndices: number[] = [];
         for (let triangleIndex = 0; triangleIndex < this.triangles.length; triangleIndex++) {
@@ -869,7 +872,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                 }
             }
         }
-        return realVertexIndices.length;
+        return realVertexIndices.sort((a, b) => a - b).map((i) => this.vertices[i]);
     }
 
     public getVoronoiGraph(): VoronoiGraph<T> {
