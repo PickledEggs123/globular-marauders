@@ -323,7 +323,12 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
 
             // perform sutherland-hodgman polygon clipping
             goodPoints = outOfBoundsVoronoiCells.map((polygon) => VoronoiTreeNode.polygonClip<T>(forNode, polygon));
-            randomPointsWithinVoronoiCell = goodPoints.map(v => v.centroid);
+            randomPointsWithinVoronoiCell = goodPoints.reduce((acc, v) => {
+                if (acc.every(p => VoronoiGraph.angularDistance(p, v.centroid, 1) > 0.001)) {
+                    acc.push(v.centroid);
+                }
+                return acc;
+            }, [] as Array<[number, number, number]>);
         }
 
         // create tree nodes

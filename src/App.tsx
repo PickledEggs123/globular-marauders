@@ -369,6 +369,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     private showVoronoiRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
     private autoPilotEnabledRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
     private audioEnabledRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
+    private svgRef: React.RefObject<SVGSVGElement> = React.createRef<SVGSVGElement>();
     public rotateCameraInterval: any = null;
     private activeKeys: any[] = [];
     private keyDownHandlerInstance: any;
@@ -376,6 +377,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     public delaunayGraph: DelaunayGraph<Planet> = new DelaunayGraph<Planet>(this);
     private delaunayData: DelaunayTriangle[] = [];
     public voronoiGraph: VoronoiGraph<Planet> = new VoronoiGraph(this);
+    public voronoiData: VoronoiCell[] = [];
     public voronoiShips: VoronoiTree<Ship> = new VoronoiTree(this);
     public voronoiShipsCells: VoronoiCell[] = [];
     public voronoiTerrain: VoronoiTerrain = new VoronoiTerrain(this);
@@ -1298,7 +1300,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
     private getPointsAndRotatedPoints(vertices: Quaternion[]) {
         const rotatedPoints = vertices.map((v: Quaternion): [number, number, number] => {
-            return v.rotateVector([0, 0, -1]);
+            return v.rotateVector([0, 0, 1]);
         });
         const points: Array<{x: number, y: number}> = rotatedPoints.map(point => {
             return {
@@ -1330,7 +1332,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             DelaunayGraph.subtract(rotatedPoints[2], rotatedPoints[0]),
         );
 
-        const triangleFacingCamera = DelaunayGraph.dotProduct([0, 0, 1], triangleNormal) < 0;
+        const triangleFacingCamera = DelaunayGraph.dotProduct([0, 0, 1], triangleNormal) > 0;
 
         // get a point position for the text box on the area
         let averageDrawingPoint: {x: number, y: number} | null = null;
@@ -1350,7 +1352,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                         averageDrawingPoint && (
                             <text
                                 x={averageDrawingPoint.x * this.state.width}
-                                y={averageDrawingPoint.y * this.state.height}
+                                y={(1 - averageDrawingPoint.y) * this.state.height}
                                 stroke="white"
                                 style={{opacity: 0.1}}
                             >{tile.id}</text>
@@ -2183,21 +2185,21 @@ export class App extends React.Component<IAppProps, IAppState> {
         planet.orientation = Quaternion.fromAxisAngle([0, 0, 1], Math.random() * 2 * Math.PI);
         const colorValue = Math.random();
         if (colorValue > 0.875)
-            planet.color = this.lerpColors(planet.county.duchy.color, "#ff8888", 0.2);
+            planet.color = this.lerpColors(planet.county.duchy.color, "#ff8888", 0.33);
         else if (colorValue > 0.75)
-            planet.color = this.lerpColors(planet.county.duchy.color, "#88ff88", 0.2);
+            planet.color = this.lerpColors(planet.county.duchy.color, "#88ff88", 0.33);
         else if (colorValue > 0.625)
-            planet.color = this.lerpColors(planet.county.duchy.color, "#8888ff", 0.2);
+            planet.color = this.lerpColors(planet.county.duchy.color, "#8888ff", 0.33);
         else if (colorValue > 0.5)
-            planet.color = this.lerpColors(planet.county.duchy.color, "#ffff88", 0.2);
+            planet.color = this.lerpColors(planet.county.duchy.color, "#ffff88", 0.33);
         else if (colorValue > 0.375)
-            planet.color = this.lerpColors(planet.county.duchy.color, "#88ffff", 0.2);
+            planet.color = this.lerpColors(planet.county.duchy.color, "#88ffff", 0.33);
         else if (colorValue > 0.25)
-            planet.color = this.lerpColors(planet.county.duchy.color, "#ff88ff", 0.2);
+            planet.color = this.lerpColors(planet.county.duchy.color, "#ff88ff", 0.33);
         else if (colorValue > 0.125)
-            planet.color = this.lerpColors(planet.county.duchy.color, "#ffffff", 0.2);
+            planet.color = this.lerpColors(planet.county.duchy.color, "#ffffff", 0.33);
         else
-            planet.color = this.lerpColors(planet.county.duchy.color, "#888888", 0.2);
+            planet.color = this.lerpColors(planet.county.duchy.color, "#888888", 0.33);
         if (isCapital) {
             planet.size = 10;
             planet.settlementProgress = 1;
@@ -2213,6 +2215,9 @@ export class App extends React.Component<IAppProps, IAppState> {
 
     componentDidMount() {
         // set initial world scale
+        if (this.props.isVoronoiTestMode) {
+            this.worldScale = 1;
+        }
         if (typeof(this.props.worldScale) === "number") {
             this.worldScale = this.props.worldScale;
         }
@@ -2221,7 +2226,11 @@ export class App extends React.Component<IAppProps, IAppState> {
         this.delaunayGraph.initialize();
         this.delaunayData = Array.from(this.delaunayGraph.GetTriangles());
         this.voronoiGraph = this.delaunayGraph.getVoronoiGraph();
-        this.voronoiTerrain.generateTerrain();
+        this.voronoiData = this.voronoiGraph.cells;
+        if (!this.props.isVoronoiTestMode) {
+            this.voronoiTerrain.generateTerrain();
+            this.voronoiData = this.voronoiTerrain.kingdoms.reduce((acc, k) => [...acc, ...k.nodes.map(n => n.voronoiCell)], [] as VoronoiCell[]);
+        }
 
         // initialize stars
         this.stars = Array.from(this.voronoiTerrain.getStars());
@@ -2230,57 +2239,59 @@ export class App extends React.Component<IAppProps, IAppState> {
         this.planets = Array.from(this.voronoiTerrain.getPlanets());
 
         // initialize factions
-        const factionDataList = [{
-            id: EFaction.DUTCH,
-            color: "orange",
-            // the forth planet is always in a random location
-            // the dutch are a republic which means players can vote on things
-            // but the dutch are weaker compared to the kingdoms
-            kingdom: this.voronoiTerrain.kingdoms[0]
-        }, {
-            id: EFaction.ENGLISH,
-            color: "red",
-            kingdom: this.voronoiTerrain.kingdoms[1]
-        }, {
-            id: EFaction.FRENCH,
-            color: "blue",
-            kingdom: this.voronoiTerrain.kingdoms[2]
-        }, {
-            id: EFaction.PORTUGUESE,
-            color: "green",
-            kingdom: this.voronoiTerrain.kingdoms[3]
-        }, {
-            id: EFaction.SPANISH,
-            color: "yellow",
-            kingdom: this.voronoiTerrain.kingdoms[4]
-        }];
-        for (const factionData of factionDataList) {
-            let planetId: string;
-            if (factionData.kingdom.duchies[0].counties[0].planet) {
-                planetId = factionData.kingdom.duchies[0].counties[0].planet.id;
-            } else {
-                throw new Error("Could not find planet to make faction");
-            }
-            const faction = new Faction(this, factionData.id, factionData.color, planetId);
-            this.factions[factionData.id] = faction;
-            const planet = this.planets.find(p => p.id === planetId);
-            if (planet) {
-                planet.claim(faction);
-            }
-            if (planet && !this.props.isTestMode) {
-                for (let numShipsToStartWith = 0; numShipsToStartWith < 10; numShipsToStartWith++) {
-                    const shipType = planet.shipyard.getNextShipTypeToBuild();
-                    const shipData = SHIP_DATA.find(s => s.shipType === shipType);
-                    if (!shipData) {
-                        throw new Error("Could not find ship type");
-                    }
-                    planet.wood += shipData.cost;
-                    planet.cannons += shipData.cannons.numCannons;
-                    planet.cannonades += shipData.cannons.numCannonades;
-                    planet.shipyard.buildShip(shipType);
-                    const dock = planet.shipyard.docks[planet.shipyard.docks.length - 1];
-                    if (dock) {
-                        dock.progress = dock.shipCost - 1;
+        if (!this.props.isVoronoiTestMode) {
+            const factionDataList = [{
+                id: EFaction.DUTCH,
+                color: "orange",
+                // the forth planet is always in a random location
+                // the dutch are a republic which means players can vote on things
+                // but the dutch are weaker compared to the kingdoms
+                kingdom: this.voronoiTerrain.kingdoms[0]
+            }, {
+                id: EFaction.ENGLISH,
+                color: "red",
+                kingdom: this.voronoiTerrain.kingdoms[1]
+            }, {
+                id: EFaction.FRENCH,
+                color: "blue",
+                kingdom: this.voronoiTerrain.kingdoms[2]
+            }, {
+                id: EFaction.PORTUGUESE,
+                color: "green",
+                kingdom: this.voronoiTerrain.kingdoms[3]
+            }, {
+                id: EFaction.SPANISH,
+                color: "yellow",
+                kingdom: this.voronoiTerrain.kingdoms[4]
+            }];
+            for (const factionData of factionDataList) {
+                let planetId: string;
+                if (factionData.kingdom.duchies[0].counties[0].planet) {
+                    planetId = factionData.kingdom.duchies[0].counties[0].planet.id;
+                } else {
+                    throw new Error("Could not find planet to make faction");
+                }
+                const faction = new Faction(this, factionData.id, factionData.color, planetId);
+                this.factions[factionData.id] = faction;
+                const planet = this.planets.find(p => p.id === planetId);
+                if (planet) {
+                    planet.claim(faction);
+                }
+                if (planet && !this.props.isTestMode) {
+                    for (let numShipsToStartWith = 0; numShipsToStartWith < 10; numShipsToStartWith++) {
+                        const shipType = planet.shipyard.getNextShipTypeToBuild();
+                        const shipData = SHIP_DATA.find(s => s.shipType === shipType);
+                        if (!shipData) {
+                            throw new Error("Could not find ship type");
+                        }
+                        planet.wood += shipData.cost;
+                        planet.cannons += shipData.cannons.numCannons;
+                        planet.cannonades += shipData.cannons.numCannonades;
+                        planet.shipyard.buildShip(shipType);
+                        const dock = planet.shipyard.docks[planet.shipyard.docks.length - 1];
+                        if (dock) {
+                            dock.progress = dock.shipCost - 1;
+                        }
                     }
                 }
             }
@@ -2307,7 +2318,10 @@ export class App extends React.Component<IAppProps, IAppState> {
 
     handleSvgClick(event: React.MouseEvent) {
         // get element coordinates
-        const node = event.target as HTMLElement;
+        if (!this.svgRef.current) {
+            return;
+        }
+        const node = this.svgRef.current;
         const bounds = node.getBoundingClientRect();
         const x = event.clientX - bounds.left;
         const y = event.clientY - bounds.top;
@@ -2330,6 +2344,22 @@ export class App extends React.Component<IAppProps, IAppState> {
                 .mul(ship.orientation.clone())
                 .mul(clickQuaternion)
                 .rotateVector([0, 0, 1]);
+
+            if (this.props.isVoronoiTestMode) {
+                // insert into delaunay graph
+                this.delaunayGraph.incrementalInsert(spherePoint);
+
+                // insert multiple if shift key is down
+                if (event.shiftKey) {
+                    for (let i = 0; i < 9; i++) {
+                        this.delaunayGraph.incrementalInsert();
+                    }
+                }
+
+                // rebuild delaunay data
+                this.delaunayData = Array.from(this.delaunayGraph.GetTriangles());
+                this.voronoiGraph = this.delaunayGraph.getVoronoiGraph();
+            }
         }
     }
 
@@ -2351,7 +2381,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 }
                 {
                     this.state.showVoronoi ?
-                        this.voronoiGraph.cells.map(this.rotateDelaunayTriangle.bind(this))
+                        this.voronoiData.map(this.rotateDelaunayTriangle.bind(this))
                             .map(this.drawDelaunayTile.bind(this)) :
                         null
                 }
@@ -3481,7 +3511,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                         </ul>
                     )
                 }
-                <svg width={this.state.width} height={this.state.height}>
+                <svg ref={this.svgRef} width={this.state.width} height={this.state.height}>
                     <defs>
                         <mask id="worldMask">
                             <circle

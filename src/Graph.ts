@@ -168,7 +168,9 @@ export class VoronoiGraph<T extends ICameraState> {
             const c = cell.vertices[i + 1];
 
             // compute triangle fan parameters
-            const averagePoint = App.getAveragePoint(cell.vertices);
+            const averagePoint = DelaunayGraph.normalize(
+                App.getAveragePoint([cell.vertices[0], cell.vertices[i], cell.vertices[i + 1]])
+            );
             const area = DelaunayGraph.dotProduct(
                 DelaunayGraph.subtract(a, b),
                 DelaunayGraph.subtract(c, b)
@@ -194,11 +196,11 @@ export class VoronoiGraph<T extends ICameraState> {
             sumWeight += triangleFanParameter.area;
         }
 
-        return [
+        return DelaunayGraph.normalize([
             sumAveragePoint[0] / sumWeight,
             sumAveragePoint[1] / sumWeight,
             sumAveragePoint[2] / sumWeight
-        ];
+        ]);
     }
 
     /**
@@ -628,19 +630,45 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
         center: [number, number, number],
         radius: number
     } | null {
-        const center = DelaunayGraph.normalize(DelaunayGraph.crossProduct(
-            DelaunayGraph.normalize(DelaunayGraph.subtract(b, a)),
-            DelaunayGraph.normalize(DelaunayGraph.subtract(c, a))
-        ));
-        if (center.some(i => isNaN(i))) {
-            // skip insertion if normal is NaN.
-            return null;
+        const computeCenterMaths: Array<() => [number, number, number]> = [() => {
+            const v1 = DelaunayGraph.subtract(b, a);
+            const v2 = DelaunayGraph.subtract(c, a);
+            return DelaunayGraph.normalize(DelaunayGraph.crossProduct(
+                v1,
+                v2
+            ));
+        }, () => {
+            const v1 = DelaunayGraph.subtract(c, b);
+            const v2 = DelaunayGraph.subtract(a, b);
+            return DelaunayGraph.normalize(DelaunayGraph.crossProduct(
+                v1,
+                v2
+            ));
+        }, () => {
+            const v1 = DelaunayGraph.subtract(a, c);
+            const v2 = DelaunayGraph.subtract(b, c);
+            return DelaunayGraph.normalize(DelaunayGraph.crossProduct(
+                v1,
+                v2
+            ));
+        }]
+        for (const math of computeCenterMaths) {
+            const center = math();
+            if (center.some(i => isNaN(i))) {
+                // skip insertion if normal is NaN.
+                continue;
+            }
+            const radius = VoronoiGraph.angularDistance(center, a, 1);
+            const rb = VoronoiGraph.angularDistance(center, b, 1);
+            const rc = VoronoiGraph.angularDistance(center, c, 1);
+            if (Math.abs(rb - radius) < 0.0001 && Math.abs(rc - radius) < 0.0001) {
+                return {
+                    center,
+                    radius,
+                };
+            }
         }
-        const radius = Math.acos(Math.abs(center[0] + center[1] + center[2]));
-        return {
-            center,
-            radius,
-        };
+        return null;
     }
 
     /**
@@ -678,6 +706,14 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
 
         // perform bowyer watson to balance triangles
         this.bowyerWatsonInsertion(vertex)
+    }
+
+    private validateTriangles() {
+        for (const triangle of this.triangles) {
+            if (Array.from(new Set(triangle.reduce((acc, edgeIndex) => [...acc, ...this.edges[edgeIndex]], [] as number[]))).length !== 3) {
+                throw new Error("BAD TRIANGLE FOUND");
+            }
+        }
     }
 
     /**
@@ -755,19 +791,37 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
             if (this.edges[triangle[2]][1] !== this.edges[triangle[0]][0]) {
                 isOrientedCorrectly = false;
             }
+            if (Array.from(new Set(triangle.reduce((acc, edgeIndex) => [...acc, ...this.edges[edgeIndex]], [] as number[]))).length !== 3) {
+                isOrientedCorrectly = false;
+            }
+            const vertices = triangle.map(edgeIndex => this.vertices[this.edges[edgeIndex][0]]);
+            if (
+                DelaunayGraph.dotProduct(DelaunayGraph.crossProduct(
+                    DelaunayGraph.subtract(vertices[1], vertices[0]),
+                    DelaunayGraph.subtract(vertices[2], vertices[0])
+                ), DelaunayGraph.normalize(App.getAveragePoint(vertices))) < 0
+            ) {
+                this.triangles[this.triangles.length - 1] = [
+                    triangle[0],
+                    triangle[2],
+                    triangle[1]
+                ];
+            }
             if (!isOrientedCorrectly) {
                 throw new Error("Newly created triangle not oriented correctly");
             }
+            this.validateTriangles();
         }
 
         // delete bad triangles
-        badTriangleIndices = badTriangleIndices.reverse();
+        badTriangleIndices = badTriangleIndices.sort((a, b) => b - a);
         for (const triangleIndex of badTriangleIndices) {
             this.triangles.splice(triangleIndex, 1);
+            this.validateTriangles();
         }
 
         // delete bad triangle edges
-        badEdgeIndicesOfBadTriangles.reverse();
+        badEdgeIndicesOfBadTriangles.sort((a, b) => b - a);
         for (const edgeIndex of badEdgeIndicesOfBadTriangles) {
             for (let triangleIndex = 0; triangleIndex < this.triangles.length; triangleIndex++) {
                 for (let i = 0; i < this.triangles[triangleIndex].length; i++) {
@@ -777,6 +831,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                 }
             }
             this.edges.splice(edgeIndex, 1);
+            this.validateTriangles();
         }
     }
 
@@ -800,6 +855,9 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
 
     // create new triangles to keep a constant number of points of a delaunay graph.
     public numRealVertices(): number {
+        if (this.vertices.length > 100) {
+            return this.vertices.length;
+        }
         const realVertexIndices: number[] = [];
         for (let triangleIndex = 0; triangleIndex < this.triangles.length; triangleIndex++) {
             const triangle = this.triangles[triangleIndex];
@@ -877,7 +935,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
 
             if (edges.length >= 3) {
                 // sort counter clockwise, ascending order.
-                edges = edges.sort((a, b) => b.thetaAngle - a.thetaAngle);
+                edges = edges.sort((a, b) => a.thetaAngle - b.thetaAngle);
 
                 // for each edge, compute a point of the voronoi cell
                 for (let i = 0; i < edges.length; i++) {
@@ -934,7 +992,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                     const bPoint = averageTransform.rotateVector(b);
                     const aTheta = Math.atan2(aPoint[1], aPoint[0]);
                     const bTheta = Math.atan2(bPoint[1], bPoint[0]);
-                    return bTheta - aTheta;
+                    return aTheta - bTheta;
                 });
 
                 // validate data
