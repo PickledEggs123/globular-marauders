@@ -190,6 +190,7 @@ export class Order {
             ) / Planet.NUM_SETTLEMENT_PROGRESS_STEPS;
             if (colonyWorld.settlementProgress === 1) {
                 colonyWorld.settlementLevel = ESettlementLevel.OUTPOST;
+                colonyWorld.claim(this.faction)
             }
             if (!this.faction.planetIds.includes(this.planetId)) {
                 this.faction.planetIds.push(this.planetId);

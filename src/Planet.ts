@@ -12,6 +12,8 @@ import {
 } from "./Resource";
 import {EShipType, Ship, SHIP_DATA} from "./Ship";
 import App from "./App";
+import {VoronoiCounty} from "./VoronoiTree";
+import {Faction} from "./Faction";
 
 export interface IResourceExported {
     resourceType: EResourceType;
@@ -491,6 +493,21 @@ export class Blacksmith extends Building {
     }
 }
 
+export class Star implements ICameraState {
+    public instance: App;
+    public id: string = "";
+    public position: Quaternion = Quaternion.ONE;
+    public positionVelocity: Quaternion = Quaternion.ONE;
+    public orientation: Quaternion = Quaternion.ONE;
+    public orientationVelocity: Quaternion = Quaternion.ONE;
+    public color: string = "blue";
+    public size: number = 3;
+
+    constructor(instance: App) {
+        this.instance = instance;
+    }
+}
+
 export class Planet implements ICameraState {
     public instance: App;
     public id: string = "";
@@ -503,6 +520,7 @@ export class Planet implements ICameraState {
     public settlementProgress: number = 0;
     public settlementLevel: ESettlementLevel = ESettlementLevel.UNTAMED;
     public pathingNode: PathingNode<DelaunayGraph<Planet>> | null = null;
+    public county: VoronoiCounty;
     // the resources the island can produce
     public naturalResources: EResourceType[];
     // the resources the island produces from its plantations
@@ -557,8 +575,9 @@ export class Planet implements ICameraState {
         return this.shipyard.shipsAvailable[shipType];
     }
 
-    constructor(instance: App) {
+    constructor(instance: App, county: VoronoiCounty) {
         this.instance = instance;
+        this.county = county;
 
         // initialize the natural resources
         this.naturalResources = [];
@@ -582,6 +601,10 @@ export class Planet implements ICameraState {
             this.mine,
             this.blacksmith
         ];
+    }
+
+    public claim(faction: Faction) {
+        this.county.claim(faction);
     }
 
     public buildInitialResourceBuildings() {

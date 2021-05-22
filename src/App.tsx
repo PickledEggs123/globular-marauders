@@ -25,9 +25,9 @@ import {
     VoronoiCell,
     VoronoiGraph
 } from "./Graph";
-import {VoronoiTerrain, VoronoiTree} from "./VoronoiTree";
+import {VoronoiCounty, VoronoiTerrain, VoronoiTree} from "./VoronoiTree";
 import {Faction, LuxuryBuff} from "./Faction";
-import {EBuildingType, Manufactory, Planet, Plantation} from "./Planet";
+import {EBuildingType, Manufactory, Planet, Plantation, Star} from "./Planet";
 import {CannonBall, Crate, SmokeCloud} from "./Item";
 import * as Tone from "tone";
 
@@ -384,7 +384,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     public playerShip: Ship | null = null;
     public crates: Crate[] = [];
     public planets: Planet[] = [];
-    public stars: Planet[] = [];
+    public stars: Star[] = [];
     public smokeClouds: SmokeCloud[] = [];
     public cannonBalls: CannonBall[] = [];
     public luxuryBuffs: LuxuryBuff[] = [];
@@ -647,8 +647,28 @@ export class App extends React.Component<IAppProps, IAppState> {
         let planetTitle: string = "";
         if (planetDrawing.original.settlementProgress > 0) {
             if (ownerFaction) {
+                // get the settlement text
+                let settlementText: string = "";
                 const settlementEntry = Object.entries(ESettlementLevel).find(e => e[1] === planetDrawing.original.settlementLevel);
-                planetTitle = `${ownerFaction.id}${settlementEntry ? ` ${settlementEntry[0]}` : ""}`;
+                if (settlementEntry) {
+                    settlementText = ` ${settlementEntry[0]}`;
+                }
+
+                // get the title text
+                let titleText: string = "";
+                if (planetDrawing.original.county.faction) {
+                    titleText = "County of ";
+                    if (planetDrawing.original.county.duchy.capital === planetDrawing.original.county) {
+                        titleText = "Duchy of ";
+                        if (planetDrawing.original.county.duchy.kingdom.capital === planetDrawing.original.county.duchy) {
+                            titleText = "Kingdom of ";
+                            if (planetDrawing.original.id === ownerFaction.homeWorldPlanetId) {
+                                titleText = "Empire of ";
+                            }
+                        }
+                    }
+                }
+                planetTitle = `${titleText}${ownerFaction.id}${settlementText}`;
             }
 
             planetX = x * this.state.width;
@@ -689,9 +709,9 @@ export class App extends React.Component<IAppProps, IAppState> {
                             <text
                                 key={`${planetDrawing.id}-planet-title`}
                                 x={planetX + size * (this.state.zoom * this.worldScale) + 10}
-                                y={planetY}
+                                y={planetY - 6}
                                 fill="white"
-                                fontSize="8"
+                                fontSize="12"
                             >{planetTitle}</text>
                             {
                                 planetDrawing.original.buildings.filter(b => {
@@ -2110,45 +2130,75 @@ export class App extends React.Component<IAppProps, IAppState> {
         return voronoiGraph.cells.slice(4);
     }
 
-    public buildStar(point: [number, number, number], index: number): Planet {
-        const planet = new Planet(this);
-        planet.id = `star-${index}`;
-        planet.position = Quaternion.fromBetweenVectors([0, 0, 1], point);
+    public buildStar(point: [number, number, number], index: number): Star {
+        const star = new Star(this);
+        star.id = `star-${index}`;
+        star.position = Quaternion.fromBetweenVectors([0, 0, 1], point);
         if (index % 5 === 0 || index % 5 === 1) {
-            planet.color = "blue";
-            planet.size = 5;
+            star.color = "blue";
+            star.size = 5;
         } else if (index % 5 === 2 || index % 5 === 3) {
-            planet.color = "yellow";
-            planet.size = 2.5;
+            star.color = "yellow";
+            star.size = 2.5;
         } else if (index % 5 === 4) {
-            planet.color = "red";
-            planet.size = 7.5;
+            star.color = "red";
+            star.size = 7.5;
         }
-        return planet;
+        return star;
+    }
+
+    public lerpColors(a: string, b: string, t: number): string {
+        const v1: number[] = [
+            parseInt(a.slice(1, 3), 16),
+            parseInt(a.slice(3, 5), 16),
+            parseInt(a.slice(5, 7), 16)
+        ];
+        const v2: number[] = [
+            parseInt(b.slice(1, 3), 16),
+            parseInt(b.slice(3, 5), 16),
+            parseInt(b.slice(5, 7), 16)
+        ];
+        const v3 = [
+            Math.floor(v1[0] * (1 - t) + v2[0] * t),
+            Math.floor(v1[1] * (1 - t) + v2[1] * t),
+            Math.floor(v1[2] * (1 - t) + v2[2] * t)
+        ];
+        const v4 = [v3[0].toString(16), v3[1].toString(16), v3[2].toString(16)];
+        return `#${v4[0].length === 2 ? v4[0] : `0${v4[0]}`}${v4[1].length === 2 ? v4[1] : `0${v4[1]}`}${v4[2].length === 2 ? v4[2] : `0${v4[2]}`}`;
     }
 
     /**
      * Create a planet.
      * @param planetPoint The point the planet is created at.
+     * @param county The feudal county of the planet.
      * @param planetI The index of the planet.
+     * @param isCapital If the planet is a capital.
      * @private
      */
-    public createPlanet(planetPoint: [number, number, number], planetI: number): Planet {
-        const planet = new Planet(this);
+    public createPlanet(planetPoint: [number, number, number], county: VoronoiCounty, planetI: number, isCapital: boolean): Planet {
+        const planet = new Planet(this, county);
         planet.id = `planet-${planetI}`;
         planet.position = Quaternion.fromBetweenVectors([0, 0, 1], planetPoint);
         planet.position = planet.position.normalize();
         planet.orientation = Quaternion.fromAxisAngle([0, 0, 1], Math.random() * 2 * Math.PI);
         const colorValue = Math.random();
-        if (colorValue > 0.75)
-            planet.color = "#ff8888";
+        if (colorValue > 0.875)
+            planet.color = this.lerpColors(planet.county.duchy.color, "#ff8888", 0.2);
+        else if (colorValue > 0.75)
+            planet.color = this.lerpColors(planet.county.duchy.color, "#88ff88", 0.2);
+        else if (colorValue > 0.625)
+            planet.color = this.lerpColors(planet.county.duchy.color, "#8888ff", 0.2);
         else if (colorValue > 0.5)
-            planet.color = "#88ff88";
+            planet.color = this.lerpColors(planet.county.duchy.color, "#ffff88", 0.2);
+        else if (colorValue > 0.375)
+            planet.color = this.lerpColors(planet.county.duchy.color, "#88ffff", 0.2);
         else if (colorValue > 0.25)
-            planet.color = "#ffff88";
+            planet.color = this.lerpColors(planet.county.duchy.color, "#ff88ff", 0.2);
+        else if (colorValue > 0.125)
+            planet.color = this.lerpColors(planet.county.duchy.color, "#ffffff", 0.2);
         else
-            planet.color = "#8888ff";
-        if (planetI < 5) {
+            planet.color = this.lerpColors(planet.county.duchy.color, "#888888", 0.2);
+        if (isCapital) {
             planet.size = 10;
             planet.settlementProgress = 1;
             planet.settlementLevel = ESettlementLevel.CAPITAL;
@@ -2186,27 +2236,37 @@ export class App extends React.Component<IAppProps, IAppState> {
             // the forth planet is always in a random location
             // the dutch are a republic which means players can vote on things
             // but the dutch are weaker compared to the kingdoms
-            planetId: this.planets[4].id
+            kingdom: this.voronoiTerrain.kingdoms[0]
         }, {
             id: EFaction.ENGLISH,
             color: "red",
-            planetId: this.planets[0].id
+            kingdom: this.voronoiTerrain.kingdoms[1]
         }, {
             id: EFaction.FRENCH,
             color: "blue",
-            planetId: this.planets[1].id
+            kingdom: this.voronoiTerrain.kingdoms[2]
         }, {
             id: EFaction.PORTUGUESE,
             color: "green",
-            planetId: this.planets[2].id
+            kingdom: this.voronoiTerrain.kingdoms[3]
         }, {
             id: EFaction.SPANISH,
             color: "yellow",
-            planetId: this.planets[3].id
+            kingdom: this.voronoiTerrain.kingdoms[4]
         }];
         for (const factionData of factionDataList) {
-            this.factions[factionData.id] = new Faction(this, factionData.id, factionData.color, factionData.planetId);
-            const planet = this.planets.find(p => p.id === factionData.planetId);
+            let planetId: string;
+            if (factionData.kingdom.duchies[0].counties[0].planet) {
+                planetId = factionData.kingdom.duchies[0].counties[0].planet.id;
+            } else {
+                throw new Error("Could not find planet to make faction");
+            }
+            const faction = new Faction(this, factionData.id, factionData.color, planetId);
+            this.factions[factionData.id] = faction;
+            const planet = this.planets.find(p => p.id === planetId);
+            if (planet) {
+                planet.claim(faction);
+            }
             if (planet && !this.props.isTestMode) {
                 for (let numShipsToStartWith = 0; numShipsToStartWith < 10; numShipsToStartWith++) {
                     const shipType = planet.shipyard.getNextShipTypeToBuild();

@@ -2,7 +2,8 @@ import {ICameraState} from "./Interface";
 import {DelaunayGraph, VoronoiCell, VoronoiGraph} from "./Graph";
 import Quaternion from "quaternion";
 import App from "./App";
-import {Planet} from "./Planet";
+import {Planet, Star} from "./Planet";
+import {Faction} from "./Faction";
 
 interface IVoronoiTreeNodeParent<T extends ICameraState> {
     nodes: Array<VoronoiTreeNode<T>>;
@@ -473,16 +474,32 @@ export class VoronoiTree<T extends ICameraState> implements IVoronoiTreeNodePare
  * A voronoi tree node used to generate the terrain of a kingdom. There are 5 duchies in a kingdom.
  */
 export class VoronoiCounty extends VoronoiTreeNode<ICameraState> {
+    duchy: VoronoiDuchy;
+    faction: Faction | null = null;
     planet: Planet | null = null;
     getPlanetId: () => number;
+    capital: Planet | null = null;
 
-    constructor(app: App, voronoiCell: VoronoiCell, level: number, parent: IVoronoiTreeNodeParent<ICameraState>, getPlanetId: () => number) {
+    constructor(
+        app: App,
+        voronoiCell: VoronoiCell,
+        level: number,
+        parent: IVoronoiTreeNodeParent<ICameraState>,
+        duchy: VoronoiDuchy,
+        getPlanetId: () => number
+    ) {
         super(app, voronoiCell, level, parent);
+        this.duchy = duchy;
         this.getPlanetId = getPlanetId;
     }
 
     public generateTerrain() {
-        this.planet = this.app.createPlanet(this.voronoiCell.centroid, this.getPlanetId());
+        // capitals are first counties, in first duchies, in the first 5 kingdoms
+        const isCapital =
+            this.duchy.counties[0] === this &&
+            this.duchy.kingdom.duchies[0] === this.duchy &&
+            this.duchy.kingdom.terrain.kingdoms.findIndex(k => k === this.duchy.kingdom) < 5;
+        this.planet = this.app.createPlanet(this.voronoiCell.centroid, this, this.getPlanetId(), isCapital);
     }
 
     public *getPlanets(): Generator<Planet> {
@@ -490,33 +507,64 @@ export class VoronoiCounty extends VoronoiTreeNode<ICameraState> {
             yield this.planet;
         }
     }
+
+    public claim(faction: Faction) {
+        // handle planet
+        if (this.planet) {
+            // remove planet from faction
+            if (this.faction) {
+                const planetIndex = this.faction.planetIds.findIndex(id => this.planet && id === this.planet.id);
+                if (planetIndex >= 0) {
+                    this.faction.planetIds.splice(planetIndex, 1);
+                }
+            }
+            // add planet to faction
+            if (!faction.planetIds.includes(this.planet.id)) {
+                faction.planetIds.push(this.planet.id);
+            }
+        }
+
+        // set faction
+        this.faction = faction;
+
+        // perform duchy claim
+        this.duchy.claim(this, faction);
+    }
 }
 
 /**
  * A voronoi tree node used to generate the terrain of a kingdom. There are 5 duchies in a kingdom.
  */
 export class VoronoiDuchy extends VoronoiTreeNode<ICameraState> {
+    kingdom: VoronoiKingdom;
+    faction: Faction | null = null;
+    capital: VoronoiCounty | null = null;
     counties: VoronoiCounty[] = [];
-    stars: Planet[] = [];
+    stars: Star[] = [];
     getPlanetId: () => number;
     getStarId: () => number;
+    color: string = "red";
 
     constructor(
         app: App,
         voronoiCell: VoronoiCell,
         level: number,
         parent: IVoronoiTreeNodeParent<ICameraState>,
+        kingdom: VoronoiKingdom,
         getPlanetId: () => number,
         getStarId: () => number,
+        color: string
     ) {
         super(app, voronoiCell, level, parent);
+        this.kingdom = kingdom;
         this.getPlanetId = getPlanetId;
         this.getStarId = getStarId;
+        this.color = color;
     }
 
     public generateTerrain() {
         this.nodes = VoronoiTreeNode.createTreeNodes(this.parent.nodes, this);
-        this.counties = this.nodes.map(n => new VoronoiCounty(n.app, n.voronoiCell, n.level, n.parent, this.getPlanetId));
+        this.counties = this.nodes.map(n => new VoronoiCounty(n.app, n.voronoiCell, n.level, n.parent, this, this.getPlanetId));
 
         const tempStars = VoronoiTreeNode.createTreeNodes(this.parent.nodes, this);
         this.stars = tempStars.map(s => s.voronoiCell.centroid).map((starPosition) => {
@@ -533,8 +581,21 @@ export class VoronoiDuchy extends VoronoiTreeNode<ICameraState> {
         }
     }
 
-    public *getStars(): Generator<Planet> {
+    public *getStars(): Generator<Star> {
         yield * this.stars;
+    }
+
+    public claim(county: VoronoiCounty, faction: Faction) {
+        // if no capital, make first colony the capital
+        if (!this.capital) {
+            this.capital = county;
+        }
+
+        // set faction
+        this.faction = faction;
+
+        // perform kingdom claim
+        this.kingdom.claim(this, faction);
     }
 }
 
@@ -542,6 +603,9 @@ export class VoronoiDuchy extends VoronoiTreeNode<ICameraState> {
  * A voronoi tree node used to generate the terrain of a kingdom. There are 5 duchies in a kingdom.
  */
 export class VoronoiKingdom extends VoronoiTreeNode<ICameraState> {
+    terrain: VoronoiTerrain;
+    faction: Faction | null = null;
+    capital: VoronoiDuchy | null = null;
     duchies: VoronoiDuchy[] = [];
     getPlanetId: () => number;
     getStarId: () => number;
@@ -551,17 +615,28 @@ export class VoronoiKingdom extends VoronoiTreeNode<ICameraState> {
         voronoiCell: VoronoiCell,
         level: number,
         parent: IVoronoiTreeNodeParent<ICameraState>,
+        terrain: VoronoiTerrain,
         getPlanetId: () => number,
         getStarId: () => number
     ) {
         super(app, voronoiCell, level, parent);
+        this.terrain = terrain;
         this.getPlanetId = getPlanetId;
         this.getStarId = getStarId;
     }
 
     public generateTerrain() {
         this.nodes = VoronoiTreeNode.createTreeNodes(this.parent.nodes, this);
-        this.duchies = this.nodes.map(n => new VoronoiDuchy(n.app, n.voronoiCell, n.level, n.parent, this.getPlanetId ,this.getStarId));
+        this.duchies = this.nodes.map((n, index) => {
+            let color: string;
+            if (index % 3 === 0)
+                color = "#ff4444";
+            else if (index % 3 === 1)
+                color = "#44ff44";
+            else
+                color = "#4444ff";
+            return new VoronoiDuchy(n.app, n.voronoiCell, n.level, n.parent, this, this.getPlanetId ,this.getStarId, color)
+        });
         for (const duchy of this.duchies) {
             duchy.generateTerrain();
         }
@@ -573,10 +648,20 @@ export class VoronoiKingdom extends VoronoiTreeNode<ICameraState> {
         }
     }
 
-    public *getStars(): Generator<Planet> {
+    public *getStars(): Generator<Star> {
         for (const duchy of this.duchies) {
             yield * Array.from(duchy.getStars());
         }
+    }
+
+    public claim(duchy: VoronoiDuchy, faction: Faction) {
+        // if no capital, make first colony the capital
+        if (!this.capital) {
+            this.capital = duchy;
+        }
+
+        // set faction
+        this.faction = faction;
     }
 }
 
@@ -605,7 +690,7 @@ export class VoronoiTerrain extends VoronoiTree<ICameraState> {
 
     public generateTerrain() {
         this.nodes = this.createRootNodes(this);
-        this.kingdoms = this.nodes.map(n => new VoronoiKingdom(n.app, n.voronoiCell, n.level, n.parent, this.getPlanetId, this.getStarId));
+        this.kingdoms = this.nodes.map(n => new VoronoiKingdom(n.app, n.voronoiCell, n.level, n.parent, this, this.getPlanetId, this.getStarId));
         for (const kingdom of this.kingdoms) {
             kingdom.generateTerrain();
         }
@@ -617,7 +702,7 @@ export class VoronoiTerrain extends VoronoiTree<ICameraState> {
         }
     }
 
-    public *getStars(): Generator<Planet> {
+    public *getStars(): Generator<Star> {
         for (const kingdom of this.kingdoms) {
             yield * Array.from(kingdom.getStars());
         }
