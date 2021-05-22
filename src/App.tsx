@@ -503,7 +503,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         return App.GetCameraState(tempShip);
     }
 
-    private rotateDelaunayTriangle(triangle: ICellData, index: number): IDrawableTile {
+    private rotateDelaunayTriangle(earthLike: boolean, triangle: ICellData, index: number): IDrawableTile {
         const {
             position: cameraPosition,
             orientation: cameraOrientation,
@@ -516,18 +516,28 @@ export class App extends React.Component<IAppProps, IAppState> {
         };
         const vertices = triangle.vertices.map(pointToQuaternion);
         let color: string = "red";
-        if (index % 6 === 0) {
-            color = "red";
-        } else if (index % 6 === 1) {
-            color = "orange";
-        } else if (index % 6 === 2) {
-            color = "yellow";
-        } else if (index % 6 === 3) {
-            color = "green";
-        } else if (index % 6 === 4) {
-            color = "blue";
-        } else if (index % 6 === 5) {
-            color = "purple";
+        if (earthLike) {
+            // earth colors
+            if (index % 6 < 2) {
+                color = "green";
+            } else {
+                color = "blue";
+            }
+        } else {
+            // beach ball colors
+            if (index % 6 === 0) {
+                color = "red";
+            } else if (index % 6 === 1) {
+                color = "orange";
+            } else if (index % 6 === 2) {
+                color = "yellow";
+            } else if (index % 6 === 3) {
+                color = "green";
+            } else if (index % 6 === 4) {
+                color = "blue";
+            } else if (index % 6 === 5) {
+                color = "purple";
+            }
         }
 
         const tile = new DelaunayTile();
@@ -1320,7 +1330,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         };
     }
 
-    private drawDelaunayTessellatedTriangle(tile: DelaunayTile, triangle: ITessellatedTriangle, index: number, arr: ITessellatedTriangle[]) {
+    private drawDelaunayTessellatedTriangle(earthLike: boolean, tile: DelaunayTile, triangle: ITessellatedTriangle, index: number, arr: ITessellatedTriangle[]) {
         const {
             points,
             rotatedPoints
@@ -1346,10 +1356,12 @@ export class App extends React.Component<IAppProps, IAppState> {
                     <polygon
                         points={points.map(p => `${p.x * this.state.width},${(1 - p.y) * this.state.height}`).join(" ")}
                         fill={tile.color}
-                        style={{opacity: 0.1}}
+                        stroke={!earthLike ? "white" : undefined}
+                        strokeWidth={!earthLike ? 2 : 0}
+                        style={{opacity: !earthLike ? 0.1 : 1}}
                     />
                     {
-                        averageDrawingPoint && (
+                        averageDrawingPoint && !earthLike && (
                             <text
                                 x={averageDrawingPoint.x * this.state.width}
                                 y={(1 - averageDrawingPoint.y) * this.state.height}
@@ -1374,12 +1386,12 @@ export class App extends React.Component<IAppProps, IAppState> {
         ];
     }
 
-    private drawDelaunayTile(tile: IDrawableTile) {
+    private drawDelaunayTile(earthLike: boolean, tile: IDrawableTile) {
         const tessellationMesh = Array.from(this.getDelaunayTileTessellation(tile.centroid, tile.vertices));
         return (
             <g key={tile.id}>
                 {
-                    tessellationMesh.map(this.drawDelaunayTessellatedTriangle.bind(this, tile))
+                    tessellationMesh.map(this.drawDelaunayTessellatedTriangle.bind(this, earthLike, tile))
                 }
             </g>
         );
@@ -2229,7 +2241,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         this.voronoiData = this.voronoiGraph.cells;
         if (!this.props.isVoronoiTestMode) {
             this.voronoiTerrain.generateTerrain();
-            this.voronoiData = this.voronoiTerrain.kingdoms.reduce((acc, k) => [...acc, ...k.nodes.map(n => n.voronoiCell)], [] as VoronoiCell[]);
+            this.voronoiData = this.voronoiTerrain.kingdoms.slice(0, 1).reduce((acc, k) => [...acc, ...k.nodes.map(n => n.voronoiCell)], [] as VoronoiCell[]);
         }
 
         // initialize stars
@@ -2359,6 +2371,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 // rebuild delaunay data
                 this.delaunayData = Array.from(this.delaunayGraph.GetTriangles());
                 this.voronoiGraph = this.delaunayGraph.getVoronoiGraph();
+                this.voronoiData = this.voronoiGraph.cells;
             }
         }
     }
@@ -2375,14 +2388,14 @@ export class App extends React.Component<IAppProps, IAppState> {
                 />
                 {
                     this.state.showDelaunay ?
-                        this.delaunayData.map(this.rotateDelaunayTriangle.bind(this))
-                            .map(this.drawDelaunayTile.bind(this)) :
+                        this.delaunayData.map(this.rotateDelaunayTriangle.bind(this, false))
+                            .map(this.drawDelaunayTile.bind(this, false)) :
                         null
                 }
                 {
                     this.state.showVoronoi ?
-                        this.voronoiData.map(this.rotateDelaunayTriangle.bind(this))
-                            .map(this.drawDelaunayTile.bind(this)) :
+                        this.voronoiData.map(this.rotateDelaunayTriangle.bind(this, !!this.props.isVoronoiTestMode))
+                            .map(this.drawDelaunayTile.bind(this, !!this.props.isVoronoiTestMode)) :
                         null
                 }
                 {/*{*/}
@@ -3527,7 +3540,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                             this.renderGameWorld.call(this)
                         }
                         {
-                            this.state.showMainMenu ? this.renderMainMenu.call(this) : null
+                            this.state.showMainMenu && !this.props.isVoronoiTestMode ? this.renderMainMenu.call(this) : null
                         }
                         {
                             this.state.showSpawnMenu ? this.renderSpawnMenu.call(this) : null
