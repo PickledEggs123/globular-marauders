@@ -25,7 +25,7 @@ import {
     VoronoiCell,
     VoronoiGraph
 } from "./Graph";
-import {VoronoiCounty, VoronoiTerrain, VoronoiTree} from "./VoronoiTree";
+import {VoronoiCounty, VoronoiKingdom, VoronoiTerrain, VoronoiTree} from "./VoronoiTree";
 import {Faction, LuxuryBuff} from "./Faction";
 import {EBuildingType, Manufactory, Planet, Plantation, Star} from "./Planet";
 import {CannonBall, Crate, SmokeCloud} from "./Item";
@@ -314,6 +314,12 @@ interface ITargetLineData {
     targetNodes: Array<[[number, number], number]>
 }
 
+enum EVoronoiMode {
+    KINGDOM = "KINGDOM",
+    DUCHY = "DUCHY",
+    COUNTY = "COUNTY"
+}
+
 interface IAppProps {
     /**
      * If the app is in test mode.
@@ -338,6 +344,7 @@ interface IAppState {
     zoom: number;
     showDelaunay: boolean;
     showVoronoi: boolean;
+    voronoiMode: EVoronoiMode;
     autoPilotEnabled: boolean;
     audioEnabled: boolean;
     showMainMenu: boolean;
@@ -355,6 +362,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         zoom: 4 as number,
         showDelaunay: false as boolean,
         showVoronoi: false as boolean,
+        voronoiMode: EVoronoiMode.KINGDOM as EVoronoiMode,
         autoPilotEnabled: true as boolean,
         audioEnabled: false as boolean,
         faction: null as EFaction | null,
@@ -379,7 +387,6 @@ export class App extends React.Component<IAppProps, IAppState> {
     public voronoiGraph: VoronoiGraph<Planet> = new VoronoiGraph(this);
     public voronoiData: VoronoiCell[] = [];
     public voronoiShips: VoronoiTree<Ship> = new VoronoiTree(this);
-    public voronoiShipsCells: VoronoiCell[] = [];
     public voronoiTerrain: VoronoiTerrain = new VoronoiTerrain(this);
     public factions: { [key: string]: Faction } = {};
     public ships: Ship[] = [];
@@ -391,7 +398,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     public cannonBalls: CannonBall[] = [];
     public luxuryBuffs: LuxuryBuff[] = [];
     public gold: number = 2000;
-    public worldScale: number = 2;
+    public worldScale: number = 3;
     public music: MusicPlayer = new MusicPlayer();
     public demoAttackingShipId: string | null = null;
     public lastDemoAttackingShipTime: Date = new Date();
@@ -2034,16 +2041,20 @@ export class App extends React.Component<IAppProps, IAppState> {
 
     private handleShowVoronoi() {
         if (this.showVoronoiRef.current) {
-            // cache a copy of the data since it updates often
-            if (this.showVoronoiRef.current.checked) {
-                this.voronoiShipsCells = Array.from(this.voronoiShips.listCells());
-            }
-
             this.setState({
                 ...this.state,
                 showVoronoi: this.showVoronoiRef.current.checked,
             });
         }
+    }
+
+    private handleChangeVoronoi(voronoiMode: EVoronoiMode) {
+        this.setState({
+            ...this.state,
+            voronoiMode,
+        }, () => {
+            this.refreshVoronoiData();
+        });
     }
 
     private handleAutoPilotEnabled() {
@@ -2189,7 +2200,7 @@ export class App extends React.Component<IAppProps, IAppState> {
      * @param isCapital If the planet is a capital.
      * @private
      */
-    public createPlanet(planetPoint: [number, number, number], county: VoronoiCounty, planetI: number, isCapital: boolean): Planet {
+    public createPlanet(planetPoint: [number, number, number], county: VoronoiCounty, planetI: number): Planet {
         const planet = new Planet(this, county);
         planet.id = `planet-${planetI}`;
         planet.position = Quaternion.fromBetweenVectors([0, 0, 1], planetPoint);
@@ -2212,17 +2223,36 @@ export class App extends React.Component<IAppProps, IAppState> {
             planet.color = this.lerpColors(planet.county.duchy.color, "#ffffff", 0.33);
         else
             planet.color = this.lerpColors(planet.county.duchy.color, "#888888", 0.33);
-        if (isCapital) {
-            planet.size = 10;
-            planet.settlementProgress = 1;
-            planet.settlementLevel = ESettlementLevel.CAPITAL;
-            planet.naturalResources = [...CAPITAL_GOODS];
-        } else {
-            planet.buildInitialResourceBuildings();
-        }
+        planet.buildInitialResourceBuildings();
         planet.recomputeResources();
         planet.pathingNode = this.delaunayGraph.createPathingNode(planet.position.rotateVector([0, 0, 1]));
         return planet;
+    }
+
+    refreshVoronoiData() {
+        switch (this.state.voronoiMode) {
+            default:
+            case EVoronoiMode.KINGDOM: {
+                this.voronoiData = this.voronoiTerrain.kingdoms.reduce((acc, k) => [
+                    ...acc, k.voronoiCell
+                ], [] as VoronoiCell[]);
+                break;
+            }
+            case EVoronoiMode.DUCHY: {
+                this.voronoiData = this.voronoiTerrain.kingdoms.reduce((acc, k) => [
+                    ...acc, ...k.duchies.map(d => d.voronoiCell)
+                ], [] as VoronoiCell[]);
+                break;
+            }
+            case EVoronoiMode.COUNTY: {
+                this.voronoiData = this.voronoiTerrain.kingdoms.reduce((acc, k) => [
+                    ...acc, ...k.duchies.reduce((acc2, d) => [
+                        ...acc2, ...d.counties.map(c => c.voronoiCell)
+                    ], [] as VoronoiCell[])
+                ], [] as VoronoiCell[]);
+                break;
+            }
+        }
     }
 
     componentDidMount() {
@@ -2239,10 +2269,8 @@ export class App extends React.Component<IAppProps, IAppState> {
         this.delaunayData = Array.from(this.delaunayGraph.GetTriangles());
         this.voronoiGraph = this.delaunayGraph.getVoronoiGraph();
         this.voronoiData = this.voronoiGraph.cells;
-        if (!this.props.isVoronoiTestMode) {
-            this.voronoiTerrain.generateTerrain();
-            this.voronoiData = this.voronoiTerrain.kingdoms.reduce((acc, k) => [...acc, k.voronoiCell], [] as VoronoiCell[]);
-        }
+        this.voronoiTerrain.generateTerrain();
+        this.refreshVoronoiData();
 
         // initialize stars
         this.stars = Array.from(this.voronoiTerrain.getStars());
@@ -2252,41 +2280,80 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         // initialize factions
         if (!this.props.isVoronoiTestMode) {
+            const factionStartingPoints = this.generateGoodPoints(1, 10).map(p => p.centroid);
+            let factionStartingKingdoms = this.voronoiTerrain.kingdoms;
+            const getStartingKingdom = (point: [number, number, number]): VoronoiKingdom => {
+                // get the closest kingdom to the point
+                const kingdom = factionStartingKingdoms.reduce((acc, k) => {
+                    if (!acc) {
+                        return k;
+                    } else {
+                        const distanceToAcc = VoronoiGraph.angularDistance(point, acc.voronoiCell.centroid, this.worldScale);
+                        const distanceToK = VoronoiGraph.angularDistance(point, k.voronoiCell.centroid, this.worldScale);
+                        if (distanceToK < distanceToAcc) {
+                            return k;
+                        } else {
+                            return acc;
+                        }
+                    }
+                }, null as VoronoiKingdom | null);
+
+                // handle empty value
+                if (!kingdom) {
+                    throw new Error("Could not find a kingdom to start a faction on");
+                }
+
+                // return closest kingdom
+                factionStartingKingdoms = factionStartingKingdoms.filter(k => k !== kingdom);
+                return kingdom;
+            };
             const factionDataList = [{
                 id: EFaction.DUTCH,
                 color: "orange",
                 // the forth planet is always in a random location
                 // the dutch are a republic which means players can vote on things
                 // but the dutch are weaker compared to the kingdoms
-                kingdom: this.voronoiTerrain.kingdoms[0]
+                kingdom: getStartingKingdom(factionStartingPoints[0])
             }, {
                 id: EFaction.ENGLISH,
                 color: "red",
-                kingdom: this.voronoiTerrain.kingdoms[1]
+                kingdom: getStartingKingdom(factionStartingPoints[1])
             }, {
                 id: EFaction.FRENCH,
                 color: "blue",
-                kingdom: this.voronoiTerrain.kingdoms[2]
+                kingdom: getStartingKingdom(factionStartingPoints[2])
             }, {
                 id: EFaction.PORTUGUESE,
                 color: "green",
-                kingdom: this.voronoiTerrain.kingdoms[3]
+                kingdom: getStartingKingdom(factionStartingPoints[3])
             }, {
                 id: EFaction.SPANISH,
                 color: "yellow",
-                kingdom: this.voronoiTerrain.kingdoms[4]
+                kingdom: getStartingKingdom(factionStartingPoints[4])
             }];
             for (const factionData of factionDataList) {
-                let planetId: string;
-                if (factionData.kingdom.duchies[0].counties[0].planet) {
-                    planetId = factionData.kingdom.duchies[0].counties[0].planet.id;
-                } else {
+                let planetId: string | null = null;
+                if (factionData.kingdom) {
+                    for (const duchy of factionData.kingdom.duchies) {
+                        for (const county of duchy.counties) {
+                            if (county.planet) {
+                                planetId = county.planet.id;
+                                break;
+                            }
+                        }
+                        if (planetId) {
+                            break;
+                        }
+                    }
+                }
+                if (!planetId) {
                     throw new Error("Could not find planet to make faction");
                 }
                 const faction = new Faction(this, factionData.id, factionData.color, planetId);
                 this.factions[factionData.id] = faction;
                 const planet = this.planets.find(p => p.id === planetId);
                 if (planet) {
+                    planet.setAsStartingCapital();
                     planet.claim(faction);
                 }
                 if (planet && !this.props.isTestMode) {
@@ -2394,7 +2461,13 @@ export class App extends React.Component<IAppProps, IAppState> {
                 }
                 {
                     this.state.showVoronoi ?
-                        this.voronoiData.map(this.rotateDelaunayTriangle.bind(this, !!this.props.isVoronoiTestMode))
+                        this.voronoiData.filter(d => {
+                            return VoronoiGraph.angularDistance(
+                                this.getPlayerShip().position.rotateVector([0, 0, 1]),
+                                d.centroid,
+                                this.worldScale
+                            ) < (Math.PI / (this.worldScale * this.state.zoom)) + d.radius;
+                        }).map(this.rotateDelaunayTriangle.bind(this, !!this.props.isVoronoiTestMode))
                             .map(this.drawDelaunayTile.bind(this, !!this.props.isVoronoiTestMode)) :
                         null
                 }
@@ -3397,34 +3470,62 @@ export class App extends React.Component<IAppProps, IAppState> {
     render() {
         return (
             <div className="App">
-                <div style={{display: "flex"}}>
-                    <div style={{display: "inline-block"}}>
-                        <input type="checkbox" ref={this.showNotesRef} checked={this.state.showNotes} onChange={this.handleShowNotes.bind(this)}/>
-                        <span>Show Notes</span>
+                <div style={{display: "flex", justifyContent: "space-evenly"}}>
+                    <div style={{display: "inline-block", background: "lightskyblue"}}>
+                        <label>
+                            <input type="checkbox" tabIndex={-1} ref={this.showNotesRef} checked={this.state.showNotes} onChange={this.handleShowNotes.bind(this)}/>
+                            <span>Show Notes</span>
+                        </label>
                     </div>
-                    <div style={{display: "inline-block"}}>
-                        <input type="checkbox" ref={this.showShipsRef} checked={this.state.showShips} onChange={this.handleShowShips.bind(this)}/>
-                        <span>Show Ships</span>
+                    <div style={{display: "inline-block", background: "lightskyblue"}}>
+                        <label>
+                            <input type="checkbox" tabIndex={-1} ref={this.showShipsRef} checked={this.state.showShips} onChange={this.handleShowShips.bind(this)}/>
+                            <span>Show Ships</span>
+                        </label>
                     </div>
-                    <div style={{display: "inline-block"}}>
-                        <input type="checkbox" ref={this.showItemsRef} checked={this.state.showItems} onChange={this.handleShowItems.bind(this)}/>
-                        <span>Show Items</span>
+                    <div style={{display: "inline-block", background: "lightskyblue"}}>
+                        <label>
+                            <input type="checkbox" tabIndex={-1} ref={this.showItemsRef} checked={this.state.showItems} onChange={this.handleShowItems.bind(this)}/>
+                            <span>Show Items</span>
+                        </label>
                     </div>
-                    <div style={{display: "inline-block"}}>
-                        <input type="checkbox" ref={this.showDelaunayRef} checked={this.state.showDelaunay} onChange={this.handleShowDelaunay.bind(this)}/>
-                        <span>Show Delaunay</span>
+                    <div style={{display: "inline-block", background: "lightskyblue"}}>
+                        <label>
+                            <input type="checkbox" tabIndex={-1} ref={this.showDelaunayRef} checked={this.state.showDelaunay} onChange={this.handleShowDelaunay.bind(this)}/>
+                            <span>Show Delaunay</span>
+                        </label>
                     </div>
-                    <div style={{display: "inline-block"}}>
-                        <input type="checkbox" ref={this.showVoronoiRef} checked={this.state.showVoronoi} onChange={this.handleShowVoronoi.bind(this)}/>
-                        <span>Show Voronoi</span>
+                    <div style={{display: "inline-block", background: "lightskyblue"}}>
+                        <label>
+                            <input type="checkbox" tabIndex={-1} ref={this.showVoronoiRef} checked={this.state.showVoronoi} onChange={this.handleShowVoronoi.bind(this)}/>
+                            <span>Show Voronoi</span>
+                        </label>
+                        <g key="voronoi-mode-radio-group">
+                            <label>
+                                <input type="radio" tabIndex={-1} checked={this.state.voronoiMode === EVoronoiMode.KINGDOM} onChange={this.handleChangeVoronoi.bind(this, EVoronoiMode.KINGDOM)}/>
+                                <span>Kingdom</span>
+                            </label>
+                            <label>
+                                <input type="radio" tabIndex={-1} checked={this.state.voronoiMode === EVoronoiMode.DUCHY} onChange={this.handleChangeVoronoi.bind(this, EVoronoiMode.DUCHY)}/>
+                                <span>Duchy</span>
+                            </label>
+                            <label>
+                                <input type="radio" tabIndex={-1} checked={this.state.voronoiMode === EVoronoiMode.COUNTY} onChange={this.handleChangeVoronoi.bind(this, EVoronoiMode.COUNTY)}/>
+                                <span>County</span>
+                            </label>
+                        </g>
                     </div>
-                    <div style={{display: "inline-block"}}>
-                        <input type="checkbox" ref={this.autoPilotEnabledRef} checked={this.state.autoPilotEnabled} onChange={this.handleAutoPilotEnabled.bind(this)}/>
-                        <span>AutoPilot Enabled</span>
+                    <div style={{display: "inline-block", background: "lightskyblue"}}>
+                        <label>
+                            <input type="checkbox" tabIndex={-1} ref={this.autoPilotEnabledRef} checked={this.state.autoPilotEnabled} onChange={this.handleAutoPilotEnabled.bind(this)}/>
+                            <span>AutoPilot Enabled</span>
+                        </label>
                     </div>
-                    <div style={{display: "inline-block"}}>
-                        <input type="checkbox" ref={this.audioEnabledRef} checked={this.state.audioEnabled} onChange={this.handleAudioEnabled.bind(this)}/>
-                        <span>Audio Enabled</span>
+                    <div style={{display: "inline-block", background: "lightskyblue"}}>
+                        <label>
+                            <input type="checkbox" tabIndex={-1} ref={this.audioEnabledRef} checked={this.state.audioEnabled} onChange={this.handleAudioEnabled.bind(this)}/>
+                            <span>Audio Enabled</span>
+                        </label>
                     </div>
                 </div>
                 {

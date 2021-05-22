@@ -199,7 +199,8 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
      */
     private static polygonClip<T extends ICameraState>(forNode: VoronoiTreeNode<T>, polygon: VoronoiCell): VoronoiCell {
         // copy data, to make the function immutable
-        const vertices: Array<[number, number, number]> = [];
+        let vertices: Array<[number, number, number]> = polygon.vertices;
+        let tempVertices: Array<[number, number, number]> = [];
 
         // for each outer line, assume infinite line segment
         for (let outerIndex = 0; outerIndex < forNode.voronoiCell.vertices.length; outerIndex++) {
@@ -211,10 +212,10 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
             let beginClipping: boolean = false;
 
             // for each inner line segment
-            for (let innerIndex = 0; innerIndex < polygon.vertices.length || beginClipping; innerIndex++) {
+            for (let innerIndex = 0; innerIndex < vertices.length || beginClipping; innerIndex++) {
                 // compute intersection with line segment and infinite culling line
-                const innerA = polygon.vertices[innerIndex % polygon.vertices.length];
-                const innerB = polygon.vertices[(innerIndex + 1) % polygon.vertices.length];
+                const innerA = vertices[innerIndex % vertices.length];
+                const innerB = vertices[(innerIndex + 1) % vertices.length];
                 const midPoint = DelaunayGraph.normalize(App.getAveragePoint([innerA, innerB]));
                 const innerN = DelaunayGraph.normalize(DelaunayGraph.crossProduct(innerA, innerB));
                 const line = DelaunayGraph.normalize(DelaunayGraph.crossProduct(outerN, innerN));
@@ -224,13 +225,22 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
                     -line[2]
                 ];
 
+                if (DelaunayGraph.dotProduct(intercept, outerN) > 0.001) {
+                    intercept[0] *= -1;
+                    intercept[1] *= -1;
+                    intercept[2] *= -1;
+                }
+                if (DelaunayGraph.dotProduct(intercept, outerN) > 0.001) {
+                    throw new Error("BAD INTERCEPT");
+                }
+
                 // determine if to cull or to cut the polygon
-                const isInnerAInside = DelaunayGraph.dotProduct(outerN, innerA) < 0;
-                const isInnerBInside = DelaunayGraph.dotProduct(outerN, innerB) < 0;
+                const isInnerAInside = DelaunayGraph.dotProduct(outerN, innerA) > 0;
+                const isInnerBInside = DelaunayGraph.dotProduct(outerN, innerB) > 0;
                 if (isInnerAInside && !isInnerBInside) {
                     // moved outside of polygon, begin clipping
                     beginClipping = true;
-                    vertices.push(innerA, intercept);
+                    tempVertices.push(innerA, intercept);
                 } else if (!isInnerAInside && !isInnerBInside) {
                     // still outside of polygon, skip this segment
                 } else if (!isInnerAInside && isInnerBInside) {
@@ -239,13 +249,15 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
                     // fix duplicate vertex bug caused by a polygon starting on a polygon clip
                     // if there is a triangle 1, 2, 3 with 1 being out of bounds, it would insert intercept 1-2, 2, 3, intercept 3-1
                     // do not insert intercept 1-2 twice, the for loop can continue past the last index
-                    if (innerIndex < polygon.vertices.length) {
-                        vertices.push(intercept);
+                    if (innerIndex < vertices.length) {
+                        tempVertices.push(intercept);
                     }
                 } else {
-                    vertices.push(innerA);
+                    tempVertices.push(innerA);
                 }
             }
+            vertices = tempVertices;
+            tempVertices = [];
         }
 
         // compute new voronoi cell
@@ -286,8 +298,8 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
         const a = Quaternion.fromBetweenVectors([0, 0, 1], forNode.voronoiCell.vertices[0]);
         const b = Quaternion.fromBetweenVectors([0, 0, 1], forNode.voronoiCell.vertices[randomTriangleIndex]);
         const c = Quaternion.fromBetweenVectors([0, 0, 1], forNode.voronoiCell.vertices[randomTriangleIndex + 1]);
-        const x = a.clone().inverse().mul(b).pow(randomX);
-        const y = a.clone().inverse().mul(c).pow(randomY);
+        const x = (a.clone().inverse().mul(b)).pow(randomX);
+        const y = (a.clone().inverse().mul(c)).pow(randomY);
 
         // interpolate point on random values
         const point = a.clone().mul(x.clone()).mul(y.clone());
@@ -312,17 +324,23 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
 
         // compute random nodes within voronoi cell, hierarchical voronoi tree.
         let goodPoints: VoronoiCell[] = [];
-        for (let step = 0; step < 10; step++) {
+        let numSteps: number = 10;
+        // if (forNode.level === 1) {
+        //     goodPoints.push(forNode.voronoiCell);
+        //     numSteps = 0;
+        // }
+        for (let step = 0; step < numSteps; step++) {
             const delaunay = new DelaunayGraph<T>(forNode.app);
             delaunay.initializeWithPoints(randomPointsWithinVoronoiCell);
             // this line is needed because inserting vertices could remove old vertices.
             while (delaunay.numRealVertices() < numRandomPoints + 4) {
                 delaunay.incrementalInsert();
             }
-            const outOfBoundsVoronoiCells = delaunay.getVoronoiGraph().cells.slice(4);
+            const outOfBoundsVoronoiCells = delaunay.getVoronoiGraph().cells;
 
             // perform sutherland-hodgman polygon clipping
-            goodPoints = outOfBoundsVoronoiCells.map((polygon) => VoronoiTreeNode.polygonClip<T>(forNode, polygon));
+            goodPoints = outOfBoundsVoronoiCells.map((polygon) => VoronoiTreeNode.polygonClip<T>(forNode, polygon))
+                .filter((polygon) => polygon.vertices.length > 0);
             randomPointsWithinVoronoiCell = goodPoints.reduce((acc, v) => {
                 if (acc.every(p => VoronoiGraph.angularDistance(p, v.centroid, 1) > 0.001)) {
                     acc.push(v.centroid);
@@ -499,12 +517,7 @@ export class VoronoiCounty extends VoronoiTreeNode<ICameraState> {
     }
 
     public generateTerrain() {
-        // capitals are first counties, in first duchies, in the first 5 kingdoms
-        const isCapital =
-            this.duchy.counties[0] === this &&
-            this.duchy.kingdom.duchies[0] === this.duchy &&
-            this.duchy.kingdom.terrain.kingdoms.findIndex(k => k === this.duchy.kingdom) < 5;
-        this.planet = this.app.createPlanet(this.voronoiCell.centroid, this, this.getPlanetId(), isCapital);
+        this.planet = this.app.createPlanet(this.voronoiCell.centroid, this, this.getPlanetId());
     }
 
     public *getPlanets(): Generator<Planet> {
@@ -676,7 +689,7 @@ export class VoronoiKingdom extends VoronoiTreeNode<ICameraState> {
 export class VoronoiTerrain extends VoronoiTree<ICameraState> {
     kingdoms: VoronoiKingdom[] = [];
     recursionNodeLevels(): number[] {
-        return [20, 3, 4];
+        return [25, 3, 4];
     }
 
     planetId: number = 0;

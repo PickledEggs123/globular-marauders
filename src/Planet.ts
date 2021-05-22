@@ -613,6 +613,13 @@ export class Planet implements ICameraState {
         );
     }
 
+    public setAsStartingCapital() {
+        this.size = 10;
+        this.settlementProgress = 1;
+        this.settlementLevel = ESettlementLevel.CAPITAL;
+        this.naturalResources = [...CAPITAL_GOODS];
+    }
+
     // rebuild the resources array based on events such as less or more items
     public recomputeResources() {
         // update resources array
