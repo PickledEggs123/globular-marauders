@@ -25,6 +25,26 @@ export class VoronoiCell implements ICellData {
     public vertices: [number, number, number][] = [];
     public centroid: [number, number, number] = [0, 0, 0];
     public radius: number = 0;
+
+    /**
+     * If the voronoi cell contains the point.
+     * @param point The point to test.
+     */
+    public containsPoint(point: [number, number, number]): boolean {
+        // for each pair of vertices
+        for (let i = 0; i < this.vertices.length; i++) {
+            // test line segment and point
+            const a = this.vertices[i % this.vertices.length];
+            const b = this.vertices[(i + 1) % this.vertices.length];
+            const n = DelaunayGraph.normalize(DelaunayGraph.crossProduct(a, b));
+            const v = DelaunayGraph.dotProduct(n, point);
+            if (v < 0) {
+                // point is on the outside edge of the voronoi cell, return false
+                return false;
+            }
+        }
+        return true;
+    }
 }
 
 /**

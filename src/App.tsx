@@ -398,7 +398,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     public cannonBalls: CannonBall[] = [];
     public luxuryBuffs: LuxuryBuff[] = [];
     public gold: number = 2000;
-    public worldScale: number = 3;
+    public worldScale: number = 1;
     public music: MusicPlayer = new MusicPlayer();
     public demoAttackingShipId: string | null = null;
     public lastDemoAttackingShipTime: Date = new Date();
@@ -2131,15 +2131,18 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     public generateGoodPoints<T extends ICameraState>(numPoints: number, numSteps: number): VoronoiCell[] {
+        if (numPoints < 4) {
+            throw new Error("Bad number of points, expected at least 4 points");
+        }
         let delaunayGraph = new DelaunayGraph<T>(this);
         let voronoiGraph = new VoronoiGraph<T>(this);
         delaunayGraph.initialize();
-        for (let i = 0; i < numPoints; i++) {
+        for (let i = 0; i < numPoints - 4; i++) {
             delaunayGraph.incrementalInsert();
         }
         for (let step = 0; step < numSteps; step++) {
             // this line is needed because inserting vertices could remove old vertices.
-            while (delaunayGraph.numRealVertices() < numPoints + 4) {
+            while (delaunayGraph.numRealVertices() < numPoints) {
                 delaunayGraph.incrementalInsert();
             }
             voronoiGraph = delaunayGraph.getVoronoiGraph();
@@ -2148,7 +2151,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             delaunayGraph.initializeWithPoints(lloydPoints.slice(4));
         }
         // this line is needed because inserting vertices could remove old vertices.
-        while (delaunayGraph.numRealVertices() < numPoints - 4) {
+        while (delaunayGraph.numRealVertices() < numPoints) {
             delaunayGraph.incrementalInsert();
         }
         voronoiGraph = delaunayGraph.getVoronoiGraph();
@@ -2280,7 +2283,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         // initialize factions
         if (!this.props.isVoronoiTestMode) {
-            const factionStartingPoints = this.generateGoodPoints(1, 10).map(p => p.centroid);
+            const factionStartingPoints = this.generateGoodPoints(5, 10).map(p => p.centroid);
             let factionStartingKingdoms = this.voronoiTerrain.kingdoms;
             const getStartingKingdom = (point: [number, number, number]): VoronoiKingdom => {
                 // get the closest kingdom to the point

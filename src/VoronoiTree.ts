@@ -164,9 +164,9 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
             const nab = DelaunayGraph.crossProduct(a, b);
             const nbc = DelaunayGraph.crossProduct(b, c);
             const nca = DelaunayGraph.crossProduct(c, a);
-            const angleA = DelaunayGraph.dotProduct(nab, [-nca[0], -nca[1], -nca[2]]);
-            const angleB = DelaunayGraph.dotProduct(nbc, [-nab[0], -nab[1], -nab[2]]);
-            const angleC = DelaunayGraph.dotProduct(nca, [-nbc[0], -nbc[1], -nbc[2]]);
+            const angleA = Math.acos(DelaunayGraph.dotProduct(nab, [-nca[0], -nca[1], -nca[2]]));
+            const angleB = Math.acos(DelaunayGraph.dotProduct(nbc, [-nab[0], -nab[1], -nab[2]]));
+            const angleC = Math.acos(DelaunayGraph.dotProduct(nca, [-nbc[0], -nbc[1], -nbc[2]]));
             const area = angleA + angleB + angleC - Math.PI;
             triangleAreasInPolygon.push(area);
         }
@@ -181,7 +181,7 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
         }, [] as number[]);
         const randomTriangleInPolygonRandValue = Math.random() * triangleAreasInPolygonSum;
         let randomTriangleInPolygonIndex: number = 0;
-        for (let i = triangleAreasInPolygonCum.length - 1; i >= 0; i--) {
+        for (let i = 0; i < triangleAreasInPolygonCum.length; i++) {
             if (triangleAreasInPolygonCum[i] > randomTriangleInPolygonRandValue) {
                 randomTriangleInPolygonIndex = i;
                 break;
@@ -274,36 +274,57 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
                 )
             );
         }, 0);
-
         return copy;
     }
 
+    /**
+     * If the voronoi tree node contains the point.
+     * @param point The point to test.
+     */
+    public containsPoint(point: [number, number, number]): boolean {
+        return this.voronoiCell.containsPoint(point);
+    }
+
     public static createRandomPoint<T extends ICameraState>(forNode: VoronoiTreeNode<T>): [number, number, number] {
-        // pick a random triangle of a polygon
-        const randomTriangleIndex = VoronoiTreeNode.getRandomTriangleOfSphericalPolygon<T>(forNode);
+        for (let tries = 0; tries < 10; tries++) {
+            // pick a random triangle of a polygon
+            const randomTriangleIndex = VoronoiTreeNode.getRandomTriangleOfSphericalPolygon<T>(forNode);
 
-        // pick a random point within a spherical triangle
-        //
-        // the random point is in the area bounded by x = 0, y = 1 - x, and y = 0
-        // start with a square
-        let randomX = Math.random();
-        let randomY = Math.random();
-        if (randomX + randomY > 0.5) {
-            // flip point back onto triangle if it is above y = 1 - x
-            randomX = 1 - randomX;
-            randomY = 1 - randomY;
+            // create a random point between tree points by computing a weighted average
+            // create dirichlet distribution
+            const dirichletDistribution = [Math.random(), Math.random(), Math.random()];
+            const dirichletDistributionSum = dirichletDistribution.reduce((acc, v) => acc + v, 0);
+            dirichletDistribution[0] /= dirichletDistributionSum;
+            dirichletDistribution[1] /= dirichletDistributionSum;
+            dirichletDistribution[2] /= dirichletDistributionSum;
+
+            // get points
+            const a = forNode.voronoiCell.vertices[0];
+            const b = forNode.voronoiCell.vertices[randomTriangleIndex + 1];
+            const c = forNode.voronoiCell.vertices[randomTriangleIndex + 2];
+
+            // compute weighted average
+            const sumPoint = DelaunayGraph.add(
+                DelaunayGraph.add([
+                    dirichletDistribution[0] * a[0],
+                    dirichletDistribution[0] * a[1],
+                    dirichletDistribution[0] * a[2],
+                ], [
+                    dirichletDistribution[1] * b[0],
+                    dirichletDistribution[1] * b[1],
+                    dirichletDistribution[1] * b[2],
+                ]), [
+                    dirichletDistribution[2] * c[0],
+                    dirichletDistribution[2] * c[1],
+                    dirichletDistribution[2] * c[2],
+                ]);
+            const randomPoint = DelaunayGraph.normalize(sumPoint);
+
+            if (forNode.containsPoint(randomPoint) || tries === 10 - 1) {
+                return randomPoint;
+            }
         }
-
-        // create x and y axis interpolation quaternions
-        const a = Quaternion.fromBetweenVectors([0, 0, 1], forNode.voronoiCell.vertices[0]);
-        const b = Quaternion.fromBetweenVectors([0, 0, 1], forNode.voronoiCell.vertices[randomTriangleIndex]);
-        const c = Quaternion.fromBetweenVectors([0, 0, 1], forNode.voronoiCell.vertices[randomTriangleIndex + 1]);
-        const x = (a.clone().inverse().mul(b)).pow(randomX);
-        const y = (a.clone().inverse().mul(c)).pow(randomY);
-
-        // interpolate point on random values
-        const point = a.clone().mul(x.clone()).mul(y.clone());
-        return point.rotateVector([0, 0, 1]);
+        throw new Error("Failed to generate random point in triangle");
     }
 
     /**
@@ -316,7 +337,7 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
         const nodes: Array<VoronoiTreeNode<T>> = [];
 
         // generate random points within a voronoi cell.
-        let randomPointsWithinVoronoiCell: Array<[number, number, number]> = [];
+        let randomPointsWithinVoronoiCell: Array<[number, number, number]> = [...forNode.voronoiCell.vertices];
         const numRandomPoints = forNode.recursionNodeLevels()[forNode.level];
         for (let i = 0; i < numRandomPoints; i++) {
             randomPointsWithinVoronoiCell.push(VoronoiTreeNode.createRandomPoint(forNode));
@@ -689,7 +710,7 @@ export class VoronoiKingdom extends VoronoiTreeNode<ICameraState> {
 export class VoronoiTerrain extends VoronoiTree<ICameraState> {
     kingdoms: VoronoiKingdom[] = [];
     recursionNodeLevels(): number[] {
-        return [25, 3, 4];
+        return [15, 3, 4];
     }
 
     planetId: number = 0;
