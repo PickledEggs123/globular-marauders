@@ -153,14 +153,17 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
 
     /**
      * Return a random polygon triangle of a voronoi cell.
+     * @return int between 0 and n - 1, which is a triangle slice from the centroid to the pair of vertices.
      * @private
      */
     private static getRandomTriangleOfSphericalPolygon<T extends ICameraState>(forNode: VoronoiTreeNode<T>): number {
         const triangleAreasInPolygon: number[] = [];
-        for (let i = 1; i < forNode.voronoiCell.vertices.length - 1; i++) {
-            const a = forNode.voronoiCell.vertices[0];
-            const b = forNode.voronoiCell.vertices[i];
-            const c = forNode.voronoiCell.vertices[i + 1];
+        // for each pair of vertices
+        for (let i = 0; i < forNode.voronoiCell.vertices.length; i++) {
+            // create triangle centroid, i, i + 1
+            const a = forNode.voronoiCell.centroid;
+            const b = forNode.voronoiCell.vertices[i % forNode.voronoiCell.vertices.length];
+            const c = forNode.voronoiCell.vertices[(i + 1) % forNode.voronoiCell.vertices.length];
             const nab = DelaunayGraph.crossProduct(a, b);
             const nbc = DelaunayGraph.crossProduct(b, c);
             const nca = DelaunayGraph.crossProduct(c, a);
@@ -179,6 +182,8 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
             }
             return acc;
         }, [] as number[]);
+
+        // pick random triangle index of voronoi cell
         const randomTriangleInPolygonRandValue = Math.random() * triangleAreasInPolygonSum;
         let randomTriangleInPolygonIndex: number = 0;
         for (let i = 0; i < triangleAreasInPolygonCum.length; i++) {
@@ -263,7 +268,7 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
         // compute new voronoi cell
         const copy = new VoronoiCell();
         copy.vertices = vertices;
-        copy.centroid = App.getAveragePoint(copy.vertices);
+        copy.centroid = DelaunayGraph.normalize(App.getAveragePoint(copy.vertices));
         copy.radius = copy.vertices.reduce((acc: number, vertex): number => {
             return Math.max(
                 acc,
@@ -285,6 +290,15 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
         return this.voronoiCell.containsPoint(point);
     }
 
+    /**
+     * If the point is near by a voronoi node.
+     * @param point The point to test.
+     */
+    public isNearBy(point: [number, number, number]): boolean {
+        return VoronoiGraph.angularDistance(point, this.voronoiCell.centroid, this.app.worldScale) <
+            this.voronoiCell.radius + (Math.PI / this.app.worldScale);
+    }
+
     public static createRandomPoint<T extends ICameraState>(forNode: VoronoiTreeNode<T>): [number, number, number] {
         for (let tries = 0; tries < 10; tries++) {
             // pick a random triangle of a polygon
@@ -299,9 +313,9 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
             dirichletDistribution[2] /= dirichletDistributionSum;
 
             // get points
-            const a = forNode.voronoiCell.vertices[0];
-            const b = forNode.voronoiCell.vertices[randomTriangleIndex + 1];
-            const c = forNode.voronoiCell.vertices[randomTriangleIndex + 2];
+            const a = forNode.voronoiCell.centroid;
+            const b = forNode.voronoiCell.vertices[randomTriangleIndex % forNode.voronoiCell.vertices.length];
+            const c = forNode.voronoiCell.vertices[(randomTriangleIndex + 1) % forNode.voronoiCell.vertices.length];
 
             // compute weighted average
             const sumPoint = DelaunayGraph.add(
@@ -313,11 +327,13 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
                     dirichletDistribution[1] * b[0],
                     dirichletDistribution[1] * b[1],
                     dirichletDistribution[1] * b[2],
-                ]), [
+                ]),
+                [
                     dirichletDistribution[2] * c[0],
                     dirichletDistribution[2] * c[1],
                     dirichletDistribution[2] * c[2],
-                ]);
+                ]
+            );
             const randomPoint = DelaunayGraph.normalize(sumPoint);
 
             if (forNode.containsPoint(randomPoint) || tries === 10 - 1) {
@@ -337,7 +353,7 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
         const nodes: Array<VoronoiTreeNode<T>> = [];
 
         // generate random points within a voronoi cell.
-        let randomPointsWithinVoronoiCell: Array<[number, number, number]> = [...forNode.voronoiCell.vertices];
+        let randomPointsWithinVoronoiCell: Array<[number, number, number]> = [];
         const numRandomPoints = forNode.recursionNodeLevels()[forNode.level];
         for (let i = 0; i < numRandomPoints; i++) {
             randomPointsWithinVoronoiCell.push(VoronoiTreeNode.createRandomPoint(forNode));
@@ -352,16 +368,17 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
         // }
         for (let step = 0; step < numSteps; step++) {
             const delaunay = new DelaunayGraph<T>(forNode.app);
-            delaunay.initializeWithPoints(randomPointsWithinVoronoiCell);
+            delaunay.initializeWithPoints(randomPointsWithinVoronoiCell.map((p) => [-p[0], -p[1], -p[2]]));
             // this line is needed because inserting vertices could remove old vertices.
             while (delaunay.numRealVertices() < numRandomPoints + 4) {
-                delaunay.incrementalInsert();
+                delaunay.incrementalInsert(VoronoiTreeNode.createRandomPoint(forNode));
             }
             const outOfBoundsVoronoiCells = delaunay.getVoronoiGraph().cells;
 
             // perform sutherland-hodgman polygon clipping
             goodPoints = outOfBoundsVoronoiCells.map((polygon) => VoronoiTreeNode.polygonClip<T>(forNode, polygon))
-                .filter((polygon) => polygon.vertices.length > 0);
+                .filter((polygon) => polygon.vertices.length > 0)
+                .filter((polygon) => DelaunayGraph.distanceFormula(polygon.centroid, forNode.voronoiCell.centroid) > 0.001);
             randomPointsWithinVoronoiCell = goodPoints.reduce((acc, v) => {
                 if (acc.every(p => VoronoiGraph.angularDistance(p, v.centroid, 1) > 0.001)) {
                     acc.push(v.centroid);
@@ -398,7 +415,7 @@ export class VoronoiTree<T extends ICameraState> implements IVoronoiTreeNodePare
     public app: App;
 
     public recursionNodeLevels(): number[] {
-        return [20, 20, 20];
+        return [30, 5, 5];
     }
 
     constructor(app: App) {
@@ -413,7 +430,7 @@ export class VoronoiTree<T extends ICameraState> implements IVoronoiTreeNodePare
         const nodes: Array<VoronoiTreeNode<T>> = [];
 
         // compute points
-        const goodPoints = this.app.generateGoodPoints(this.recursionNodeLevels()[0], 3);
+        const goodPoints = this.app.generateGoodPoints(this.recursionNodeLevels()[0], 10);
         for (const point of goodPoints) {
             const node = new VoronoiTreeNode<T>(parent.app, point, 1, parent);
             node.radius = point.vertices.reduce((acc, v) => Math.max(
@@ -605,7 +622,8 @@ export class VoronoiDuchy extends VoronoiTreeNode<ICameraState> {
         this.nodes = VoronoiTreeNode.createTreeNodes(this.parent.nodes, this);
         this.counties = this.nodes.map(n => new VoronoiCounty(n.app, n.voronoiCell, n.level, n.parent, this, this.getPlanetId));
 
-        const tempStars = VoronoiTreeNode.createTreeNodes(this.parent.nodes, this);
+        //const tempStars = VoronoiTreeNode.createTreeNodes(this.parent.nodes, this);
+        const tempStars = [this];
         this.stars = tempStars.map(s => s.voronoiCell.centroid).map((starPosition) => {
             return this.app.buildStar.call(this.app, starPosition, this.getStarId());
         });
@@ -614,9 +632,13 @@ export class VoronoiDuchy extends VoronoiTreeNode<ICameraState> {
         }
     }
 
-    public *getPlanets(): Generator<Planet> {
+    public *getPlanets(position?: [number, number, number]): Generator<Planet> {
         for (const county of this.counties) {
-            yield * Array.from(county.getPlanets());
+            if (!position) {
+                yield * Array.from(county.getPlanets());
+            } else if (position && county.isNearBy(position)) {
+                yield * Array.from(county.getPlanets());
+            }
         }
     }
 
@@ -681,15 +703,23 @@ export class VoronoiKingdom extends VoronoiTreeNode<ICameraState> {
         }
     }
 
-    public *getPlanets(): Generator<Planet> {
+    public *getPlanets(position?: [number, number, number]): Generator<Planet> {
         for (const duchy of this.duchies) {
-            yield * Array.from(duchy.getPlanets());
+            if (!position) {
+                yield * Array.from(duchy.getPlanets());
+            } else if (position && duchy.isNearBy(position)) {
+                yield * Array.from(duchy.getPlanets(position));
+            }
         }
     }
 
-    public *getStars(): Generator<Star> {
+    public *getStars(position?: [number, number, number]): Generator<Star> {
         for (const duchy of this.duchies) {
-            yield * Array.from(duchy.getStars());
+            if (!position) {
+                yield * Array.from(duchy.getStars());
+            } else if (position && duchy.isNearBy(position)) {
+                yield * Array.from(duchy.getStars());
+            }
         }
     }
 
@@ -710,7 +740,7 @@ export class VoronoiKingdom extends VoronoiTreeNode<ICameraState> {
 export class VoronoiTerrain extends VoronoiTree<ICameraState> {
     kingdoms: VoronoiKingdom[] = [];
     recursionNodeLevels(): number[] {
-        return [15, 3, 4];
+        return [5, 3, 3];
     }
 
     planetId: number = 0;
@@ -735,15 +765,23 @@ export class VoronoiTerrain extends VoronoiTree<ICameraState> {
         }
     }
 
-    public *getPlanets(): Generator<Planet> {
+    public *getPlanets(position?: [number, number, number]): Generator<Planet> {
         for (const kingdom of this.kingdoms) {
-            yield * Array.from(kingdom.getPlanets());
+            if (!position) {
+                yield * Array.from(kingdom.getPlanets());
+            } else if (position && kingdom.isNearBy(position)) {
+                yield * Array.from(kingdom.getPlanets(position));
+            }
         }
     }
 
-    public *getStars(): Generator<Star> {
+    public *getStars(position?: [number, number, number]): Generator<Star> {
         for (const kingdom of this.kingdoms) {
-            yield * Array.from(kingdom.getStars());
+            if (!position) {
+                yield * Array.from(kingdom.getStars());
+            } else if (position && kingdom.isNearBy(position)) {
+                yield * Array.from(kingdom.getStars(position));
+            }
         }
     }
 }

@@ -386,6 +386,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     private delaunayData: DelaunayTriangle[] = [];
     public voronoiGraph: VoronoiGraph<Planet> = new VoronoiGraph(this);
     public voronoiData: VoronoiCell[] = [];
+    public refreshVoronoiDataTick: number = 0;
     public voronoiShips: VoronoiTree<Ship> = new VoronoiTree(this);
     public voronoiTerrain: VoronoiTerrain = new VoronoiTerrain(this);
     public factions: { [key: string]: Faction } = {};
@@ -393,12 +394,11 @@ export class App extends React.Component<IAppProps, IAppState> {
     public playerShip: Ship | null = null;
     public crates: Crate[] = [];
     public planets: Planet[] = [];
-    public stars: Star[] = [];
     public smokeClouds: SmokeCloud[] = [];
     public cannonBalls: CannonBall[] = [];
     public luxuryBuffs: LuxuryBuff[] = [];
     public gold: number = 2000;
-    public worldScale: number = 1;
+    public worldScale: number = 2;
     public music: MusicPlayer = new MusicPlayer();
     public demoAttackingShipId: string | null = null;
     public lastDemoAttackingShipTime: Date = new Date();
@@ -2000,6 +2000,13 @@ export class App extends React.Component<IAppProps, IAppState> {
             faction.handleFactionLoop();
         }
 
+        if (this.refreshVoronoiDataTick <= 20) {
+            this.refreshVoronoiDataTick += 1;
+        } else {
+            this.refreshVoronoiDataTick = 0;
+            this.refreshVoronoiData();
+        }
+
         this.forceUpdate();
     }
 
@@ -2148,7 +2155,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             voronoiGraph = delaunayGraph.getVoronoiGraph();
             const lloydPoints = voronoiGraph.lloydRelaxation();
             delaunayGraph = new DelaunayGraph<T>(this);
-            delaunayGraph.initializeWithPoints(lloydPoints.slice(4));
+            delaunayGraph.initializeWithPoints(lloydPoints.slice(-(numPoints - 4)));
         }
         // this line is needed because inserting vertices could remove old vertices.
         while (delaunayGraph.numRealVertices() < numPoints) {
@@ -2233,26 +2240,46 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     refreshVoronoiData() {
+        const position = this.getPlayerShip().position.rotateVector([0, 0, 1]);
+
         switch (this.state.voronoiMode) {
             default:
             case EVoronoiMode.KINGDOM: {
-                this.voronoiData = this.voronoiTerrain.kingdoms.reduce((acc, k) => [
-                    ...acc, k.voronoiCell
-                ], [] as VoronoiCell[]);
+                this.voronoiData = this.voronoiTerrain.kingdoms.reduce((acc, k) => {
+                    if (k.isNearBy(position)) {
+                        return [
+                            ...acc, k.voronoiCell
+                        ];
+                    } else {
+                        return acc;
+                    }
+                }, [] as VoronoiCell[]);
                 break;
             }
             case EVoronoiMode.DUCHY: {
-                this.voronoiData = this.voronoiTerrain.kingdoms.reduce((acc, k) => [
-                    ...acc, ...k.duchies.map(d => d.voronoiCell)
-                ], [] as VoronoiCell[]);
+                this.voronoiData = this.voronoiTerrain.kingdoms.reduce((acc, k) => {
+                    if (k.isNearBy(position)) {
+                        return [
+                            ...acc, ...k.duchies.map(d => d.voronoiCell)
+                        ];
+                    } else {
+                        return acc;
+                    }
+                }, [] as VoronoiCell[]);
                 break;
             }
             case EVoronoiMode.COUNTY: {
-                this.voronoiData = this.voronoiTerrain.kingdoms.reduce((acc, k) => [
-                    ...acc, ...k.duchies.reduce((acc2, d) => [
-                        ...acc2, ...d.counties.map(c => c.voronoiCell)
-                    ], [] as VoronoiCell[])
-                ], [] as VoronoiCell[]);
+                this.voronoiData = this.voronoiTerrain.kingdoms.reduce((acc, k) => {
+                    if (k.isNearBy(position)) {
+                        return [
+                            ...acc, ...k.duchies.reduce((acc2, d) => [
+                                ...acc2, ...d.counties.map(c => c.voronoiCell)
+                            ], [] as VoronoiCell[])
+                        ];
+                    } else {
+                        return acc;
+                    }
+                }, [] as VoronoiCell[]);
                 break;
             }
         }
@@ -2274,9 +2301,6 @@ export class App extends React.Component<IAppProps, IAppState> {
         this.voronoiData = this.voronoiGraph.cells;
         this.voronoiTerrain.generateTerrain();
         this.refreshVoronoiData();
-
-        // initialize stars
-        this.stars = Array.from(this.voronoiTerrain.getStars());
 
         // initialize planets
         this.planets = Array.from(this.voronoiTerrain.getPlanets());
@@ -2447,6 +2471,8 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     private renderGameWorld() {
+        const shipPosition = this.getPlayerShip().position.rotateVector([0, 0, 1]);
+
         return (
             <>
                 <circle
@@ -2482,24 +2508,18 @@ export class App extends React.Component<IAppProps, IAppState> {
                 {/*}*/}
                 {
                     ([
-                        ...((this.state.zoom * this.worldScale) >= 2 ? this.stars : Array.from(this.voronoiGraph.fetchDrawables(
-                            this.getPlayerShip().position.rotateVector([0, 0, 1])
-                        ))).map(this.rotatePlanet.bind(this))
+                        ...Array.from(this.voronoiTerrain.getStars(shipPosition)).map(this.rotatePlanet.bind(this))
                             .map(this.convertToDrawable.bind(this, "-star2", 0.5)),
-                        ...((this.state.zoom * this.worldScale) >= 4 ? this.stars : Array.from(this.voronoiGraph.fetchDrawables(
-                            this.getPlayerShip().position.rotateVector([0, 0, 1])
-                        ))).map(this.rotatePlanet.bind(this))
+                        ...Array.from(this.voronoiTerrain.getStars(shipPosition)).map(this.rotatePlanet.bind(this))
                             .map(this.convertToDrawable.bind(this, "-star3", 0.25)),
-                        ...((this.state.zoom * this.worldScale) >= 8 ? this.stars : Array.from(this.voronoiGraph.fetchDrawables(
-                            this.getPlayerShip().position.rotateVector([0, 0, 1])
-                        ))).map(this.rotatePlanet.bind(this))
+                        ...Array.from(this.voronoiTerrain.getStars(shipPosition)).map(this.rotatePlanet.bind(this))
                             .map(this.convertToDrawable.bind(this, "-star4", 0.125))
                     ] as Array<IDrawable<Planet>>)
                         .sort((a: any, b: any) => b.distance - a.distance)
                         .map(this.drawStar.bind(this))
                 }
                 {
-                    (this.planets.map(this.rotatePlanet.bind(this))
+                    (Array.from(this.voronoiTerrain.getPlanets(shipPosition)).map(this.rotatePlanet.bind(this))
                         .map(this.convertToDrawable.bind(this, "-planet", 1)) as Array<IDrawable<Planet>>)
                         .map(this.drawPlanet.bind(this, false))
                 }
@@ -2525,7 +2545,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                         .map(this.drawShip.bind(this))
                 }
                 {
-                    (this.planets.map(this.rotatePlanet.bind(this))
+                    (Array.from(this.voronoiTerrain.getPlanets(shipPosition)).map(this.rotatePlanet.bind(this))
                         .map(this.convertToDrawable.bind(this, "-planet", 1)) as Array<IDrawable<Planet>>)
                         .map(this.drawPlanet.bind(this, true))
                 }
