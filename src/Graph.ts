@@ -986,8 +986,8 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                     throw new Error("b is Invalid");
                 }
                 if (
-                    edges.every(edge => edge.thetaAngle !== thetaAngle && DelaunayGraph.distanceFormula(edge.b, b) > 0.0001) &&
-                    DelaunayGraph.distanceFormula(a, b) > 0.0001
+                    edges.every(edge => edge.thetaAngle !== thetaAngle && DelaunayGraph.distanceFormula(edge.b, b) > 0.000001) &&
+                    DelaunayGraph.distanceFormula(a, b) > 0.000001
                 ) {
                     edges.push({
                         a,
