@@ -6,7 +6,7 @@ import reportWebVitals from './reportWebVitals';
 
 ReactDOM.render(
   <React.StrictMode>
-    <App isVoronoiTestMode={false} />
+    <App isVoronoiTestMode={true} />
   </React.StrictMode>,
   document.getElementById('root')
 );

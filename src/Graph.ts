@@ -505,9 +505,45 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
     }
 
     public initializeWithPoints(points: Array<[number, number, number]>) {
+        if (points.length < 4) {
+            throw new Error("Not enough points to initialize delaunay");
+        }
+
+        // initialize sphere
         this.initialize();
-        for (const point of points) {
-            this.incrementalInsert(point);
+
+        // match vertices to the original point tetrahedron
+        const pointPairs: number[] = [];
+        for (let i = 0; i < 4; i++) {
+            const point = points[i];
+
+            let bestDistance: number = Math.PI;
+            let bestPointIndex: number | null = null;
+            for (let j = 0; j < this.vertices.length; j++) {
+                const distance = VoronoiGraph.angularDistance(point, this.vertices[j], 1);
+                if (distance < bestDistance && !pointPairs.includes(j)) {
+                    bestDistance = distance;
+                    bestPointIndex = j;
+                }
+            }
+            if (bestPointIndex !== null) {
+                pointPairs.push(bestPointIndex);
+            } else {
+                throw new Error("Could not initialize sphere delaunay");
+            }
+        }
+
+        // perform initialization using data points
+        for (let i = 0; i < points.length; i++) {
+            const point = points[i];
+
+            if (pointPairs.includes(i)) {
+                // for first four points replace original triangular pyramid
+                this.vertices[pointPairs.indexOf(i)] = [...point];
+            } else {
+                // after first four points, perform regular insertion
+                this.incrementalInsert(point);
+            }
         }
     }
 
@@ -1000,7 +1036,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                     }
                     const point1 = line;
                     const point2: [number, number, number] = [-line[0], -line[1], -line[2]];
-                    if (DelaunayGraph.dotProduct(firstEdge.a, point1) < 0) {
+                    if (DelaunayGraph.dotProduct(firstEdge.a, point1) > 0) {
                         points.push(point1);
                     } else {
                         points.push(point2);

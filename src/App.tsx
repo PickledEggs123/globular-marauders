@@ -2139,7 +2139,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
     public generateGoodPoints<T extends ICameraState>(numPoints: number, numSteps: number): VoronoiCell[] {
         if (numPoints < 4) {
-            throw new Error("Bad number of points, expected at least 4 points");
+            throw new Error("Not enough points to initialize sphere");
         }
         let delaunayGraph = new DelaunayGraph<T>(this);
         let voronoiGraph = new VoronoiGraph<T>(this);
@@ -2155,10 +2155,62 @@ export class App extends React.Component<IAppProps, IAppState> {
             voronoiGraph = delaunayGraph.getVoronoiGraph();
             const lloydPoints = voronoiGraph.lloydRelaxation();
             delaunayGraph = new DelaunayGraph<T>(this);
-            delaunayGraph.initializeWithPoints(lloydPoints.slice(-(numPoints - 4)));
+            delaunayGraph.initializeWithPoints(lloydPoints);
         }
         // this line is needed because inserting vertices could remove old vertices.
         while (delaunayGraph.numRealVertices() < numPoints) {
+            delaunayGraph.incrementalInsert();
+        }
+        voronoiGraph = delaunayGraph.getVoronoiGraph();
+        return voronoiGraph.cells;
+    }
+
+    public generateTessellatedPoints<T extends ICameraState>(tessellationLevel: number, numSteps: number): VoronoiCell[] {
+        let delaunayGraph = new DelaunayGraph<T>(this);
+        let voronoiGraph = new VoronoiGraph<T>(this);
+        delaunayGraph.initialize();
+
+        // generate tessellated points to a tessellation level
+        const tessellatedPoints = Array.from(delaunayGraph.GetTriangles())
+            .map(this.rotateDelaunayTriangle.bind(this, false))
+            .reduce((acc, tile) => {
+                const tessellatedTriangles = Array.from(this.getDelaunayTileTessellation(tile.centroid, tile.vertices, tessellationLevel, 1));
+                return [
+                    ...acc,
+                    ...tessellatedTriangles.map(t => {
+                        return DelaunayGraph.normalize(
+                            App.getAveragePoint(t.vertices.map(v => v.rotateVector([0, 0, 1])))
+                        );
+                    })
+                ];
+            }, [] as Array<[number, number, number]>);
+        const jitteredTessellatedPoints = tessellatedPoints.map(t => {
+            const jitter = DelaunayGraph.randomPoint();
+            const jitterAmount = 0;
+            return DelaunayGraph.normalize([
+                t[0] + jitter[0] * jitterAmount,
+                t[1] + jitter[1] * jitterAmount,
+                t[2] + jitter[2] * jitterAmount
+            ]);
+        });
+
+        // add jittered tessellated points
+        for (const point of jitteredTessellatedPoints) {
+            delaunayGraph.incrementalInsert(point);
+        }
+
+        for (let step = 0; step < numSteps; step++) {
+            // this line is needed because inserting vertices could remove old vertices.
+            while (delaunayGraph.numRealVertices() < Math.pow(4, tessellationLevel) + 4) {
+                delaunayGraph.incrementalInsert();
+            }
+            voronoiGraph = delaunayGraph.getVoronoiGraph();
+            const lloydPoints = voronoiGraph.lloydRelaxation();
+            delaunayGraph = new DelaunayGraph<T>(this);
+            delaunayGraph.initializeWithPoints(lloydPoints);
+        }
+        // this line is needed because inserting vertices could remove old vertices.
+        while (delaunayGraph.numRealVertices() < Math.pow(4, tessellationLevel) + 4) {
             delaunayGraph.incrementalInsert();
         }
         voronoiGraph = delaunayGraph.getVoronoiGraph();
@@ -2292,6 +2344,14 @@ export class App extends React.Component<IAppProps, IAppState> {
         }
         if (typeof(this.props.worldScale) === "number") {
             this.worldScale = this.props.worldScale;
+        }
+
+        // initialize voronoi test mode parameters
+        if (this.props.isVoronoiTestMode) {
+            this.setState({
+                zoom: 1,
+                showVoronoi: true
+            });
         }
 
         // initialize 3d terrain stuff
@@ -3568,14 +3628,15 @@ export class App extends React.Component<IAppProps, IAppState> {
                             <li>Add ship building economy for each planet. DONE 4/24/2021</li>
                             <li>Planets will sell ships using dutch auction, 50% will go to faction as tax, 50% will go to island renovation. DONE 4/24/2021</li>
                             <li>Make cannon balls damage merchant ships. -- DONE 4/27/2021</li>
-                            <li>Add tax trading where planets will pay taxes to the capital.</li>
-                            <li>Construction and upgrade of buildings in capitals and colonies. -- DONE 5/15/2021</li>
-                            <li>Add Imperial/Colonial empire design, the capital will upgrade certain locations into high level planets.</li>
                             <li>Add ability to pirate merchants and raid colonies. -- DONE 4/30/2021</li>
                             <li>Add ability for AI to aim at player. -- DONE 5/1/2021</li>
                             <li>Add AI pirates. -- DONE 5/9/2021</li>
+                            <li>Construction and upgrade of buildings in capitals and colonies. -- DONE 5/15/2021</li>
+                            <li>Fix Delaunay and Voronoi. -- DONE 5/26/2021</li>
+                            <li>Added nested delaunay and nested voronoi.</li>
+                            <li>Add Imperial/Colonial empire design, the capital will upgrade certain locations into high level planets.</li>
+                            <li>Add tax trading where planets will pay taxes to the capital.</li>
                             <li>Pirate hunters.</li>
-                            <li>Improve Voronoi generation to improve AI movement.</li>
                             <li>Factions will plan invasions of enemy colonies and capitals.</li>
                             <li>Add multiplayer...</li>
                             <li>Break game into client and server.</li>

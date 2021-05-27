@@ -368,9 +368,13 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
         // }
         for (let step = 0; step < numSteps; step++) {
             const delaunay = new DelaunayGraph<T>(forNode.app);
-            delaunay.initializeWithPoints(randomPointsWithinVoronoiCell.map((p) => [-p[0], -p[1], -p[2]]));
             // this line is needed because inserting vertices could remove old vertices.
-            while (delaunay.numRealVertices() < numRandomPoints + 4) {
+            while (randomPointsWithinVoronoiCell.length < numRandomPoints) {
+                randomPointsWithinVoronoiCell.push(VoronoiTreeNode.createRandomPoint(forNode));
+            }
+            delaunay.initializeWithPoints(randomPointsWithinVoronoiCell);
+            // this line is needed because inserting vertices could remove old vertices.
+            while (delaunay.numRealVertices() < numRandomPoints) {
                 delaunay.incrementalInsert(VoronoiTreeNode.createRandomPoint(forNode));
             }
             const outOfBoundsVoronoiCells = delaunay.getVoronoiGraph().cells;
@@ -430,7 +434,8 @@ export class VoronoiTree<T extends ICameraState> implements IVoronoiTreeNodePare
         const nodes: Array<VoronoiTreeNode<T>> = [];
 
         // compute points
-        const goodPoints = this.app.generateGoodPoints(this.recursionNodeLevels()[0], 10);
+        // const goodPoints = this.app.generateGoodPoints(this.recursionNodeLevels()[0], 3);
+        const goodPoints = this.app.generateTessellatedPoints(2, 0);
         for (const point of goodPoints) {
             const node = new VoronoiTreeNode<T>(parent.app, point, 1, parent);
             node.radius = point.vertices.reduce((acc, v) => Math.max(
@@ -740,7 +745,7 @@ export class VoronoiKingdom extends VoronoiTreeNode<ICameraState> {
 export class VoronoiTerrain extends VoronoiTree<ICameraState> {
     kingdoms: VoronoiKingdom[] = [];
     recursionNodeLevels(): number[] {
-        return [5, 3, 3];
+        return [20, 4, 4];
     }
 
     planetId: number = 0;
