@@ -195,6 +195,20 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
         return randomTriangleInPolygonIndex;
     }
 
+    private static rotateBackToPosition(rotation: Quaternion, polygon: VoronoiCell): VoronoiCell {
+        const o = new VoronoiCell();
+        o.centroid = rotation.clone().inverse()
+            .mul(Quaternion.fromBetweenVectors([0, 0, 1], polygon.centroid))
+            .rotateVector([0, 0, 1]);
+        o.vertices = polygon.vertices.map(v => {
+            return rotation.clone().inverse()
+                .mul(Quaternion.fromBetweenVectors([0, 0, 1], v))
+                .rotateVector([0, 0, 1]);
+        });
+        o.radius = polygon.radius;
+        return o;
+    }
+
     /**
      * Perform Sutherland-hodgman polygon clipping on a pair of voronoi cells. This will fit a voronoi cell inside
      * another voronoi cell, on a sphere. For hierarchical voronoi tree.
@@ -372,7 +386,16 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
             while (randomPointsWithinVoronoiCell.length < numRandomPoints) {
                 randomPointsWithinVoronoiCell.push(VoronoiTreeNode.createRandomPoint(forNode));
             }
-            delaunay.initializeWithPoints(randomPointsWithinVoronoiCell);
+
+            // rotate random points to the bottom of the tetrahedron
+            const rotationToBottomOfTetrahedron = Quaternion.fromBetweenVectors(forNode.voronoiCell.centroid, [0, 0, -1]);
+            delaunay.initializeWithPoints([
+                ...delaunay.getTetrahedronPoints(),
+                ...randomPointsWithinVoronoiCell.map(p => {
+                    return rotationToBottomOfTetrahedron.mul(Quaternion.fromBetweenVectors([0, 0, 1], p)).rotateVector([0, 0, 1]);
+                })
+            ]);
+
             // this line is needed because inserting vertices could remove old vertices.
             while (delaunay.numRealVertices() < numRandomPoints) {
                 delaunay.incrementalInsert(VoronoiTreeNode.createRandomPoint(forNode));
@@ -380,7 +403,9 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
             const outOfBoundsVoronoiCells = delaunay.getVoronoiGraph().cells;
 
             // perform sutherland-hodgman polygon clipping
-            goodPoints = outOfBoundsVoronoiCells.map((polygon) => VoronoiTreeNode.polygonClip<T>(forNode, polygon))
+            goodPoints = outOfBoundsVoronoiCells.map((polygon) => {
+                return VoronoiTreeNode.rotateBackToPosition(rotationToBottomOfTetrahedron, polygon);
+            }).map((polygon) => VoronoiTreeNode.polygonClip<T>(forNode, polygon))
                 .filter((polygon) => polygon.vertices.length > 0)
                 .filter((polygon) => DelaunayGraph.distanceFormula(polygon.centroid, forNode.voronoiCell.centroid) > 0.001);
             randomPointsWithinVoronoiCell = goodPoints.reduce((acc, v) => {
@@ -745,7 +770,7 @@ export class VoronoiKingdom extends VoronoiTreeNode<ICameraState> {
 export class VoronoiTerrain extends VoronoiTree<ICameraState> {
     kingdoms: VoronoiKingdom[] = [];
     recursionNodeLevels(): number[] {
-        return [20, 4, 4];
+        return [20, 3, 3];
     }
 
     planetId: number = 0;

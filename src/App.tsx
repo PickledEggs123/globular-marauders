@@ -398,7 +398,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     public cannonBalls: CannonBall[] = [];
     public luxuryBuffs: LuxuryBuff[] = [];
     public gold: number = 2000;
-    public worldScale: number = 2;
+    public worldScale: number = 3;
     public music: MusicPlayer = new MusicPlayer();
     public demoAttackingShipId: string | null = null;
     public lastDemoAttackingShipTime: Date = new Date();
@@ -650,7 +650,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
         const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
         const distance = planetDrawing.distance * 5;
-        const size = 5 * Math.max(0, 2 * Math.atan(planetDrawing.original.size / (2 * distance)));
+        const size = 2 * Math.max(0, 2 * Math.atan(planetDrawing.original.size / (2 * distance)));
 
         // extract faction information
         let factionColor: string | null = null;

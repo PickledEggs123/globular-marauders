@@ -468,12 +468,8 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
         return closestPathingNode;
     }
 
-    /**
-     * Initialize a basic graph, ready for incremental construction.
-     */
-    public initialize() {
+    public getTetrahedronPoints(): Array<[number, number, number]> {
         const north: [number, number, number] = DelaunayGraph.normalize([0, 0, 1]);
-        this.vertices.push(north);
 
         const tetrahedronAngle = 120 / 180 * Math.PI;
         const base1: [number, number, number] = DelaunayGraph.normalize([
@@ -491,6 +487,16 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
             Math.sin(2 * tetrahedronAngle) * Math.sin(tetrahedronAngle),
             Math.cos(2 * tetrahedronAngle)
         ]);
+
+        return [north, base1, base2, base3];
+    }
+
+    /**
+     * Initialize a basic graph, ready for incremental construction.
+     */
+    public initialize() {
+        const [north, base1, base2, base3] = this.getTetrahedronPoints();
+        this.vertices.push(north);
         this.vertices.push(base1, base2, base3);
 
         this.edges.push([0, 1], [1, 2], [2, 0]);
