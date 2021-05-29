@@ -382,7 +382,7 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
         //     goodPoints.push(forNode.voronoiCell);
         //     numSteps = 0;
         // }
-        for (let step = 0; step < numSteps; step++) {
+        for (let step = 0; step < numSteps || (goodPoints.length !== numRandomPoints && step < numSteps * 2); step++) {
             const delaunay = new DelaunayGraph<T>(forNode.app);
             // this line is needed because inserting vertices could remove old vertices.
             while (randomPointsWithinVoronoiCell.length < numRandomPoints) {
@@ -410,10 +410,6 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
             });
             const points2 = points1.map((polygon) => VoronoiTreeNode.polygonClip<T>(forNode, polygon));
             goodPoints = points2.filter((polygon) => forNode.containsPoint(polygon.vertex));
-            // check number of points
-            if (goodPoints.length !== numRandomPoints) {
-                throw new Error("Incorrect number of points");
-            }
             randomPointsWithinVoronoiCell = goodPoints.reduce((acc, v) => {
                 if (acc.every(p => VoronoiGraph.angularDistance(p, v.centroid, 1) > 0.001)) {
                     acc.push(v.centroid);

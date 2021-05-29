@@ -1,6 +1,6 @@
-import {ESettlementLevel, ICameraState, IGoldAccount} from "./Interface";
+import {ESettlementLevel, ICameraState, IExplorationGraphData, IGoldAccount} from "./Interface";
 import Quaternion from "quaternion";
-import {DelaunayGraph, PathingNode} from "./Graph";
+import {DelaunayGraph, PathingNode, VoronoiGraph} from "./Graph";
 import {
     CAPITAL_GOODS,
     EResourceType,
@@ -13,7 +13,8 @@ import {
 import {EShipType, Ship, SHIP_DATA} from "./Ship";
 import App from "./App";
 import {VoronoiCounty} from "./VoronoiTree";
-import {Faction} from "./Faction";
+import {ERoyalRank, Faction, LuxuryBuff} from "./Faction";
+import {EOrderType, Order} from "./Order";
 
 export interface IResourceExported {
     resourceType: EResourceType;
@@ -166,14 +167,20 @@ export class Shipyard extends Building {
     public numberOfDocks: number = 10;
     public numShipsAvailable: number = 0;
     public shipsAvailable: Record<EShipType, number> = {
+        [EShipType.CUTTER]: 0,
         [EShipType.SLOOP]: 0,
         [EShipType.CORVETTE]: 0,
-        [EShipType.HIND]: 0
+        [EShipType.BRIGANTINE]: 0,
+        [EShipType.BRIG]: 0,
+        [EShipType.FRIGATE]: 0
     };
     public shipsBuilding: Record<EShipType, number> = {
+        [EShipType.CUTTER]: 0,
         [EShipType.SLOOP]: 0,
         [EShipType.CORVETTE]: 0,
-        [EShipType.HIND]: 0
+        [EShipType.BRIGANTINE]: 0,
+        [EShipType.BRIG]: 0,
+        [EShipType.FRIGATE]: 0
     };
 
     buildingType: EBuildingType = EBuildingType.SHIPYARD;
@@ -184,13 +191,13 @@ export class Shipyard extends Building {
     }
 
     public getNextShipTypeToBuild(): EShipType {
+        if (this.shipsAvailable.CUTTER + this.shipsBuilding.CUTTER < this.numberOfDocks * 3 / 10) {
+            return EShipType.CUTTER;
+        }
         if (this.shipsAvailable.SLOOP + this.shipsBuilding.SLOOP < this.numberOfDocks * 3 / 10) {
             return EShipType.SLOOP;
         }
-        if (this.shipsAvailable.CORVETTE + this.shipsBuilding.CORVETTE < this.numberOfDocks * 3 / 10) {
-            return EShipType.CORVETTE;
-        }
-        return EShipType.HIND;
+        return EShipType.CORVETTE;
     }
 
     public getNumberOfDocksAtUpgradeLevel(): number {
@@ -569,6 +576,29 @@ export class Planet implements ICameraState {
     public static NUM_SETTLEMENT_PROGRESS_STEPS = 20;
 
     /**
+     * The list of planet priorities for exploration.
+     * @private
+     */
+    public explorationGraph: Record<string, IExplorationGraphData> = {};
+    public enemyPresenceTick: number = 10 * 30;
+    /**
+     * A list of luxuryBuffs which improves the faction.
+     */
+    public luxuryBuffs: LuxuryBuff[] = [];
+    /**
+     * A list of ship ids owned by this faction.
+     */
+    public shipIds: string[] = [];
+    public shipsAvailable: Record<EShipType, number> = {
+        [EShipType.CUTTER]: 0,
+        [EShipType.SLOOP]: 0,
+        [EShipType.CORVETTE]: 0,
+        [EShipType.BRIGANTINE]: 0,
+        [EShipType.BRIG]: 0,
+        [EShipType.FRIGATE]: 0
+    };
+
+    /**
      * Get the number of ships available.
      */
     public getNumShipsAvailable(shipType: EShipType): number {
@@ -605,6 +635,305 @@ export class Planet implements ICameraState {
 
     public claim(faction: Faction) {
         this.county.claim(faction);
+
+        // build exploration graph for which planets to explore and in what order
+        this.buildExplorationGraph();
+    }
+
+    /**
+     * Build a map of the world from the faction's point of view.
+     */
+    buildExplorationGraph() {
+        const homeWorld = this;
+        if (homeWorld) {
+            for (const planet of this.instance.planets) {
+                if (planet.pathingNode && homeWorld.pathingNode && planet.id !== homeWorld.id) {
+                    const path = homeWorld.pathingNode.pathToObject(planet.pathingNode);
+                    if (path.length === 0) {
+                        throw new Error("Found 0 length path, could not build AI map to world");
+                    }
+                    const distance = path.slice(-1).reduce((acc: {
+                        lastPosition: [number, number, number],
+                        totalDistance: number
+                    }, vertex) => {
+                        // detect duplicate point, or the same point twice.
+                        if (DelaunayGraph.distanceFormula(acc.lastPosition, vertex) < 0.00001) {
+                            return {
+                                lastPosition: vertex,
+                                totalDistance: acc.totalDistance
+                            };
+                        }
+
+                        const segmentDistance = VoronoiGraph.angularDistance(acc.lastPosition, vertex, this.instance.worldScale);
+                        return {
+                            lastPosition: vertex,
+                            totalDistance: acc.totalDistance + segmentDistance
+                        };
+                    }, {
+                        lastPosition: homeWorld.position.rotateVector([0, 0, 1]),
+                        totalDistance: 0
+                    }).totalDistance;
+
+                    this.explorationGraph[planet.id] = {
+                        distance,
+                        settlerShipIds: [],
+                        traderShipIds: [],
+                        pirateShipIds: [],
+                        enemyStrength: 0,
+                        planet
+                    };
+                }
+            }
+        }
+    }
+
+    /**
+     * Give an order to a ship.
+     * @param ship
+     */
+    public getOrder(ship: Ship): Order {
+        const shipData = SHIP_DATA.find(s => s.shipType === ship.shipType);
+        if (!shipData) {
+            throw new Error("Could not find ship type");
+        }
+
+        const entries = Object.entries(this.explorationGraph)
+            .sort((a, b) => {
+                let distance = a[1].distance - b[1].distance;
+
+                const aRank = a[1].planet.getRoyalRank();
+                const bRank = b[1].planet.getRoyalRank();
+                const aIsVassal = a[1].planet.isVassal(this);
+                const bIsVassal = b[1].planet.isVassal(this);
+                if (bRank > aRank) {
+                    distance += Math.PI * this.instance.worldScale * 4;
+                }
+                if (aIsVassal && !bIsVassal) {
+                    distance += Math.PI * this.instance.worldScale;
+                } else if (!aIsVassal && bIsVassal) {
+                    distance -= Math.PI * this.instance.worldScale;
+                }
+                return distance;
+            });
+
+        const homeFaction = this.county.faction;
+
+        // find worlds to pirate
+        const pirateWorldEntry = entries.find(entry => {
+            // settle new worlds which have not been settled yet
+            const roomToPirate = entry[1].pirateShipIds.length === 0;
+            const weakEnemyPresence = entry[1].enemyStrength <= 0;
+            const isSettledEnoughToTrade = entry[1].planet.settlementLevel >= ESettlementLevel.OUTPOST &&
+                entry[1].planet.settlementLevel <= ESettlementLevel.TERRITORY;
+            const isOwnedByEnemy = Object.values(this.instance.factions).some(faction => {
+                if (homeFaction && entry[1].planet.county.faction && entry[1].planet.county.faction.id === homeFaction.id) {
+                    // do not pirate own faction
+                    return false;
+                } else {
+                    // the faction should pirate other factions
+                    return faction.planetIds.includes(entry[0]);
+                }
+            });
+            return roomToPirate && weakEnemyPresence && isSettledEnoughToTrade && isOwnedByEnemy;
+        });
+
+        // find worlds to trade
+        const tradeWorldEntry = entries.find(entry => {
+            // settle new worlds which have not been settled yet
+            const roomToTrade = entry[1].traderShipIds.length <= entry[1].planet.resources.length - shipData.cargoSize;
+            const isSettledEnoughToTrade = entry[1].planet.settlementLevel >= ESettlementLevel.OUTPOST;
+            const notTradedYet = Object.values(this.instance.factions).every(faction => {
+                if (homeFaction && entry[1].planet.county.faction && entry[1].planet.county.faction.id === homeFaction.id) {
+                    // trade with own faction
+                    return true;
+                } else {
+                    // the faction should not colonize another planet colonized by another faction
+                    return !faction.planetIds.includes(entry[0]);
+                }
+            });
+            return roomToTrade && isSettledEnoughToTrade && notTradedYet;
+        });
+
+        // find worlds to settle
+        const settlementWorldEntry = entries.find(entry => {
+            // settle new worlds which have not been settled yet
+            const roomToSettleMore = entry[1].settlerShipIds.length <=
+                Planet.NUM_SETTLEMENT_PROGRESS_STEPS -
+                Math.round(entry[1].planet.settlementProgress * Planet.NUM_SETTLEMENT_PROGRESS_STEPS) - shipData.settlementProgressFactor;
+            const notSettledYet = Object.values(this.instance.factions).every(faction => {
+                if (homeFaction && homeFaction.planetIds.includes(entry[1].planet.id)) {
+                    // settle with own faction
+                    return true;
+                } else {
+                    // the faction should not colonize another planet colonized by another faction
+                    return !faction.planetIds.includes(entry[0]);
+                }
+            });
+            return roomToSettleMore && notSettledYet;
+        });
+
+        if (!this.county.faction) {
+            throw new Error("No faction assigned to planet");
+        }
+
+        if (pirateWorldEntry && shipData.cannons.numCannons > 4) {
+            // found a piracy slot, add ship to pirate
+            pirateWorldEntry[1].pirateShipIds.push(ship.id);
+
+            const order = new Order(this.instance, ship, this.county.faction);
+            order.orderType = EOrderType.PIRATE;
+            order.planetId = pirateWorldEntry[0];
+            order.expireTicks = 10 * 60 * 20; // pirate for 20 minutes before signing a new contract
+            return order;
+        } else if (tradeWorldEntry && shipData.cannons.numCannons <= 4) {
+            // found a trade slot, add ship to trade
+            tradeWorldEntry[1].traderShipIds.push(ship.id);
+
+            const order = new Order(this.instance, ship, this.county.faction);
+            order.orderType = EOrderType.TRADE;
+            order.planetId = tradeWorldEntry[0];
+            order.expireTicks = 10 * 60 * 20; // trade for 20 minutes before signing a new contract
+            return order;
+        } else if (settlementWorldEntry) {
+            // add ship to colonize
+            settlementWorldEntry[1].settlerShipIds.push(ship.id);
+
+            const order = new Order(this.instance, ship, this.county.faction);
+            order.orderType = EOrderType.SETTLE;
+            order.planetId = settlementWorldEntry[0];
+            return order;
+        } else if (
+            this.county.capital &&
+            this.county.capital !== this
+        ) {
+            // tribute count
+            const order = new Order(this.instance, ship, this.county.faction);
+            order.orderType = EOrderType.TRIBUTE;
+            order.planetId = this.county.capital.id;
+            return order;
+        } else if (
+            this.county.duchy.capital &&
+            this.county.duchy.capital.planet &&
+            this.county.duchy.capital !== this.county
+        ) {
+            // tribute duke
+            const order = new Order(this.instance, ship, this.county.faction);
+            order.orderType = EOrderType.TRIBUTE;
+            order.planetId = this.county.duchy.capital.planet.id;
+            return order;
+        } else if (
+            this.county.duchy.kingdom.capital &&
+            this.county.duchy.kingdom.capital.capital &&
+            this.county.duchy.kingdom.capital.capital.planet &&
+            this.county.duchy.kingdom.capital !== this.county.duchy
+        ) {
+            // tribute king
+            const order = new Order(this.instance, ship, this.county.faction);
+            order.orderType = EOrderType.TRIBUTE;
+            order.planetId = this.county.duchy.kingdom.capital.capital.planet.id;
+            return order;
+        } else if (
+            this.county.duchy.kingdom.faction &&
+            this.county.faction &&
+            this.county.duchy.kingdom.faction !== this.county.faction
+        ) {
+            // tribute emperor
+            const order = new Order(this.instance, ship, this.county.faction);
+            order.orderType = EOrderType.TRIBUTE;
+            order.planetId = this.county.duchy.kingdom.faction.homeWorldPlanetId;
+            return order;
+        } else {
+            // add ship to explore
+            const order = new Order(this.instance, ship, this.county.faction);
+            order.orderType = EOrderType.ROAM;
+            return order;
+        }
+    }
+
+    public getRoyalRank(): ERoyalRank {
+        if (this.county.capital === this) {
+            if (this.county.duchy.capital === this.county) {
+                if (this.county.duchy.kingdom.capital === this.county.duchy) {
+                    if (this.county.duchy.kingdom.faction && this.county.duchy.kingdom.faction.homeWorldPlanetId === this.id) {
+                        return ERoyalRank.EMPEROR;
+                    } else {
+                        return ERoyalRank.KING;
+                    }
+                } else {
+                    return ERoyalRank.DUKE;
+                }
+            } else {
+                return ERoyalRank.COUNT;
+            }
+        } else {
+            return ERoyalRank.UNCLAIMED;
+        }
+    }
+
+    public isVassal(other: Planet): boolean {
+        switch (this.getRoyalRank()) {
+            case ERoyalRank.EMPEROR: {
+                return !!(this.county.duchy.kingdom.faction &&
+                    other.county.duchy.kingdom.faction &&
+                    this.county.duchy.kingdom.faction === other.county.duchy.kingdom.faction);
+            }
+            case ERoyalRank.KING: {
+                return this.county.duchy.kingdom === other.county.duchy.kingdom;
+            }
+            case ERoyalRank.DUKE: {
+                return this.county.duchy === other.county.duchy;
+            }
+            case ERoyalRank.COUNT: {
+                return this.county === other.county;
+            }
+            default: {
+                return false;
+            }
+        }
+    }
+
+    /**
+     * Apply a new luxury buff to a faction.
+     * @param account A gold holding account which increases after trading.
+     * @param resourceType The resource type affects the buff.
+     * @param planetId The source world of the goods.
+     * @param amount The amount multiplier of the resource.
+     */
+    public applyLuxuryBuff(account: IGoldAccount, resourceType: EResourceType, planetId: string, amount: number) {
+        const oldLuxuryBuff = this.luxuryBuffs.find(l => l.matches(resourceType, planetId));
+        if (oldLuxuryBuff) {
+            const percentReplenished = oldLuxuryBuff.replenish();
+            oldLuxuryBuff.amount = amount;
+            const goldProfit = Math.floor(oldLuxuryBuff.goldValue() * percentReplenished);
+            const goldBonus = Math.floor(goldProfit * 0.2);
+            this.gold -= goldBonus;
+            account.gold += goldBonus;
+        } else if (this.county.faction) {
+            this.luxuryBuffs.push(new LuxuryBuff(this.instance, this.county.faction, this, resourceType, planetId, amount));
+        }
+    }
+
+    public isEnemyPresenceTick(): boolean {
+        if (this.enemyPresenceTick <= 0) {
+            this.enemyPresenceTick = 10 * 30;
+            return true;
+        } else {
+            this.enemyPresenceTick -= 1;
+            return false;
+        }
+    }
+
+    public getNextShipTypeToBuild(): EShipType {
+        if (this.shipsAvailable[EShipType.CUTTER] < Math.ceil(this.shipIds.length * (1 / 2))) {
+            return EShipType.CUTTER;
+        }
+        if (this.shipsAvailable[EShipType.SLOOP] < Math.ceil(this.shipIds.length * (1 / 3))) {
+            return EShipType.SLOOP;
+        }
+        if (this.shipsAvailable[EShipType.CORVETTE] < Math.ceil(this.shipIds.length * (1 / 6))) {
+            return EShipType.CORVETTE;
+        }
+        return EShipType.CUTTER;
     }
 
     public buildInitialResourceBuildings() {
@@ -618,10 +947,16 @@ export class Planet implements ICameraState {
         this.settlementProgress = 1;
         this.settlementLevel = ESettlementLevel.CAPITAL;
         this.naturalResources = [...CAPITAL_GOODS];
+        this.gold = 100000;
     }
 
     // rebuild the resources array based on events such as less or more items
     public recomputeResources() {
+        if (this.settlementLevel < ESettlementLevel.OUTPOST || this.settlementLevel >= ESettlementLevel.CAPITAL) {
+            // do not update resources if an unsettled world or capital world
+            return;
+        }
+
         // update resources array
         this.resources.splice(0, this.resources.length);
         // start with capital goods
@@ -721,6 +1056,82 @@ export class Planet implements ICameraState {
         if (this.woodConstruction >= nextUpgradeCost) {
             nextBuildingToUpgrade.upgrade();
         }
+
+
+        // captain new AI ships
+        const nextShipTypeToBuild = this.getNextShipTypeToBuild();
+        if (
+            this.shipIds.length < 3 &&
+            this.county.faction &&
+            this.getNumShipsAvailable(nextShipTypeToBuild) > 2 &&
+            this.county.faction.shipIds.length < 50 &&
+            this.gold >= this.shipyard.quoteShip(nextShipTypeToBuild)
+        ) {
+            this.spawnShip(this, nextShipTypeToBuild, true);
+        }
+
+        // handle the luxury buffs from trading
+        const expiredLuxuryBuffs: LuxuryBuff[] = [];
+        for (const luxuryBuff of this.luxuryBuffs) {
+            const expired = luxuryBuff.expired();
+            if (expired) {
+                expiredLuxuryBuffs.push(luxuryBuff);
+            } else {
+                luxuryBuff.handleLuxuryBuffLoop();
+            }
+        }
+        for (const expiredLuxuryBuff of expiredLuxuryBuffs) {
+            expiredLuxuryBuff.remove();
+        }
+
+        // handle enemy presence loop
+        if (this.isEnemyPresenceTick()) {
+            for (const node of Object.values(this.explorationGraph)) {
+                if (node.enemyStrength > 0) {
+                    node.enemyStrength -= 1;
+                }
+            }
+        }
+    }
+
+    public handleShipDestroyed(ship: Ship) {
+        // remove ship from exploration graph
+        for (const order of ship.orders) {
+            if (!order.planetId) {
+                continue;
+            }
+
+            const node = this.explorationGraph[order.planetId];
+            const settlerIndex = node.settlerShipIds.findIndex(s => s === ship.id);
+            if (settlerIndex >= 0) {
+                node.settlerShipIds.splice(settlerIndex, 1);
+            }
+            const traderIndex = node.traderShipIds.findIndex(s => s === ship.id);
+            if (traderIndex >= 0) {
+                node.traderShipIds.splice(traderIndex, 1);
+            }
+            const pirateIndex = node.pirateShipIds.findIndex(s => s === ship.id);
+            if (pirateIndex >= 0) {
+                node.pirateShipIds.splice(pirateIndex, 1);
+            }
+        }
+
+        // remove ship from faction registry
+        const shipIndex = this.shipIds.findIndex(s => s === ship.id);
+        if (shipIndex >= 0) {
+            this.shipIds.splice(shipIndex, 1);
+        }
+        this.shipsAvailable[ship.shipType] -= 1;
+    }
+
+    public tribute(ship: Ship) {
+        // remove ship from old planet's roster
+        if (ship.planet) {
+            ship.planet.handleShipDestroyed(ship);
+        }
+
+        // add ship to new planet roster
+        this.addNewShip(ship);
     }
 
     /**
@@ -820,10 +1231,7 @@ export class Planet implements ICameraState {
         for (const goodToTake of goodsToTake) {
             const boughtGood = ship.buyGoodFromShip(goodToTake);
             if (boughtGood) {
-                const faction = Object.values(this.instance.factions).find(f => f.homeWorldPlanetId === this.id);
-                if (faction) {
-                    faction.applyLuxuryBuff(this.instance, goodToTake, boughtGood.sourcePlanetId, boughtGood.amount);
-                }
+                this.applyLuxuryBuff(this.instance, goodToTake, boughtGood.sourcePlanetId, boughtGood.amount);
             }
         }
         for (let i = 0; i < goodsToOffer.length; i++) {
@@ -846,6 +1254,11 @@ export class Planet implements ICameraState {
         return this.shipyard.buyShip(account, shipType, asFaction);
     }
 
+    addNewShip(ship: Ship) {
+        this.shipIds.push(ship.id);
+        this.shipsAvailable[ship.shipType] += 1;
+    }
+
     createShip(shipType: EShipType): Ship {
         // get the position of the planet
         const planetWorld = this.instance.planets.find(p => p.id === this.id);
@@ -863,6 +1276,7 @@ export class Planet implements ICameraState {
         // create ship
         const ship = new Ship(this.instance, shipType);
         ship.faction = faction;
+        ship.planet = this;
         ship.id = `ship-${this.id}-${faction.getShipAutoIncrement()}`;
         App.addRandomPositionAndOrientationToEntity(ship);
         ship.position = Quaternion.fromBetweenVectors([0, 0, 1], shipPoint);
@@ -872,6 +1286,7 @@ export class Planet implements ICameraState {
         faction.shipIds.push(ship.id);
         faction.instance.ships.push(ship);
         faction.shipsAvailable[ship.shipType] += 1;
+        this.addNewShip(ship);
 
         return ship;
     }

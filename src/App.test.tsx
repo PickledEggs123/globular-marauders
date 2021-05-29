@@ -31,11 +31,11 @@ const getTestShip = (app: App, wrapper: ShallowWrapper<any>, colonyWorldTrades: 
 
   // get planets
   const faction = app.factions[factionType];
-  const getOrder = sinon.spy(faction, "getOrder");
   const homeWorldTradeItem = colonyWorldTrades.find(c => c.id === faction.homeWorldPlanetId);
   if (!homeWorldTradeItem) {
     throw new Error("Could not find home world trade");
   }
+  const getOrder = sinon.spy(homeWorldTradeItem.planet, "getOrder");
 
   // remove ships at all factions
   for (const faction of Object.values(app.factions)) {
@@ -92,14 +92,14 @@ const assertFactionData = (faction: Faction) => {
     }
 
     // validate faction's data about each planet
-    expect(faction.explorationGraph).toHaveProperty(planet.id);
+    expect(homeWorld.explorationGraph).toHaveProperty(planet.id);
     const expectedDistance = VoronoiGraph.angularDistance(
       homeWorld.position.rotateVector([0, 0, 1]),
       planet.position.rotateVector([0, 0, 1]),
       faction.instance.worldScale
     );
-    expect(faction.explorationGraph[planet.id].distance).toBe(expectedDistance);
-    expect(faction.explorationGraph[planet.id].planet).toBe(planet);
+    expect(homeWorld.explorationGraph[planet.id].distance).toBe(expectedDistance);
+    expect(homeWorld.explorationGraph[planet.id].planet).toBe(planet);
   }
 };
 
@@ -193,7 +193,7 @@ const setupPlanetManufactoryTest = (numMinutes: number = 60) => {
   if (!englishHomeWorld) {
     throw new Error("Could not find English Home World");
   }
-  const closestEnglishPlanet = Object.values(englishFaction.explorationGraph).reduce((acc, n) => {
+  const closestEnglishPlanet = Object.values(englishHomeWorld.explorationGraph).reduce((acc, n) => {
     if (!acc || (acc && n.distance < acc.distance)) {
       return {
         distance: n.distance,
@@ -311,7 +311,7 @@ const setupPathingTest = (points: Array<[number, number, number]>, numMinutes: n
   const colonyWorldTrades = app.planets.map(p => ({ id: p.id, spy: sinon.spy(p, "trade"), planet: p }));
   const {
     testShip
-  } = getTestShip(app, wrapper, colonyWorldTrades, EFaction.DUTCH, EShipType.SLOOP);
+  } = getTestShip(app, wrapper, colonyWorldTrades, EFaction.DUTCH, EShipType.CUTTER);
   testShip.position = Quaternion.ONE;
   testShip.positionVelocity = Quaternion.ONE;
   testShip.orientation = Quaternion.ONE;
@@ -368,11 +368,11 @@ const setupTradingTest = (numMinutes: number = 20) => {
   const {
     testShip,
     getOrder,
-  } = getTestShip(app, wrapper, colonyWorldTrades, EFaction.DUTCH, EShipType.SLOOP);
+  } = getTestShip(app, wrapper, colonyWorldTrades, EFaction.DUTCH, EShipType.CUTTER);
   const buyGoodFromShip = sinon.spy(testShip, "buyGoodFromShip");
 
   // determine number of trips
-  const shipData = SHIP_DATA.find(s => s.shipType === EShipType.SLOOP);
+  const shipData = SHIP_DATA.find(s => s.shipType === EShipType.CUTTER);
   if (!shipData) {
     throw new Error("Could not find ship type");
   }
@@ -459,7 +459,7 @@ const setupPiracyTest = (numMinutes: number = 20) => {
   if (!englishHomeWorld) {
     throw new Error("Could not find English Home World");
   }
-  const closestEnglishPlanet = Object.values(englishFaction.explorationGraph).reduce((acc, n) => {
+  const closestEnglishPlanet = Object.values(englishHomeWorld.explorationGraph).reduce((acc, n) => {
     if (!acc || (acc && n.distance < acc.distance)) {
       return {
         distance: n.distance,
@@ -477,7 +477,7 @@ const setupPiracyTest = (numMinutes: number = 20) => {
   }
   closestEnglishPlanet.planet.settlementProgress = 1;
   closestEnglishPlanet.planet.settlementLevel = ESettlementLevel.OUTPOST;
-  englishFaction.planetIds.push(closestEnglishPlanet.planet.id);
+  closestEnglishPlanet.planet.claim(englishFaction);
 
   // run a game loop to help the planets build their plantation resources
   app.gameLoop.call(app);
@@ -489,7 +489,7 @@ const setupPiracyTest = (numMinutes: number = 20) => {
   const {
     testShip: englishMerchantShip,
     getOrder: englishMerchantShipGetOrder,
-  } = getTestShip(app, wrapper, colonyWorldTrades, EFaction.ENGLISH, EShipType.SLOOP);
+  } = getTestShip(app, wrapper, colonyWorldTrades, EFaction.ENGLISH, EShipType.CUTTER);
 
   // create dutch ship to pirate
   app.returnToMainMenu();
@@ -497,7 +497,7 @@ const setupPiracyTest = (numMinutes: number = 20) => {
   const {
     testShip: dutchPirateShip,
     getOrder: dutchPirateShipGetOrder,
-  } = getTestShip(app, wrapper, colonyWorldTrades, EFaction.DUTCH, EShipType.HIND);
+  } = getTestShip(app, wrapper, colonyWorldTrades, EFaction.DUTCH, EShipType.CORVETTE);
 
   // test conditions to test for
   // a count down time for each stage of the journey
@@ -735,7 +735,7 @@ describe('Collision Detection', () => {
       expect(Math.abs(segmentDistance - interceptDistance)).not.toBeLessThan(PHYSICS_SCALE / 1000);
     });
     it('cannon ball hits ship', () => {
-      const ship = new Ship({} as App, EShipType.HIND);
+      const ship = new Ship({} as App, EShipType.CORVETTE);
       ship.id = "test-ship";
       const cannonBall = new CannonBall(EFaction.ENGLISH);
       cannonBall.position = Quaternion.fromBetweenVectors(
@@ -752,7 +752,7 @@ describe('Collision Detection', () => {
       });
     });
     it('cannon ball misses ship (too slow)', () => {
-      const ship = new Ship({} as App, EShipType.HIND);
+      const ship = new Ship({} as App, EShipType.CORVETTE);
       ship.id = "test-ship";
       const cannonBall = new CannonBall(EFaction.ENGLISH);
       cannonBall.position = Quaternion.fromBetweenVectors(
@@ -772,7 +772,7 @@ describe('Collision Detection', () => {
       });
     });
     it('cannon ball misses ship (opposite direction)', () => {
-      const ship = new Ship({} as App, EShipType.HIND);
+      const ship = new Ship({} as App, EShipType.CORVETTE);
       ship.id = "test-ship";
       const cannonBall = new CannonBall(EFaction.ENGLISH);
       cannonBall.position = Quaternion.fromBetweenVectors(
@@ -789,7 +789,7 @@ describe('Collision Detection', () => {
       });
     });
     it('cannon ball misses ship (parallel direction)', () => {
-      const ship = new Ship({} as App, EShipType.HIND);
+      const ship = new Ship({} as App, EShipType.CORVETTE);
       ship.id = "test-ship";
       const cannonBall = new CannonBall(EFaction.ENGLISH);
       cannonBall.position = Quaternion.fromBetweenVectors(
@@ -806,7 +806,7 @@ describe('Collision Detection', () => {
       });
     });
     it('ship hits still cannon ball', () => {
-      const ship = new Ship({} as App, EShipType.HIND);
+      const ship = new Ship({} as App, EShipType.CORVETTE);
       ship.id = "test-ship";
       ship.position = Quaternion.fromBetweenVectors(
           [0, 0, 1],

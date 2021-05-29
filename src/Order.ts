@@ -28,6 +28,10 @@ export enum EOrderType {
      * Find and destroy an enemy ship, then return the cargo.
      */
     PIRATE = "PIRATE",
+    /**
+     * Send a ship to the planet's lord so the lord can use the ship for a better purpose.
+     */
+    TRIBUTE = "TRIBUTE",
 }
 
 /**
@@ -156,6 +160,15 @@ export class Order {
         }
 
         homeWorld.trade(this.owner);
+    }
+
+    public transferToNewLord() {
+        const newLordWorld = this.app.planets.find(planet => planet.id === this.planetId);
+        if (!newLordWorld || !newLordWorld.pathingNode) {
+            throw new Error("Could not find lord world for pathing back to home world (TRIBUTE)");
+        }
+
+        newLordWorld.tribute(this.owner);
     }
 
     public beginPirateMission() {
@@ -391,6 +404,28 @@ export class Order {
     }
 
     /**
+     * An order for the current smaller planet to give a free ship to the larger lord planet.
+     * @private
+     */
+    private tribute() {
+        // fly to a specific planet
+        if (this.stage === 0 && this.owner.pathFinding.points.length === 0) {
+            this.stage += 1;
+
+            // return to home world
+            this.returnToHomeWorld();
+        } else if (this.stage === 1 && this.owner.pathFinding.points.length === 0) {
+            this.stage += 1;
+
+            // end order
+            this.owner.removeOrder(this);
+
+            // transfer to lord
+            this.transferToNewLord();
+        }
+    }
+
+    /**
      * Determine what a ship should do.
      */
     public handleOrderLoop() {
@@ -402,6 +437,8 @@ export class Order {
             this.trade();
         } else if (this.orderType === EOrderType.PIRATE) {
             this.pirate();
+        } else if (this.orderType === EOrderType.TRIBUTE) {
+            this.tribute();
         }
         this.runningTicks += 1;
     }
@@ -411,6 +448,7 @@ export class Order {
      */
     public isInMissionArea(): boolean {
         switch (this.orderType) {
+            case EOrderType.TRIBUTE:
             case EOrderType.SETTLE:
             case EOrderType.TRADE: {
                 // trade and settler ships are suppose to be between the colony world and home world, trading

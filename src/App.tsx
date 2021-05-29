@@ -474,6 +474,15 @@ export class App extends React.Component<IAppProps, IAppState> {
         };
     }
 
+    private getPlayerPlanet(): Planet | null {
+        const ship = this.playerShip;
+        if (ship) {
+            return ship.planet || null;
+        } else {
+            return null;
+        }
+    }
+
     private getPlayerShip(): ICameraState {
         const ship = this.playerShip;
         if (ship) {
@@ -499,7 +508,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         }
 
         // no faction selected, orbit the world
-        const tempShip = new Ship(this, EShipType.SLOOP);
+        const tempShip = new Ship(this, EShipType.CUTTER);
         tempShip.id = "ghost-ship";
         const numSecondsToCircle = 120 * this.worldScale;
         const millisecondsPerSecond = 1000;
@@ -1865,9 +1874,8 @@ export class App extends React.Component<IAppProps, IAppState> {
             }
             // get new orders from faction
             if (ship.orders.length === 0) {
-                const faction = Object.values(this.factions).find(f => f.shipIds.includes(this.ships[i].id));
-                if (faction) {
-                    ship.orders.push(faction.getOrder(ship));
+                if (ship.planet) {
+                    ship.orders.push(ship.planet.getOrder(ship));
                 }
             }
             // handle first priority order
@@ -2712,12 +2720,13 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     private renderFactionStatus() {
-        const faction = Object.values(this.factions).find(f => this.playerShip && f.shipIds.includes(this.playerShip.id));
+        const planet = this.getPlayerPlanet();
+        const faction = planet?.county?.faction;
         if (faction) {
             return (
                 <g key="faction-status" transform={`translate(${this.state.width - 80},${this.state.height - 80})`}>
                     <text x="0" y="30" fontSize={8} color="black">Faction: {faction.id}</text>
-                    <text x="0" y="45" fontSize={8} color="black">Gold: {faction.gold}</text>
+                    <text x="0" y="45" fontSize={8} color="black">Gold: {planet ? planet.gold : "N/A"}</text>
                     <text x="0" y="60" fontSize={8} color="black">Planet{faction.planetIds.length > 1 ? "s" : ""}: {faction.planetIds.length}</text>
                     <text x="0" y="75" fontSize={8} color="black">Ship{faction.shipIds.length > 1 ? "s" : ""}: {faction.shipIds.length}</text>
                 </g>

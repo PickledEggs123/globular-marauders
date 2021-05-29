@@ -7,7 +7,7 @@ import {DelaunayGraph, PathFinder, VoronoiGraph} from "./Graph";
 import {computeConeLineIntersection, IConeHitTest} from "./Intersection";
 import {Faction} from "./Faction";
 import {CannonBall, Crate} from "./Item";
-import {IResourceExported} from "./Planet";
+import {IResourceExported, Planet} from "./Planet";
 
 /**
  * The scale of the graphics engine to physics. All graphics is a plane scaled down by this factor, then projected
@@ -15,9 +15,35 @@ import {IResourceExported} from "./Planet";
  */
 export const PHYSICS_SCALE = 1 / 1000;
 /**
- * The hind class ship hull. This format allows rendering in graphics and computing the physics hull.
+ * The corvette class ship hull. This format allows rendering in graphics and computing the physics hull.
  */
-export const HindHull: Array<[number, number]> = [
+export const BrigHull: Array<[number, number]> = [
+    [0, -50],
+    [18, -40],
+    [18, 45],
+    [9, 50],
+    [0, 45],
+    [-9, 50],
+    [-18, 45],
+    [-18, -40]
+];
+/**
+ * The corvette class ship hull. This format allows rendering in graphics and computing the physics hull.
+ */
+export const BrigantineHull: Array<[number, number]> = [
+    [0, -40],
+    [14, -30],
+    [14, 35],
+    [7, 40],
+    [0, 35],
+    [-7, 40],
+    [-14, 35],
+    [-14, -30]
+];
+/**
+ * The corvette class ship hull. This format allows rendering in graphics and computing the physics hull.
+ */
+export const CorvetteHull: Array<[number, number]> = [
     [0, -30],
     [10, -20],
     [10, 25],
@@ -28,30 +54,30 @@ export const HindHull: Array<[number, number]> = [
     [-10, -20]
 ];
 /**
- * The hull of the corvette class ship. This format allows rendering and physics hull computations.
- */
-export const CorvetteHull: Array<[number, number]> = [
-    [0, -20],
-    [8, -15],
-    [8, 15],
-    [4, 20],
-    [0, 18],
-    [-4, 20],
-    [-8, 15],
-    [-8, -15]
-];
-/**
  * The hull of the sloop class ships. This format allows for rendering and physics hull computations.
  */
 export const SloopHull: Array<[number, number]> = [
+    [0, -20],
+    [5, -15],
+    [5, 20],
+    [3, 15],
+    [0, 18],
+    [-3, 15],
+    [-5, 20],
+    [-5, -15]
+];
+/**
+ * The hull of the cutter class ships. This format allows for rendering and physics hull computations.
+ */
+export const CutterHull: Array<[number, number]> = [
     [0, -15],
-    [5, -10],
-    [5, 15],
-    [3, 10],
+    [3, -10],
+    [3, 15],
+    [1.5, 10],
     [0, 12],
-    [-3, 10],
-    [-5, 15],
-    [-5, -10]
+    [-1.5, 10],
+    [-3, 15],
+    [-3, -10]
 ];
 
 /**
@@ -62,17 +88,30 @@ export enum EShipType {
      * A small ship with two cannons, one on each side. Meant for trading and speed. It is cheap to build.
      * It has 4 cannonades.
      */
-    SLOOP = "SLOOP",
+    CUTTER = "CUTTER",
     /**
-     * A ship with four cannons, two on each side, it has 10 cannonades which automatically fire at near by ship.
+     * A ship with eight cannons, four on each side, it has 10 cannonades which automatically fire at near by ship.
      * Great for speed and harassing enemies from strange angles. Also cheap to build.
      */
-    CORVETTE = "CORVETTE",
+    SLOOP = "SLOOP",
     /**
      * The cheap main battle ship which has 8 cannons, 4 on each side and no cannonades. Made to attack ships directly.
      */
-    HIND = "HIND",
+    CORVETTE = "CORVETTE",
+    /**
+     * 18 cannons.
+     */
+    BRIGANTINE = "BRIGANTINE",
+    /**
+     * 24 cannons.
+     */
+    BRIG = "BRIG",
+    /**
+     * 28 cannons.
+     */
+    FRIGATE = "FRIGATE",
 }
+// galleon 80 guns
 
 /**
  * The data format for new ships.
@@ -98,11 +137,41 @@ export interface IShipData {
  * The list of ship data.
  */
 export const SHIP_DATA: IShipData[] = [{
-    shipType: EShipType.HIND,
+    shipType: EShipType.BRIG,
+    cost: 1200,
+    settlementProgressFactor: 5,
+    cargoSize: 5,
+    hull: BrigHull,
+    hullStrength: 640,
+    cannons: {
+        numCannons: 24,
+        numCannonades: 6,
+        startY: 40,
+        endY: -40,
+        leftWall: 18,
+        rightWall: -18
+    }
+}, {
+    shipType: EShipType.BRIGANTINE,
+    cost: 900,
+    settlementProgressFactor: 5,
+    cargoSize: 4,
+    hull: BrigantineHull,
+    hullStrength: 640,
+    cannons: {
+        numCannons: 18,
+        numCannonades: 6,
+        startY: 30,
+        endY: -30,
+        leftWall: 14,
+        rightWall: -14
+    }
+}, {
+    shipType: EShipType.CORVETTE,
     cost: 600,
     settlementProgressFactor: 4,
     cargoSize: 3,
-    hull: HindHull,
+    hull: CorvetteHull,
     hullStrength: 640,
     cannons: {
         numCannons: 14,
@@ -113,34 +182,34 @@ export const SHIP_DATA: IShipData[] = [{
         rightWall: -10
     }
 }, {
-    shipType: EShipType.CORVETTE,
+    shipType: EShipType.SLOOP,
     cost: 300,
     settlementProgressFactor: 2,
     cargoSize: 2,
-    hull: CorvetteHull,
+    hull: SloopHull,
     hullStrength: 320,
     cannons: {
         numCannons: 8,
         numCannonades: 4,
         startY: 15,
         endY: -15,
-        leftWall: 6,
-        rightWall: -6
+        leftWall: 5,
+        rightWall: -5
     }
 }, {
-    shipType: EShipType.SLOOP,
+    shipType: EShipType.CUTTER,
     cost: 150,
     settlementProgressFactor: 1,
     cargoSize: 1,
-    hull: SloopHull,
+    hull: CutterHull,
     hullStrength: 160,
     cannons: {
         numCannons: 4,
         numCannonades: 2,
         startY: 10,
         endY: -10,
-        leftWall: 4,
-        rightWall: -4
+        leftWall: 3,
+        rightWall: -3
     }
 }];
 
@@ -149,6 +218,7 @@ export class Ship implements IAutomatedShip {
     public id: string = "";
     public shipType: EShipType;
     public faction: Faction | null = null;
+    public planet: Planet | null = null;
     public color: string = "purple";
     public position: Quaternion = Quaternion.ONE;
     public positionVelocity: Quaternion = Quaternion.ONE;
@@ -297,34 +367,34 @@ export class Ship implements IAutomatedShip {
      */
     public removeOrder(order: Order) {
         // clean faction data
-        if (this.faction && order.planetId) {
+        if (this.planet && order.planetId) {
             // clean up settle order
             if (order.orderType === EOrderType.SETTLE) {
-                const index = this.faction.explorationGraph[order.planetId].settlerShipIds.findIndex(s => s === this.id);
+                const index = this.planet.explorationGraph[order.planetId].settlerShipIds.findIndex(s => s === this.id);
                 if (index >= 0) {
-                    this.faction.explorationGraph[order.planetId].settlerShipIds.splice(index, 1);
+                    this.planet.explorationGraph[order.planetId].settlerShipIds.splice(index, 1);
                 }
             }
 
             // clean up trade order
             if (order.orderType === EOrderType.TRADE) {
-                const index = this.faction.explorationGraph[order.planetId].traderShipIds.findIndex(s => s === this.id);
+                const index = this.planet.explorationGraph[order.planetId].traderShipIds.findIndex(s => s === this.id);
                 if (index >= 0) {
-                    this.faction.explorationGraph[order.planetId].traderShipIds.splice(index, 1);
+                    this.planet.explorationGraph[order.planetId].traderShipIds.splice(index, 1);
                 }
             }
 
             // clean up pirate order
             if (order.orderType === EOrderType.PIRATE) {
-                const index = this.faction.explorationGraph[order.planetId].pirateShipIds.findIndex(s => s === this.id);
+                const index = this.planet.explorationGraph[order.planetId].pirateShipIds.findIndex(s => s === this.id);
                 if (index >= 0) {
-                    this.faction.explorationGraph[order.planetId].pirateShipIds.splice(index, 1);
+                    this.planet.explorationGraph[order.planetId].pirateShipIds.splice(index, 1);
                 }
             }
 
             // handle retreated orders by not sending another ship towards that area for a while
             if (order.orderResult === EOrderResult.RETREAT) {
-                this.faction.explorationGraph[order.planetId].enemyStrength = order.enemyStrength;
+                this.planet.explorationGraph[order.planetId].enemyStrength = order.enemyStrength;
             }
         }
 
@@ -379,6 +449,9 @@ export class Ship implements IAutomatedShip {
 
         // register a destroyed ship with the faction
         // incorrect behavior, the faction should think the ship is destroyed after a timeout
+        if (this.planet) {
+            this.planet.handleShipDestroyed(this);
+        }
         if (this.faction) {
             this.faction.handleShipDestroyed(this);
         }
@@ -400,7 +473,7 @@ export class Ship implements IAutomatedShip {
 
     /**
      * Sell a good to the ship.
-     * @param resourceType The type of resource.
+     * @param resourceExported The resource exported from the planet.
      * @param sourcePlanetId The source of the resource.
      */
     public sellGoodToShip(resourceExported: IResourceExported, sourcePlanetId: string): boolean {

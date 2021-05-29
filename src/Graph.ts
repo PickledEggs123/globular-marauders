@@ -230,7 +230,7 @@ export class VoronoiGraph<T extends ICameraState> {
      */
     public lloydRelaxation(): Array<[number, number, number]> {
         // for each cell
-        const relaxedPoints: Array<[number, number, number]> = [];
+        let relaxedPoints: Array<[number, number, number]> = [];
         for (const cell of this.cells) {
             // the sum had a division, this is the final result
             if (cell.centroid.some(i => isNaN(i))) {
@@ -241,6 +241,12 @@ export class VoronoiGraph<T extends ICameraState> {
             }
             const point = VoronoiGraph.centroidOfCell(cell);
             relaxedPoints.push(point);
+        }
+
+        // re center points to evenly distribute around the sphere.
+        for (let step = 0; step < 3; step++) {
+            const averagePoint = App.getAveragePoint(relaxedPoints);
+            relaxedPoints = relaxedPoints.map(p => DelaunayGraph.normalize(DelaunayGraph.subtract(p, averagePoint)));
         }
         return relaxedPoints;
     }
