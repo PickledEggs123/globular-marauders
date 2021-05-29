@@ -697,23 +697,99 @@ export class Planet implements ICameraState {
             throw new Error("Could not find ship type");
         }
 
+        // sort by importance
         const entries = Object.entries(this.explorationGraph)
             .sort((a, b) => {
-                let distance = a[1].distance - b[1].distance;
-
-                const aRank = a[1].planet.getRoyalRank();
-                const bRank = b[1].planet.getRoyalRank();
-                const aIsVassal = a[1].planet.isVassal(this);
-                const bIsVassal = b[1].planet.isVassal(this);
-                if (bRank > aRank) {
-                    distance += Math.PI * this.instance.worldScale * 4;
+                // check for lords domain or the lords duchy
+                // dukes and kings should prioritize their local duchy
+                const aIsDuchyDomain = this.isDuchyDomain(a[1].planet);
+                const bIsDuchyDomain = this.isDuchyDomain(b[1].planet);
+                if (aIsDuchyDomain && !bIsDuchyDomain) {
+                    return -1;
+                } else if (!aIsDuchyDomain && bIsDuchyDomain) {
+                    return 1;
                 }
+                const isKing = (
+                    this.getRoyalRank() === ERoyalRank.EMPEROR ||
+                    this.getRoyalRank() === ERoyalRank.KING
+                );
+                if (isKing) {
+                    // kings should prioritize new duchy capitals for their vassal dukes.
+                    const aIsUnclaimedDuchyOfKingdom = this.isUnclaimedSisterDuchyOfKingdom(a[1].planet);
+                    const bIsUnclaimedDuchyOfKingdom = this.isUnclaimedSisterDuchyOfKingdom(b[1].planet);
+                    if (aIsUnclaimedDuchyOfKingdom && !bIsUnclaimedDuchyOfKingdom) {
+                        return -1;
+                    } else if (!aIsUnclaimedDuchyOfKingdom && bIsUnclaimedDuchyOfKingdom) {
+                        return 1;
+                    }
+                }
+                // prioritize the remaining counties in kingdom
+                const aIsKingdomDomain = this.isKingdomDomain(a[1].planet);
+                const bIsKingdomDomain = this.isKingdomDomain(b[1].planet);
+                if (aIsKingdomDomain && !bIsKingdomDomain) {
+                    return -1;
+                } else if (!aIsKingdomDomain && bIsKingdomDomain) {
+                    return 1;
+                }
+                const isEmperor = this.getRoyalRank() === ERoyalRank.EMPEROR;
+                if (isEmperor) {
+                    // emperors should prioritize new kingdom capitals for their vassal kings.
+                    const aIsUnclaimedKingdomOfEmpire = this.isUnclaimedSisterKingdomOfEmpire(a[1].planet);
+                    const bIsUnclaimedKingdomOfEmpire = this.isUnclaimedSisterKingdomOfEmpire(b[1].planet);
+                    if (aIsUnclaimedKingdomOfEmpire && !bIsUnclaimedKingdomOfEmpire) {
+                        return -1;
+                    } else if (!aIsUnclaimedKingdomOfEmpire && bIsUnclaimedKingdomOfEmpire) {
+                        return 1;
+                    }
+                }
+                // prioritize imperial vassals
+                const aIsVassal = this.isVassal(a[1].planet);
+                const bIsVassal = this.isVassal(b[1].planet);
                 if (aIsVassal && !bIsVassal) {
-                    distance += Math.PI * this.instance.worldScale;
+                    return -1;
                 } else if (!aIsVassal && bIsVassal) {
-                    distance -= Math.PI * this.instance.worldScale;
+                    return 1;
                 }
-                return distance;
+                // prioritize settlement progress
+                const settlementDifference = b[1].planet.settlementProgress - a[1].planet.settlementProgress;
+                if (settlementDifference !== 0){
+                    return settlementDifference;
+                }
+                // prioritize unclaimed land
+                const aIsUnclaimed = a[1].planet.isUnclaimed();
+                const bIsUnclaimed = b[1].planet.isUnclaimed();
+                if (aIsUnclaimed && !bIsUnclaimed) {
+                    return -1;
+                } else if (!aIsUnclaimed && bIsUnclaimed) {
+                    return 1;
+                }
+                // prioritize enemy counties
+                const aIsCountyCapital = a[1].planet.isCountyCapital();
+                const bIsCountyCapital = b[1].planet.isCountyCapital();
+                if (aIsCountyCapital && !bIsCountyCapital) {
+                    return -1;
+                } else if (!aIsCountyCapital && bIsCountyCapital) {
+                    return 1;
+                }
+                // prioritize enemy duchies
+                const aIsDuchyCapital = a[1].planet.isDuchyCapital();
+                const bIsDuchyCapital = b[1].planet.isDuchyCapital();
+                if (aIsDuchyCapital && !bIsDuchyCapital) {
+                    return -1;
+                } else if (!aIsDuchyCapital && bIsDuchyCapital) {
+                    return 1;
+                }
+                // prioritize enemy kingdoms
+                const aIsKingdomCapital = a[1].planet.isKingdomCapital();
+                const bIsKingdomCapital = b[1].planet.isKingdomCapital();
+                if (aIsKingdomCapital && !bIsKingdomCapital) {
+                    return -1;
+                } else if (!aIsKingdomCapital && bIsKingdomCapital) {
+                    return 1;
+                }
+
+                // rank by distance
+                return a[1].distance - b[1].distance;
             });
 
         const homeFaction = this.county.faction;
@@ -759,6 +835,24 @@ export class Planet implements ICameraState {
             // settle new worlds which have not been settled yet
             const roomToSettleMore = entry[1].settlerShipIds.length <=
                 Planet.NUM_SETTLEMENT_PROGRESS_STEPS -
+                Math.round(entry[1].planet.settlementProgress * Planet.NUM_SETTLEMENT_PROGRESS_STEPS) - shipData.settlementProgressFactor;
+            const notSettledYet = Object.values(this.instance.factions).every(faction => {
+                if (homeFaction && homeFaction.planetIds.includes(entry[1].planet.id)) {
+                    // settle with own faction
+                    return true;
+                } else {
+                    // the faction should not colonize another planet colonized by another faction
+                    return !faction.planetIds.includes(entry[0]);
+                }
+            });
+            return roomToSettleMore && notSettledYet;
+        });
+
+        // find worlds to colonize
+        const colonizeWorldEntry = entries.find(entry => {
+            // colonize settled worlds by sending more people
+            const roomToSettleMore = entry[1].settlerShipIds.length <=
+                Planet.NUM_SETTLEMENT_PROGRESS_STEPS * 5 -
                 Math.round(entry[1].planet.settlementProgress * Planet.NUM_SETTLEMENT_PROGRESS_STEPS) - shipData.settlementProgressFactor;
             const notSettledYet = Object.values(this.instance.factions).every(faction => {
                 if (homeFaction && homeFaction.planetIds.includes(entry[1].planet.id)) {
@@ -868,6 +962,46 @@ export class Planet implements ICameraState {
         } else {
             return ERoyalRank.UNCLAIMED;
         }
+    }
+
+    public isDuchyDomain(other: Planet): boolean {
+        return this.county.duchy === other.county.duchy;
+    }
+
+    public isKingdomDomain(other: Planet): boolean {
+        return this.county.duchy.kingdom === other.county.duchy.kingdom;
+    }
+
+    public isSisterDuchyOfKingdom(other: Planet): boolean {
+        return this.isKingdomDomain(other) && !this.isDuchyDomain(other);
+    }
+
+    public isUnclaimedSisterDuchyOfKingdom(other: Planet): boolean {
+        return this.isSisterDuchyOfKingdom(other) && !other.county.duchy.capital;
+    }
+
+    public isSisterKingdomOfEmpire(other: Planet): boolean {
+        return !this.isKingdomDomain(other);
+    }
+
+    public isUnclaimedSisterKingdomOfEmpire(other: Planet): boolean {
+        return this.isSisterKingdomOfEmpire(other) && !other.county.duchy.kingdom.capital;
+    }
+
+    public isKingdomCapital(): boolean {
+        return this.getRoyalRank() === ERoyalRank.KING;
+    }
+
+    public isDuchyCapital(): boolean {
+        return this.getRoyalRank() === ERoyalRank.DUKE;
+    }
+
+    public isCountyCapital(): boolean {
+        return this.getRoyalRank() === ERoyalRank.COUNT;
+    }
+
+    public isUnclaimed(): boolean {
+        return this.getRoyalRank() === ERoyalRank.UNCLAIMED;
     }
 
     public isVassal(other: Planet): boolean {

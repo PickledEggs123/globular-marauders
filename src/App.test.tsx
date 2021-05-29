@@ -9,7 +9,7 @@ import {EFaction, EShipType, PHYSICS_SCALE, Ship, SHIP_DATA} from "./Ship";
 import {EOrderType, Order} from "./Order";
 import {DelaunayGraph, PathFinder, VoronoiGraph} from "./Graph";
 import {CannonBall} from "./Item";
-import {Faction} from "./Faction";
+import {ERoyalRank, Faction} from "./Faction";
 import {EBuildingType, Planet} from "./Planet";
 import {ESettlementLevel} from "./Interface";
 
@@ -20,10 +20,11 @@ import {ESettlementLevel} from "./Interface";
  * @param colonyWorldTrades The list of colony worlds containing trade references.
  * @param factionType The faction of the ship to spawn.
  * @param shipType The type of ship to spawn.
+ * @param wrapGetOrder If the function should wrap getOrder.
  */
 const getTestShip = (app: App, wrapper: ShallowWrapper<any>, colonyWorldTrades: Array<{
-  id: string, spy: sinon.SinonSpy<[ship: Ship, unloaded?: boolean | undefined], void>, planet: Planet
-}>, factionType: EFaction, shipType: EShipType) => {
+  id: string, trade: sinon.SinonSpy<[ship: Ship, unloaded?: boolean | undefined], void>, planet: Planet
+}>, factionType: EFaction, shipType: EShipType, wrapGetOrder?: sinon.SinonSpy<[ship: Ship], Order>) => {
   // setup test ship and nav point
   // select faction
   app.selectFaction(factionType);
@@ -35,7 +36,7 @@ const getTestShip = (app: App, wrapper: ShallowWrapper<any>, colonyWorldTrades: 
   if (!homeWorldTradeItem) {
     throw new Error("Could not find home world trade");
   }
-  const getOrder = sinon.spy(homeWorldTradeItem.planet, "getOrder");
+  const getOrder = wrapGetOrder || sinon.spy(homeWorldTradeItem.planet, "getOrder");
 
   // remove ships at all factions
   for (const faction of Object.values(app.factions)) {
@@ -308,7 +309,7 @@ const setupPathingTest = (points: Array<[number, number, number]>, numMinutes: n
   }
 
   // setup test ship and nav point
-  const colonyWorldTrades = app.planets.map(p => ({ id: p.id, spy: sinon.spy(p, "trade"), planet: p }));
+  const colonyWorldTrades = app.planets.map(p => ({ id: p.id, trade: sinon.spy(p, "trade"), planet: p }));
   const {
     testShip
   } = getTestShip(app, wrapper, colonyWorldTrades, EFaction.DUTCH, EShipType.CUTTER);
@@ -364,7 +365,7 @@ const setupTradingTest = (numMinutes: number = 20) => {
     assertFactionData(faction);
   }
 
-  const colonyWorldTrades = app.planets.map(p => ({ id: p.id, spy: sinon.spy(p, "trade"), planet: p }));
+  const colonyWorldTrades = app.planets.map(p => ({ id: p.id, trade: sinon.spy(p, "trade"), planet: p }));
   const {
     testShip,
     getOrder,
@@ -418,9 +419,9 @@ const setupTradingTest = (numMinutes: number = 20) => {
 
   // expect ship to trade with second planet
   expect(getOrder.returnValues[numberOfTripsToColonizePlanet].orderType).toBe(EOrderType.TRADE);
-  expect(colonyWorldTradeItem.spy.callCount).toBeGreaterThan(0);
+  expect(colonyWorldTradeItem.trade.callCount).toBeGreaterThan(0);
   let buyGoodCall = 0;
-  for (let step = 0; step < colonyWorldTradeItem.spy.callCount; step++) {
+  for (let step = 0; step < colonyWorldTradeItem.trade.callCount; step++) {
     for (const outpostGood of OUTPOST_GOODS) {
       expect(buyGoodFromShip.getCall(buyGoodCall++).args[0]).toBe(outpostGood);
     }
@@ -428,6 +429,107 @@ const setupTradingTest = (numMinutes: number = 20) => {
       expect(buyGoodFromShip.getCall(buyGoodCall++).args[0]).toBe(capitalGood);
     }
   }
+};
+
+/**
+ * Setup settling and trading tests. The emperor should claim two counties, two duchies, and two near by kingdoms
+ * @param numMinutes This test should take 60 minutes of game time.
+ */
+const setupFeudalismTest = (numMinutes: number = 20) => {
+  // setup wrapper to run test
+  const wrapper = shallow<App>(<App isTestMode worldScale={1} />);
+  const app = wrapper.instance();
+  app.forceUpdate = () => undefined;
+
+  // remove all ships
+  for (const faction of Object.values(app.factions)) {
+    faction.handleFactionLoop = () => undefined;
+  }
+
+  // validate data
+  for (const faction of Object.values(app.factions)) {
+    assertFactionData(faction);
+  }
+
+  // get home world
+  const dutchFaction = app.factions[EFaction.DUTCH];
+  if (!dutchFaction) {
+    throw new Error("Could not find Dutch Faction");
+  }
+  const dutchHomeWorld = app.planets.find(p => p.id === dutchFaction.homeWorldPlanetId);
+  if (!dutchHomeWorld) {
+    throw new Error("Could not find Dutch Home World");
+  }
+
+  // create 4 dutch ships to claim planets quickly
+  const colonyWorldTrades = app.planets.map(p => ({ id: p.id, trade: sinon.spy(p, "trade"), claim: sinon.spy(p, "claim"), planet: p }));
+  const { getOrder } = getTestShip(app, wrapper, colonyWorldTrades, EFaction.DUTCH, EShipType.CORVETTE);
+  app.returnToMainMenu();
+  wrapper.update();
+  getTestShip(app, wrapper, colonyWorldTrades, EFaction.DUTCH, EShipType.CORVETTE, getOrder);
+  app.returnToMainMenu();
+  wrapper.update();
+  getTestShip(app, wrapper, colonyWorldTrades, EFaction.DUTCH, EShipType.CORVETTE, getOrder);
+  app.returnToMainMenu();
+  wrapper.update();
+  getTestShip(app, wrapper, colonyWorldTrades, EFaction.DUTCH, EShipType.CORVETTE, getOrder);
+
+  // determine number of trips
+  const shipData = SHIP_DATA.find(s => s.shipType === EShipType.CUTTER);
+  if (!shipData) {
+    throw new Error("Could not find ship type");
+  }
+
+  // test the ship navigation to nav point
+  const numStepsPerSecond = 10;
+  const numSecondsPerMinute = 60;
+  const numSteps = numStepsPerSecond * numSecondsPerMinute * numMinutes;
+  let successfullyReachedDestination = false;
+  const latestClaims: Planet[] = [];
+  for (let step = 0; step < numSteps; step++) {
+    app.gameLoop.call(app);
+
+    // remove wood to prevent additional ships
+    for (const planet of app.planets) {
+      planet.wood = 0;
+    }
+
+    // add new claims
+    for (const colonyWorld of colonyWorldTrades) {
+      if (colonyWorld.claim.callCount === 1) {
+        if (!latestClaims.includes(colonyWorld.planet)) {
+          latestClaims.push(colonyWorld.planet);
+        }
+      } else if (colonyWorld.claim.callCount > 1) {
+        throw new Error("Too many claims on a single planet");
+      }
+    }
+
+    // end test
+    if (latestClaims.length >= 10) {
+      successfullyReachedDestination = true;
+      break;
+    }
+  }
+
+  // expect ship to complete it's mission.
+  expect(successfullyReachedDestination).toBeTruthy();
+
+  // expect the specific order of claims
+  // the emperor's local duchy or domain
+  expect(latestClaims[0].getRoyalRank()).toBe(ERoyalRank.COUNT);
+  expect(latestClaims[1].getRoyalRank()).toBe(ERoyalRank.COUNT);
+  // the emperor's local dukes or local vassals
+  expect(latestClaims[2].getRoyalRank()).toBe(ERoyalRank.DUKE);
+  expect(latestClaims[3].getRoyalRank()).toBe(ERoyalRank.DUKE);
+  // counties of the local vassal dukes
+  expect(latestClaims[4].getRoyalRank()).toBe(ERoyalRank.COUNT);
+  expect(latestClaims[5].getRoyalRank()).toBe(ERoyalRank.COUNT);
+  expect(latestClaims[6].getRoyalRank()).toBe(ERoyalRank.COUNT);
+  expect(latestClaims[7].getRoyalRank()).toBe(ERoyalRank.COUNT);
+  // remote kings to setup new kingdoms or colonies
+  expect(latestClaims[8].getRoyalRank()).toBe(ERoyalRank.KING);
+  expect(latestClaims[9].getRoyalRank()).toBe(ERoyalRank.KING);
 };
 
 /**
@@ -485,7 +587,7 @@ const setupPiracyTest = (numMinutes: number = 20) => {
   app.gameLoop.call(app);
 
   // create english ship to be pirated
-  const colonyWorldTrades = app.planets.map(p => ({ id: p.id, spy: sinon.spy(p, "trade"), planet: p }));
+  const colonyWorldTrades = app.planets.map(p => ({ id: p.id, trade: sinon.spy(p, "trade"), planet: p }));
   const {
     testShip: englishMerchantShip,
     getOrder: englishMerchantShipGetOrder,
@@ -679,6 +781,13 @@ describe('test AI', () => {
     for (let test = 0; test < 10; test++) {
       it(`test settling and trading with random data ${test}`, () => {
         setupTradingTest(60);
+      });
+    }
+  });
+  describe('test feudalism settling and trading',  () => {
+    for (let test = 0; test < 10; test++) {
+      it(`test settling and trading with random data ${test}`, () => {
+        setupFeudalismTest(60);
       });
     }
   });

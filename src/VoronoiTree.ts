@@ -602,6 +602,14 @@ export class VoronoiCounty extends VoronoiTreeNode<ICameraState> {
     }
 
     public claim(faction: Faction) {
+        // set faction
+        this.faction = faction;
+
+        // if no capital, make only planet the capital
+        if (!this.capital) {
+            this.capital = this.planet;
+        }
+
         // handle planet
         if (this.planet) {
             // remove planet from faction
@@ -616,9 +624,6 @@ export class VoronoiCounty extends VoronoiTreeNode<ICameraState> {
                 faction.planetIds.push(this.planet.id);
             }
         }
-
-        // set faction
-        this.faction = faction;
 
         // perform duchy claim
         this.duchy.claim(this, faction);
@@ -683,13 +688,13 @@ export class VoronoiDuchy extends VoronoiTreeNode<ICameraState> {
     }
 
     public claim(county: VoronoiCounty, faction: Faction) {
+        // set faction
+        this.faction = faction;
+
         // if no capital, make first colony the capital
         if (!this.capital) {
             this.capital = county;
         }
-
-        // set faction
-        this.faction = faction;
 
         // perform kingdom claim
         this.kingdom.claim(this, faction);
@@ -760,13 +765,13 @@ export class VoronoiKingdom extends VoronoiTreeNode<ICameraState> {
     }
 
     public claim(duchy: VoronoiDuchy, faction: Faction) {
+        // set faction
+        this.faction = faction;
+
         // if no capital, make first colony the capital
         if (!this.capital) {
             this.capital = duchy;
         }
-
-        // set faction
-        this.faction = faction;
     }
 }
 

@@ -201,12 +201,14 @@ export class Order {
             colonyWorld.settlementProgress = (
                 Math.round(colonyWorld.settlementProgress * Planet.NUM_SETTLEMENT_PROGRESS_STEPS) + shipData.settlementProgressFactor
             ) / Planet.NUM_SETTLEMENT_PROGRESS_STEPS;
-            if (colonyWorld.settlementProgress === 1) {
+            if (colonyWorld.settlementProgress >= 1 && colonyWorld.settlementLevel < ESettlementLevel.OUTPOST) {
                 colonyWorld.settlementLevel = ESettlementLevel.OUTPOST;
-                colonyWorld.claim(this.faction)
+            } else if (colonyWorld.settlementProgress >= 5 && colonyWorld.settlementLevel < ESettlementLevel.COLONY) {
+                colonyWorld.settlementLevel = ESettlementLevel.COLONY;
             }
             if (!this.faction.planetIds.includes(this.planetId)) {
                 this.faction.planetIds.push(this.planetId);
+                colonyWorld.claim(this.faction)
             }
 
             // trade with homeWorld
