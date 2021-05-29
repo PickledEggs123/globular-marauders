@@ -24,6 +24,7 @@ export interface ICellData {
 export class VoronoiCell implements ICellData {
     public vertices: [number, number, number][] = [];
     public centroid: [number, number, number] = [0, 0, 0];
+    public vertex: [number, number, number] = [0, 0, 0];
     public radius: number = 0;
 
     /**
@@ -1049,6 +1050,15 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                     }
                 }
 
+                // reduce duplicate points
+                points = points.reduce((acc, p) => {
+                    if (!acc.some(v => DelaunayGraph.distanceFormula(v, p) < 0.001)) {
+                        return [...acc, p];
+                    } else {
+                        return acc;
+                    }
+                }, [] as Array<[number, number, number]>);
+
                 // sort points counter clockwise
                 const averagePoint = DelaunayGraph.normalize(App.getAveragePoint(points));
                 const averageTransform = Quaternion.fromBetweenVectors([0, 0, 1], averagePoint).inverse();
@@ -1072,6 +1082,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                 const cell = new VoronoiCell();
                 cell.vertices.push(...sortedPoints);
                 cell.centroid = averagePoint;
+                cell.vertex = this.vertices[vertexIndex];
                 cell.radius = cell.vertices.reduce((acc: number, vertex): number => {
                     return Math.max(
                         acc,

@@ -2568,11 +2568,11 @@ export class App extends React.Component<IAppProps, IAppState> {
                 {/*}*/}
                 {
                     ([
-                        ...Array.from(this.voronoiTerrain.getStars(shipPosition)).map(this.rotatePlanet.bind(this))
+                        ...Array.from(this.voronoiTerrain.getStars(shipPosition, 0.5)).map(this.rotatePlanet.bind(this))
                             .map(this.convertToDrawable.bind(this, "-star2", 0.5)),
-                        ...Array.from(this.voronoiTerrain.getStars(shipPosition)).map(this.rotatePlanet.bind(this))
+                        ...Array.from(this.voronoiTerrain.getStars(shipPosition, 0.25)).map(this.rotatePlanet.bind(this))
                             .map(this.convertToDrawable.bind(this, "-star3", 0.25)),
-                        ...Array.from(this.voronoiTerrain.getStars(shipPosition)).map(this.rotatePlanet.bind(this))
+                        ...Array.from(this.voronoiTerrain.getStars(shipPosition, 0.125)).map(this.rotatePlanet.bind(this))
                             .map(this.convertToDrawable.bind(this, "-star4", 0.125))
                     ] as Array<IDrawable<Planet>>)
                         .sort((a: any, b: any) => b.distance - a.distance)

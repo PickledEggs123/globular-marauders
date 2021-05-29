@@ -195,14 +195,14 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
         return randomTriangleInPolygonIndex;
     }
 
-    private static rotateBackToPosition(rotation: Quaternion, polygon: VoronoiCell): VoronoiCell {
+    private static rotateVoronoiCell(rotation: Quaternion, polygon: VoronoiCell): VoronoiCell {
         const o = new VoronoiCell();
-        o.centroid = rotation.clone().inverse()
-            .mul(Quaternion.fromBetweenVectors([0, 0, 1], polygon.centroid))
+        o.centroid = rotation.mul(Quaternion.fromBetweenVectors([0, 0, 1], polygon.centroid))
+            .rotateVector([0, 0, 1]);
+        o.vertex = rotation.mul(Quaternion.fromBetweenVectors([0, 0, 1], polygon.vertex))
             .rotateVector([0, 0, 1]);
         o.vertices = polygon.vertices.map(v => {
-            return rotation.clone().inverse()
-                .mul(Quaternion.fromBetweenVectors([0, 0, 1], v))
+            return rotation.mul(Quaternion.fromBetweenVectors([0, 0, 1], v))
                 .rotateVector([0, 0, 1]);
         });
         o.radius = polygon.radius;
@@ -283,6 +283,7 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
         const copy = new VoronoiCell();
         copy.vertices = vertices;
         copy.centroid = DelaunayGraph.normalize(App.getAveragePoint(copy.vertices));
+        copy.vertex = polygon.vertex;
         copy.radius = copy.vertices.reduce((acc: number, vertex): number => {
             return Math.max(
                 acc,
@@ -307,10 +308,11 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
     /**
      * If the point is near by a voronoi node.
      * @param point The point to test.
+     * @param radius The radius of the sphere to test.
      */
-    public isNearBy(point: [number, number, number]): boolean {
+    public isNearBy(point: [number, number, number], radius: number = 1): boolean {
         return VoronoiGraph.angularDistance(point, this.voronoiCell.centroid, this.app.worldScale) <
-            this.voronoiCell.radius + (Math.PI / this.app.worldScale);
+            this.voronoiCell.radius + (Math.PI * radius / this.app.worldScale);
     }
 
     public static createRandomPoint<T extends ICameraState>(forNode: VoronoiTreeNode<T>): [number, number, number] {
@@ -403,17 +405,26 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
             const outOfBoundsVoronoiCells = delaunay.getVoronoiGraph().cells;
 
             // perform sutherland-hodgman polygon clipping
-            goodPoints = outOfBoundsVoronoiCells.map((polygon) => {
-                return VoronoiTreeNode.rotateBackToPosition(rotationToBottomOfTetrahedron, polygon);
-            }).map((polygon) => VoronoiTreeNode.polygonClip<T>(forNode, polygon))
-                .filter((polygon) => polygon.vertices.length > 0)
-                .filter((polygon) => DelaunayGraph.distanceFormula(polygon.centroid, forNode.voronoiCell.centroid) > 0.001);
+            const points1 = outOfBoundsVoronoiCells.map((polygon) => {
+                return VoronoiTreeNode.rotateVoronoiCell(rotationToBottomOfTetrahedron.clone().inverse(), polygon);
+            });
+            const points2 = points1.map((polygon) => VoronoiTreeNode.polygonClip<T>(forNode, polygon));
+            goodPoints = points2.filter((polygon) => forNode.containsPoint(polygon.vertex));
+            // check number of points
+            if (goodPoints.length !== numRandomPoints) {
+                throw new Error("Incorrect number of points");
+            }
             randomPointsWithinVoronoiCell = goodPoints.reduce((acc, v) => {
                 if (acc.every(p => VoronoiGraph.angularDistance(p, v.centroid, 1) > 0.001)) {
                     acc.push(v.centroid);
                 }
                 return acc;
             }, [] as Array<[number, number, number]>);
+        }
+
+        // check number of points
+        if (goodPoints.length !== numRandomPoints) {
+            throw new Error("Incorrect number of points");
         }
 
         // create tree nodes
@@ -652,8 +663,7 @@ export class VoronoiDuchy extends VoronoiTreeNode<ICameraState> {
         this.nodes = VoronoiTreeNode.createTreeNodes(this.parent.nodes, this);
         this.counties = this.nodes.map(n => new VoronoiCounty(n.app, n.voronoiCell, n.level, n.parent, this, this.getPlanetId));
 
-        //const tempStars = VoronoiTreeNode.createTreeNodes(this.parent.nodes, this);
-        const tempStars = [this];
+        const tempStars = VoronoiTreeNode.createTreeNodes(this.parent.nodes, this);
         this.stars = tempStars.map(s => s.voronoiCell.centroid).map((starPosition) => {
             return this.app.buildStar.call(this.app, starPosition, this.getStarId());
         });
@@ -743,11 +753,11 @@ export class VoronoiKingdom extends VoronoiTreeNode<ICameraState> {
         }
     }
 
-    public *getStars(position?: [number, number, number]): Generator<Star> {
+    public *getStars(position?: [number, number, number], radius: number = 1): Generator<Star> {
         for (const duchy of this.duchies) {
             if (!position) {
                 yield * Array.from(duchy.getStars());
-            } else if (position && duchy.isNearBy(position)) {
+            } else if (position && duchy.isNearBy(position, radius)) {
                 yield * Array.from(duchy.getStars());
             }
         }
@@ -805,12 +815,12 @@ export class VoronoiTerrain extends VoronoiTree<ICameraState> {
         }
     }
 
-    public *getStars(position?: [number, number, number]): Generator<Star> {
+    public *getStars(position?: [number, number, number], radius: number = 1): Generator<Star> {
         for (const kingdom of this.kingdoms) {
             if (!position) {
                 yield * Array.from(kingdom.getStars());
-            } else if (position && kingdom.isNearBy(position)) {
-                yield * Array.from(kingdom.getStars(position));
+            } else if (position && kingdom.isNearBy(position, radius)) {
+                yield * Array.from(kingdom.getStars(position, radius));
             }
         }
     }
