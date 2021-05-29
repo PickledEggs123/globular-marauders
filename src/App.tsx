@@ -3633,14 +3633,23 @@ export class App extends React.Component<IAppProps, IAppState> {
                             <li>Add AI pirates. -- DONE 5/9/2021</li>
                             <li>Construction and upgrade of buildings in capitals and colonies. -- DONE 5/15/2021</li>
                             <li>Fix Delaunay and Voronoi. -- DONE 5/26/2021</li>
-                            <li>Added nested delaunay and nested voronoi.</li>
+                            <li>Add nested delaunay and nested voronoi. -- DONE 5/28/2021</li>
                             <li>Add Imperial/Colonial empire design, the capital will upgrade certain locations into high level planets.</li>
                             <li>Add tax trading where planets will pay taxes to the capital.</li>
                             <li>Pirate hunters.</li>
                             <li>Factions will plan invasions of enemy colonies and capitals.</li>
-                            <li>Add multiplayer...</li>
-                            <li>Break game into client and server.</li>
-                            <li>Add multiple clients.</li>
+                            <li>Add multiplayer... (1 month)
+                                <ol>
+                                    <li>Break game into client and server.</li>
+                                    <li>Create bot clients based on bot code, copied into client.</li>
+                                    <li>Test number of bots on single process server before lagging.</li>
+                                    <li>Create multi process servers which divide each kingdom (1 out of 20 voronoi cells) into a process.</li>
+                                    <li>Test number of bots on multi process server.</li>
+                                    <li>Create code which can spawn multiple servers and release multiple servers.</li>
+                                    <li>Create random match making via Website (1 server).</li>
+                                    <li>Create infinite random match making via Website (automatic generated servers).</li>
+                                </ol>
+                            </li>
                             <li>Play Styles:
                                 <ul>
                                     <li>Pirate/Marauder will attack kingdoms and other pirates.</li>
