@@ -11,7 +11,7 @@ import {DelaunayGraph, PathFinder, VoronoiGraph} from "./Graph";
 import {CannonBall} from "./Item";
 import {ERoyalRank, Faction} from "./Faction";
 import {EBuildingType, Planet} from "./Planet";
-import {ESettlementLevel} from "./Interface";
+import {ESettlementLevel, IGoldAccount} from "./Interface";
 
 /**
  * Get a test ship from the app.
@@ -377,7 +377,7 @@ const setupTradingTest = (numMinutes: number = 20) => {
   if (!shipData) {
     throw new Error("Could not find ship type");
   }
-  const numberOfTripsToColonizePlanet = 20 / shipData.settlementProgressFactor;
+  const numberOfTripsToColonizePlanet = Planet.NUM_SETTLEMENT_PROGRESS_STEPS / shipData.settlementProgressFactor;
 
   // test the ship navigation to nav point
   const numStepsPerSecond = 10;
@@ -461,8 +461,14 @@ const setupFeudalismTest = (numMinutes: number = 20) => {
     throw new Error("Could not find Dutch Home World");
   }
 
-  // create 4 dutch ships to claim planets quickly
-  const colonyWorldTrades = app.planets.map(p => ({ id: p.id, trade: sinon.spy(p, "trade"), claim: sinon.spy(p, "claim"), planet: p }));
+  // create 4 dutch corvettes to claim planets quickly
+  const colonyWorldTrades = app.planets.map(p => ({
+    id: p.id,
+    trade: sinon.spy(p, "trade"),
+    claim: sinon.spy(p, "claim"),
+    spawnShip: sinon.spy(p, "spawnShip"),
+    planet: p
+  }));
   const { getOrder } = getTestShip(app, wrapper, colonyWorldTrades, EFaction.DUTCH, EShipType.CORVETTE);
   app.returnToMainMenu();
   wrapper.update();
@@ -486,12 +492,19 @@ const setupFeudalismTest = (numMinutes: number = 20) => {
   const numSteps = numStepsPerSecond * numSecondsPerMinute * numMinutes;
   let successfullyReachedDestination = false;
   const latestClaims: Planet[] = [];
+  const newColonies: Array<{
+    planet: Planet,
+    spawnShip: sinon.SinonSpy<[account: IGoldAccount, shipType: EShipType, asFaction?: boolean], Ship>,
+    getOrder: sinon.SinonSpy<[ship: Ship], Order>
+  }> = [];
   for (let step = 0; step < numSteps; step++) {
     app.gameLoop.call(app);
 
     // remove wood to prevent additional ships
     for (const planet of app.planets) {
-      planet.wood = 0;
+      if (!dutchFaction.planetIds.includes(planet.id)) {
+        planet.wood = 0;
+      }
     }
 
     // add new claims
@@ -505,8 +518,30 @@ const setupFeudalismTest = (numMinutes: number = 20) => {
       }
     }
 
+    // add new colonies
+    for (const colonyWorld of colonyWorldTrades) {
+      if (colonyWorld.planet.settlementLevel === ESettlementLevel.COLONY && dutchHomeWorld.isKingdomDomain(colonyWorld.planet)) {
+        if (!newColonies.some(i => i.planet === colonyWorld.planet)) {
+          newColonies.push({
+            planet: colonyWorld.planet,
+            spawnShip: colonyWorld.spawnShip,
+            getOrder: sinon.spy(colonyWorld.planet, "getOrder")
+          });
+        }
+      }
+    }
+
     // end test
-    if (latestClaims.length >= 10) {
+    if (
+        // at least 10 planets
+        latestClaims.length >= 10 &&
+        // all 8 colonies in kingdom are colonies
+        newColonies.length >= 8 &&
+        // all 8 colonies have created at least 1 ship
+        newColonies.every(c => c.spawnShip.callCount > 0) &&
+        // all 8 colonies have sent at least 1 tribute ship
+        newColonies.every(c => c.getOrder.returnValues.some(v => v.orderType === EOrderType.TRIBUTE))
+    ) {
       successfullyReachedDestination = true;
       break;
     }
@@ -530,6 +565,23 @@ const setupFeudalismTest = (numMinutes: number = 20) => {
   // remote kings to setup new kingdoms or colonies
   expect(latestClaims[8].getRoyalRank()).toBe(ERoyalRank.KING);
   expect(latestClaims[9].getRoyalRank()).toBe(ERoyalRank.KING);
+
+  // expect counties to give at least 1 tribute order
+  for (const newColony of newColonies) {
+    switch (newColony.planet.getRoyalRank()) {
+      case ERoyalRank.COUNT: {
+        expect(newColony.spawnShip.callCount).toBeGreaterThan(0);
+        break;
+      }
+      case ERoyalRank.DUKE: {
+        expect(newColony.spawnShip.callCount).toBeGreaterThan(0);
+        break;
+      }
+      default: {
+        throw new Error("Bad Royal Rank as vassal of emperor in emperor's kingdom domain");
+      }
+    }
+  }
 };
 
 /**

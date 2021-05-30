@@ -573,7 +573,7 @@ export class Planet implements ICameraState {
     /**
      * Number of settlements to colonize a planet.
      */
-    public static NUM_SETTLEMENT_PROGRESS_STEPS = 20;
+    public static NUM_SETTLEMENT_PROGRESS_STEPS = 4;
 
     /**
      * The list of planet priorities for exploration.
@@ -796,6 +796,7 @@ export class Planet implements ICameraState {
 
         // find worlds to pirate
         const pirateWorldEntry = entries.find(entry => {
+            const largeEnoughToPirate = this.isAbleToPirate();
             // settle new worlds which have not been settled yet
             const roomToPirate = entry[1].pirateShipIds.length === 0;
             const weakEnemyPresence = entry[1].enemyStrength <= 0;
@@ -810,12 +811,13 @@ export class Planet implements ICameraState {
                     return faction.planetIds.includes(entry[0]);
                 }
             });
-            return roomToPirate && weakEnemyPresence && isSettledEnoughToTrade && isOwnedByEnemy;
+            return largeEnoughToPirate && roomToPirate && weakEnemyPresence && isSettledEnoughToTrade && isOwnedByEnemy;
         });
 
         // find worlds to trade
         const tradeWorldEntry = entries.find(entry => {
             // settle new worlds which have not been settled yet
+            const worldIsAbleToTrade = this.isAbleToTrade(entry[1].planet);
             const roomToTrade = entry[1].traderShipIds.length <= entry[1].planet.resources.length - shipData.cargoSize;
             const isSettledEnoughToTrade = entry[1].planet.settlementLevel >= ESettlementLevel.OUTPOST;
             const notTradedYet = Object.values(this.instance.factions).every(faction => {
@@ -827,11 +829,12 @@ export class Planet implements ICameraState {
                     return !faction.planetIds.includes(entry[0]);
                 }
             });
-            return roomToTrade && isSettledEnoughToTrade && notTradedYet;
+            return worldIsAbleToTrade && roomToTrade && isSettledEnoughToTrade && notTradedYet;
         });
 
         // find worlds to settle
         const settlementWorldEntry = entries.find(entry => {
+            const worldIsAbleToTrade = this.isAbleToSettle(entry[1].planet);
             // settle new worlds which have not been settled yet
             const roomToSettleMore = entry[1].settlerShipIds.length <=
                 Planet.NUM_SETTLEMENT_PROGRESS_STEPS -
@@ -845,12 +848,13 @@ export class Planet implements ICameraState {
                     return !faction.planetIds.includes(entry[0]);
                 }
             });
-            return roomToSettleMore && notSettledYet;
+            return worldIsAbleToTrade && roomToSettleMore && notSettledYet;
         });
 
         // find worlds to colonize
         const colonizeWorldEntry = entries.find(entry => {
             // colonize settled worlds by sending more people
+            const worldIsAbleToTrade = this.isAbleToSettle(entry[1].planet);
             const roomToSettleMore = entry[1].settlerShipIds.length <=
                 Planet.NUM_SETTLEMENT_PROGRESS_STEPS * 5 -
                 Math.round(entry[1].planet.settlementProgress * Planet.NUM_SETTLEMENT_PROGRESS_STEPS) - shipData.settlementProgressFactor;
@@ -863,7 +867,7 @@ export class Planet implements ICameraState {
                     return !faction.planetIds.includes(entry[0]);
                 }
             });
-            return roomToSettleMore && notSettledYet;
+            return worldIsAbleToTrade && roomToSettleMore && notSettledYet;
         });
 
         if (!this.county.faction) {
@@ -888,8 +892,16 @@ export class Planet implements ICameraState {
             order.planetId = tradeWorldEntry[0];
             order.expireTicks = 10 * 60 * 20; // trade for 20 minutes before signing a new contract
             return order;
-        } else if (settlementWorldEntry) {
+        } else if (colonizeWorldEntry) {
             // add ship to colonize
+            colonizeWorldEntry[1].settlerShipIds.push(ship.id);
+
+            const order = new Order(this.instance, ship, this.county.faction);
+            order.orderType = EOrderType.SETTLE;
+            order.planetId = colonizeWorldEntry[0];
+            return order;
+        } else if (settlementWorldEntry) {
+            // add ship to settle
             settlementWorldEntry[1].settlerShipIds.push(ship.id);
 
             const order = new Order(this.instance, ship, this.county.faction);
@@ -988,6 +1000,10 @@ export class Planet implements ICameraState {
         return this.isSisterKingdomOfEmpire(other) && !other.county.duchy.kingdom.capital;
     }
 
+    public isImperialCapital(): boolean {
+        return this.getRoyalRank() === ERoyalRank.EMPEROR;
+    }
+
     public isKingdomCapital(): boolean {
         return this.getRoyalRank() === ERoyalRank.KING;
     }
@@ -998,6 +1014,118 @@ export class Planet implements ICameraState {
 
     public isCountyCapital(): boolean {
         return this.getRoyalRank() === ERoyalRank.COUNT;
+    }
+
+    public isDomainFull(): boolean {
+        switch (this.getRoyalRank()) {
+            case ERoyalRank.EMPEROR: {
+                const faction = this.county.duchy.kingdom.faction;
+                if (faction) {
+                    const imperialCapital = this.instance.planets.find(p => p.id === faction.homeWorldPlanetId);
+                    if (imperialCapital) {
+                        // if all counties have a capital, return true
+                        const imperialKingdom = imperialCapital.county.duchy.kingdom;
+                        for (const duchy of imperialKingdom.duchies) {
+                            for (const county of duchy.counties) {
+                                if (!county.capital) {
+                                    return false;
+                                }
+                            }
+                        }
+                        return true;
+                    } else {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
+            }
+            case ERoyalRank.KING: {
+                for (const duchy of this.county.duchy.kingdom.duchies) {
+                    for (const county of duchy.counties) {
+                        if (!county.capital) {
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            }
+            case ERoyalRank.DUKE: {
+                for (const county of this.county.duchy.counties) {
+                    if (!county.capital) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            case ERoyalRank.COUNT:
+            default: {
+                return true;
+            }
+        }
+    }
+
+    public isAbleToPirate(): boolean {
+        switch (this.getRoyalRank()) {
+            case ERoyalRank.EMPEROR:
+            case ERoyalRank.KING:
+            case ERoyalRank.DUKE: {
+                // emperor, king, and dukes can pirate
+                return this.isDomainFull();
+            }
+            case ERoyalRank.COUNT:
+            default: {
+                // counts do not pirate
+                return false;
+            }
+        }
+    }
+
+    public isAbleToTrade(other: Planet): boolean {
+        switch (this.getRoyalRank()) {
+            case ERoyalRank.EMPEROR: {
+                // emperors only trade with kingdom capitals
+                return (this.isVassal(other) && other.isKingdomCapital()) ||
+                    (this.isKingdomDomain(other) && other.isDuchyCapital()) ||
+                    (this.isDuchyDomain(other) && other.isCountyCapital());
+            }
+            case ERoyalRank.KING: {
+                // kings only trade with duchy capitals
+                return (this.isKingdomDomain(other) && other.isDuchyCapital()) ||
+                    (this.isDuchyDomain(other) && other.isCountyCapital());
+            }
+            case ERoyalRank.DUKE: {
+                // dukes only trade with county capitals
+                return this.isDuchyDomain(other) && other.isCountyCapital();
+            }
+            case ERoyalRank.COUNT:
+            default: {
+                // counts do not trade
+                return false;
+            }
+        }
+    }
+
+    public isAbleToSettle(other: Planet): boolean {
+        switch (this.getRoyalRank()) {
+            case ERoyalRank.EMPEROR: {
+                // emperors can settle anywhere
+                return true;
+            }
+            case ERoyalRank.KING: {
+                // kings only settle within their domain
+                return this.isKingdomDomain(other);
+            }
+            case ERoyalRank.DUKE: {
+                // dukes only settle within their domain
+                return this.isDuchyDomain(other);
+            }
+            case ERoyalRank.COUNT:
+            default: {
+                // counts do not settle
+                return false;
+            }
+        }
     }
 
     public isUnclaimed(): boolean {
@@ -1022,6 +1150,41 @@ export class Planet implements ICameraState {
             }
             default: {
                 return false;
+            }
+        }
+    }
+
+    public getLordWorld(): Planet {
+        switch (this.getRoyalRank()) {
+            case ERoyalRank.EMPEROR: {
+                return this;
+            }
+            case ERoyalRank.KING: {
+                const planet = this.instance.planets.find(p => {
+                    return this.county.duchy.kingdom.faction &&
+                        p.id === this.county.duchy.kingdom.faction.homeWorldPlanetId;
+                });
+                if (!planet) {
+                    throw new Error("Could not find imperial capital");
+                }
+                return planet;
+            }
+            case ERoyalRank.DUKE: {
+                const planet = this.county.duchy.kingdom.capital?.capital?.planet;
+                if (!planet) {
+                    throw new Error("Could not find kingdom capital");
+                }
+                return planet;
+            }
+            case ERoyalRank.COUNT: {
+                const planet = this.county.duchy.capital?.planet;
+                if (!planet) {
+                    throw new Error("Could not find duchy capital");
+                }
+                return planet;
+            }
+            default: {
+                throw new Error("Planet is not part of royal hierarchy");
             }
         }
     }
@@ -1115,7 +1278,7 @@ export class Planet implements ICameraState {
         // subtract manufactured resources
         for (const manufacturedResource of this.manufacturedResources) {
             // the amount of recipes that can be produced
-            let amount: number = Number.MAX_VALUE;
+            let amount: number = manufacturedResource.amount;
             for (const ingredient of manufacturedResource.ingredients) {
                 const oldResource = this.resources.find(i => i.resourceType === ingredient.resourceType);
                 if (oldResource) {
@@ -1199,7 +1362,7 @@ export class Planet implements ICameraState {
             this.county.faction &&
             this.getNumShipsAvailable(nextShipTypeToBuild) > 2 &&
             this.county.faction.shipIds.length < 50 &&
-            this.gold >= this.shipyard.quoteShip(nextShipTypeToBuild)
+            this.gold >= this.shipyard.quoteShip(nextShipTypeToBuild, true)
         ) {
             this.spawnShip(this, nextShipTypeToBuild, true);
         }
@@ -1344,7 +1507,7 @@ export class Planet implements ICameraState {
         if (this.settlementLevel === ESettlementLevel.UNTAMED) {
             goodsToTake = CAPITAL_GOODS;
             goodsToOffer = [];
-        } else if (this.settlementLevel === ESettlementLevel.OUTPOST) {
+        } else if (this.settlementLevel >= ESettlementLevel.OUTPOST || this.settlementLevel <= ESettlementLevel.COLONY) {
             goodsToTake = CAPITAL_GOODS;
             goodsToOffer = this.resources;
         } else if (this.settlementLevel === ESettlementLevel.CAPITAL) {

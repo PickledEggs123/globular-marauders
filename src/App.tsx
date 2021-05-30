@@ -2,7 +2,7 @@ import React from 'react';
 import './App.css';
 import Quaternion from 'quaternion';
 import {IHitTest} from "./Intersection";
-import {CAPITAL_GOODS, EResourceType, ITEM_DATA, OUTPOST_GOODS} from "./Resource";
+import {EResourceType, ITEM_DATA, OUTPOST_GOODS} from "./Resource";
 import {
     ESettlementLevel,
     ICameraState,
@@ -397,7 +397,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     public smokeClouds: SmokeCloud[] = [];
     public cannonBalls: CannonBall[] = [];
     public luxuryBuffs: LuxuryBuff[] = [];
-    public gold: number = 2000;
+    public gold: number = 20000;
     public worldScale: number = 3;
     public music: MusicPlayer = new MusicPlayer();
     public demoAttackingShipId: string | null = null;
@@ -649,8 +649,9 @@ export class App extends React.Component<IAppProps, IAppState> {
      * @param radius the size of the pi chart
      */
     private getPointsOfAngularProgress(percent: number, radius: number) {
-        return new Array(17).fill(0).map((v, i) => {
-            return `${radius * Math.cos((i / 16) * percent * Math.PI * 2)},${radius * Math.sin((i / 16) * percent * Math.PI * 2)}`;
+        const numSlices = Math.ceil(percent * 32);
+        return new Array(numSlices + 1).fill(0).map((v, i) => {
+            return `${radius * Math.cos((i / numSlices) * percent * Math.PI * 2)},${radius * Math.sin((i / numSlices) * percent * Math.PI * 2)}`;
         }).join(" ");
     }
 
@@ -709,11 +710,22 @@ export class App extends React.Component<IAppProps, IAppState> {
                 {
                     !uiPass && planetDrawing.original.settlementProgress > 0 && factionColor && (
                         <polygon
-                            key={`${planetDrawing.id}-settlement-progress`}
+                            key={`${planetDrawing.id}-settlement-progress-1`}
                             transform={`translate(${x * this.state.width},${(1 - y) * this.state.height})`}
                             fill={factionColor}
                             style={{opacity: 0.8}}
-                            points={`0,0 ${this.getPointsOfAngularProgress.call(this, planetDrawing.original.settlementProgress, size * (this.state.zoom * this.worldScale) * 1.35)}`}
+                            points={`0,0 ${this.getPointsOfAngularProgress.call(this, Math.max(0, Math.min(planetDrawing.original.settlementProgress, 1)), size * (this.state.zoom * this.worldScale) * 1.35)}`}
+                        />
+                    )
+                }
+                {
+                    !uiPass && planetDrawing.original.settlementProgress > 1 && factionColor && (
+                        <polygon
+                            key={`${planetDrawing.id}-settlement-progress-2`}
+                            transform={`translate(${x * this.state.width},${(1 - y) * this.state.height})`}
+                            fill={factionColor}
+                            style={{opacity: 0.8}}
+                            points={`0,0 ${this.getPointsOfAngularProgress.call(this, Math.max(0, Math.min((planetDrawing.original.settlementProgress - 1) / 4, 1)), size * (this.state.zoom * this.worldScale) * 1.70)}`}
                         />
                     )
                 }

@@ -85,7 +85,7 @@ export class Order {
     }
 
     public returnToHomeWorld() {
-        const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWorldPlanetId);
+        const homeWorld = this.owner.planet;
         if (!homeWorld || !homeWorld.pathingNode) {
             throw new Error("Could not find home world for pathing back to home world (RETURN TO HOME WORLD)");
         }
@@ -119,11 +119,7 @@ export class Order {
         if (!colonyWorld || !colonyWorld.pathingNode) {
             throw new Error("Could not find colony world for pathing to enemy colony world (PIRATE COLONY)");
         }
-        const enemyFaction = Object.values(this.app.factions).find(f => f.planetIds.includes(colonyWorld.id));
-        if (!enemyFaction) {
-            throw new Error("Could not find enemy faction that owns the colony (PIRATE COLONY)")
-        }
-        const enemyHomeWorld = this.app.planets.find(planet => planet.id === enemyFaction.homeWorldPlanetId);
+        const enemyHomeWorld = colonyWorld.getLordWorld();
         if (!enemyHomeWorld || !enemyHomeWorld.pathingNode) {
             throw new Error("Could not find enemy home world (PIRATE COLONY)");
         }
@@ -145,7 +141,7 @@ export class Order {
     }
 
     public beginSettlementMission() {
-        const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWorldPlanetId);
+        const homeWorld = this.owner.planet;
         if (!homeWorld || !homeWorld.pathingNode) {
             throw new Error("Could not find home world for pathing back to home world (SETTLE)");
         }
@@ -153,8 +149,17 @@ export class Order {
         homeWorld.trade(this.owner);
     }
 
+    public endSettlementMission() {
+        const homeWorld = this.owner.planet;
+        if (!homeWorld || !homeWorld.pathingNode) {
+            throw new Error("Could not find home world for pathing back to home world (SETTLE)");
+        }
+
+        homeWorld.trade(this.owner, true);
+    }
+
     public beginTradeMission() {
-        const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWorldPlanetId);
+        const homeWorld = this.owner.planet;
         if (!homeWorld || !homeWorld.pathingNode) {
             throw new Error("Could not find home world for pathing back to home world (TRADE)");
         }
@@ -172,7 +177,7 @@ export class Order {
     }
 
     public beginPirateMission() {
-        const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWorldPlanetId);
+        const homeWorld = this.owner.planet;
         if (!homeWorld || !homeWorld.pathingNode) {
             throw new Error("Could not find home world for pathing back to home world (PIRATE)");
         }
@@ -293,6 +298,8 @@ export class Order {
             // return to home world
             this.returnToHomeWorld();
         } else if (this.stage === 3 && this.owner.pathFinding.points.length === 0) {
+            this.endSettlementMission();
+
             // end order
             this.owner.removeOrder(this);
         }
@@ -459,7 +466,7 @@ export class Order {
                 if (!colonyWorld || !colonyWorld.pathingNode) {
                     throw new Error("Could not find home world for pathing back to home world (MISSION AREA)");
                 }
-                const homeWorld = this.app.planets.find(planet => planet.id === this.faction.homeWorldPlanetId);
+                const homeWorld = this.owner.planet;
                 if (!homeWorld || !homeWorld.pathingNode) {
                     throw new Error("Could not find home world for pathing back to home world (MISSION AREA)");
                 }
