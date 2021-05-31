@@ -624,6 +624,25 @@ const setupPiracyTest = (numMinutes: number = 20) => {
     assertFactionData(faction);
   }
 
+  const dutchFaction = app.factions[EFaction.DUTCH];
+  if (!dutchFaction) {
+    throw new Error("Could not find Dutch Faction");
+  }
+  const dutchHomeWorld = app.planets.find(p => p.id === dutchFaction.homeWorldPlanetId);
+  if (!dutchHomeWorld) {
+    throw new Error("Could not find Dutch Home World");
+  }
+  // claim the entire dutch imperial kingdom
+  // so the dutch king will send pirates
+  for (const county of Array.from(dutchHomeWorld.getCountiesOfDomain())) {
+    const planet = county.planet;
+    if (planet && planet.settlementLevel === ESettlementLevel.UNTAMED) {
+      planet.settlementProgress = 5;
+      planet.settlementLevel = ESettlementLevel.COLONY;
+      planet.claim(dutchFaction);
+    }
+  }
+
   // give English faction a colony, so they can trade with it, and also be pirated
   const englishFaction = app.factions[EFaction.ENGLISH];
   if (!englishFaction) {

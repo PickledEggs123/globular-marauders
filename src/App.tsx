@@ -3655,11 +3655,17 @@ export class App extends React.Component<IAppProps, IAppState> {
                             <li>Construction and upgrade of buildings in capitals and colonies. -- DONE 5/15/2021</li>
                             <li>Fix Delaunay and Voronoi. -- DONE 5/26/2021</li>
                             <li>Add nested delaunay and nested voronoi. -- DONE 5/28/2021</li>
-                            <li>Add Imperial/Colonial empire design, the capital will upgrade certain locations into high level planets.</li>
-                            <li>Add Feudal tribute and Feudal offers to move ships to where they're needed.</li>
-                            <li>Add tax trading where planets will pay taxes to the capital.</li>
-                            <li>Pirate hunters.</li>
+                            <li>Add Imperial/Colonial empire design, the capital will upgrade certain locations into high level planets. -- DONE 5/31/2021</li>
+                            <li>Add Feudal tribute and Feudal offers to move ships to where they're needed. -- DONE 5/31/2021</li>
+                            <li>Add Feudal resource trading where planets will spoke and wheel resources back to the emperor.</li>
+                            <li>Add Feudal taxes where planets will pay taxes to the capital.</li>
+                            <li>Pirate hunters. Ships will report the position of pirates and the local ruler will send or request a ship to patrol the area.</li>
                             <li>Factions will plan invasions of enemy colonies and capitals.</li>
+                            <li>Create a flotilla of boats to attack an area.</li>
+                            <li>Sitting on a planet with no enemies for 30 seconds will capture it.</li>
+                            <li>3 minutes of no reinforcements will confirm the capture.</li>
+                            <li>10 or 15 minute battles to capture as many planets within a kingdom or duchy as possible.</li>
+                            <li>Compute new nobility after each battle.</li>
                             <li>Add multiplayer... (1 month)
                                 <ol>
                                     <li>Break game into client and server.</li>
