@@ -507,8 +507,8 @@ const setupFeudalismTest = (numMinutes: number = 20) => {
       }
     }
 
-    // add new claims
     for (const colonyWorld of colonyWorldTrades) {
+      // add new claims
       if (colonyWorld.claim.callCount === 1) {
         if (!latestClaims.includes(colonyWorld.planet)) {
           latestClaims.push(colonyWorld.planet);
@@ -516,10 +516,8 @@ const setupFeudalismTest = (numMinutes: number = 20) => {
       } else if (colonyWorld.claim.callCount > 1) {
         throw new Error("Too many claims on a single planet");
       }
-    }
 
-    // add new colonies
-    for (const colonyWorld of colonyWorldTrades) {
+      // add new colonies
       if (colonyWorld.planet.settlementLevel === ESettlementLevel.COLONY && dutchHomeWorld.isKingdomDomain(colonyWorld.planet)) {
         if (!newColonies.some(i => i.planet === colonyWorld.planet)) {
           newColonies.push({
@@ -529,6 +527,16 @@ const setupFeudalismTest = (numMinutes: number = 20) => {
           });
         }
       }
+
+      // assert counts have no ship demand
+      if (colonyWorld.planet.getRoyalRank() === ERoyalRank.COUNT) {
+        for (const shipType of Object.values(EShipType)) {
+          expect(colonyWorld.planet.shipsDemand[shipType]).toBe(0);
+        }
+      }
+
+      // assert planets have less than max ships
+      expect(colonyWorld.planet.shipIds.length).toBeLessThanOrEqual(Faction.MAX_SHIPS);
     }
 
     // end test
@@ -545,9 +553,21 @@ const setupFeudalismTest = (numMinutes: number = 20) => {
       successfullyReachedDestination = true;
       break;
     }
+
+    if (getOrder.callCount > 1000) {
+      throw new Error("Bug in get order, might be a tribute loop between king and vassal");
+    }
+
+    if (dutchFaction.shipIds.length >= Faction.MAX_SHIPS) {
+      throw new Error("MAX SHIPS, cannot create new ships, the test will never pass now");
+    }
   }
 
   // expect ship to complete it's mission.
+  expect(latestClaims.length >= 10).toBeTruthy();
+  expect(newColonies.length >= 8).toBeTruthy();
+  expect(newColonies.every(c => c.spawnShip.callCount > 0)).toBeTruthy();
+  expect(newColonies.every(c => c.getOrder.returnValues.some(v => v.orderType === EOrderType.TRIBUTE))).toBeTruthy();
   expect(successfullyReachedDestination).toBeTruthy();
 
   // expect the specific order of claims

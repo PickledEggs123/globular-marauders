@@ -3656,6 +3656,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                             <li>Fix Delaunay and Voronoi. -- DONE 5/26/2021</li>
                             <li>Add nested delaunay and nested voronoi. -- DONE 5/28/2021</li>
                             <li>Add Imperial/Colonial empire design, the capital will upgrade certain locations into high level planets.</li>
+                            <li>Add Feudal tribute and Feudal offers to move ships to where they're needed.</li>
                             <li>Add tax trading where planets will pay taxes to the capital.</li>
                             <li>Pirate hunters.</li>
                             <li>Factions will plan invasions of enemy colonies and capitals.</li>

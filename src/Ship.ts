@@ -390,6 +390,10 @@ export class Ship implements IAutomatedShip {
                 if (index >= 0) {
                     this.planet.explorationGraph[order.planetId].pirateShipIds.splice(index, 1);
                 }
+                const pirateSlotIndex = this.planet.pirateSlots.findIndex(s => s === order.owner.id);
+                if (pirateSlotIndex >= 0) {
+                    this.planet.pirateSlots.splice(pirateSlotIndex, 1);
+                }
             }
 
             // handle retreated orders by not sending another ship towards that area for a while

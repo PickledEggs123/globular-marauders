@@ -177,6 +177,8 @@ export class Faction {
      */
     private shipIdAutoIncrement: number = 0;
 
+    public static MAX_SHIPS: number = 100;
+
     public getShipAutoIncrement(): number {
         return this.shipIdAutoIncrement++;
     }

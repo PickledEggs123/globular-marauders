@@ -149,15 +149,6 @@ export class Order {
         homeWorld.trade(this.owner);
     }
 
-    public endSettlementMission() {
-        const homeWorld = this.owner.planet;
-        if (!homeWorld || !homeWorld.pathingNode) {
-            throw new Error("Could not find home world for pathing back to home world (SETTLE)");
-        }
-
-        homeWorld.trade(this.owner, true);
-    }
-
     public beginTradeMission() {
         const homeWorld = this.owner.planet;
         if (!homeWorld || !homeWorld.pathingNode) {
@@ -298,8 +289,6 @@ export class Order {
             // return to home world
             this.returnToHomeWorld();
         } else if (this.stage === 3 && this.owner.pathFinding.points.length === 0) {
-            this.endSettlementMission();
-
             // end order
             this.owner.removeOrder(this);
         }
