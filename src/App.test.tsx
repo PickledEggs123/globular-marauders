@@ -11,7 +11,7 @@ import {DelaunayGraph, PathFinder, VoronoiGraph} from "./Graph";
 import {CannonBall} from "./Item";
 import {ERoyalRank, Faction} from "./Faction";
 import {EBuildingType, Planet} from "./Planet";
-import {ESettlementLevel, IGoldAccount} from "./Interface";
+import {ESettlementLevel, IMoneyAccount} from "./Interface";
 
 /**
  * Get a test ship from the app.
@@ -494,7 +494,7 @@ const setupFeudalismTest = (numMinutes: number = 20) => {
   const latestClaims: Planet[] = [];
   const newColonies: Array<{
     planet: Planet,
-    spawnShip: sinon.SinonSpy<[account: IGoldAccount, shipType: EShipType, asFaction?: boolean], Ship>,
+    spawnShip: sinon.SinonSpy<[account: IMoneyAccount, shipType: EShipType, asFaction?: boolean], Ship>,
     getOrder: sinon.SinonSpy<[ship: Ship], Order>
   }> = [];
   for (let step = 0; step < numSteps; step++) {

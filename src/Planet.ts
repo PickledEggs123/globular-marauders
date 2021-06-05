@@ -1,11 +1,11 @@
-import {ESettlementLevel, ICameraState, IExplorationGraphData, IGoldAccount} from "./Interface";
+import {ESettlementLevel, ICameraState, ICurrency, IExplorationGraphData, MoneyAccount} from "./Interface";
 import Quaternion from "quaternion";
 import {DelaunayGraph, PathingNode, VoronoiGraph} from "./Graph";
 import {
     CAPITAL_GOODS,
     EResourceType,
     ICargoItem,
-    IItemRecipe,
+    IItemRecipe, ITEM_DATA,
     ITEM_RECIPES,
     NATURAL_RESOURCES,
     OUTPOST_GOODS
@@ -273,19 +273,18 @@ export class Shipyard extends Building {
     /**
      * Player bought a ship from the shipyard.
      */
-    public buyShip(account: IGoldAccount, shipType: EShipType, asFaction: boolean = false): Ship {
+    public buyShip(account: MoneyAccount, shipType: EShipType, asFaction: boolean = false): Ship {
         // check gold
         const shipPrice = this.quoteShip(shipType, asFaction);
-        if (account.gold < shipPrice) {
+        if (!account.hasEnough(shipPrice)) {
             throw new Error("Need more gold to buy this ship");
         }
 
         // perform gold transaction
-        account.gold -= shipPrice;
-        const goldToTaxes = Math.ceil(shipPrice * 0.5);
-        const goldProfit = shipPrice - goldToTaxes;
-        this.planet.taxes += goldToTaxes;
-        this.planet.gold += goldProfit;
+        if (!this.planet.moneyAccount) {
+            throw new Error("Shipyard building ships without money account");
+        }
+        PlanetaryMoneyAccount.MakePaymentWithTaxes(account, this.planet.moneyAccount, shipPrice, 0.5);
 
         // spawn the ship
         const doneDockIndex = this.docks.findIndex(d => d.isDone() && d.shipType === shipType);
@@ -302,10 +301,10 @@ export class Shipyard extends Building {
     /**
      * The price of the ship to buy.
      */
-    public quoteShip(shipType: EShipType, asFaction: boolean = false): number {
+    public quoteShip(shipType: EShipType, asFaction: boolean = false): ICurrency[] {
         // factions get free ships
         if (asFaction) {
-            return 0;
+            return [];
         }
 
         const shipData = SHIP_DATA.find(i => i.shipType === shipType);
@@ -316,7 +315,11 @@ export class Shipyard extends Building {
         const priceCeiling = Math.ceil(shipData.cost * 3);
         const priceFloor = 0;
         const price = Math.ceil(shipData.cost * (3 / (this.shipsAvailable[shipData.shipType] / this.getNumberOfDocksAtUpgradeLevel() * 10)));
-        return Math.max(priceFloor, Math.min(price, priceCeiling));
+        const goldAmount = Math.max(priceFloor, Math.min(price, priceCeiling));
+        return [{
+            currencyId: "GOLD",
+            amount: goldAmount
+        }];
     }
 }
 
@@ -515,6 +518,547 @@ export class Star implements ICameraState {
     }
 }
 
+/**
+ * The currency system of a planetary economy. Each instance oc planetary economy will link to this which contains
+ * the global amount of currency. Increasing currency will allow for short term purchase of goods or as payment of
+ * captains after winning a battle. But too much currency will cause prices to double and triple.
+ */
+export class PlanetaryCurrencySystem {
+    /**
+     * The name of the currency. Each kingdom will contain it's own paper money, only redeemable in that kingdom. There
+     * could be off shore markets which will convert foreign money to local money for a loss. Gold is special in that
+     * it can be minted only if Gold ore is discovered. Paper money can be minted at any moment and in any amount.
+     */
+    public name: string;
+    /**
+     * The global amount of a currency.
+     */
+    public globalAmount: number = 0;
+
+    /**
+     * Create a currency system.
+     * @param name The name of the currency.
+     */
+    constructor(name: string) {
+        this.name = name;
+    }
+
+    /**
+     * Add more currency to the system. Should be called before giving money to a captain who helped in a battle. Planets
+     * need to determine the correct amount of reward.
+     * @param amount
+     */
+    public addCurrency(amount: number) {
+        this.globalAmount += amount;
+    }
+
+    /**
+     * Remove currency from the system. Should be called after collecting taxes. Planets need to determine the correct
+     * amount of taxes.
+     * @param amount
+     */
+    public removeCurrency(amount: number) {
+        this.globalAmount -= amount;
+    }
+}
+
+/**
+ * A class which stores how many goods are in the economy of a planet, duchy, kingdom, or empire.
+ */
+export class PlanetaryEconomySystem {
+    /**
+     * The resources of an economy.
+     */
+    resources: Array<IResourceExported> = [];
+    /**
+     * The sum of resource unit value.
+     */
+    resourceUnitSum: number = 0;
+    /**
+     * The planets of an economy.
+     */
+    planets: Planet[] = [];
+
+    /**
+     * Add a resource to the economy.
+     */
+    addResource(resource: IResourceExported) {
+        this.resources.push(resource);
+        this.resourceUnitSum += resource.amount;
+    }
+
+    /**
+     * Remove all resources from the economy.
+     */
+    clearResources() {
+        this.resources.splice(0, this.resources.length);
+        this.resourceUnitSum = 0;
+    }
+
+    /**
+     * Add a planet to the economy.
+     * @param planet
+     */
+    addPlanet(planet: Planet) {
+        this.planets.push(planet);
+    }
+
+    /**
+     * Remove a planet from the economy.
+     * @param planet The planet to remove.
+     */
+    removePlanet(planet: Planet) {
+        const index = this.planets.findIndex(p => p === planet);
+        if (index >= 0) {
+            this.planets.splice(index, 1);
+        }
+    }
+
+    /**
+     * Get the unit value of a planet.
+     * @param planet
+     */
+    getPlanetUnitValue(planet: Planet): number {
+        return PlanetaryMoneyAccount.BASE_VALUE_PER_PLANET +
+            planet.buildings.reduce((acc, building) => {
+                return acc + building.buildingLevel * PlanetaryMoneyAccount.VALUE_MULTIPLE_PER_BUILDING_LEVEL;
+            }, 0);
+    }
+
+    /**
+     * Get the number of planet units in an economy.
+     */
+    getPlanetUnitValueSum(): number {
+        return this.planets.reduce((acc, planet) => {
+            return acc + this.getPlanetUnitValue(planet);
+        }, 0);
+    }
+
+    /**
+     * Determine the supply of a resource.
+     * @param resourceType
+     */
+    getResourceTypeValueSum(resourceType: EResourceType): number {
+        const v = this.resources.reduce((acc, r) => r.resourceType === resourceType ? acc + r.amount : acc, 0);
+        return 0.2 + v * 0.2;
+    }
+
+    /**
+     * Determine the supply of all resources.
+     */
+    getResourceTypesValueSum(): number {
+        let sum = 0;
+        for (const resourceType of Object.values(EResourceType)) {
+            sum += this.getResourceTypeValueSum(resourceType);
+        }
+        return sum;
+    }
+
+    /**
+     * Get the sum of the economy.
+     */
+    getEconomyValueSum(): number {
+        return this.getPlanetUnitValueSum() + this.getResourceTypesValueSum();
+    }
+}
+
+/**
+ * A class which simulates the economy of an island.
+ */
+export class PlanetaryMoneyAccount {
+    /**
+     * The currency of the planetary economy account. Each kingdom has it's own paper money. All kingdoms will respect
+     * gold. Pirates which rob a ship with only paper money will either convert paper money or spend paper money in the
+     * same place it committed the robbery at. Might be a fun mechanic, trying to pirate a ship, and sink it before being
+     * reported, to then spend the money or find someone to convert the money.
+     */
+    public currencySystem: PlanetaryCurrencySystem;
+    /**
+     * The economy system for the planetary economy account. Store the sum of resources for each item in the kingdom.
+     */
+    public economySystem: PlanetaryEconomySystem;
+
+    /**
+     * The amount of gold coins ready to spend. Only used by gold.
+     */
+    public cash: MoneyAccount = new MoneyAccount();
+    /**
+     * The amount of gold coins reserved for taxes, back to the duke, king, or emperor. Only used by gold.
+     */
+    public taxes: MoneyAccount = new MoneyAccount();
+    /**
+     * The amount of gold coins held for reserve by the planetary government. Only used by gold.
+     */
+    public reserve: MoneyAccount = new MoneyAccount();
+    /**
+     * The amount of gold coins held by citizens after they are paid for their work.
+     */
+    public citizenCash: MoneyAccount = new MoneyAccount();
+
+    /**
+     * The multiple per crate.
+     */
+    public static VALUE_MULTIPLE_PER_CRATE: number = 100;
+    /**
+     * The multiple per level of building on planet.
+     */
+    public static VALUE_MULTIPLE_PER_BUILDING_LEVEL: number = 1000;
+    /**
+     * The multiple per planet empty planet.
+     */
+    public static BASE_VALUE_PER_PLANET: number = 1000;
+
+    /**
+     * Create a new planetary economy account;
+     * @param currencySystem The currency of the money account.
+     * @param economySystem The economy of the money account.
+     */
+    constructor(currencySystem: PlanetaryCurrencySystem, economySystem: PlanetaryEconomySystem) {
+        this.currencySystem = currencySystem;
+        this.economySystem = economySystem;
+    }
+
+    /**
+     * Economy update
+     * ===
+     * Below is a list of a requirements of the feudal economy of the game, "Globular Marauders". The goals of the
+     * economy is to have inflationary effects and a mercantile mindset for fun. By keeping track of various data
+     * about the currency, prices will go up and down randomly to simulate a working economy. Losing wars will result
+     * in high prices or high taxes, stupidly printing money will result in higher taxes, Running out of gold will
+     * hurt the empire.
+     *
+     * Properties of the ideal video game economy
+     * ---
+     * Gold is neither created or destroyed, only transferred, unless there's a gold mine.
+     * Cash is neither created or destroyed in sales, unless it's grants from a victorious invasion or taxes.
+     *
+     * Kingdoms will try to pay players to colonize, pirate and invade.
+     * - [ ] Kingdoms will create budget and tax plans
+     * - [ ] Possible future, players can argue over tax plans in between battles
+     * - [ ] Player republics might be fun
+     * Kingdoms will try to pay AIs to colonize and trade.
+     * Kingdoms will create schemes for world conquest by moving gold around.
+     * Players will collect gold and cash for larger ships, royal titles, and a score board retirement.
+     * Merchants will collect gold and cash for a citizens cash retirement on a planet.
+     * Citizens will collect gold and cash for a making and buying things.
+     *
+     * Kingdom -> Player
+     * ===
+     * Players will capture planets will get rewarded with a grant, no taxes.
+     * ---
+     * Why? When expanding the empire, the
+     * new subjects will need their own copy of the imperial currency, so new currency must be created or issued,
+     * who better to issue newly minted imperial money to then the players which captured or colonized planets.
+     * Loosing land will result in inflation.
+     * - [X] Compute planet reward to determining surplus or deficit of currency
+     * - [ ] Compute tax plan for planet deficits
+     *   - Added taxes based on percentage for ships sold
+     *
+     * Players will pirate or trade cargo with taxable money.
+     *  ---
+     * This money will be included as part of the tax target in the future. Too much untaxed cargo will result
+     * in inflation.
+     * - [X] Compute resource reward to determine payment for cargo.
+     * - [ ] Compute tax plan for cargo
+     *
+     * Savings goal
+     * ---
+     * Kingdoms are trying to keep as much money in reserve to pay merchants, pirates, and captains to do the empire
+     * building. Kingdoms will determine an amount of gold to circulate and try to keep the rest in reserve. Kingdoms
+     * will also institute tariff measures if their reserve gold is low.
+     * - [ ] Create tariffs
+     *
+     * Kingdoms will issue cash (paper currency) and collect taxes, to destroy old cash. Their goal is to keep the
+     * amount of circulation balanced to avoid inflation. A great way to cause inflation is to lose land, which results
+     * in higher prices or higher taxes.
+     * - [X] Create paper cash system
+     *
+     * Gold is based on the global conquest base line, what percentage of the world does the empire own, then distribute
+     * that amount of gold.
+     * - [X] Create gold system
+     *
+     * Cash is based on the price target base line, If prices are too low, distribute more money, if prices are too
+     * high, try raising taxes (strange). For example:
+     * 1. Kingdom captured a duchy (3 planets), 9 planets (kingdom) is now 12, need to expand currency by 12 / 9 to
+     * keep the same constant price, or "give imperial money to new empire so they can use imperial money instead
+     * of their original money".
+     * 2. Kingdom lost a duchy (3 planets), 9 planets (kingdom) is now 6, need to tax away 3 / 9 of the money to
+     * keep the same constant price, or "live with the high prices of a failed state". High prices will cause shortages
+     * because players who could afford large ships now have to hold smaller ships, and pay the difference in taxes
+     * until the economy returns to normal price level, or pay everyone more money but for less things. (weird).
+     * 3. Gold on captured planets will transferred to their new owners so very little monetary balancing has to be
+     * done.
+     * 4. Losing land is very bad.
+     *
+     * Barter is part of feudal/colonial obligations, no money involved.
+     * - [ ] Create feudal obligation system
+     *
+     * Player -> Kingdom
+     * ===
+     * Players will buy repairs and ships from planets. Might also buy a title to a planet. Might help upgrade something
+     * on the planet.
+     *
+     * Repairs are offered by planets which send taxes to the local ruler and the empire.
+     * - [ ] Create repairs and modifications
+     * Ships are offered by planets which send taxes to the local ruler and the empire.
+     * - [ ] Create better ship prices, which are part tax plan, maybe K/D ratio can be used for tax bracket.
+     * Titles are player own-able objects which can be purchased or given as a gift.
+     * - Players which capture planets are given ownership
+     * - [ ] Players can own planet and manage planet governance directives
+     * - Players which colonize planets are given ownership
+     * - When they leave the game, ownership is transferred to the empire
+     * - [ ] Players which leave will transfer ownership to second in command
+     *   - [ ] If they return before 30 minutes, they get ownership again
+     *   - [ ] If they wait more than 30 minutes, second in command becomes official
+     *   - [ ] If they're no players in succession, the empire receives ownership
+     *   - [ ] The empire can gift or sell titles back to players
+     * - Players can sell ownership to other players
+     *   - [ ] Players can sell titles to other players or back to the empire
+     *
+     * Savings goal
+     * ---
+     * Players are saving money to own larger ships and collect titles. The highest title a player may own is king.
+     * Maybe one day, players might be emperors which divide out gold.
+     *
+     * Kingdom -> Trader -> Kingdom
+     * ===
+     * Traders will use gold, cash, or barter to trade goods between planets.
+     *
+     * Gold
+     * ---
+     * Gold requires reserve, difficult to not run out of gold on one side. Need to keep trade balance. Running out of
+     * gold will prevent people from buying. Traders traveling between kingdoms might use gold. One goal of the game
+     * is to take all of the gold from a kingdom.
+     *
+     * Gold requires a trade plan to keep the trade balance unless the kingdom requires a resource it does not have,
+     * then it will trade at a trade imbalance. Running out of gold will result in bad effects. No more mercenaries.
+     * - [ ] Add gold traders which trade between empires, since gold is a universal transfer of value.
+     *
+     * Cash
+     * ---
+     * Cash can be generated as needed, but not enough product sold from Kingdom to Trader will result in too much cash.
+     * People will buy too much, resulting in a shortage or increase prices.
+     *
+     * Cash does not require a trade plan to keep trade balance, When someone sells something to the economy, they
+     * receive a cash payment which can be used to buy something from the other planet.
+     * - [ ] Add cash traders which trade between gold less colonies, since colonies might share the same cash.
+     * - [ ] Add international cash traders which perform cash conversions at a 50% profit.
+     *   - Take 1000 cash and give 500 other cash,
+     *     go to other kingdom,
+     *     buy specific good,
+     *     go back home,
+     *     sell good for 1000 cash.
+     *     - Useful for pirates who don't want to trade in foreign currency.
+     *     - Maybe the gold traders are traveling between Kingdom capitals and empires
+     *     - Maybe the cash traders are traveling within the kingdom.
+     *     - More likely to run into a cash trader
+     *       - Cargo sold for cash or gold
+     *       - Cash sold for other cash or gold
+     *       - Pirates spend cash and gold on rum to rank in the pirate leader boards
+     *
+     * Barter
+     * ---
+     * Barter trading resources without money, might be imbalanced towards one side, like a colonial system.
+     *
+     * Used for imperial tribute, trading without money with the advantage towards the empire.
+     * - [-] Partially working, need to finish imperial tribute.
+     *   - [ ] Add feudal obligation ratio
+     *
+     * Royal Merchants
+     * ---
+     * Royal merchants are ships owned by the crown, which trade resources for profit for the crown. All profits
+     * will go to the crown. Usually, the Royal merchants are limited to the imperial realm.
+     * - [-] Partially working, Royal merchants should collect tribute and perform royal commerce.
+     *   - [ ] Perform royal commerce.
+     *
+     * Independent Merchants
+     * ---
+     * Players or merchant ships of players which trade resources for profit, Independent merchants can trade across
+     * imperial borders.
+     * This will mean ships will not attack independent merchants unless the independent merchant damages them.
+     * Independent merchants might cause gold deficits.
+     * - [ ] Independent merchants
+     * - [ ] Independent merchant fleets owned by players
+     * - [ ] Merchants which escape from pirates should report piracy
+     * - [ ] Pirates can disguise as independent merchants until their close enough to attack.
+     * - [ ] Perform independent commerce.
+     *
+     * Savings goal
+     * ---
+     * Merchants want to collect money for retirement. When a merchant has enough money, they will sell their ship
+     * and take all the cash they collected and put it into the citizens account.
+     *  - [ ] Create merchant retirement once merchant reaches a specific amount of profit.
+     *
+     * Kingdom -> Citizens -> Kingdom
+     * ===
+     * Citizens are the local workers which produce goods and buy goods. Having more citizens will increase demand
+     * and consumption.
+     * Citizens also buy goods which increases the demand for traders, which increases the demand for pirates.
+     *
+     * Paying Citizens
+     * ---
+     * You pay citizens to work. With money, citizens will work. Gold not necessary, cash payments is good enough.
+     * - [ ] Money goes into citizens bank account for their work
+     *
+     * Citizens with money will accumulate a set of desires for products, citizens will always have food, but the
+     * desire is for luxuries such as coffee, tea, furs, rum. This means each planet should have a desire counter
+     * which ticks up in time and once a desire has been satisfied, it resets. The money paid for a desire is
+     * the Dirichlet of desire multiplied by the total citizen money. Dirichlet is a list of probabilities between
+     * 0 and 1 summing to 1. [0.2, 0.2, 0.2, 0.2, 0.2] is a Dirichlet distribution. Traders will queue the best
+     * to worse probabilities.
+     * - [ ] Implement citizen desire class which keeps track of desire/demand
+     * - [ ] Merchants will pick the largest desire and trade, largest desire will provide the most profit.
+     *
+     * Selling Goods
+     * ---
+     * Citizens will use the money they accumulated to buy cargo, sold by traders. Citizens will demand a diverse
+     * set of goods. Traders will collect the most desired good in the order of desire.
+     *
+     * Citizens will get paid for 1/2, 1/3, 1/4, 1/5 the value of the final product. This money will go into the
+     * citizens bank account. Payment happens once a trade happens.
+     *
+     * This means merchants must know the amount of resources to buy, to pay the kingdom, to pay the citizens, so the
+     * kingdom can give the goods to the merchant, which will return to their original port, to sell the good, to
+     * collect payment and profit.
+     *
+     * Savings goal
+     * ---
+     * Citizens want to work to collect money to spend it on luxuries.
+     * Kingdom cash -> Citizens cash -> Kingdom cash / Merchant profit -> Citizens cash / Merchant Retirement.
+     * Feels like kingdoms might run out of money somehow.
+     * - [ ] Poor planets will offer merchants a good retirement to attract large lump sums of money. Last ditch
+     *       attempt at balancing the economy of an empire. Imagine the poor planet offering more land acres than
+     *       a rich planet, some people might prefer more land then expensive city accommodations.
+     *
+     * Feudal and Market ratio
+     * ===
+     * Feudal lords can set a ratio between 1/2, 1/3, 1/4, 1/5 of feudal obligations of their vassals, which must send
+     * raw goods to the feudal lord. Count -> Duke -> King -> Emperor.
+     *
+     * At a 1 / 3rd feudal obligation.
+     * Counts get 1 resource,  keep 2 / 3 of resources, 0.66.
+     * Duke get (3 / 3) + 2 * (1 / 3) = 5 / 3 of resources, keep 10 / 9 of resources, 1.11.
+     * King get (3 / 3) + 2 * (1 / 3) + 2 * (5 / 9) = 25 / 9 of resources, keep 50 / 27 of resources, 1.85.
+     * Emperor get (3 / 3) + 2 * (1 / 3) + 2 * (5 / 9) + 2 * (25 / 27) = 125 / 27 of resources, 4.63.
+     * - [ ] Add feudal obligations
+     *
+     * Royal Merchants
+     * ---
+     * Resources acquired through feudal obligation can be used to collect money from citizens across the empire as
+     * a second form of tax.
+     */
+
+    /**
+     * --------------------------------------------------------------------------------------------------------------
+     * The following section is dedicated to rewarding players for capturing cargo and planets. This is money
+     * moving from kingdom to players. Need to compute taxes which is money from players to kingdoms.
+     * --------------------------------------------------------------------------------------------------------------
+     */
+    /**
+     * The intrinsic value of a resource.
+     * @param resourceType The resource type to check.
+     */
+    public computeValueForResourceType(resourceType: EResourceType): number {
+        const itemData = ITEM_DATA.find(i => i.resourceType === resourceType);
+        if (!itemData) {
+            throw new Error("Could not find Resource Type");
+        }
+        return itemData.basePrice;
+    }
+
+    /**
+     * The prices of the game is based on monetary theory which accounts for inflation and deflation.
+     * The formula is M * V = P * Q (money * velocity multiplier = price * quantity). A new price
+     * can be computed based on (price = money * velocity multiplier / quantity). Attacking supply will lower the denominator
+     * which will cause price to increase. Issuing more money via quests and not enough taxes will also cause money to
+     * increase which will increase the price. To decrease price, more taxes or more supply is needed. In theory, areas
+     * with more supply (lower prices) will transfer goods to areas with less supply (higher prices). Medieval embargoes,
+     * medieval hoarding, and medieval price gouging might be an amusing mechanic.
+     *
+     * Note: DO NOT FORGET THAT LUXURY BUFFS CAN BE PERCENTAGES OF THE PRICE. REPLENISHING 90% of 100 is 90 gold.
+     */
+    public computePriceForResourceType(resourceType: EResourceType) {
+        return Math.ceil(
+            (
+                this.currencySystem.globalAmount *
+                this.computeValueForResourceType(resourceType) *
+                PlanetaryMoneyAccount.VALUE_MULTIPLE_PER_CRATE
+            ) / (
+                this.economySystem.getEconomyValueSum()
+            )
+        );
+    }
+
+    /**
+     * Determine price for a planet.
+     * @param planet
+     */
+    public computePriceForPlanet(planet: Planet) {
+        return Math.ceil(
+            (
+                this.currencySystem.globalAmount *
+                this.economySystem.getPlanetUnitValue(planet)
+            ) / (
+                this.economySystem.getEconomyValueSum()
+            )
+        );
+    }
+
+    /**
+     * Determine the reward amount for a set of captured planets. Useful for invasion forces. Kingdoms will reward
+     * captains using this formula.
+     */
+    public determineRewardAmountFromPlanets(planets: Planet[]) {
+        let sum = 0;
+        for (const planet of planets) {
+            sum += this.computePriceForPlanet(planet);
+        }
+        return Math.ceil(sum);
+    }
+
+    /**
+     * Determine the reward amount for a set of captured cargo. Useful for pirates. Kingdoms will reward pirates
+     * using this formula.
+     * @param resources
+     */
+    public determineRewardAmountFromResources(resources: ICargoItem[]) {
+        let sum = 0;
+        for (const resource of resources) {
+            sum += this.computePriceForResourceType(resource.resourceType) * resource.amount;
+        }
+        return Math.ceil(sum);
+    }
+
+    /**
+     * --------------------------------------
+     * The following section is for payments
+     * --------------------------------------
+     */
+
+    /**
+     * Pay for something on a planet with taxes.
+     * @param account The money account to transfer from.
+     * @param other The other money account to use.
+     * @param payment The payment to make.
+     * @param taxes The percent tax between 0 and 1.
+     */
+    public static MakePaymentWithTaxes(account: MoneyAccount, other: PlanetaryMoneyAccount, payment: ICurrency[], taxes: number = 0) {
+        const taxesPayment = payment.map(p => ({currencyId: p.currencyId, amount: Math.ceil(p.amount * taxes)}));
+        const profitPayment = payment.reduce((acc, p) => {
+            const taxes = taxesPayment.find(t => t.currencyId === p.currencyId);
+            if (taxes && p.amount > taxes.amount) {
+                acc.push({
+                    currencyId: p.currencyId,
+                    amount: p.amount - taxes.amount
+                });
+            }
+            return acc;
+        }, [] as ICurrency[]);
+        account.makePayment(other.taxes, taxesPayment);
+        account.makePayment(other.cash, profitPayment);
+    }
+}
+
 export class Planet implements ICameraState {
     public instance: App;
     public id: string = "";
@@ -553,10 +1097,12 @@ export class Planet implements ICameraState {
     public cannons: number = 0;
     // the number of cannonades for building ships
     public cannonades: number = 0;
-    // the amount of gold to spend
-    public gold: number = 0;
-    // the amount of taxes to send back to the capital
-    public taxes: number = 0;
+    // economy of the planet
+    public economySystem: PlanetaryEconomySystem | null = null;
+    // currency of the planet
+    public currencySystem: PlanetaryCurrencySystem | null = null;
+    // money account keeping track of money
+    public moneyAccount: PlanetaryMoneyAccount | null = null;
     // a building which builds ships
     public shipyard: Shipyard;
     // a building which chops down trees for wood
@@ -1279,15 +1825,15 @@ export class Planet implements ICameraState {
      * @param planetId The source world of the goods.
      * @param amount The amount multiplier of the resource.
      */
-    public applyLuxuryBuff(account: IGoldAccount, resourceType: EResourceType, planetId: string, amount: number) {
+    public applyLuxuryBuff(account: MoneyAccount, resourceType: EResourceType, planetId: string, amount: number) {
         const oldLuxuryBuff = this.luxuryBuffs.find(l => l.matches(resourceType, planetId));
         if (oldLuxuryBuff) {
-            const percentReplenished = oldLuxuryBuff.replenish();
-            oldLuxuryBuff.amount = amount;
-            const goldProfit = Math.floor(oldLuxuryBuff.goldValue() * percentReplenished);
-            const goldBonus = Math.floor(goldProfit * 0.2);
-            this.gold -= goldBonus;
-            account.gold += goldBonus;
+            // const percentReplenished = oldLuxuryBuff.replenish();
+            // oldLuxuryBuff.amount = amount;
+            // const goldProfit = Math.floor(oldLuxuryBuff.goldValue() * percentReplenished);
+            // const goldBonus = Math.floor(goldProfit * 0.2);
+            // this.gold -= goldBonus;
+            // account.gold += goldBonus;
         } else if (this.county.faction) {
             this.luxuryBuffs.push(new LuxuryBuff(this.instance, this.county.faction, this, resourceType, planetId, amount));
         }
@@ -1383,12 +1929,14 @@ export class Planet implements ICameraState {
         );
     }
 
-    public setAsStartingCapital() {
+    public setAsStartingCapital(faction: Faction) {
         this.size = 10;
         this.settlementProgress = 1;
         this.settlementLevel = ESettlementLevel.CAPITAL;
         this.naturalResources = [...CAPITAL_GOODS];
-        this.gold = 100000;
+        this.economySystem = new PlanetaryEconomySystem();
+        this.currencySystem = new PlanetaryCurrencySystem(`${faction.id} Bucks`);
+        this.moneyAccount = new PlanetaryMoneyAccount(this.currencySystem, this.economySystem);
     }
 
     // rebuild the resources array based on events such as less or more items
@@ -1510,9 +2058,10 @@ export class Planet implements ICameraState {
             this.county.faction &&
             this.getNumShipsAvailable(nextShipTypeToBuild) > 2 &&
             this.county.faction.shipIds.length < Faction.MAX_SHIPS &&
-            this.gold >= this.shipyard.quoteShip(nextShipTypeToBuild, true)
+            this.moneyAccount &&
+            this.moneyAccount.cash.hasEnough(this.shipyard.quoteShip(nextShipTypeToBuild, true))
         ) {
-            this.spawnShip(this, nextShipTypeToBuild, true);
+            this.spawnShip(this.moneyAccount.cash, nextShipTypeToBuild, true);
         }
 
         // handle the luxury buffs from trading
@@ -1679,8 +2228,8 @@ export class Planet implements ICameraState {
         // trade with the ship
         for (const goodToTake of goodsToTake) {
             const boughtGood = ship.buyGoodFromShip(goodToTake);
-            if (boughtGood) {
-                this.applyLuxuryBuff(this.instance, goodToTake, boughtGood.sourcePlanetId, boughtGood.amount);
+            if (boughtGood && this.moneyAccount) {
+                this.applyLuxuryBuff(this.moneyAccount.cash, goodToTake, boughtGood.sourcePlanetId, boughtGood.amount);
             }
         }
         for (let i = 0; i < goodsToOffer.length; i++) {
@@ -1693,7 +2242,7 @@ export class Planet implements ICameraState {
     /**
      * Create a new ship.
      */
-    public spawnShip(account: IGoldAccount, shipType: EShipType, asFaction: boolean = false): Ship {
+    public spawnShip(account: MoneyAccount, shipType: EShipType, asFaction: boolean = false): Ship {
         // check ship availability
         if (this.shipyard.shipsAvailable[shipType] === 0) {
             throw new Error("No ships available");

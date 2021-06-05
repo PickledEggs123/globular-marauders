@@ -11,7 +11,7 @@ import {
     IDrawable,
     IExpirable,
     IExpirableTicks,
-    MIN_DISTANCE
+    MIN_DISTANCE, MoneyAccount
 } from "./Interface";
 import {EFaction, EShipType, PHYSICS_SCALE, Ship, SHIP_DATA} from "./Ship";
 import {EOrderType, Order} from "./Order";
@@ -397,7 +397,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     public smokeClouds: SmokeCloud[] = [];
     public cannonBalls: CannonBall[] = [];
     public luxuryBuffs: LuxuryBuff[] = [];
-    public gold: number = 20000;
+    public money: MoneyAccount = new MoneyAccount(20000);
     public worldScale: number = 3;
     public music: MusicPlayer = new MusicPlayer();
     public demoAttackingShipId: string | null = null;
@@ -2460,7 +2460,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 this.factions[factionData.id] = faction;
                 const planet = this.planets.find(p => p.id === planetId);
                 if (planet) {
-                    planet.setAsStartingCapital();
+                    planet.setAsStartingCapital(faction);
                     planet.claim(faction);
                 }
                 if (planet && !this.props.isTestMode) {
@@ -2738,7 +2738,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             return (
                 <g key="faction-status" transform={`translate(${this.state.width - 80},${this.state.height - 80})`}>
                     <text x="0" y="30" fontSize={8} color="black">Faction: {faction.id}</text>
-                    <text x="0" y="45" fontSize={8} color="black">Gold: {planet ? planet.gold : "N/A"}</text>
+                    <text x="0" y="45" fontSize={8} color="black">Gold: {planet && planet.moneyAccount ? planet.moneyAccount.cash.getGold() : "N/A"}</text>
                     <text x="0" y="60" fontSize={8} color="black">Planet{faction.planetIds.length > 1 ? "s" : ""}: {faction.planetIds.length}</text>
                     <text x="0" y="75" fontSize={8} color="black">Ship{faction.shipIds.length > 1 ? "s" : ""}: {faction.shipIds.length}</text>
                 </g>
@@ -2752,7 +2752,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         if (this.playerShip) {
             return (
                 <g key="player-status" transform={`translate(0,${this.state.height - 80})`}>
-                    <text x="0" y="45" fontSize={8} color="black">Gold: {this.gold}</text>
+                    <text x="0" y="45" fontSize={8} color="black">Gold: {this.money.getGold()}</text>
                 </g>
             );
         } else {
@@ -2833,8 +2833,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                 showSpawnMenu: false
             });
             const planet = this.planets.find(p => p.id === planetId);
-            if (planet && this.gold >= planet.shipyard.quoteShip(shipType)) {
-                this.playerShip = planet.shipyard.buyShip(this, shipType);
+            if (planet && this.money.hasEnough(planet.shipyard.quoteShip(shipType))) {
+                this.playerShip = planet.shipyard.buyShip(this.money, shipType);
             } else {
                 this.returnToMainMenu();
             }

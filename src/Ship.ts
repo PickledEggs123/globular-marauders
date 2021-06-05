@@ -1,4 +1,4 @@
-import {IAutomatedShip, ICameraState} from "./Interface";
+import {IAutomatedShip, ICameraState, MoneyAccount} from "./Interface";
 import Quaternion from "quaternion";
 import {EResourceType, ICargoItem} from "./Resource";
 import App from "./App";
@@ -237,6 +237,7 @@ export class Ship implements IAutomatedShip {
     public burnTicks: number[] = new Array(App.NUM_BURN_TICKS).fill(0);
     public repairTicks: number[] = new Array(App.NUM_REPAIR_TICKS).fill(0);
     public healthTickCoolDown = App.HEALTH_TICK_COOL_DOWN;
+    public moneyAccount: MoneyAccount = new MoneyAccount();
 
     constructor(app: App, shipType: EShipType) {
         this.app = app;
