@@ -5,20 +5,22 @@ import {
     CAPITAL_GOODS,
     EResourceType,
     ICargoItem,
-    IItemRecipe, ITEM_DATA,
+    IItemRecipe,
+    ITEM_DATA,
     ITEM_RECIPES,
     NATURAL_RESOURCES,
     OUTPOST_GOODS
 } from "./Resource";
 import {EShipType, Ship, SHIP_DATA} from "./Ship";
 import App from "./App";
-import {VoronoiCounty} from "./VoronoiTree";
+import {FeudalGovernment, VoronoiCounty} from "./VoronoiTree";
 import {ERoyalRank, Faction, LuxuryBuff} from "./Faction";
 import {EOrderType, Order} from "./Order";
 
 export interface IResourceExported {
     resourceType: EResourceType;
     amount: number;
+    feudalObligation: boolean;
 }
 
 export interface IResourceProduced extends IItemRecipe {
@@ -372,7 +374,8 @@ export class Plantation extends Building {
             // add new resources array
             this.planet.producedResources.push({
                 resourceType: this.resourceType,
-                amount: this.buildingLevel
+                amount: this.buildingLevel,
+                feudalObligation: false,
             });
         }
     }
@@ -395,7 +398,7 @@ export class Manufactory extends Building {
         // check for available room to upgrade
         const hasRoomToUpgradeManufacturing = this.recipe.ingredients.every(ingredient => {
             let amount = 0;
-            for (const resource of this.planet.resources) {
+            for (const resource of this.planet.marketResources) {
                 if (resource.resourceType === ingredient.resourceType) {
                     amount += resource.amount;
                 }
@@ -791,7 +794,7 @@ export class PlanetaryMoneyAccount {
      * 4. Losing land is very bad.
      *
      * Barter is part of feudal/colonial obligations, no money involved.
-     * - [ ] Create feudal obligation system
+     * - [X] Create feudal obligation system
      *
      * Player -> Kingdom
      * ===
@@ -861,8 +864,8 @@ export class PlanetaryMoneyAccount {
      * Barter trading resources without money, might be imbalanced towards one side, like a colonial system.
      *
      * Used for imperial tribute, trading without money with the advantage towards the empire.
-     * - [-] Partially working, need to finish imperial tribute.
-     *   - [ ] Add feudal obligation ratio
+     * - [X] Partially working, need to finish imperial tribute.
+     *   - [X] Add feudal obligation ratio
      *
      * Royal Merchants
      * ---
@@ -940,7 +943,7 @@ export class PlanetaryMoneyAccount {
      * Duke get (3 / 3) + 2 * (1 / 3) = 5 / 3 of resources, keep 10 / 9 of resources, 1.11.
      * King get (3 / 3) + 2 * (1 / 3) + 2 * (5 / 9) = 25 / 9 of resources, keep 50 / 27 of resources, 1.85.
      * Emperor get (3 / 3) + 2 * (1 / 3) + 2 * (5 / 9) + 2 * (25 / 27) = 125 / 27 of resources, 4.63.
-     * - [ ] Add feudal obligations
+     * - [X] Add feudal obligations
      *
      * Royal Merchants
      * ---
@@ -1061,6 +1064,8 @@ export class PlanetaryMoneyAccount {
 
 export class Planet implements ICameraState {
     public instance: App;
+
+    // planet properties
     public id: string = "";
     public position: Quaternion = Quaternion.ONE;
     public positionVelocity: Quaternion = Quaternion.ONE;
@@ -1068,19 +1073,36 @@ export class Planet implements ICameraState {
     public orientationVelocity: Quaternion = Quaternion.ONE;
     public color: string = "blue";
     public size: number = 3;
+
+    // population properties
     public settlementProgress: number = 0;
     public settlementLevel: ESettlementLevel = ESettlementLevel.UNTAMED;
+
+    // ai pathing
     public pathingNode: PathingNode<DelaunayGraph<Planet>> | null = null;
+
+    // feudal hierarchy
     public county: VoronoiCounty;
+
+    // resource properties
     // the resources the island can produce
     public naturalResources: EResourceType[];
     // the resources the island produces from its plantations
     public producedResources: IResourceExported[] = [];
     // the resources the island imports from trading
     public importedResources: ICargoItem[] = [];
+    // the resources the island manufactures, it removes raw material and adds refined product
     public manufacturedResources: IResourceProduced[] = [];
-    // resources which are exported from the island
+    // the resources which are exported from the island, not the final output
     public resources: Array<IResourceExported> = [];
+    // the resources which are reserved for market use, paid in gold or cash
+    public marketResources: Array<IResourceExported> = [];
+    // the resources which are reserved for the feudal lord, free of charge
+    public feudalObligationResources: Array<IResourceExported> = [];
+    // used to cycle through exports for feudal obligation resources since those are free of charge
+    private feudalObligationResourceCycle: number = 0;
+
+    // construction and ship building properties
     // the amount of wood available to build ships
     public wood: number = 0;
     // the amount of wood available to build buildings
@@ -1097,12 +1119,18 @@ export class Planet implements ICameraState {
     public cannons: number = 0;
     // the number of cannonades for building ships
     public cannonades: number = 0;
+
+    // government and economy properties
+    // the feudal government of the planet
+    public feudalGovernment: FeudalGovernment | null = null;
     // economy of the planet
     public economySystem: PlanetaryEconomySystem | null = null;
     // currency of the planet
     public currencySystem: PlanetaryCurrencySystem | null = null;
     // money account keeping track of money
     public moneyAccount: PlanetaryMoneyAccount | null = null;
+
+    // real estate properties, used to manufacture stuff
     // a building which builds ships
     public shipyard: Shipyard;
     // a building which chops down trees for wood
@@ -1113,7 +1141,8 @@ export class Planet implements ICameraState {
     public blacksmith: Blacksmith;
     // a list of buildings to upgrade
     public readonly buildings: Building[];
-    private resourceCycle: number = 0;
+
+    // property used to initialize buildings
     private numTicks: number = 0;
 
     /**
@@ -1198,23 +1227,59 @@ export class Planet implements ICameraState {
         // build exploration graph for which planets to explore and in what order
         this.buildExplorationGraph();
 
+        this.feudalGovernment = new FeudalGovernment(this.findFeudalLord.bind(this));
+
         switch (this.getRoyalRank()) {
             case ERoyalRank.EMPEROR: {
+                // emperors have more pirates and their own economy
                 this.numPirateSlots = 5;
+                this.economySystem = new PlanetaryEconomySystem();
+                this.currencySystem = new PlanetaryCurrencySystem(`${faction.id} Bucks`);
                 break;
             }
             case ERoyalRank.KING: {
+                // kings have some pirates and their own economy
                 this.numPirateSlots = 3;
+                this.economySystem = new PlanetaryEconomySystem();
+                this.currencySystem = new PlanetaryCurrencySystem(`${faction.id} Bucks - ${Math.floor(Math.random() * 1000)}`);
                 break;
             }
             case ERoyalRank.DUKE: {
+                // dukes have few pirates and barrow their lords currency, but have their own economy
                 this.numPirateSlots = 1;
+
+                const lordPlanet = this.getLordWorld();
+                if (!lordPlanet.currencySystem) {
+                    throw new Error("Couldn't find currency system to copy from king to duke");
+                }
+                this.economySystem = new PlanetaryEconomySystem();
+                this.currencySystem = lordPlanet.currencySystem;
+                break;
+            }
+            case ERoyalRank.COUNT: {
+                // counts do not have pirates, they also copy their lords economy and currency
+                this.numPirateSlots = 0;
+
+                const lordPlanet = this.getLordWorld();
+                if (!lordPlanet.economySystem) {
+                    throw new Error("Couldn't find economy system to copy from king to duke");
+                }
+                if (!lordPlanet.currencySystem) {
+                    throw new Error("Couldn't find currency system to copy from king to duke");
+                }
+                this.economySystem = lordPlanet.economySystem;
+                this.currencySystem = lordPlanet.currencySystem;
                 break;
             }
             default: {
+                // everything else does not have pirates for now
                 this.numPirateSlots = 0;
                 break;
             }
+        }
+
+        if (this.currencySystem && this.economySystem) {
+            this.moneyAccount = new PlanetaryMoneyAccount(this.currencySystem, this.economySystem);
         }
     }
 
@@ -1396,10 +1461,10 @@ export class Planet implements ICameraState {
         });
 
         // find worlds to trade
-        const tradeWorldEntries = entries.filter(entry => {
+        const tradeVassalEntries = entries.filter(entry => {
             // settle new worlds which have not been settled yet
             const worldIsAbleToTrade = this.isAbleToTrade(entry[1].planet);
-            const roomToTrade = entry[1].traderShipIds.length <= entry[1].planet.resources.length - 1;
+            const roomToTrade = entry[1].traderShipIds.length <= entry[1].planet.feudalObligationResources.length - 1;
             const isSettledEnoughToTrade = entry[1].planet.settlementLevel >= ESettlementLevel.OUTPOST;
             const notTradedYet = Object.values(this.instance.factions).every(faction => {
                 if (homeFaction && entry[1].planet.county.faction && entry[1].planet.county.faction.id === homeFaction.id) {
@@ -1454,7 +1519,7 @@ export class Planet implements ICameraState {
         return {
             offerVassalEntries,
             pirateWorldEntries,
-            tradeWorldEntries,
+            tradeVassalEntries,
             settlementWorldEntries,
             colonizeWorldEntries
         };
@@ -1474,13 +1539,13 @@ export class Planet implements ICameraState {
         const {
             offerVassalEntries,
             pirateWorldEntries,
-            tradeWorldEntries,
+            tradeVassalEntries,
             settlementWorldEntries,
             colonizeWorldEntries
         } = this.getPlanetExplorationEntries(ship.shipType);
         const offerVassalEntry = offerVassalEntries[0];
         const pirateWorldEntry = pirateWorldEntries[0];
-        const tradeWorldEntry = tradeWorldEntries[0];
+        const tradeVassalWorldEntry = tradeVassalEntries[0];
         const settlementWorldEntry = settlementWorldEntries[0];
         const colonizeWorldEntry = colonizeWorldEntries[0];
 
@@ -1498,13 +1563,13 @@ export class Planet implements ICameraState {
             order.planetId = pirateWorldEntry[0];
             order.expireTicks = 10 * 60 * 20; // pirate for 20 minutes before signing a new contract
             return order;
-        } else if (tradeWorldEntry && shipData.cannons.numCannons <= 4) {
+        } else if (tradeVassalWorldEntry && shipData.cannons.numCannons <= 4) {
             // found a trade slot, add ship to trade
-            tradeWorldEntry[1].traderShipIds.push(ship.id);
+            tradeVassalWorldEntry[1].traderShipIds.push(ship.id);
 
             const order = new Order(this.instance, ship, this.county.faction);
             order.orderType = EOrderType.TRADE;
-            order.planetId = tradeWorldEntry[0];
+            order.planetId = tradeVassalWorldEntry[0];
             order.expireTicks = 10 * 60 * 20; // trade for 20 minutes before signing a new contract
             return order;
         } else if (colonizeWorldEntry) {
@@ -1828,12 +1893,17 @@ export class Planet implements ICameraState {
     public applyLuxuryBuff(account: MoneyAccount, resourceType: EResourceType, planetId: string, amount: number) {
         const oldLuxuryBuff = this.luxuryBuffs.find(l => l.matches(resourceType, planetId));
         if (oldLuxuryBuff) {
-            // const percentReplenished = oldLuxuryBuff.replenish();
-            // oldLuxuryBuff.amount = amount;
-            // const goldProfit = Math.floor(oldLuxuryBuff.goldValue() * percentReplenished);
-            // const goldBonus = Math.floor(goldProfit * 0.2);
-            // this.gold -= goldBonus;
-            // account.gold += goldBonus;
+            const percentReplenished = oldLuxuryBuff.replenish();
+            oldLuxuryBuff.amount = amount;
+            const goldProfit = Math.floor(oldLuxuryBuff.goldValue() * percentReplenished);
+            const goldBonus = Math.floor(goldProfit * 0.2);
+            const payment: ICurrency[] = [{
+                currencyId: "GOLD",
+                amount: goldBonus,
+            }];
+            if (this.moneyAccount) {
+                this.moneyAccount.cash.makePayment(account, payment);
+            }
         } else if (this.county.faction) {
             this.luxuryBuffs.push(new LuxuryBuff(this.instance, this.county.faction, this, resourceType, planetId, amount));
         }
@@ -1861,7 +1931,7 @@ export class Planet implements ICameraState {
 
     public computeShipDemand() {
         const {
-            tradeWorldEntries,
+            tradeVassalEntries,
             pirateWorldEntries,
             colonizeWorldEntries
         } = this.getPlanetExplorationEntries();
@@ -1872,7 +1942,10 @@ export class Planet implements ICameraState {
         }
 
         // compute new demand
-        this.shipsDemand[EShipType.CUTTER] += tradeWorldEntries.length;
+        this.shipsDemand[EShipType.CUTTER] += tradeVassalEntries.reduce((acc, t) => {
+            const numberOfCuttersNeededForPlanet = t[1].planet.feudalObligationResources.length;
+            return acc + numberOfCuttersNeededForPlanet;
+        }, 0);
         this.shipsDemand[EShipType.CORVETTE] = Math.min(this.numPirateSlots, pirateWorldEntries.length) +
             Math.max(0, Math.min(colonizeWorldEntries.length, 10));
     }
@@ -1929,14 +2002,32 @@ export class Planet implements ICameraState {
         );
     }
 
+    public findFeudalLord(): FeudalGovernment | null {
+        switch (this.getRoyalRank()) {
+            default:
+            case ERoyalRank.EMPEROR: {
+                // non royal governments and emperors do not have feudal lords.
+                return null;
+            }
+            case ERoyalRank.KING:
+            case ERoyalRank.DUKE:
+            case ERoyalRank.COUNT: {
+                // kings, dukes, and counts have feudal lords
+                const planet = this.getLordWorld();
+                if (planet.feudalGovernment) {
+                    return planet.feudalGovernment;
+                } else {
+                    return null;
+                }
+            }
+        }
+    }
+
     public setAsStartingCapital(faction: Faction) {
         this.size = 10;
         this.settlementProgress = 1;
         this.settlementLevel = ESettlementLevel.CAPITAL;
         this.naturalResources = [...CAPITAL_GOODS];
-        this.economySystem = new PlanetaryEconomySystem();
-        this.currencySystem = new PlanetaryCurrencySystem(`${faction.id} Bucks`);
-        this.moneyAccount = new PlanetaryMoneyAccount(this.currencySystem, this.economySystem);
     }
 
     // rebuild the resources array based on events such as less or more items
@@ -1951,10 +2042,21 @@ export class Planet implements ICameraState {
         // start with capital goods
         this.resources.push(...this.naturalResources.filter(r => CAPITAL_GOODS.includes(r)).map(resourceType => ({
             resourceType,
-            amount: 1
+            amount: 1,
+            feudalObligation: false,
         })));
         // start with produced resources
         this.resources.push(...this.producedResources);
+        // compute imported resources
+        this.importedResources.splice(0, this.importedResources.length);
+        for (const luxuryBuff of this.luxuryBuffs) {
+            this.importedResources.push({
+                resourceType: luxuryBuff.resourceType,
+                amount: luxuryBuff.amount,
+                sourcePlanetId: luxuryBuff.planetId,
+                pirated: false,
+            });
+        }
         // insert imported resources
         for (const importedResource of this.importedResources) {
             const oldResource = this.resources.find(r => r.resourceType === importedResource.resourceType);
@@ -1963,7 +2065,8 @@ export class Planet implements ICameraState {
             } else {
                 this.resources.push({
                     resourceType: importedResource.resourceType,
-                    amount: importedResource.amount
+                    amount: importedResource.amount,
+                    feudalObligation: false,
                 });
             }
         }
@@ -1996,11 +2099,50 @@ export class Planet implements ICameraState {
                     } else {
                         this.resources.push({
                             resourceType: product.resourceType,
-                            amount: product.amount * amount
+                            amount: product.amount * amount,
+                            feudalObligation: false,
                         });
                     }
                 }
             }
+        }
+
+        // setup feudal obligations and market goods
+        let feudalObligationAmount = this.feudalGovernment ?
+            Math.ceil(this.resources.reduce((acc, r) => {
+                return acc + r.amount;
+            }, 0) * this.feudalGovernment.getCurrentFeudalObligationRatio()) :
+            0;
+        this.feudalObligationResources.splice(0, this.feudalObligationResources.length);
+        const splitResource = (resource: IResourceExported, amount: number) => {
+            if (amount >= resource.amount) {
+                this.feudalObligationResources.push({
+                    ...resource,
+                    feudalObligation: true,
+                });
+            } else if (amount <= 0) {
+                this.marketResources.push({
+                    ...resource,
+                    feudalObligation: false,
+                });
+            } else {
+                const feudalAmount = amount;
+                const marketAmount = resource.amount - feudalAmount;
+                this.feudalObligationResources.push({
+                    resourceType: resource.resourceType,
+                    amount: feudalAmount,
+                    feudalObligation: true,
+                });
+                this.marketResources.push({
+                    resourceType: resource.resourceType,
+                    amount: marketAmount,
+                    feudalObligation: false,
+                });
+            }
+        };
+        for (const resource of this.resources) {
+            splitResource(resource, feudalObligationAmount);
+            feudalObligationAmount -= resource.amount;
         }
     }
 
@@ -2178,7 +2320,7 @@ export class Planet implements ICameraState {
         const recipe = ITEM_RECIPES.find(recipe => {
             return recipe.ingredients.every(ingredient => {
                 let amount = 0;
-                for (const resource of this.resources) {
+                for (const resource of this.marketResources) {
                     if (resource.resourceType === ingredient.resourceType) {
                         amount += resource.amount;
                     }
@@ -2208,16 +2350,16 @@ export class Planet implements ICameraState {
         if (this.settlementLevel === ESettlementLevel.UNTAMED) {
             goodsToTake = CAPITAL_GOODS;
             goodsToOffer = [];
-        } else if (this.settlementLevel >= ESettlementLevel.OUTPOST && this.settlementLevel <= ESettlementLevel.COLONY) {
+        } else if (this.settlementLevel >= ESettlementLevel.OUTPOST && this.settlementLevel <= ESettlementLevel.PROVINCE) {
             goodsToTake = CAPITAL_GOODS;
-            goodsToOffer = this.resources;
+            goodsToOffer = this.feudalObligationResources;
         } else if (this.settlementLevel === ESettlementLevel.CAPITAL) {
             // the capital will take outpost goods an pirated goods
             goodsToTake = Array.from(new Set([
                 ...OUTPOST_GOODS,
                 ...ship.cargo.filter(c => c.pirated).map(c => c.resourceType)
             ]));
-            goodsToOffer = this.resources;
+            goodsToOffer = this.feudalObligationResources;
         }
 
         // do not take cargo, because the ship is beginning a piracy mission
@@ -2233,8 +2375,8 @@ export class Planet implements ICameraState {
             }
         }
         for (let i = 0; i < goodsToOffer.length; i++) {
-            if (ship.sellGoodToShip(goodsToOffer[this.resourceCycle % this.resources.length], this.id)) {
-                this.resourceCycle = (this.resourceCycle + 1) % this.resources.length;
+            if (ship.sellGoodToShip(goodsToOffer[this.feudalObligationResourceCycle % this.feudalObligationResources.length], this.id)) {
+                this.feudalObligationResourceCycle = (this.feudalObligationResourceCycle + 1) % this.feudalObligationResources.length;
             }
         }
     }

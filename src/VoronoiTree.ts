@@ -569,6 +569,53 @@ export class VoronoiTree<T extends ICameraState> implements IVoronoiTreeNodePare
 }
 
 /**
+ * A class which manages feudal governments.
+ */
+export class FeudalGovernment {
+    public static LIST_OF_FEUDAL_OBLIGATION_RATIOS: number[] = [
+        1 / 2,
+        1 / 3,
+        1 / 4,
+        1 / 5
+    ];
+
+    /**
+     * The amount of feudal obligation to the current tier of government. Essentially the tax rate of free resources
+     * for the domain of this government.
+     */
+    feudalObligationRatio: number = 1 / 3;
+
+    /**
+     * A function passed by the owning class to help determine the feudal government above this government.
+     */
+    getLordFeudalGovernment: () => FeudalGovernment | null;
+
+    /**
+     * Create an instance of a feudal government.
+     * @param getLordFeudalGovernment A function which finds the lord of this feudal government.
+     */
+    constructor(getLordFeudalGovernment: () => FeudalGovernment | null) {
+        this.getLordFeudalGovernment = getLordFeudalGovernment;
+    }
+
+    /**
+     * The amount of feudal obligation to the lord, the tier above this government. The tax rate of the lord, which
+     * this government will pay.
+     */
+    getCurrentFeudalObligationRatio() {
+        if (this.getLordFeudalGovernment) {
+            // has feudal lord, pay obligation
+            const feudalLord = this.getLordFeudalGovernment();
+            if (feudalLord) {
+                return feudalLord.feudalObligationRatio;
+            }
+        }
+        // no feudal lord, no obligation
+        return 0;
+    }
+}
+
+/**
  * A voronoi tree node used to generate the terrain of a kingdom. There are 5 duchies in a kingdom.
  */
 export class VoronoiCounty extends VoronoiTreeNode<ICameraState> {

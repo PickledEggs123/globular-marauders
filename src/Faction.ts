@@ -34,45 +34,6 @@ export class LuxuryBuff {
     }
 
     /**
-     * Calculate the gold exchange of each faction.
-     * @param app
-     * @param faction
-     * @param resourceType
-     * @constructor
-     */
-    public static CalculateGoldBuff(app: App, faction: Faction, resourceType: EResourceType) {
-        // const totalLuxuries: number = Object.values(app.factions).reduce((acc: number, f) => {
-        //     return acc + f.luxuryBuffs.reduce((acc2: number, l) => {
-        //         if (l.resourceType === resourceType) {
-        //             return acc2 + 1;
-        //         } else {
-        //             return acc2;
-        //         }
-        //     }, 0);
-        // }, 0);
-        // const factionLuxuries: number = faction.luxuryBuffs.reduce((acc: number, l) => {
-        //     if (l.resourceType === resourceType) {
-        //         return acc + 1;
-        //     } else {
-        //         return acc;
-        //     }
-        // }, 0);
-        // const averageLuxuryConsumption: number = totalLuxuries / Object.values(app.factions).length;
-        //
-        // // get the price multiplier of the item
-        // let basePrice: number = 1;
-        // const itemData = ITEM_DATA.find(item => item.resourceType === resourceType);
-        // if (itemData) {
-        //     basePrice = itemData.basePrice;
-        // }
-        //
-        // // calculate the gold exchange based on luxuries
-        // if (totalLuxuries > 0) {
-        //     faction.gold += ((factionLuxuries / totalLuxuries) - averageLuxuryConsumption) * basePrice;
-        // }
-    }
-
-    /**
      * Increment the buff.
      */
     public handleLuxuryBuffLoop() {
@@ -123,14 +84,14 @@ export class LuxuryBuff {
      */
     public remove() {
         // remove from app
-        const appIndex = this.instance.luxuryBuffs.findIndex(l => l === this);
-        if (appIndex >= 0) {
-            this.instance.luxuryBuffs.splice(appIndex, 1);
+        const indexInApp = this.instance.luxuryBuffs.findIndex(l => l === this);
+        if (indexInApp >= 0) {
+            this.instance.luxuryBuffs.splice(indexInApp, 1);
         }
-        // remove from faction
-        const factionIndex = this.planet.luxuryBuffs.findIndex(l => l === this);
-        if (factionIndex >= 0) {
-            this.planet.luxuryBuffs.splice(factionIndex, 1);
+        // remove from planet
+        const indexInPlanet = this.planet.luxuryBuffs.findIndex(l => l === this);
+        if (indexInPlanet >= 0) {
+            this.planet.luxuryBuffs.splice(indexInPlanet, 1);
         }
     }
 }

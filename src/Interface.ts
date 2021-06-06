@@ -141,7 +141,7 @@ export class MoneyAccount {
             } else {
                 return false;
             }
-        });
+        }) || payments.length === 0;
     }
 
     public makePayment(other: MoneyAccount, payments: ICurrency[]) {

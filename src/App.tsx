@@ -2003,13 +2003,6 @@ export class App extends React.Component<IAppProps, IAppState> {
             }
         }
 
-        // handle luxury buffs
-        for (const resourceType of Object.values(OUTPOST_GOODS)) {
-            for (const faction of Object.values(this.factions)) {
-                LuxuryBuff.CalculateGoldBuff(this, faction, resourceType);
-            }
-        }
-
         // handle planet loop
         for (const planet of this.planets) {
             planet.handlePlanetLoop();

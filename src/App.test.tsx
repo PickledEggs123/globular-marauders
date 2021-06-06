@@ -11,7 +11,7 @@ import {DelaunayGraph, PathFinder, VoronoiGraph} from "./Graph";
 import {CannonBall} from "./Item";
 import {ERoyalRank, Faction} from "./Faction";
 import {EBuildingType, Planet} from "./Planet";
-import {ESettlementLevel, IMoneyAccount} from "./Interface";
+import {ESettlementLevel, MoneyAccount} from "./Interface";
 
 /**
  * Get a test ship from the app.
@@ -56,7 +56,7 @@ const getTestShip = (app: App, wrapper: ShallowWrapper<any>, colonyWorldTrades: 
   homeWorldTradeItem.planet.shipyard.buildShip(shipType);
   homeWorldTradeItem.planet.shipyard.docks[0].progress += shipData.cost;
   homeWorldTradeItem.planet.shipyard.handleBuildingLoop();
-  app.gold += homeWorldTradeItem.planet.shipyard.quoteShip(shipType);
+  app.money.currencies = homeWorldTradeItem.planet.shipyard.quoteShip(shipType);
 
   // spawn at home world
   app.beginSpawnShip(homeWorldTradeItem.planet.id, shipType);
@@ -494,7 +494,7 @@ const setupFeudalismTest = (numMinutes: number = 20) => {
   const latestClaims: Planet[] = [];
   const newColonies: Array<{
     planet: Planet,
-    spawnShip: sinon.SinonSpy<[account: IMoneyAccount, shipType: EShipType, asFaction?: boolean], Ship>,
+    spawnShip: sinon.SinonSpy<[account: MoneyAccount, shipType: EShipType, asFaction?: boolean], Ship>,
     getOrder: sinon.SinonSpy<[ship: Ship], Order>
   }> = [];
   for (let step = 0; step < numSteps; step++) {
