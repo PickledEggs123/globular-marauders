@@ -26,6 +26,7 @@ export class VoronoiCell implements ICellData {
     public centroid: [number, number, number] = [0, 0, 0];
     public vertex: [number, number, number] = [0, 0, 0];
     public radius: number = 0;
+    public neighborIndices: number[] = [];
 
     /**
      * If the voronoi cell contains the point.
@@ -955,7 +956,8 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                 thetaAngle: number,
                 a: [number, number, number],
                 b: [number, number, number],
-                vertex: [number, number, number]
+                vertex: [number, number, number],
+                neighborIndex: number,
             }> = [];
 
             // build edge data for algebra
@@ -1001,6 +1003,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                         b,
                         thetaAngle,
                         vertex: bVertex,
+                        neighborIndex: bIndex,
                     });
                 }
             }
@@ -1099,6 +1102,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                         )
                     );
                 }, 0);
+                cell.neighborIndices = edges.map(e => e.neighborIndex);
                 graph.cells.push(cell);
             }
         }

@@ -25,6 +25,7 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
     public radius: number = 0;
     public level: number;
     public parent: IVoronoiTreeNodeParent<T>;
+    public neighbors: Array<VoronoiTreeNode<T>> = [];
     public items: T[] = [];
     public app: App;
 
@@ -206,6 +207,7 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
                 .rotateVector([0, 0, 1]);
         });
         o.radius = polygon.radius;
+        o.neighborIndices = polygon.neighborIndices;
         return o;
     }
 
@@ -294,6 +296,7 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
                 )
             );
         }, 0);
+        copy.neighborIndices = polygon.neighborIndices;
         return copy;
     }
 
@@ -475,6 +478,11 @@ export class VoronoiTree<T extends ICameraState> implements IVoronoiTreeNodePare
                 VoronoiGraph.angularDistance(point.centroid, v, this.app.worldScale)
             ), 0);
             nodes.push(node);
+        }
+        for (let i = 0; i < goodPoints.length; i++) {
+            const node = nodes[i];
+            const point = goodPoints[i];
+            node.neighbors = point.neighborIndices.map(index => nodes[index]);
         }
         return nodes;
     }
@@ -753,6 +761,7 @@ export class VoronoiDuchy extends VoronoiTreeNode<ICameraState> {
  */
 export class VoronoiKingdom extends VoronoiTreeNode<ICameraState> {
     terrain: VoronoiTerrain;
+    neighborKingdoms: VoronoiKingdom[] = [];
     faction: Faction | null = null;
     capital: VoronoiDuchy | null = null;
     duchies: VoronoiDuchy[] = [];
@@ -848,6 +857,9 @@ export class VoronoiTerrain extends VoronoiTree<ICameraState> {
     public generateTerrain() {
         this.nodes = this.createRootNodes(this);
         this.kingdoms = this.nodes.map(n => new VoronoiKingdom(n.app, n.voronoiCell, n.level, n.parent, this, this.getPlanetId, this.getStarId));
+        for (const kingdom of this.kingdoms) {
+            kingdom.neighborKingdoms = kingdom.neighbors.map(n => n as VoronoiKingdom);
+        }
         for (const kingdom of this.kingdoms) {
             kingdom.generateTerrain();
         }

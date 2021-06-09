@@ -2,7 +2,7 @@ import {ESettlementLevel, ICameraState, ICurrency, IExplorationGraphData, MoneyA
 import Quaternion from "quaternion";
 import {DelaunayGraph, PathingNode, VoronoiGraph} from "./Graph";
 import {
-    CAPITAL_GOODS,
+    CAPITAL_GOODS, CONSUMABLE_RESOURCES,
     EResourceType,
     ICargoItem,
     IItemRecipe,
@@ -565,6 +565,80 @@ export class PlanetaryCurrencySystem {
     }
 }
 
+export interface IEconomyDemand {
+    resourceType: EResourceType;
+    amount: number;
+}
+
+/**
+ * Compute the demand of a planet over time.
+ */
+export class PlanetaryEconomyDemand {
+    planet: Planet;
+
+    demands: IEconomyDemand[] = [];
+
+    demandTick: number = 0;
+
+    public static DEMAND_TICK_COOL_DOWN: number = 60 * 10;
+
+    constructor(planet: Planet) {
+        this.planet = planet;
+        for (const resourceType of Object.values(EResourceType)) {
+            this.demands.push({
+                resourceType,
+                amount: 0
+            });
+        }
+    }
+
+    isDemandTick(): boolean {
+        if (this.demandTick <= 0) {
+            this.demandTick = PlanetaryEconomyDemand.DEMAND_TICK_COOL_DOWN;
+            return true;
+        } else {
+            this.demandTick -= 1;
+            return false;
+        }
+    }
+
+    handleEconomyDemand() {
+        // increase demand over time based on settlement progress / population
+        if (this.isDemandTick()) {
+            const manufactories = this.planet.buildings.filter(b => b.buildingType === EBuildingType.MANUFACTORY);
+            for (const demand of this.demands) {
+                // reset demand
+                demand.amount = 0;
+
+                // add demand for consumables
+                if (CONSUMABLE_RESOURCES.includes(demand.resourceType)) {
+                    demand.amount += this.planet.settlementProgress;
+                }
+
+                // add demand for industrial ingredients
+                for (const b of manufactories) {
+                    if (b instanceof Manufactory) {
+                        const m = b as Manufactory;
+                        const ingredient = m.recipe.ingredients.find(i => i.resourceType === demand.resourceType);
+                        if (ingredient) {
+                            demand.amount += ingredient.amount * m.buildingLevel;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    getDemandMultiplierForResource(resourceType: EResourceType) {
+        const demand = this.demands.find(d => d.resourceType === resourceType);
+        if (demand) {
+            return Math.log(demand.amount + 1) / Math.log(3);
+        } else {
+            return 0;
+        }
+    }
+}
+
 /**
  * A class which stores how many goods are in the economy of a planet, duchy, kingdom, or empire.
  */
@@ -596,6 +670,18 @@ export class PlanetaryEconomySystem {
     clearResources() {
         this.resources.splice(0, this.resources.length);
         this.resourceUnitSum = 0;
+    }
+
+    /**
+     * Recompute the resources of a planet.
+     */
+    recomputeResources() {
+        this.clearResources();
+        for (const planet of this.planets) {
+            for (const marketResource of planet.marketResources) {
+                this.addResource(marketResource);
+            }
+        }
     }
 
     /**
@@ -666,9 +752,22 @@ export class PlanetaryEconomySystem {
 }
 
 /**
+ * The price of a resource on that planet. Used to determine the market prices of each resource.
+ * A market class will be used to find the best deals within the area.
+ */
+export interface IMarketPrice {
+    resourceType: EResourceType;
+    price: number;
+}
+
+/**
  * A class which simulates the economy of an island.
  */
 export class PlanetaryMoneyAccount {
+    /**
+     * The planet the economy is for.
+     */
+    public planet: Planet;
     /**
      * The currency of the planetary economy account. Each kingdom has it's own paper money. All kingdoms will respect
      * gold. Pirates which rob a ship with only paper money will either convert paper money or spend paper money in the
@@ -697,6 +796,14 @@ export class PlanetaryMoneyAccount {
      * The amount of gold coins held by citizens after they are paid for their work.
      */
     public citizenCash: MoneyAccount = new MoneyAccount();
+    /**
+     * The demands of the citizens, changes the price of goods.
+     */
+    public citizenDemand: PlanetaryEconomyDemand;
+    /**
+     * A list of prices for each resource.
+     */
+    public resourcePrices: IMarketPrice[] = [];
 
     /**
      * The multiple per crate.
@@ -713,12 +820,15 @@ export class PlanetaryMoneyAccount {
 
     /**
      * Create a new planetary economy account;
+     * @param planet The planet of the economy.
      * @param currencySystem The currency of the money account.
      * @param economySystem The economy of the money account.
      */
-    constructor(currencySystem: PlanetaryCurrencySystem, economySystem: PlanetaryEconomySystem) {
+    constructor(planet: Planet, currencySystem: PlanetaryCurrencySystem, economySystem: PlanetaryEconomySystem) {
+        this.planet = planet;
         this.currencySystem = currencySystem;
         this.economySystem = economySystem;
+        this.citizenDemand = new PlanetaryEconomyDemand(this.planet);
     }
 
     /**
@@ -981,15 +1091,38 @@ export class PlanetaryMoneyAccount {
      * Note: DO NOT FORGET THAT LUXURY BUFFS CAN BE PERCENTAGES OF THE PRICE. REPLENISHING 90% of 100 is 90 gold.
      */
     public computePriceForResourceType(resourceType: EResourceType) {
-        return Math.ceil(
-            (
-                this.currencySystem.globalAmount *
-                this.computeValueForResourceType(resourceType) *
-                PlanetaryMoneyAccount.VALUE_MULTIPLE_PER_CRATE
-            ) / (
-                this.economySystem.getEconomyValueSum()
-            )
+        const supplySide = (
+            this.currencySystem.globalAmount *
+            this.computeValueForResourceType(resourceType) *
+            PlanetaryMoneyAccount.VALUE_MULTIPLE_PER_CRATE
+        ) / (
+            this.economySystem.getEconomyValueSum()
         );
+        const demandSide = this.citizenDemand.getDemandMultiplierForResource(resourceType);
+        return Math.ceil(supplySide * demandSide);
+    }
+
+    /**
+     * The prices of the game is based on monetary theory which accounts for inflation and deflation.
+     * The formula is M * V = P * Q (money * velocity multiplier = price * quantity). A new price
+     * can be computed based on (price = money * velocity multiplier / quantity). Attacking supply will lower the denominator
+     * which will cause price to increase. Issuing more money via quests and not enough taxes will also cause money to
+     * increase which will increase the price. To decrease price, more taxes or more supply is needed. In theory, areas
+     * with more supply (lower prices) will transfer goods to areas with less supply (higher prices). Medieval embargoes,
+     * medieval hoarding, and medieval price gouging might be an amusing mechanic.
+     *
+     * Note: DO NOT FORGET THAT LUXURY BUFFS CAN BE PERCENTAGES OF THE PRICE. REPLENISHING 90% of 100 is 90 gold.
+     */
+    public computePriceForResourceTypeInForeignCurrency(resourceType: EResourceType, currencySystem: PlanetaryCurrencySystem) {
+        const supplySide = (
+            currencySystem.globalAmount *
+            this.computeValueForResourceType(resourceType) *
+            PlanetaryMoneyAccount.VALUE_MULTIPLE_PER_CRATE
+        ) / (
+            this.economySystem.getEconomyValueSum()
+        );
+        const demandSide = this.citizenDemand.getDemandMultiplierForResource(resourceType);
+        return Math.ceil(supplySide * demandSide);
     }
 
     /**
@@ -1059,6 +1192,101 @@ export class PlanetaryMoneyAccount {
         }, [] as ICurrency[]);
         account.makePayment(other.taxes, taxesPayment);
         account.makePayment(other.cash, profitPayment);
+    }
+
+    /**
+     * --------------------------------------------------------------------------------------------------------------
+     * The following section is for market prices. Determining which ships go between which planets, carrying stuff.
+     * --------------------------------------------------------------------------------------------------------------
+     */
+    /**
+     * Compute the new market prices for the planet.
+     */
+    computeNewMarketPrices() {
+        this.resourcePrices.splice(0, this.resourcePrices.length);
+        for (const resourceType of Object.values(EResourceType)) {
+            this.resourcePrices.push({
+                resourceType,
+                price: this.computePriceForResourceType(resourceType),
+            });
+        }
+    }
+
+    /**
+     * ---------------------------------------
+     * The game loop of the planetary economy
+     * ---------------------------------------
+     */
+
+    public handlePlanetaryEconomy() {
+        this.citizenDemand.handleEconomyDemand();
+        this.computeNewMarketPrices();
+    }
+}
+
+/**
+ * Class used to determine which planets to buy resources from. Used by each planet to determine where to buy stuff.
+ */
+export class Market {
+    /**
+     * Used to get a list of planets near the current planet.
+     * @param planet
+     */
+    static *GetPlanetsWithinNeighborhood(planet: Planet): Generator<Planet> {
+        const planetKingdom = planet.county.duchy.kingdom;
+        for (const neighborKingdom of planetKingdom.neighborKingdoms) {
+            yield * Array.from(neighborKingdom.getPlanets());
+        }
+    }
+
+    /**
+     * Used to determine which planets to buy a resource from, for the cheapest price.
+     * @param planet
+     * @param resourceType
+     */
+    static GetLowestPriceForResource(planet: Planet, resourceType: EResourceType): [number, Planet] {
+        if (!planet.currencySystem) {
+            throw new Error("Could not find currency system to compute prices in");
+        }
+
+        const neighborhoodPlanets = Array.from(Market.GetPlanetsWithinNeighborhood(planet));
+
+        // get best planet and lowest price
+        let bestPlanet: Planet | null = null;
+        let bestPrice: number | null = null;
+        for (const neighborPlanet of neighborhoodPlanets) {
+            if (neighborPlanet.moneyAccount) {
+                const price = neighborPlanet.moneyAccount.computePriceForResourceTypeInForeignCurrency(resourceType, planet.currencySystem);
+                if (price > 0 && (bestPrice === null || price < bestPrice)) {
+                    bestPlanet = neighborPlanet;
+                    bestPrice = price;
+                }
+            }
+        }
+        if (bestPlanet === null || bestPrice === null) {
+            throw new Error("Could not find best price for resource");
+        }
+        return [bestPrice, bestPlanet];
+    }
+
+    static GetBiggestPriceDifferenceInImportsForPlanet(homePlanet: Planet): [EResourceType, number, Planet] {
+        // get best resource, planet, and profit
+        let bestResourceType: EResourceType | null = null;
+        let bestPlanet: Planet | null = null;
+        let bestProfit: number | null = null;
+        for (const resourceType of Object.values(EResourceType)) {
+            // get best planet and profit for resource
+            const [profit, planet] = Market.GetLowestPriceForResource(homePlanet, resourceType);
+            if (profit > 0 && (bestProfit === null || profit > bestProfit)) {
+                bestResourceType = resourceType;
+                bestPlanet = planet;
+                bestProfit = profit;
+            }
+        }
+        if (bestResourceType === null || bestPlanet === null || bestProfit === null) {
+            throw new Error("Could not find best profit in area.");
+        }
+        return [bestResourceType, bestProfit, bestPlanet];
     }
 }
 
@@ -1229,11 +1457,18 @@ export class Planet implements ICameraState {
 
         this.feudalGovernment = new FeudalGovernment(this.findFeudalLord.bind(this));
 
+        // remove the previous economic system
+        if (this.economySystem) {
+            this.economySystem.removePlanet(this);
+            this.economySystem = null;
+        }
+
         switch (this.getRoyalRank()) {
             case ERoyalRank.EMPEROR: {
                 // emperors have more pirates and their own economy
                 this.numPirateSlots = 5;
                 this.economySystem = new PlanetaryEconomySystem();
+                this.economySystem.addPlanet(this);
                 this.currencySystem = new PlanetaryCurrencySystem(`${faction.id} Bucks`);
                 break;
             }
@@ -1241,6 +1476,7 @@ export class Planet implements ICameraState {
                 // kings have some pirates and their own economy
                 this.numPirateSlots = 3;
                 this.economySystem = new PlanetaryEconomySystem();
+                this.economySystem.addPlanet(this);
                 this.currencySystem = new PlanetaryCurrencySystem(`${faction.id} Bucks - ${Math.floor(Math.random() * 1000)}`);
                 break;
             }
@@ -1253,6 +1489,7 @@ export class Planet implements ICameraState {
                     throw new Error("Couldn't find currency system to copy from king to duke");
                 }
                 this.economySystem = new PlanetaryEconomySystem();
+                this.economySystem.addPlanet(this);
                 this.currencySystem = lordPlanet.currencySystem;
                 break;
             }
@@ -1268,6 +1505,7 @@ export class Planet implements ICameraState {
                     throw new Error("Couldn't find currency system to copy from king to duke");
                 }
                 this.economySystem = lordPlanet.economySystem;
+                this.economySystem.addPlanet(this);
                 this.currencySystem = lordPlanet.currencySystem;
                 break;
             }
@@ -1279,7 +1517,7 @@ export class Planet implements ICameraState {
         }
 
         if (this.currencySystem && this.economySystem) {
-            this.moneyAccount = new PlanetaryMoneyAccount(this.currencySystem, this.economySystem);
+            this.moneyAccount = new PlanetaryMoneyAccount(this, this.currencySystem, this.economySystem);
         }
     }
 
@@ -1460,7 +1698,7 @@ export class Planet implements ICameraState {
             return largeEnoughToPirate && roomToPirate && weakEnemyPresence && isSettledEnoughToTrade && isOwnedByEnemy;
         });
 
-        // find worlds to trade
+        // find vassals to trade
         const tradeVassalEntries = entries.filter(entry => {
             // settle new worlds which have not been settled yet
             const worldIsAbleToTrade = this.isAbleToTrade(entry[1].planet);
@@ -1477,6 +1715,9 @@ export class Planet implements ICameraState {
             });
             return worldIsAbleToTrade && roomToTrade && isSettledEnoughToTrade && notTradedYet;
         });
+
+        // find neighbors to market trade
+        const tradeMarketEntry = Market.GetBiggestPriceDifferenceInImportsForPlanet(this);
 
         // find worlds to settle
         const settlementWorldEntries = entries.filter(entry => {
@@ -1520,6 +1761,7 @@ export class Planet implements ICameraState {
             offerVassalEntries,
             pirateWorldEntries,
             tradeVassalEntries,
+            tradeMarketEntry,
             settlementWorldEntries,
             colonizeWorldEntries
         };
@@ -1891,21 +2133,29 @@ export class Planet implements ICameraState {
      * @param amount The amount multiplier of the resource.
      */
     public applyLuxuryBuff(account: MoneyAccount, resourceType: EResourceType, planetId: string, amount: number) {
+        // update luxury buff
         const oldLuxuryBuff = this.luxuryBuffs.find(l => l.matches(resourceType, planetId));
+        // let percentReplenished = 1;
         if (oldLuxuryBuff) {
-            const percentReplenished = oldLuxuryBuff.replenish();
+            // percentReplenished = oldLuxuryBuff.replenish();
+            oldLuxuryBuff.replenish();
             oldLuxuryBuff.amount = amount;
-            const goldProfit = Math.floor(oldLuxuryBuff.goldValue() * percentReplenished);
-            const goldBonus = Math.floor(goldProfit * 0.2);
-            const payment: ICurrency[] = [{
-                currencyId: "GOLD",
-                amount: goldBonus,
-            }];
-            if (this.moneyAccount) {
-                this.moneyAccount.cash.makePayment(account, payment);
-            }
         } else if (this.county.faction) {
             this.luxuryBuffs.push(new LuxuryBuff(this.instance, this.county.faction, this, resourceType, planetId, amount));
+        }
+
+        // update economy
+        if (this.economySystem && this.moneyAccount) {
+            this.economySystem.recomputeResources();
+
+            // merchant is not paid for feudal obligation missions
+            // // pay merchant
+            // const goldAmount = Math.floor(this.moneyAccount.computePriceForResourceType(resourceType) * amount * percentReplenished);
+            // const payment: ICurrency[] = [{
+            //     currencyId: "GOLD",
+            //     amount: goldAmount,
+            // }];
+            // this.moneyAccount.cash.makePayment(account, payment);
         }
     }
 
@@ -2023,7 +2273,7 @@ export class Planet implements ICameraState {
         }
     }
 
-    public setAsStartingCapital(faction: Faction) {
+    public setAsStartingCapital() {
         this.size = 10;
         this.settlementProgress = 1;
         this.settlementLevel = ESettlementLevel.CAPITAL;
@@ -2227,6 +2477,11 @@ export class Planet implements ICameraState {
                     node.enemyStrength -= 1;
                 }
             }
+        }
+
+        // handle resource economy
+        if (this.moneyAccount) {
+            this.moneyAccount.handlePlanetaryEconomy();
         }
     }
 

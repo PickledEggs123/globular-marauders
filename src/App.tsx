@@ -2453,7 +2453,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 this.factions[factionData.id] = faction;
                 const planet = this.planets.find(p => p.id === planetId);
                 if (planet) {
-                    planet.setAsStartingCapital(faction);
+                    planet.setAsStartingCapital();
                     planet.claim(faction);
                 }
                 if (planet && !this.props.isTestMode) {

@@ -59,20 +59,6 @@ export class LuxuryBuff {
     }
 
     /**
-     * The total value of the luxury buff.
-     */
-    public goldValue(): number {
-        if (CAPITAL_GOODS.includes(this.resourceType)) {
-            return 0;
-        }
-        const itemData = ITEM_DATA.find(item => item.resourceType === this.resourceType);
-        if (itemData) {
-            return this.expires * itemData.basePrice * this.amount;
-        }
-        return this.expires;
-    }
-
-    /**
      * The buff expired.
      */
     public expired() {

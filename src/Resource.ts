@@ -41,31 +41,32 @@ export interface IItemData {
     basePrice: number;
     makes?: EResourceType;
     natural: boolean;
+    consumable: boolean;
 }
 
 export const ITEM_DATA: IItemData[] = [
     // outpost goods
-    {resourceType: EResourceType.COTTON, basePrice: 1, natural: true, makes: EResourceType.CLOTHING},
-    {resourceType: EResourceType.CLOTHING, basePrice: 3, natural: false},
-    {resourceType: EResourceType.FLAX, basePrice: 1, natural: true, makes: EResourceType.ROPE},
-    {resourceType: EResourceType.ROPE, basePrice: 3, natural: false},
-    {resourceType: EResourceType.TOBACCO, basePrice: 1, natural: true, makes: EResourceType.CIGAR},
-    {resourceType: EResourceType.CIGAR, basePrice: 3, natural: false},
-    {resourceType: EResourceType.SUGAR_CANE, basePrice: 1, natural: true, makes: EResourceType.MOLASSES},
-    {resourceType: EResourceType.MOLASSES, basePrice: 3, natural: false, makes: EResourceType.RUM},
-    {resourceType: EResourceType.RUM, basePrice: 5, natural: false},
-    {resourceType: EResourceType.COFFEE, basePrice: 2, natural: true},
-    {resourceType: EResourceType.CACAO, basePrice: 2, natural: true},
-    {resourceType: EResourceType.RUBBER, basePrice: 2, natural: true},
-    {resourceType: EResourceType.FUR, basePrice: 3, natural: true, makes: EResourceType.FUR_APPAREL},
-    {resourceType: EResourceType.FUR_APPAREL, basePrice: 5, natural: false},
-    {resourceType: EResourceType.MAHOGANY, basePrice: 3, natural: true, makes: EResourceType.FURNITURE},
-    {resourceType: EResourceType.FURNITURE, basePrice: 5, natural: false},
+    {resourceType: EResourceType.COTTON, basePrice: 1, natural: true, consumable: false, makes: EResourceType.CLOTHING},
+    {resourceType: EResourceType.CLOTHING, basePrice: 3, natural: false, consumable: true},
+    {resourceType: EResourceType.FLAX, basePrice: 1, natural: true, consumable: false, makes: EResourceType.ROPE},
+    {resourceType: EResourceType.ROPE, basePrice: 3, natural: false, consumable: true},
+    {resourceType: EResourceType.TOBACCO, basePrice: 1, natural: true, consumable: false, makes: EResourceType.CIGAR},
+    {resourceType: EResourceType.CIGAR, basePrice: 3, natural: false, consumable: true},
+    {resourceType: EResourceType.SUGAR_CANE, basePrice: 1, natural: true, consumable: false, makes: EResourceType.MOLASSES},
+    {resourceType: EResourceType.MOLASSES, basePrice: 3, natural: false, consumable: true, makes: EResourceType.RUM},
+    {resourceType: EResourceType.RUM, basePrice: 5, natural: false, consumable: true},
+    {resourceType: EResourceType.COFFEE, basePrice: 2, natural: true, consumable: true},
+    {resourceType: EResourceType.CACAO, basePrice: 2, natural: true, consumable: false},
+    {resourceType: EResourceType.RUBBER, basePrice: 2, natural: true, consumable: false},
+    {resourceType: EResourceType.FUR, basePrice: 3, natural: true, consumable: false, makes: EResourceType.FUR_APPAREL},
+    {resourceType: EResourceType.FUR_APPAREL, basePrice: 5, natural: false, consumable: true},
+    {resourceType: EResourceType.MAHOGANY, basePrice: 3, natural: true, consumable: false, makes: EResourceType.FURNITURE},
+    {resourceType: EResourceType.FURNITURE, basePrice: 5, natural: false, consumable: true},
     // capital goods
-    {resourceType: EResourceType.FIREARM, basePrice: 100, natural: false},
-    {resourceType: EResourceType.GUNPOWDER, basePrice: 100, natural: false},
-    {resourceType: EResourceType.IRON, basePrice: 50, natural: false},
-    {resourceType: EResourceType.RATION, basePrice: 10, natural: false},
+    {resourceType: EResourceType.FIREARM, basePrice: 100, natural: false, consumable: false},
+    {resourceType: EResourceType.GUNPOWDER, basePrice: 100, natural: false, consumable: false},
+    {resourceType: EResourceType.IRON, basePrice: 50, natural: false, consumable: false},
+    {resourceType: EResourceType.RATION, basePrice: 10, natural: false, consumable: false},
 ];
 
 /**
@@ -73,6 +74,16 @@ export const ITEM_DATA: IItemData[] = [
  */
 export const NATURAL_RESOURCES: EResourceType[] = ITEM_DATA.reduce((resourceTypes, i) => {
     if (i.natural) {
+        resourceTypes.push(i.resourceType);
+    }
+    return resourceTypes;
+}, [] as EResourceType[]);
+
+/**
+ * List of products which can be consumed by citizens.
+ */
+export const CONSUMABLE_RESOURCES: EResourceType[] = ITEM_DATA.reduce((resourceTypes, i) => {
+    if (i.consumable) {
         resourceTypes.push(i.resourceType);
     }
     return resourceTypes;
