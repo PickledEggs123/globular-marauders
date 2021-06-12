@@ -2,7 +2,7 @@
  * A type of order for a ship to complete. Orders are actions the ship should take on behalf of the faction.
  */
 import {Ship, SHIP_DATA} from "./Ship";
-import App from "./App";
+import App, {ITradeDeal} from "./App";
 import {DelaunayGraph, VoronoiGraph} from "./Graph";
 import {ESettlementLevel} from "./Interface";
 import {Faction} from "./Faction";
@@ -21,9 +21,13 @@ export enum EOrderType {
      */
     SETTLE = "SETTLE",
     /**
-     * Trade with a planet to collect luxuries.
+     * Trade with a planet to collect feudal taxes in the form of free resources.
      */
-    TRADE = "TRADE",
+    FEUDAL_TRADE = "FEUDAL_TRADE",
+    /**
+     * Trade with a planet on a some what even tone.
+     */
+    FAIR_TRADE = "FAIR_TRADE",
     /**
      * Find and destroy an enemy ship, then return the cargo.
      */
@@ -57,6 +61,7 @@ export class Order {
     public enemyStrength: number = 0;
     public planetId: string | null = null;
     public expireTicks: number = 0;
+    public tradeDeal: ITradeDeal | null = null;
     private stage: number = 0;
     private runningTicks: number = 0;
 
@@ -152,10 +157,23 @@ export class Order {
     public beginTradeMission() {
         const homeWorld = this.owner.planet;
         if (!homeWorld || !homeWorld.pathingNode) {
-            throw new Error("Could not find home world for pathing back to home world (TRADE)");
+            throw new Error("Could not find home world for pathing back to home world (FEUDAL_TRADE)");
         }
 
         homeWorld.trade(this.owner);
+    }
+
+    public beginFairTradeMission() {
+        const homeWorld = this.owner.planet;
+        if (!homeWorld || !homeWorld.pathingNode) {
+            throw new Error("Could not find home world for pathing back to home world (FAIR_TRADE)");
+        }
+
+        if (!this.tradeDeal) {
+            throw new Error("Could not find trade deal to perform fair trade (FAIR_TRADE");
+        }
+
+        homeWorld.trade(this.owner, false, this.tradeDeal.fromResourceType);
     }
 
     public transferToNewLord() {
@@ -222,6 +240,21 @@ export class Order {
         }
 
         colonyWorld.trade(this.owner);
+    }
+
+    public fairTradeWithOtherPlanet() {
+        if (!this.planetId) {
+            throw new Error("Could not find planetId to path to (FAIR_TRADE)");
+        }
+        const otherWorld = this.app.planets.find(planet => planet.id === this.planetId);
+        if (!otherWorld || !otherWorld.pathingNode) {
+            throw new Error("Could not find home world for pathing back to home world (FAIR_TRADE)");
+        }
+        if (!this.tradeDeal) {
+            throw new Error("Could not find trade deal to perform fair trade (FAIR_TRADE)");
+        }
+
+        otherWorld.trade(this.owner, false, this.tradeDeal.toResourceType);
     }
 
     private roam() {
@@ -294,7 +327,7 @@ export class Order {
         }
     }
 
-    private trade() {
+    private feudalTrade() {
         // cancel order by going back to home world
         if (this.isOrderCancelled()) {
             this.stage = 3;
@@ -322,6 +355,49 @@ export class Order {
 
             // trade with colony world
             this.tradeWithColony();
+
+            // return to home world
+            this.returnToHomeWorld();
+        } else if (this.stage === 3 && this.owner.pathFinding.points.length === 0) {
+            // check if order expired
+            if (this.runningTicks >= this.expireTicks || this.isOrderCancelled()) {
+                // end order
+                this.owner.removeOrder(this);
+            } else {
+                // reset order
+                this.stage = 0;
+            }
+        }
+    }
+
+    private fairTrade() {
+        // cancel order by going back to home world
+        if (this.isOrderCancelled()) {
+            this.stage = 3;
+
+            // return to home world
+            this.returnToHomeWorld();
+        }
+
+        // fly to a specific planet
+        if (this.stage === 0 && this.owner.pathFinding.points.length === 0) {
+            this.stage += 1;
+
+            // return to home world
+            this.returnToHomeWorld();
+        } else if (this.stage === 1 && this.owner.pathFinding.points.length === 0) {
+            this.stage += 1;
+
+            // trade with homeWorld
+            this.beginFairTradeMission();
+
+            // find other world
+            this.goToColonyWorld();
+        } else if (this.stage === 2 && this.owner.pathFinding.points.length === 0) {
+            this.stage += 1;
+
+            // trade with other world
+            this.fairTradeWithOtherPlanet();
 
             // return to home world
             this.returnToHomeWorld();
@@ -431,8 +507,10 @@ export class Order {
             this.roam();
         } else if (this.orderType === EOrderType.SETTLE) {
             this.settle();
-        } else if (this.orderType === EOrderType.TRADE) {
-            this.trade();
+        } else if (this.orderType === EOrderType.FEUDAL_TRADE) {
+            this.feudalTrade();
+        } else if (this.orderType === EOrderType.FAIR_TRADE) {
+            this.fairTrade();
         } else if (this.orderType === EOrderType.PIRATE) {
             this.pirate();
         } else if (this.orderType === EOrderType.TRIBUTE) {
@@ -448,7 +526,7 @@ export class Order {
         switch (this.orderType) {
             case EOrderType.TRIBUTE:
             case EOrderType.SETTLE:
-            case EOrderType.TRADE: {
+            case EOrderType.FEUDAL_TRADE: {
                 // trade and settler ships are suppose to be between the colony world and home world, trading
                 // attack only when between colony world and home world
                 const colonyWorld = this.app.planets.find(planet => planet.id === this.planetId);

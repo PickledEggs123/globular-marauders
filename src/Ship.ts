@@ -378,7 +378,7 @@ export class Ship implements IAutomatedShip {
             }
 
             // clean up trade order
-            if (order.orderType === EOrderType.TRADE) {
+            if (order.orderType === EOrderType.FEUDAL_TRADE || order.orderType === EOrderType.FAIR_TRADE) {
                 const index = this.planet.explorationGraph[order.planetId].traderShipIds.findIndex(s => s === this.id);
                 if (index >= 0) {
                     this.planet.explorationGraph[order.planetId].traderShipIds.splice(index, 1);

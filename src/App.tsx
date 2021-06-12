@@ -27,7 +27,7 @@ import {
 } from "./Graph";
 import {VoronoiCounty, VoronoiKingdom, VoronoiTerrain, VoronoiTree} from "./VoronoiTree";
 import {Faction, LuxuryBuff} from "./Faction";
-import {EBuildingType, Manufactory, Planet, Plantation, Star} from "./Planet";
+import {EBuildingType, Manufactory, Market, Planet, Plantation, Star} from "./Planet";
 import {CannonBall, Crate, SmokeCloud} from "./Item";
 import * as Tone from "tone";
 
@@ -352,6 +352,24 @@ interface IAppState {
     faction: EFaction | null;
 }
 
+export enum EDirectedMarketTradeDirection {
+    TO = "TO",
+    FROM = "FROM",
+}
+
+export interface IDirectedMarketTrade {
+    tradeDirection: EDirectedMarketTradeDirection;
+    resourceType: EResourceType;
+    profit: number;
+}
+
+export interface ITradeDeal {
+    toResourceType: EResourceType;
+    fromResourceType: EResourceType;
+    profit: number;
+    planet: Planet;
+}
+
 export class App extends React.Component<IAppProps, IAppState> {
     state = {
         showNotes: false as boolean,
@@ -394,6 +412,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     public playerShip: Ship | null = null;
     public crates: Crate[] = [];
     public planets: Planet[] = [];
+    public directedMarketTrade: Record<string, Array<IDirectedMarketTrade>> = {};
     public smokeClouds: SmokeCloud[] = [];
     public cannonBalls: CannonBall[] = [];
     public luxuryBuffs: LuxuryBuff[] = [];
@@ -402,6 +421,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     public music: MusicPlayer = new MusicPlayer();
     public demoAttackingShipId: string | null = null;
     public lastDemoAttackingShipTime: Date = new Date();
+    public tradeTick: number = 10 * 5;
 
     /**
      * Velocity step size of ships.
@@ -455,6 +475,10 @@ export class App extends React.Component<IAppProps, IAppState> {
      * The power of the brake action. Slow down velocity dramatically.
      */
     public static BRAKE_POWER: number = 1 / 10;
+    /**
+     * THe number of seconds between each trade tick.
+     */
+    public static TRADE_TICK_COOL_DOWN: number = 10 * 60 * 10;
 
     private static randomRange(start: number = -1, end: number = 1): number {
         const value = Math.random();
@@ -1716,7 +1740,20 @@ export class App extends React.Component<IAppProps, IAppState> {
         };
     }
 
+    private isTradeTick(): boolean {
+        if (this.tradeTick <= 0) {
+            this.tradeTick = App.TRADE_TICK_COOL_DOWN;
+            return true;
+        } else {
+            this.tradeTick -= 1;
+            return false;
+        }
+    }
     public gameLoop() {
+        if (this.isTradeTick()) {
+            Market.ComputeProfitableTradeDirectedGraph(this);
+        }
+
         // expire smoke clouds
         const expiredSmokeClouds: SmokeCloud[] = [];
         for (const smokeCloud of this.smokeClouds) {
@@ -2881,7 +2918,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                         spawnLocations.push({
                             id: planet.id,
                             numShipsAvailable,
-                            price: planet.shipyard.quoteShip(shipType),
+                            price: planet.shipyard.quoteShip(shipType)[0].amount,
                             shipType
                         });
                     }

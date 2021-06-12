@@ -2,7 +2,8 @@ import {ESettlementLevel, ICameraState, ICurrency, IExplorationGraphData, MoneyA
 import Quaternion from "quaternion";
 import {DelaunayGraph, PathingNode, VoronoiGraph} from "./Graph";
 import {
-    CAPITAL_GOODS, CONSUMABLE_RESOURCES,
+    CAPITAL_GOODS,
+    CONSUMABLE_RESOURCES,
     EResourceType,
     ICargoItem,
     IItemRecipe,
@@ -12,7 +13,7 @@ import {
     OUTPOST_GOODS
 } from "./Resource";
 import {EShipType, Ship, SHIP_DATA} from "./Ship";
-import App from "./App";
+import App, {EDirectedMarketTradeDirection, IDirectedMarketTrade, ITradeDeal} from "./App";
 import {FeudalGovernment, VoronoiCounty} from "./VoronoiTree";
 import {ERoyalRank, Faction, LuxuryBuff} from "./Faction";
 import {EOrderType, Order} from "./Order";
@@ -1243,8 +1244,9 @@ export class Market {
      * Used to determine which planets to buy a resource from, for the cheapest price.
      * @param planet
      * @param resourceType
+     * @returns A sorted list of the highest profit to lowest profit trade routes.
      */
-    static GetLowestPriceForResource(planet: Planet, resourceType: EResourceType): [number, Planet] {
+    static GetLowestPriceForResource(planet: Planet, resourceType: EResourceType): Array<[number, Planet]> {
         if (!planet.currencySystem) {
             throw new Error("Could not find currency system to compute prices in");
         }
@@ -1252,41 +1254,99 @@ export class Market {
         const neighborhoodPlanets = Array.from(Market.GetPlanetsWithinNeighborhood(planet));
 
         // get best planet and lowest price
-        let bestPlanet: Planet | null = null;
-        let bestPrice: number | null = null;
+        const profits: Array<[number, Planet]> = [];
         for (const neighborPlanet of neighborhoodPlanets) {
             if (neighborPlanet.moneyAccount) {
                 const price = neighborPlanet.moneyAccount.computePriceForResourceTypeInForeignCurrency(resourceType, planet.currencySystem);
-                if (price > 0 && (bestPrice === null || price < bestPrice)) {
-                    bestPlanet = neighborPlanet;
-                    bestPrice = price;
+                if (price > 0) {
+                    profits.push([price, neighborPlanet]);
                 }
             }
         }
-        if (bestPlanet === null || bestPrice === null) {
-            throw new Error("Could not find best price for resource");
-        }
-        return [bestPrice, bestPlanet];
+        return profits;
     }
 
-    static GetBiggestPriceDifferenceInImportsForPlanet(homePlanet: Planet): [EResourceType, number, Planet] {
+    static GetBiggestPriceDifferenceInImportsForPlanet(homePlanet: Planet): Array<[EResourceType, number, Planet]> {
         // get best resource, planet, and profit
-        let bestResourceType: EResourceType | null = null;
-        let bestPlanet: Planet | null = null;
-        let bestProfit: number | null = null;
+        const profitableResources: Array<[EResourceType, number, Planet]> = [];
         for (const resourceType of Object.values(EResourceType)) {
             // get best planet and profit for resource
-            const [profit, planet] = Market.GetLowestPriceForResource(homePlanet, resourceType);
-            if (profit > 0 && (bestProfit === null || profit > bestProfit)) {
-                bestResourceType = resourceType;
-                bestPlanet = planet;
-                bestProfit = profit;
+            const profits = Market.GetLowestPriceForResource(homePlanet, resourceType);
+            for (const [price, planet] of profits) {
+                profitableResources.push([resourceType, price, planet]);
             }
         }
-        if (bestResourceType === null || bestPlanet === null || bestProfit === null) {
-            throw new Error("Could not find best profit in area.");
+        return profitableResources;
+    }
+
+    static ComputeProfitableTradeDirectedGraph(instance: App) {
+        // setup best profitable trades for the entire game
+        for (const planet of instance.planets) {
+            if (planet.moneyAccount) {
+                planet.bestProfitableTrades = Market.GetBiggestPriceDifferenceInImportsForPlanet(planet).slice(0, 30);
+            }
         }
-        return [bestResourceType, bestProfit, bestPlanet];
+
+        // compute a directed edge graph of the trades
+        for (let i = 0; i < instance.planets.length; i++) {
+            for (let j = i + 1; j < instance.planets.length; j++) {
+                const a = instance.planets[i];
+                const b = instance.planets[j];
+                const data = [] as Array<IDirectedMarketTrade>;
+                for (const [resourceType, profit, planet] of a.bestProfitableTrades) {
+                    if (planet.id === b.id) {
+                        data.push({
+                            tradeDirection: EDirectedMarketTradeDirection.TO,
+                            resourceType,
+                            profit,
+                        });
+                    }
+                }
+                for (const [resourceType, profit, planet] of b.bestProfitableTrades) {
+                    if (planet.id === a.id) {
+                        data.push({
+                            tradeDirection: EDirectedMarketTradeDirection.FROM,
+                            resourceType,
+                            profit,
+                        });
+                    }
+                }
+                instance.directedMarketTrade[`${a.id}#${b.id}`] = data;
+            }
+        }
+
+        // compute possible trade deals, pair each directed edge into a series of bilateral trade deals
+        for (const planet of instance.planets) {
+            planet.possibleTradeDeals = [];
+        }
+        for (let i = 0; i < instance.planets.length; i++) {
+            for (let j = i + 1; j < instance.planets.length; j++) {
+                const a = instance.planets[i];
+                const b = instance.planets[j];
+                const data = instance.directedMarketTrade[`${a.id}#${b.id}`];
+                const toTrades = data.filter(t => t.tradeDirection === EDirectedMarketTradeDirection.TO);
+                const fromTrades = data.filter(t => t.tradeDirection === EDirectedMarketTradeDirection.FROM);
+                for (const toTrade of toTrades) {
+                    for (const fromTrade of fromTrades) {
+                        a.possibleTradeDeals.push({
+                            toResourceType: toTrade.resourceType,
+                            fromResourceType: fromTrade.resourceType,
+                            profit: toTrade.profit + fromTrade.profit,
+                            planet: b,
+                        });
+                        b.possibleTradeDeals.push({
+                            toResourceType: fromTrade.resourceType,
+                            fromResourceType: toTrade.resourceType,
+                            profit: toTrade.profit + fromTrade.profit,
+                            planet: a,
+                        });
+                    }
+                }
+            }
+        }
+        for (const planet of instance.planets) {
+            planet.possibleTradeDeals.sort((a, b) => a.profit - b.profit);
+        }
     }
 }
 
@@ -1329,6 +1389,17 @@ export class Planet implements ICameraState {
     public feudalObligationResources: Array<IResourceExported> = [];
     // used to cycle through exports for feudal obligation resources since those are free of charge
     private feudalObligationResourceCycle: number = 0;
+    // used to determine free market trade, a list of directed trade routes, a pair of trade routes will allow a ship
+    // to take both directions of the trade route
+    public bestProfitableTrades: Array<[EResourceType, number, Planet]> = [];
+    // a list of possible trade deals
+    public possibleTradeDeals: Array<ITradeDeal> = [];
+    // a list of registered trade deals
+    public registeredTradeDeals: Array<ITradeDeal> = [];
+    // a list of market resources which are owned by something
+    public registeredMarketResources: Array<[Ship, IResourceExported]> = [];
+    // a list of available market resources for trading
+    public availableMarketResources: Array<IResourceExported> = [];
 
     // construction and ship building properties
     // the amount of wood available to build ships
@@ -1717,7 +1788,13 @@ export class Planet implements ICameraState {
         });
 
         // find neighbors to market trade
-        const tradeMarketEntry = Market.GetBiggestPriceDifferenceInImportsForPlanet(this);
+        const tradeDealEntries = entries.reduce((acc, entry) => {
+            const bestTradeDeal = this.getBestTradeDeal(entry[1].planet);
+            if (bestTradeDeal) {
+                acc.push([entry, bestTradeDeal]);
+            }
+            return acc;
+        }, [] as Array<[[string, IExplorationGraphData], ITradeDeal]>);
 
         // find worlds to settle
         const settlementWorldEntries = entries.filter(entry => {
@@ -1761,7 +1838,7 @@ export class Planet implements ICameraState {
             offerVassalEntries,
             pirateWorldEntries,
             tradeVassalEntries,
-            tradeMarketEntry,
+            tradeDealEntries,
             settlementWorldEntries,
             colonizeWorldEntries
         };
@@ -1782,12 +1859,14 @@ export class Planet implements ICameraState {
             offerVassalEntries,
             pirateWorldEntries,
             tradeVassalEntries,
+            tradeDealEntries,
             settlementWorldEntries,
             colonizeWorldEntries
         } = this.getPlanetExplorationEntries(ship.shipType);
         const offerVassalEntry = offerVassalEntries[0];
         const pirateWorldEntry = pirateWorldEntries[0];
         const tradeVassalWorldEntry = tradeVassalEntries[0];
+        const tradeDealEntry = tradeDealEntries[0];
         const settlementWorldEntry = settlementWorldEntries[0];
         const colonizeWorldEntry = colonizeWorldEntries[0];
 
@@ -1810,9 +1889,26 @@ export class Planet implements ICameraState {
             tradeVassalWorldEntry[1].traderShipIds.push(ship.id);
 
             const order = new Order(this.instance, ship, this.county.faction);
-            order.orderType = EOrderType.TRADE;
+            order.orderType = EOrderType.FEUDAL_TRADE;
             order.planetId = tradeVassalWorldEntry[0];
             order.expireTicks = 10 * 60 * 20; // trade for 20 minutes before signing a new contract
+            return order;
+        } else if (tradeDealEntry && shipData.cannons.numCannons <= 4) {
+            // found a trade slot, add ship to trade
+            tradeDealEntry[0][1].traderShipIds.push(ship.id);
+            tradeDealEntry[0][1].planet.registeredTradeDeals.push(tradeDealEntry[1]);
+            tradeDealEntry[1].planet.registeredTradeDeals.push({
+                fromResourceType: tradeDealEntry[1].toResourceType,
+                toResourceType: tradeDealEntry[1].fromResourceType,
+                profit: tradeDealEntry[1].profit,
+                planet: tradeDealEntry[0][1].planet
+            });
+
+            const order = new Order(this.instance, ship, this.county.faction);
+            order.orderType = EOrderType.FAIR_TRADE;
+            order.planetId = tradeVassalWorldEntry[0];
+            order.expireTicks = 10 * 60 * 20; // trade for 20 minutes before signing a new contract
+            order.tradeDeal = tradeDealEntry[1];
             return order;
         } else if (colonizeWorldEntry) {
             // add ship to colonize
@@ -2040,6 +2136,27 @@ export class Planet implements ICameraState {
                 return false;
             }
         }
+    }
+
+    public getBestTradeDeal(other: Planet): ITradeDeal | null {
+        for (const tradeDeal of this.possibleTradeDeals) {
+            // ignore registered trade deals
+            const isRegistered = this.registeredTradeDeals.some(t => {
+                return t.fromResourceType === tradeDeal.fromResourceType &&
+                    t.toResourceType === tradeDeal.toResourceType &&
+                    t.planet === tradeDeal.planet;
+            });
+            if (isRegistered) {
+                continue;
+            }
+
+            const localHasResource = this.availableMarketResources.some(r => r.resourceType === tradeDeal.fromResourceType);
+            const remoteHasResource = other.availableMarketResources.some(r => r.resourceType === tradeDeal.toResourceType);
+            if (localHasResource && remoteHasResource) {
+                return tradeDeal;
+            }
+        }
+        return null;
     }
 
     public isAbleToSettle(other: Planet): boolean {
@@ -2595,8 +2712,9 @@ export class Planet implements ICameraState {
      * The planet will trade with a ship.
      * @param ship
      * @param unload if the ship will not take cargo
+     * @param specificBuy a specific resource to buy
      */
-    trade(ship: Ship, unload: boolean = false) {
+    trade(ship: Ship, unload: boolean = false, specificBuy: EResourceType | null = null) {
         // a list of items to buy from ship and sell to ship
         let goodsToTake: EResourceType[] = [];
         let goodsToOffer: IResourceExported[] = [];
@@ -2615,6 +2733,11 @@ export class Planet implements ICameraState {
                 ...ship.cargo.filter(c => c.pirated).map(c => c.resourceType)
             ]));
             goodsToOffer = this.feudalObligationResources;
+        }
+
+        // buy a specific good for fair trade
+        if (specificBuy) {
+            goodsToOffer = this.marketResources.filter(r => r.resourceType === specificBuy);
         }
 
         // do not take cargo, because the ship is beginning a piracy mission

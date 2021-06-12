@@ -418,7 +418,7 @@ const setupTradingTest = (numMinutes: number = 20) => {
   }
 
   // expect ship to trade with second planet
-  expect(getOrder.returnValues[numberOfTripsToColonizePlanet].orderType).toBe(EOrderType.TRADE);
+  expect(getOrder.returnValues[numberOfTripsToColonizePlanet].orderType).toBe(EOrderType.FEUDAL_TRADE);
   expect(colonyWorldTradeItem.trade.callCount).toBeGreaterThan(0);
   let buyGoodCall = 0;
   for (let step = 0; step < colonyWorldTradeItem.trade.callCount; step++) {
@@ -727,7 +727,7 @@ const setupPiracyTest = (numMinutes: number = 20) => {
 
     // test begin mission conditions
     if (!englishBegunTrading && englishMerchantShipGetOrder.called) {
-      expect(englishMerchantShipGetOrder.returnValues[0].orderType).toBe(EOrderType.TRADE);
+      expect(englishMerchantShipGetOrder.returnValues[0].orderType).toBe(EOrderType.FEUDAL_TRADE);
       englishBegunTrading = true;
     }
     if (!dutchBegunPirating && dutchPirateShipGetOrder.called) {
