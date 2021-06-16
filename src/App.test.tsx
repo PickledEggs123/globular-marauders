@@ -23,7 +23,7 @@ import {ESettlementLevel, MoneyAccount} from "./Interface";
  * @param wrapGetOrder If the function should wrap getOrder.
  */
 const getTestShip = (app: App, wrapper: ShallowWrapper<any>, colonyWorldTrades: Array<{
-  id: string, trade: sinon.SinonSpy<[ship: Ship, unloaded?: boolean | undefined], void>, planet: Planet
+  id: string, trade: sinon.SinonSpy<[ship: Ship, unloaded?: boolean | undefined, specificBuy?: EResourceType | null | undefined], void>, planet: Planet
 }>, factionType: EFaction, shipType: EShipType, wrapGetOrder?: sinon.SinonSpy<[ship: Ship], Order>) => {
   // setup test ship and nav point
   // select faction

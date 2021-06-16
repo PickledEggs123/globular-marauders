@@ -13,7 +13,7 @@ import {
     OUTPOST_GOODS
 } from "./Resource";
 import {EShipType, Ship, SHIP_DATA} from "./Ship";
-import App, {EDirectedMarketTradeDirection, IDirectedMarketTrade, ITradeDeal} from "./App";
+import App, {EDirectedMarketTradeDirection, IDirectedMarketTrade, ITradeDeal, Server} from "./App";
 import {FeudalGovernment, VoronoiCounty} from "./VoronoiTree";
 import {ERoyalRank, Faction, LuxuryBuff} from "./Faction";
 import {EOrderType, Order} from "./Order";
@@ -29,7 +29,7 @@ export interface IResourceProduced extends IItemRecipe {
 }
 
 export class ShipyardDock {
-    public instance: App;
+    public instance: Server;
     public planet: Planet;
     public shipyard: Shipyard;
     public progress: number = 0;
@@ -37,7 +37,7 @@ export class ShipyardDock {
     public shipType: EShipType | null = null;
     private sentDoneSignal: boolean = false;
 
-    constructor(instance: App, planet: Planet, shipyard: Shipyard) {
+    constructor(instance: Server, planet: Planet, shipyard: Shipyard) {
         this.instance = instance;
         this.planet = planet;
         this.shipyard = shipyard;
@@ -110,7 +110,7 @@ export enum EBuildingType {
  * A building on a planet which can produce resources, to help the island planet function.
  */
 export abstract class Building {
-    public instance: App;
+    public instance: Server;
     public planet: Planet;
     /**
      * The type of a building.
@@ -156,7 +156,7 @@ export abstract class Building {
         this.upgradeProgress = upgradeCost;
     }
 
-    constructor(instance: App, planet: Planet) {
+    constructor(instance: Server, planet: Planet) {
         this.instance = instance;
         this.planet = planet;
     }
@@ -353,7 +353,7 @@ export class Plantation extends Building {
     buildingType: EBuildingType = EBuildingType.PLANTATION;
     resourceType: EResourceType;
 
-    constructor(instance: App, planet: Planet, resourceType: EResourceType) {
+    constructor(instance: Server, planet: Planet, resourceType: EResourceType) {
         super(instance, planet);
         this.resourceType = resourceType;
     }
@@ -389,7 +389,7 @@ export class Manufactory extends Building {
     buildingType: EBuildingType = EBuildingType.MANUFACTORY;
     recipe: IItemRecipe;
 
-    constructor(instance: App, planet: Planet, recipe: IItemRecipe) {
+    constructor(instance: Server, planet: Planet, recipe: IItemRecipe) {
         super(instance, planet);
         this.recipe = recipe;
         this.buildingLevel = 0;
@@ -508,7 +508,7 @@ export class Blacksmith extends Building {
 }
 
 export class Star implements ICameraState {
-    public instance: App;
+    public instance: Server;
     public id: string = "";
     public position: Quaternion = Quaternion.ONE;
     public positionVelocity: Quaternion = Quaternion.ONE;
@@ -517,7 +517,7 @@ export class Star implements ICameraState {
     public color: string = "blue";
     public size: number = 3;
 
-    constructor(instance: App) {
+    constructor(instance: Server) {
         this.instance = instance;
     }
 }
@@ -1279,7 +1279,7 @@ export class Market {
         return profitableResources;
     }
 
-    static ComputeProfitableTradeDirectedGraph(instance: App) {
+    static ComputeProfitableTradeDirectedGraph(instance: Server) {
         // setup best profitable trades for the entire game
         for (const planet of instance.planets) {
             if (planet.moneyAccount) {
@@ -1351,7 +1351,7 @@ export class Market {
 }
 
 export class Planet implements ICameraState {
-    public instance: App;
+    public instance: Server;
 
     // planet properties
     public id: string = "";
@@ -1492,7 +1492,7 @@ export class Planet implements ICameraState {
         return this.shipyard.shipsAvailable[shipType];
     }
 
-    constructor(instance: App, county: VoronoiCounty) {
+    constructor(instance: Server, county: VoronoiCounty) {
         this.instance = instance;
         this.county = county;
 

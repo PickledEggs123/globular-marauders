@@ -1,6 +1,6 @@
 import Quaternion from "quaternion";
 import {IAutomatedShip, ICameraState} from "./Interface";
-import App from "./App";
+import App, {Server} from "./App";
 
 export interface ITessellatedTriangle {
     vertices: Quaternion[];
@@ -66,7 +66,7 @@ export class VoronoiGraph<T extends ICameraState> {
     /**
      * The app containing world scale.
      */
-    app: App;
+    app: Server;
     /**
      * A list of voronoi cell used for rendering and physics.
      */
@@ -82,7 +82,7 @@ export class VoronoiGraph<T extends ICameraState> {
      */
     drawableSet: Record<string, number> = {};
 
-    constructor(app: App) {
+    constructor(app: Server) {
         this.app = app;
     }
 
@@ -274,7 +274,7 @@ export class DelaunayTile implements IDrawableTile {
 interface IPathingGraph {
     vertices: Array<[number, number, number]>;
     edges: [number, number][];
-    app: App;
+    app: Server;
 }
 
 interface IPathingNode<T extends IPathingGraph> {
@@ -302,92 +302,7 @@ export class PathingNode<T extends IPathingGraph> implements IPathingNode<T> {
      * @param other
      */
     public pathToObject(other: IPathingNode<T>): Array<[number, number, number]> {
-        if (this.id < 0 || this.closestVertex < 0 || this.instance === null || this.instance.vertices.length <= 0) {
-            throw new Error("Pathing data is not initialized");
-        }
-
-        // pathing parameters
-        const path: Array<[number, number, number]> = [];
-        const start = this.closestVertex;
-        const end = other.closestVertex;
-        let foundEnd: boolean = false;
-        let fromArray: number[] = [start];
-        const foundNodes: Array<{ from: number, to: number, distance: number }> = [];
-
-        // for upto 100 node jumps
-        for (let distance = 1; distance <= 100 && !foundEnd; distance++) {
-            // perform breadth first search by
-            // copying fromArray and clearing the original then using the copy to iterate
-            const copyOfFromArray = fromArray;
-            fromArray = [];
-            for (const from of copyOfFromArray) {
-                // find leaving edges in delaunay
-                const leavingEdges = this.instance.edges.filter(edge => {
-                    return edge[0] === from;
-                });
-                let leavingEdgeMatched: boolean = false;
-
-                // for each leaving edge
-                for (const edge of leavingEdges) {
-                    const to = edge[1];
-                    // check found nodes for existing data
-                    const matchingNode = foundNodes.find(node => node.to === to);
-                    if (matchingNode) {
-                        // existing data
-                        if (distance < matchingNode.distance) {
-                            // found better distance route, replace distance
-                            matchingNode.distance = distance;
-                            leavingEdgeMatched = true;
-                        }
-                    } else {
-                        // found new unexplored route, record distance
-                        foundNodes.push({
-                            from,
-                            to,
-                            distance
-                        });
-                        leavingEdgeMatched = true;
-                    }
-                    if (to === end) {
-                        // found the end node, terminate execution
-                        foundEnd = true;
-                        break;
-                    }
-                    if (leavingEdgeMatched && !fromArray.includes(to)) {
-                        // a new leaving edge was created or an existing one was updated, continue breadth first search
-                        // by adding to to the next from array
-                        fromArray.push(to);
-                    }
-                }
-            }
-        }
-
-        // find best path from end to start
-        const endNode = foundNodes.find(node => node.to === end);
-        if (endNode) {
-            path.push(other.position);
-            let position: number = end;
-            for (let distance = endNode.distance; distance > 0; distance--) {
-                const positionCopy: number = position;
-                const nextNode = foundNodes.find(node => node.to === positionCopy && node.distance === distance);
-                if (nextNode) {
-                    position = nextNode.from;
-                    path.push(this.instance.vertices[position]);
-                } else {
-                    throw new Error("Could not find next node after building A* map, pathfinding failed.");
-                }
-            }
-            path.push(this.instance.vertices[start]);
-        } else {
-            path.splice(0, path.length);
-            path.push(this.instance.vertices[end]);
-        }
-
-        // remove duplicate nodes
-        if (path.length >= 2 && VoronoiGraph.angularDistance(path[path.length - 1], path[path.length - 2], this.instance.app.worldScale) < App.VELOCITY_STEP / this.instance.app.worldScale * Math.PI / 2) {
-            path.pop();
-        }
-        return path.reverse();
+        return [other.position];
     }
 }
 
@@ -398,7 +313,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
     /**
      * Reference to the app containing the delaunay graph.
      */
-    public app: App;
+    public app: Server;
     /**
      * The vertices of the graph.
      */
@@ -417,7 +332,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
      */
     public pathingNodes: Record<number, PathingNode<DelaunayGraph<T>>> = {};
 
-    constructor(app: App) {
+    constructor(app: Server) {
         this.app = app;
     }
 

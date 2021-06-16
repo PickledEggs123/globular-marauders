@@ -1,5 +1,5 @@
 import Quaternion from "quaternion";
-import App from "./App";
+import App, {Server} from "./App";
 import {PathFinder} from "./Graph";
 import {EFaction} from "./Ship";
 import {Planet} from "./Planet";
@@ -12,7 +12,7 @@ export interface IExpirableTicks {
 
 export interface IAutomatedShip extends ICameraState {
     activeKeys: string[];
-    app: App;
+    app: Server;
 
     isInMissionArea(): boolean;
 

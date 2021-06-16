@@ -1,7 +1,7 @@
 import {IAutomatedShip, ICameraState, MoneyAccount} from "./Interface";
 import Quaternion from "quaternion";
 import {EResourceType, ICargoItem} from "./Resource";
-import App from "./App";
+import App, {Server} from "./App";
 import {EOrderResult, EOrderType, Order} from "./Order";
 import {DelaunayGraph, PathFinder, VoronoiGraph} from "./Graph";
 import {computeConeLineIntersection, IConeHitTest} from "./Intersection";
@@ -214,7 +214,7 @@ export const SHIP_DATA: IShipData[] = [{
 }];
 
 export class Ship implements IAutomatedShip {
-    public app: App;
+    public app: Server;
     public id: string = "";
     public shipType: EShipType;
     public faction: Faction | null = null;
@@ -239,7 +239,7 @@ export class Ship implements IAutomatedShip {
     public healthTickCoolDown = App.HEALTH_TICK_COOL_DOWN;
     public moneyAccount: MoneyAccount = new MoneyAccount();
 
-    constructor(app: App, shipType: EShipType) {
+    constructor(app: Server, shipType: EShipType) {
         this.app = app;
         this.fireControl = new FireControl<Ship>(this.app, this);
         this.shipType = shipType;
@@ -516,7 +516,7 @@ export enum EFaction {
  * Allows the AI ship to fire at other ships in the world.
  */
 export class FireControl<T extends IAutomatedShip> {
-    public app: App;
+    public app: Server;
     public owner: T;
     public targetShipId: string | null = null;
     public coolDown: number = 0;
@@ -524,7 +524,7 @@ export class FireControl<T extends IAutomatedShip> {
     public isAttacking: boolean = false;
     public lastStepShouldRotate: boolean = false;
 
-    constructor(app: App, owner: T) {
+    constructor(app: Server, owner: T) {
         this.app = app;
         this.owner = owner;
     }

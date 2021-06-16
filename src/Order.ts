@@ -2,7 +2,7 @@
  * A type of order for a ship to complete. Orders are actions the ship should take on behalf of the faction.
  */
 import {Ship, SHIP_DATA} from "./Ship";
-import App, {ITradeDeal} from "./App";
+import App, {ITradeDeal, Server} from "./App";
 import {DelaunayGraph, VoronoiGraph} from "./Graph";
 import {ESettlementLevel} from "./Interface";
 import {Faction} from "./Faction";
@@ -53,7 +53,7 @@ export enum EOrderResult {
 }
 
 export class Order {
-    public app: App;
+    public app: Server;
     public owner: Ship;
     public faction: Faction;
     public orderType: EOrderType = EOrderType.ROAM;
@@ -65,7 +65,7 @@ export class Order {
     private stage: number = 0;
     private runningTicks: number = 0;
 
-    constructor(app: App, owner: Ship, faction: Faction) {
+    constructor(app: Server, owner: Ship, faction: Faction) {
         this.app = app;
         this.owner = owner;
         this.faction = faction;
@@ -82,9 +82,22 @@ export class Order {
 
     public pickRandomPlanet() {
         const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
-        const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
-        const nodes = Object.values(this.app.delaunayGraph.pathingNodes);
-        const randomTarget = nodes[Math.floor(Math.random() * nodes.length)];
+
+        // start point
+        const nearestPlanet = this.app.voronoiTerrain.getNearestPlanet(shipPosition);
+        const nearestNode = nearestPlanet.pathingNode;
+        if (!nearestNode) {
+            throw new Error("Could not find nearest pathing node");
+        }
+
+        // end point
+        const randomPlanet = this.app.planets[Math.floor(Math.random() * this.app.planets.length)];
+        const randomTarget = randomPlanet.pathingNode;
+        if (!randomTarget) {
+            throw new Error("Could not find target pathing node");
+        }
+
+        // perform pathing calculation
         this.owner.pathFinding.points = nearestNode.pathToObject(randomTarget);
         this.owner.activeKeys.splice(0, this.owner.activeKeys.length);
     }
@@ -96,7 +109,15 @@ export class Order {
         }
 
         const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
-        const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
+
+        // start point
+        const nearestPlanet = this.app.voronoiTerrain.getNearestPlanet(shipPosition);
+        const nearestNode = nearestPlanet.pathingNode;
+        if (!nearestNode) {
+            throw new Error("Could not find nearest pathing node");
+        }
+
+        // perform pathing calculations
         this.owner.pathFinding.points = nearestNode.pathToObject(homeWorld.pathingNode);
         this.owner.activeKeys.splice(0, this.owner.activeKeys.length);
     }
@@ -111,7 +132,15 @@ export class Order {
         }
 
         const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
-        const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
+
+        // start point
+        const nearestPlanet = this.app.voronoiTerrain.getNearestPlanet(shipPosition);
+        const nearestNode = nearestPlanet.pathingNode;
+        if (!nearestNode) {
+            throw new Error("Could not find nearest pathing node");
+        }
+
+        // perform pathing calculation
         this.owner.pathFinding.points = nearestNode.pathToObject(colonyWorld.pathingNode);
         this.owner.activeKeys.splice(0, this.owner.activeKeys.length);
     }
@@ -137,7 +166,15 @@ export class Order {
         ));
 
         const shipPosition = this.owner.position.rotateVector([0, 0, 1]);
-        const nearestNode = this.app.delaunayGraph.findClosestPathingNode(shipPosition);
+
+        // start point
+        const nearestPlanet = this.app.voronoiTerrain.getNearestPlanet(shipPosition);
+        const nearestNode = nearestPlanet.pathingNode;
+        if (!nearestNode) {
+            throw new Error("Could not find nearest pathing node");
+        }
+
+        // perform pathing calculation
         this.owner.pathFinding.points = [
             ...nearestNode.pathToObject(colonyWorld.pathingNode),
             hidingSpot

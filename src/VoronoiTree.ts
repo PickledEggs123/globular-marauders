@@ -1,13 +1,13 @@
 import {ICameraState} from "./Interface";
 import {DelaunayGraph, VoronoiCell, VoronoiGraph} from "./Graph";
 import Quaternion from "quaternion";
-import App from "./App";
+import App, {Server} from "./App";
 import {Planet, Star} from "./Planet";
 import {Faction} from "./Faction";
 
 interface IVoronoiTreeNodeParent<T extends ICameraState> {
     nodes: Array<VoronoiTreeNode<T>>;
-    app: App;
+    app: Server;
 
     /**
      * How a voronoi tree will break down into smaller parts.
@@ -27,13 +27,13 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
     public parent: IVoronoiTreeNodeParent<T>;
     public neighbors: Array<VoronoiTreeNode<T>> = [];
     public items: T[] = [];
-    public app: App;
+    public app: Server;
 
     public recursionNodeLevels(): number[] {
         return this.parent.recursionNodeLevels();
     }
 
-    constructor(app: App, voronoiCell: VoronoiCell, level: number, parent: IVoronoiTreeNodeParent<T>) {
+    constructor(app: Server, voronoiCell: VoronoiCell, level: number, parent: IVoronoiTreeNodeParent<T>) {
         this.app = app;
         this.voronoiCell = voronoiCell;
         this.point = voronoiCell.centroid;
@@ -451,13 +451,13 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
  */
 export class VoronoiTree<T extends ICameraState> implements IVoronoiTreeNodeParent<T> {
     public nodes: Array<VoronoiTreeNode<T>> = [];
-    public app: App;
+    public app: Server;
 
     public recursionNodeLevels(): number[] {
         return [30, 5, 5];
     }
 
-    constructor(app: App) {
+    constructor(app: Server) {
         this.app = app;
     }
 
@@ -634,7 +634,7 @@ export class VoronoiCounty extends VoronoiTreeNode<ICameraState> {
     capital: Planet | null = null;
 
     constructor(
-        app: App,
+        app: Server,
         voronoiCell: VoronoiCell,
         level: number,
         parent: IVoronoiTreeNodeParent<ICameraState>,
@@ -648,6 +648,13 @@ export class VoronoiCounty extends VoronoiTreeNode<ICameraState> {
 
     public generateTerrain() {
         this.planet = this.app.createPlanet(this.voronoiCell.centroid, this, this.getPlanetId());
+    }
+
+    public getNearestPlanet(position: [number, number, number]): Planet {
+        if (this.planet) {
+            return this.planet;
+        }
+        throw new Error("Could not find nearest planet");
     }
 
     public *getPlanets(): Generator<Planet> {
@@ -699,7 +706,7 @@ export class VoronoiDuchy extends VoronoiTreeNode<ICameraState> {
     color: string = "red";
 
     constructor(
-        app: App,
+        app: Server,
         voronoiCell: VoronoiCell,
         level: number,
         parent: IVoronoiTreeNodeParent<ICameraState>,
@@ -726,6 +733,15 @@ export class VoronoiDuchy extends VoronoiTreeNode<ICameraState> {
         for (const county of this.counties) {
             county.generateTerrain();
         }
+    }
+
+    public getNearestPlanet(position: [number, number, number]): Planet {
+        for (const county of this.counties) {
+            if (county.voronoiCell.containsPoint(position)) {
+                return county.getNearestPlanet(position);
+            }
+        }
+        throw new Error("Could not find nearest planet");
     }
 
     public *getPlanets(position?: [number, number, number]): Generator<Planet> {
@@ -769,7 +785,7 @@ export class VoronoiKingdom extends VoronoiTreeNode<ICameraState> {
     getStarId: () => number;
 
     constructor(
-        app: App,
+        app: Server,
         voronoiCell: VoronoiCell,
         level: number,
         parent: IVoronoiTreeNodeParent<ICameraState>,
@@ -798,6 +814,15 @@ export class VoronoiKingdom extends VoronoiTreeNode<ICameraState> {
         for (const duchy of this.duchies) {
             duchy.generateTerrain();
         }
+    }
+
+    public getNearestPlanet(position: [number, number, number]): Planet {
+        for (const duchy of this.duchies) {
+            if (duchy.voronoiCell.containsPoint(position)) {
+                return duchy.getNearestPlanet(position);
+            }
+        }
+        throw new Error("Could not find nearest planet");
     }
 
     public *getPlanets(position?: [number, number, number]): Generator<Planet> {
@@ -863,6 +888,15 @@ export class VoronoiTerrain extends VoronoiTree<ICameraState> {
         for (const kingdom of this.kingdoms) {
             kingdom.generateTerrain();
         }
+    }
+
+    public getNearestPlanet(position: [number, number, number]): Planet {
+        for (const kingdom of this.kingdoms) {
+            if (kingdom.voronoiCell.containsPoint(position)) {
+                return kingdom.getNearestPlanet(position);
+            }
+        }
+        throw new Error("Could not find nearest planet");
     }
 
     public *getPlanets(position?: [number, number, number]): Generator<Planet> {

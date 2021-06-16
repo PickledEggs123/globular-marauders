@@ -1,6 +1,6 @@
 import {CAPITAL_GOODS, EResourceType, ITEM_DATA} from "./Resource";
 import {EFaction, EShipType, Ship} from "./Ship";
-import App from "./App";
+import App, {Server} from "./App";
 import {Planet} from "./Planet";
 
 export enum ERoyalRank {
@@ -15,7 +15,7 @@ export enum ERoyalRank {
  * A special buff applied to factions when they accumulate luxuries.
  */
 export class LuxuryBuff {
-    public instance: App;
+    public instance: Server;
     public faction: Faction;
     public planet: Planet;
     public resourceType: EResourceType;
@@ -24,7 +24,7 @@ export class LuxuryBuff {
     private expires: number = 10 * 60 * 10;
     private ticks: number = 0;
 
-    constructor(instance: App, faction: Faction, planet: Planet, resourceType: EResourceType, planetId: string, amount: number) {
+    constructor(instance: Server, faction: Faction, planet: Planet, resourceType: EResourceType, planetId: string, amount: number) {
         this.instance = instance;
         this.faction = faction;
         this.planet = planet;
