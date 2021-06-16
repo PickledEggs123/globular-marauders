@@ -2,11 +2,12 @@
  * A type of order for a ship to complete. Orders are actions the ship should take on behalf of the faction.
  */
 import {Ship, SHIP_DATA} from "./Ship";
-import App, {ITradeDeal, Server} from "./App";
+import App from "./App";
 import {DelaunayGraph, VoronoiGraph} from "./Graph";
-import {ESettlementLevel} from "./Interface";
+import {ESettlementLevel, ITradeDeal} from "./Interface";
 import {Faction} from "./Faction";
 import {Planet} from "./Planet";
+import {Server} from "./Server";
 
 /**
  * Different type of orders a faction can issue its ships.
@@ -159,7 +160,7 @@ export class Order {
         }
 
         // compute hiding spot of the pirate
-        const hidingSpot = DelaunayGraph.normalize(App.lerp(
+        const hidingSpot = DelaunayGraph.normalize(Server.lerp(
             colonyWorld.position.rotateVector([0, 0, 1]),
             enemyHomeWorld.position.rotateVector([0, 0, 1]),
             0.25

@@ -1,9 +1,10 @@
 import {ICameraState} from "./Interface";
 import {DelaunayGraph, VoronoiCell, VoronoiGraph} from "./Graph";
 import Quaternion from "quaternion";
-import App, {Server} from "./App";
+import App from "./App";
 import {Planet, Star} from "./Planet";
 import {Faction} from "./Faction";
+import {Server} from "./Server";
 
 interface IVoronoiTreeNodeParent<T extends ICameraState> {
     nodes: Array<VoronoiTreeNode<T>>;
@@ -237,7 +238,7 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
                 // compute intersection with line segment and infinite culling line
                 const innerA = vertices[innerIndex % vertices.length];
                 const innerB = vertices[(innerIndex + 1) % vertices.length];
-                const midPoint = DelaunayGraph.normalize(App.getAveragePoint([innerA, innerB]));
+                const midPoint = DelaunayGraph.normalize(Server.getAveragePoint([innerA, innerB]));
                 const innerN = DelaunayGraph.normalize(DelaunayGraph.crossProduct(innerA, innerB));
                 const line = DelaunayGraph.normalize(DelaunayGraph.crossProduct(outerN, innerN));
                 const intercept: [number, number, number] = DelaunayGraph.dotProduct(line, midPoint) >= 0 ? line : [
@@ -284,7 +285,7 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
         // compute new voronoi cell
         const copy = new VoronoiCell();
         copy.vertices = vertices;
-        copy.centroid = DelaunayGraph.normalize(App.getAveragePoint(copy.vertices));
+        copy.centroid = DelaunayGraph.normalize(Server.getAveragePoint(copy.vertices));
         copy.vertex = polygon.vertex;
         copy.radius = copy.vertices.reduce((acc: number, vertex): number => {
             return Math.max(

@@ -1,4 +1,13 @@
-import {ESettlementLevel, ICameraState, ICurrency, IExplorationGraphData, MoneyAccount} from "./Interface";
+import {
+    EDirectedMarketTradeDirection,
+    ESettlementLevel,
+    ICameraState,
+    ICurrency,
+    IDirectedMarketTrade,
+    IExplorationGraphData,
+    ITradeDeal,
+    MoneyAccount
+} from "./Interface";
 import Quaternion from "quaternion";
 import {DelaunayGraph, PathingNode, VoronoiGraph} from "./Graph";
 import {
@@ -13,10 +22,11 @@ import {
     OUTPOST_GOODS
 } from "./Resource";
 import {EShipType, Ship, SHIP_DATA} from "./Ship";
-import App, {EDirectedMarketTradeDirection, IDirectedMarketTrade, ITradeDeal, Server} from "./App";
+import App from "./App";
 import {FeudalGovernment, VoronoiCounty} from "./VoronoiTree";
 import {ERoyalRank, Faction, LuxuryBuff} from "./Faction";
 import {EOrderType, Order} from "./Order";
+import {Server} from "./Server";
 
 export interface IResourceExported {
     resourceType: EResourceType;
@@ -2797,7 +2807,7 @@ export class Planet implements ICameraState {
         ship.faction = faction;
         ship.planet = this;
         ship.id = `ship-${this.id}-${faction.getShipAutoIncrement()}`;
-        App.addRandomPositionAndOrientationToEntity(ship);
+        Server.addRandomPositionAndOrientationToEntity(ship);
         ship.position = Quaternion.fromBetweenVectors([0, 0, 1], shipPoint);
         ship.color = faction.factionColor;
 

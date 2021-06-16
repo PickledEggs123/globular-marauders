@@ -1,9 +1,10 @@
 import Quaternion from "quaternion";
-import App, {Server} from "./App";
 import {PathFinder} from "./Graph";
 import {EFaction} from "./Ship";
 import {Planet} from "./Planet";
 import {Crate} from "./Item";
+import {Server} from "./Server";
+import {EResourceType} from "./Resource";
 
 export interface IExpirableTicks {
     life: number;
@@ -237,5 +238,32 @@ export interface IExplorationGraphData {
     traderShipIds: string[];
     pirateShipIds: string[];
     enemyStrength: number;
+    planet: Planet;
+}
+
+export enum EDirectedMarketTradeDirection {
+    TO = "TO",
+    FROM = "FROM",
+}
+
+/**
+ * A graph edge used to compute bilateral trade deals. This edge points in one direction. If there are two edges
+ * pointing in opposite direction, there can be a trade deal. An example is if it is 100 dollars to buy something at A
+ * and 200 dollars to sell at B, also 2 dollars to buy at B and 5 dollars to sell at A. It is possible then to sail
+ * between A and B and make money.
+ */
+export interface IDirectedMarketTrade {
+    tradeDirection: EDirectedMarketTradeDirection;
+    resourceType: EResourceType;
+    profit: number;
+}
+
+/**
+ * A trade deal between two planets.
+ */
+export interface ITradeDeal {
+    toResourceType: EResourceType;
+    fromResourceType: EResourceType;
+    profit: number;
     planet: Planet;
 }

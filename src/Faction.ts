@@ -1,7 +1,8 @@
 import {CAPITAL_GOODS, EResourceType, ITEM_DATA} from "./Resource";
 import {EFaction, EShipType, Ship} from "./Ship";
-import App, {Server} from "./App";
+import App from "./App";
 import {Planet} from "./Planet";
+import {Server} from "./Server";
 
 export enum ERoyalRank {
     EMPEROR = "EMPEROR",
@@ -89,7 +90,7 @@ export class Faction {
     /**
      * An instance of app to retrieve faction data.
      */
-    public instance: App;
+    public instance: Server;
     /**
      * The id of the faction.
      */
@@ -137,7 +138,7 @@ export class Faction {
      * @param factionColor The color of the faction.
      * @param homeWorldPlanetId The home world of the faction.
      */
-    constructor(instance: App, id: EFaction, factionColor: string, homeWorldPlanetId: string) {
+    constructor(instance: Server, id: EFaction, factionColor: string, homeWorldPlanetId: string) {
         this.instance = instance;
         this.id = id;
         this.factionColor = factionColor;

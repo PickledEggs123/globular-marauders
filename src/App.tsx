@@ -1,37 +1,27 @@
 import React from 'react';
 import './App.css';
 import Quaternion from 'quaternion';
-import {IHitTest} from "./Intersection";
 import {EResourceType, ITEM_DATA} from "./Resource";
 import {
     ESettlementLevel,
     ICameraState,
     ICameraStateWithOriginal,
-    ICollidable,
     IDrawable,
     IExpirable,
-    IExpirableTicks,
     MIN_DISTANCE,
     MoneyAccount
 } from "./Interface";
-import {EFaction, EShipType, PHYSICS_SCALE, Ship, SHIP_DATA} from "./Ship";
-import {EOrderType, Order} from "./Order";
-import {
-    DelaunayGraph,
-    DelaunayTile,
-    ICellData,
-    IDrawableTile,
-    ITessellatedTriangle,
-    PathingNode,
-    VoronoiCell,
-    VoronoiGraph
-} from "./Graph";
-import {VoronoiCounty, VoronoiKingdom, VoronoiTerrain, VoronoiTree} from "./VoronoiTree";
-import {Faction, LuxuryBuff} from "./Faction";
-import {EBuildingType, Manufactory, Market, Planet, Plantation, Star} from "./Planet";
-import {CannonBall, Crate, SmokeCloud} from "./Item";
+import {EFaction, EShipType, Ship, SHIP_DATA} from "./Ship";
+import {DelaunayGraph, DelaunayTile, IDrawableTile, ITessellatedTriangle, VoronoiCell, VoronoiGraph} from "./Graph";
+import {Faction} from "./Faction";
+import {EBuildingType, Manufactory, Planet, Plantation} from "./Planet";
+import {Crate, SmokeCloud} from "./Item";
 import * as Tone from "tone";
+import {EMessageType, IAutoPilotMessage, IKeyboardMessage, ISpawnMessage, Server} from "./Server";
 
+/**
+ * A class for playing music through a series of notes. The data is a list of musical notes to play in sequence.
+ */
 export class MusicPlayer {
     synth: Tone.PolySynth | null = null;
     synthPart: Tone.Sequence | null = null;
@@ -310,32 +300,40 @@ export class MusicPlayer {
     }
 }
 
+/**
+ * A class used to draw a line in the world, useful for drawing pathing directions with bends and turns.
+ */
 interface ITargetLineData {
     targetLines: Array<[[number, number], [number, number]]>,
     targetNodes: Array<[[number, number], number]>
 }
 
+/**
+ * Which mode the app is in.
+ */
 enum EVoronoiMode {
     KINGDOM = "KINGDOM",
     DUCHY = "DUCHY",
     COUNTY = "COUNTY"
 }
 
+/**
+ * The input parameters of the app.
+ */
 interface IAppProps {
     /**
      * If the app is in test mode.
      */
     isTestMode?: boolean;
     /**
-     * If the app is in voronoi test mode.
-     */
-    isVoronoiTestMode?: boolean;
-    /**
      * The size of the world, initially
      */
     worldScale?: number;
 }
 
+/**
+ * The state of the app.
+ */
 interface IAppState {
     showNotes: boolean;
     showShips: boolean;
@@ -352,1086 +350,7 @@ interface IAppState {
     faction: EFaction | null;
 }
 
-export enum EDirectedMarketTradeDirection {
-    TO = "TO",
-    FROM = "FROM",
-}
-
-export interface IDirectedMarketTrade {
-    tradeDirection: EDirectedMarketTradeDirection;
-    resourceType: EResourceType;
-    profit: number;
-}
-
-export interface ITradeDeal {
-    toResourceType: EResourceType;
-    fromResourceType: EResourceType;
-    profit: number;
-    planet: Planet;
-}
-
-export interface IPlayerData {
-    activeKeys: string[];
-    moneyAccount: MoneyAccount;
-    shipId: string;
-    autoPilotEnabled: boolean;
-}
-
-export class Server extends React.Component<IAppProps, IAppState> {
-    public voronoiShips: VoronoiTree<Ship> = new VoronoiTree(this);
-    public voronoiTerrain: VoronoiTerrain = new VoronoiTerrain(this);
-    public factions: { [key: string]: Faction } = {};
-    public ships: Ship[] = [];
-    public playerShip: Ship | null = null;
-    public crates: Crate[] = [];
-    public planets: Planet[] = [];
-    public directedMarketTrade: Record<string, Array<IDirectedMarketTrade>> = {};
-    public smokeClouds: SmokeCloud[] = [];
-    public cannonBalls: CannonBall[] = [];
-    public luxuryBuffs: LuxuryBuff[] = [];
-    public worldScale: number = 3;
-    public demoAttackingShipId: string | null = null;
-    public lastDemoAttackingShipTime: Date = new Date();
-    public tradeTick: number = 10 * 5;
-    public playerData: IPlayerData[] = [];
-
-    /**
-     * Velocity step size of ships.
-     */
-    public static VELOCITY_STEP: number = 1 / 6000;
-    /**
-     * The speed of the cannon ball projectiles.
-     */
-    public static PROJECTILE_SPEED: number = Server.VELOCITY_STEP * 100;
-    /**
-     * How long a cannon ball will live for in ticks.
-     */
-    public static PROJECTILE_LIFE: number = 40;
-    /**
-     * The enemy detection range.
-     */
-    public static PROJECTILE_DETECTION_RANGE: number = Server.PROJECTILE_SPEED * Server.PROJECTILE_LIFE * 1.2;
-    /**
-     * The number of burn ticks.
-     */
-    public static NUM_BURN_TICKS: number = 10;
-    /**
-     * The number of repair ticks.
-     */
-    public static NUM_REPAIR_TICKS: number = 10;
-    /**
-     * The number of ticks between each health tick event.
-     */
-    public static HEALTH_TICK_COOL_DOWN: number = 3 * 10;
-    /**
-     * The amount of damage that is burn damage.
-     */
-    public static BURN_DAMAGE_RATIO: number = 0.5;
-    /**
-     * The amount of damage that is repairable damage.
-     */
-    public static REPAIR_DAMAGE_RATIO: number = 0.8;
-    /**
-     * Rotation step size of ships.
-     */
-    public static ROTATION_STEP: number = 1 / 300;
-    /**
-     * The drag which slows down increases of velocity.
-     */
-    public static VELOCITY_DRAG: number = 1 / 20;
-    /**
-     * The rotation which slows down increases of rotation.
-     */
-    public static ROTATION_DRAG: number = 1 / 10;
-    /**
-     * The power of the brake action. Slow down velocity dramatically.
-     */
-    public static BRAKE_POWER: number = 1 / 10;
-    /**
-     * THe number of seconds between each trade tick.
-     */
-    public static TRADE_TICK_COOL_DOWN: number = 10 * 60 * 10;
-
-
-    static GetCameraState(viewableObject: ICameraState): ICameraState {
-        return {
-            id: viewableObject.id,
-            color: viewableObject.color,
-            position: viewableObject.position.clone(),
-            positionVelocity: viewableObject.positionVelocity.clone(),
-            orientation: viewableObject.orientation.clone(),
-            orientationVelocity: viewableObject.orientationVelocity.clone(),
-            cannonLoading: viewableObject.cannonLoading,
-            size: viewableObject.size,
-        };
-    }
-
-    /**
-     * Get the currently selected player ship. This is a place holder method within the server class. It should return
-     * identity. The client will render this result centered on the player's ship while the server will render an
-     * identity ship.
-     */
-    public getPlayerShip(): ICameraState {
-        // no faction selected, orbit the world
-        const tempShip = new Ship(this, EShipType.CUTTER);
-        tempShip.id = "ghost-ship";
-        return Server.GetCameraState(tempShip);
-    }
-
-
-    /**
-     * Compute a set of physics quaternions for the hull.
-     * @param hullPoints A physics hull to convert to quaternions.
-     * @param worldScale The size of the world.
-     * @private
-     */
-    protected static getPhysicsHull(hullPoints: Array<[number, number]>, worldScale: number): Quaternion[] {
-        const hullSpherePoints = hullPoints.map(([xi, yi]): [number, number, number] => {
-            const x = xi * PHYSICS_SCALE / worldScale;
-            const y = -yi * PHYSICS_SCALE / worldScale;
-            const z = Math.sqrt(1 - Math.pow(x, 2) - Math.pow(y, 2));
-            return [x, y, z];
-        });
-        return hullSpherePoints.map((point) => Quaternion.fromBetweenVectors([0, 0, 1], point));
-    }
-
-    public static getAveragePoint(points: Array<[number, number, number]>): [number, number, number] {
-        let sum: [number, number, number] = [0, 0, 0];
-        for (const point of points) {
-            sum = DelaunayGraph.add(sum, point);
-        }
-        return [
-            sum[0] / points.length,
-            sum[1] / points.length,
-            sum[2] / points.length,
-        ];
-    }
-
-    /**
-     * Process a ship by making changes to the ship's data.
-     * @param shipIndex Index to get ship's state.
-     * @param getActiveKeys Get the ship's active keys.
-     * @param isAutomated If the function is called by AI, which shouldn't clear pathfinding logic.
-     * @private
-     */
-    private handleShipLoop(shipIndex: number, getActiveKeys: () => string[], isAutomated: boolean) {
-        let {
-            id: cameraId,
-            position: cameraPosition,
-            positionVelocity: cameraPositionVelocity,
-            orientation: cameraOrientation,
-            orientationVelocity: cameraOrientationVelocity,
-            cannonLoading: cameraCannonLoading,
-            cannonCoolDown,
-            shipType,
-            faction
-        } = this.ships[shipIndex];
-        const shipData = SHIP_DATA.find(i => i.shipType === shipType);
-        if (!shipData) {
-            throw new Error("Could not find Ship Type");
-        }
-        const speedFactor = this.ships[shipIndex].getSpeedFactor();
-        const smokeClouds = [
-            ...this.smokeClouds.slice(-20)
-        ];
-        const cannonBalls = [
-            ...this.cannonBalls.slice(-100)
-        ];
-
-        let clearPathFindingPoints: boolean = false;
-
-        const activeKeys = getActiveKeys();
-
-        // handle movement
-        if (activeKeys.includes("a")) {
-            const rotation = Quaternion.fromAxisAngle([0, 0, 1], Math.PI).pow(App.ROTATION_STEP);
-            const rotationDrag = cameraOrientationVelocity.pow(App.ROTATION_DRAG).inverse();
-            cameraOrientationVelocity = cameraOrientationVelocity.clone().mul(rotation).mul(rotationDrag);
-            if (VoronoiGraph.angularDistanceQuaternion(cameraOrientationVelocity, 1) < Math.PI * App.ROTATION_STEP * 0.9) {
-                cameraOrientationVelocity = Quaternion.ONE;
-            }
-        }
-        if (activeKeys.includes("d")) {
-            const rotation = Quaternion.fromAxisAngle([0, 0, 1], -Math.PI).pow(App.ROTATION_STEP);
-            const rotationDrag = cameraOrientationVelocity.pow(App.ROTATION_DRAG).inverse();
-            cameraOrientationVelocity = cameraOrientationVelocity.clone().mul(rotation).mul(rotationDrag);
-            if (VoronoiGraph.angularDistanceQuaternion(cameraOrientationVelocity, 1) < Math.PI * App.ROTATION_STEP * 0.9) {
-                cameraOrientationVelocity = Quaternion.ONE;
-            }
-        }
-        if (activeKeys.includes("w")) {
-            const forward = cameraOrientation.clone().rotateVector([0, 1, 0]);
-            const rotation = Quaternion.fromBetweenVectors([0, 0, 1], forward).pow(App.VELOCITY_STEP / this.worldScale);
-            const rotationDrag = cameraPositionVelocity.pow(App.VELOCITY_DRAG / this.worldScale).inverse();
-            cameraPositionVelocity = cameraPositionVelocity.clone().mul(rotation).mul(rotationDrag);
-            if (VoronoiGraph.angularDistanceQuaternion(cameraPositionVelocity, this.worldScale) < Math.PI / 2 * App.VELOCITY_STEP / this.worldScale) {
-                cameraPositionVelocity = Quaternion.ONE;
-            }
-
-            // make backward smoke cloud
-            const smokeCloud = new SmokeCloud();
-            smokeCloud.id = `${cameraId}-${Math.floor(Math.random() * 100000000)}`;
-            smokeCloud.position = cameraPosition.clone();
-            smokeCloud.positionVelocity = cameraOrientation.clone().inverse()
-                .mul(cameraPosition.clone().inverse())
-                .mul(rotation.clone())
-                .mul(cameraPosition.clone())
-                .mul(cameraOrientation.clone());
-            smokeCloud.size = 2;
-            smokeClouds.push(smokeCloud);
-        }
-        if (activeKeys.includes("s")) {
-            const rotation = cameraPositionVelocity.clone().inverse().pow(App.BRAKE_POWER / this.worldScale);
-            cameraPositionVelocity = cameraPositionVelocity.clone().mul(rotation);
-            if (VoronoiGraph.angularDistanceQuaternion(cameraPositionVelocity, this.worldScale) < Math.PI / 2 * App.VELOCITY_STEP / this.worldScale) {
-                cameraPositionVelocity = Quaternion.ONE;
-            }
-
-            // get smoke cloud parameters
-            const engineBackwardsPointInitial = rotation.rotateVector([0, 0, 1]);
-            engineBackwardsPointInitial[2] = 0;
-            const engineBackwardsPoint = DelaunayGraph.normalize(engineBackwardsPointInitial);
-            const engineBackwards = Quaternion.fromBetweenVectors([0, 0, 1], engineBackwardsPoint).pow(App.VELOCITY_STEP / this.worldScale);
-
-            // make left smoke cloud
-            const smokeCloudLeft = new SmokeCloud();
-            smokeCloudLeft.id = `${cameraId}-${Math.floor(Math.random() * 100000000)}`;
-            smokeCloudLeft.position = cameraPosition.clone();
-            smokeCloudLeft.positionVelocity = cameraOrientation.clone().inverse()
-                .mul(cameraPosition.clone().inverse())
-                .mul(Quaternion.fromAxisAngle([0, 0, 1], Math.PI / 4))
-                .mul(engineBackwards.clone())
-                .mul(cameraPosition.clone())
-                .mul(cameraOrientation.clone());
-            smokeCloudLeft.size = 2;
-            smokeClouds.push(smokeCloudLeft);
-
-            // make right smoke cloud
-            const smokeCloudRight = new SmokeCloud();
-            smokeCloudRight.id = `${cameraId}-${Math.floor(Math.random() * 100000000)}`;
-            smokeCloudRight.position = cameraPosition.clone();
-            smokeCloudLeft.positionVelocity = cameraOrientation.clone().inverse()
-                .mul(cameraPosition.clone().inverse())
-                .mul(Quaternion.fromAxisAngle([0, 0, 1], -Math.PI / 4))
-                .mul(engineBackwards.clone())
-                .mul(cameraPosition.clone())
-                .mul(cameraOrientation.clone());
-            smokeCloudRight.size = 2;
-            smokeClouds.push(smokeCloudRight);
-        }
-
-        // handle main cannons
-        if (activeKeys.includes(" ") && !cameraCannonLoading && cannonCoolDown <= 0) {
-            cameraCannonLoading = new Date(Date.now());
-        }
-        if (!activeKeys.includes(" ") && cameraCannonLoading && faction && cannonCoolDown <= 0) {
-            // cannon fire
-            cameraCannonLoading = undefined;
-            cannonCoolDown = 20;
-
-            // fire cannons
-            for (let i = 0; i < shipData.cannons.numCannons; i++) {
-                // pick left or right side
-                let jitterPoint: [number, number, number] = [i % 2 === 0 ? -1 : 1, 0, 0];
-                // apply random jitter
-                jitterPoint[1] += DelaunayGraph.randomInt() * 0.15;
-                jitterPoint = DelaunayGraph.normalize(jitterPoint);
-                const fireDirection = cameraOrientation.clone().rotateVector(jitterPoint);
-                const fireVelocity = Quaternion.fromBetweenVectors([0, 0, 1], fireDirection).pow(App.PROJECTILE_SPEED / this.worldScale);
-
-                // create a cannon ball
-                const cannonBall = new CannonBall(faction.id);
-                cannonBall.id = `${cameraId}-${Math.floor(Math.random() * 100000000)}`;
-                cannonBall.position = cameraPosition.clone();
-                cannonBall.positionVelocity = fireVelocity.clone();
-                cannonBall.size = 15;
-                cannonBall.damage = 10;
-                cannonBalls.push(cannonBall);
-            }
-        }
-        if (activeKeys.includes(" ") && cameraCannonLoading && Date.now() - +cameraCannonLoading > 3000) {
-            // cancel cannon fire
-            cameraCannonLoading = undefined;
-        }
-
-        // handle automatic cannonades
-        for (let i = 0; i < this.ships[shipIndex].cannonadeCoolDown.length; i++) {
-            const cannonadeCoolDown = this.ships[shipIndex].cannonadeCoolDown[i];
-            if (cannonadeCoolDown <= 0) {
-                // find nearby ship
-                const targetVector = this.ships[shipIndex].fireControl.getTargetVector();
-                if (!targetVector) {
-                    continue;
-                }
-
-                // aim at ship with slight jitter
-                const angle = Math.atan2(targetVector[1], targetVector[0]);
-                const jitter = (Math.random() * 2 - 1) * 5 * Math.PI / 180;
-                const jitterPoint: [number, number, number] = [
-                    Math.cos(jitter + angle),
-                    Math.sin(jitter + angle),
-                    0
-                ];
-                const fireDirection = cameraOrientation.clone().rotateVector(jitterPoint);
-                const fireVelocity = Quaternion.fromBetweenVectors([0, 0, 1], fireDirection).pow(App.PROJECTILE_SPEED / this.worldScale);
-
-                // no faction, no cannon balls
-                if (!faction) {
-                    continue;
-                }
-
-                // roll a dice to have random cannonade fire
-                if (Math.random() > 0.1) {
-                    continue;
-                }
-
-                // create a cannon ball
-                const cannonBall = new CannonBall(faction.id);
-                cannonBall.id = `${cameraId}-${Math.floor(Math.random() * 100000000)}`;
-                cannonBall.position = cameraPosition.clone();
-                cannonBall.positionVelocity = fireVelocity.clone();
-                cannonBall.size = 15;
-                cannonBall.damage = 10;
-                cannonBalls.push(cannonBall);
-
-                // apply a cool down to the cannonades
-                this.ships[shipIndex].cannonadeCoolDown[i] = 45;
-            } else if (cannonadeCoolDown > 0) {
-                this.ships[shipIndex].cannonadeCoolDown[i] = this.ships[shipIndex].cannonadeCoolDown[i] - 1;
-            }
-        }
-
-        // if (activeKeys.some(key => ["a", "s", "d", "w", " "].includes(key)) && !isAutomated) {
-        //     clearPathFindingPoints = true;
-        // }
-
-        // apply velocity
-        if (cameraPositionVelocity !== Quaternion.ONE) {
-            cameraPosition = cameraPosition.clone().mul(cameraPositionVelocity.clone().pow(speedFactor));
-        }
-        if (cameraOrientationVelocity !== Quaternion.ONE) {
-            cameraOrientation = cameraOrientation.clone().mul(cameraOrientationVelocity.clone().pow(speedFactor));
-        }
-        if (cameraPosition !== this.ships[shipIndex].position && false) {
-            const diffQuaternion = this.ships[shipIndex].position.clone().inverse().mul(cameraPosition.clone());
-            cameraOrientation = cameraOrientation.clone().mul(diffQuaternion);
-        }
-
-        // handle cool downs
-        if (cannonCoolDown > 0) {
-            cannonCoolDown -= 1;
-        }
-        this.ships[shipIndex].handleHealthTick();
-
-        this.ships[shipIndex].position = cameraPosition;
-        this.ships[shipIndex].orientation = cameraOrientation;
-        this.ships[shipIndex].positionVelocity = cameraPositionVelocity;
-        this.ships[shipIndex].orientationVelocity = cameraOrientationVelocity;
-        this.ships[shipIndex].cannonLoading = cameraCannonLoading;
-        this.ships[shipIndex].cannonCoolDown = cannonCoolDown;
-        if (clearPathFindingPoints) {
-            this.ships[shipIndex].pathFinding.points = [];
-        }
-        if (!isAutomated)
-            this.smokeClouds = smokeClouds;
-        this.cannonBalls = cannonBalls;
-    }
-
-    public static computeIntercept(a: [number, number, number], b: [number, number, number], c: [number, number, number], d: [number, number, number]): [number, number, number] {
-        const midPoint = DelaunayGraph.normalize(App.getAveragePoint([a, b]));
-        const n1 = DelaunayGraph.crossProduct(a, b);
-        const n2 = DelaunayGraph.crossProduct(c, d);
-        const n = DelaunayGraph.crossProduct(n1, n2);
-        return DelaunayGraph.dotProduct(n, midPoint) >= 0 ? n : [
-            -n[0],
-            -n[1],
-            -n[2]
-        ];
-    }
-
-    /**
-     * Compute a cannon ball collision.
-     * @param cannonBall The cannon ball to shoot.
-     * @param ship The ship to collide against.
-     * @param worldScale The size of the world.
-     * @private
-     */
-    public static cannonBallCollision(cannonBall: ICollidable, ship: Ship, worldScale: number): IHitTest {
-        const shipData = SHIP_DATA.find(s => s.shipType === ship.shipType);
-        if (!shipData) {
-            throw new Error("Could not find ship type");
-        }
-
-        const c = cannonBall.position.clone().rotateVector([0, 0, 1]);
-        const d = cannonBall.position.clone().mul(
-            ship.positionVelocity.clone().inverse().mul(cannonBall.positionVelocity.clone())
-        ).rotateVector([0, 0, 1]);
-        const cannonBallDistance = VoronoiGraph.angularDistance(c, d, worldScale);
-
-        let hitPoint: [number, number, number] | null = null;
-        let hitDistance: number | null = null;
-        const hull = App.getPhysicsHull(shipData.hull, worldScale).map((q): Quaternion => {
-            return ship.position.clone().mul(ship.orientation.clone()).mul(q);
-        });
-        for (let i = 0; i < hull.length; i++) {
-            const a = hull[i % hull.length].rotateVector([0, 0, 1]);
-            const b = hull[(i + 1) % hull.length].rotateVector([0, 0, 1]);
-            const intercept = App.computeIntercept(a, b, c, d);
-            const segmentLength = VoronoiGraph.angularDistance(a, b, worldScale);
-            const interceptSegmentLength = VoronoiGraph.angularDistance(a, intercept, worldScale) + VoronoiGraph.angularDistance(intercept, b, worldScale);
-            const isInsideSegment = interceptSegmentLength - PHYSICS_SCALE / worldScale * cannonBall.size * 2 <= segmentLength;
-            const interceptVelocityLength = VoronoiGraph.angularDistance(c, intercept, worldScale) + VoronoiGraph.angularDistance(intercept, d, worldScale);
-            const isInsideVelocity = interceptVelocityLength - PHYSICS_SCALE / worldScale <= cannonBallDistance;
-            const interceptDistance = VoronoiGraph.angularDistance(c, intercept, worldScale);
-            if (isInsideSegment && isInsideVelocity && (!hitPoint || (hitPoint && hitDistance && interceptDistance < hitDistance))) {
-                hitPoint = intercept;
-                hitDistance = interceptDistance;
-            }
-        }
-
-        const hitTime: number | null = hitDistance ? hitDistance / cannonBallDistance : null;
-        return {
-            success: hitTime !== null && hitTime >= 0 && hitTime < 1,
-            distance: hitDistance,
-            point: hitPoint,
-            time: hitTime,
-        };
-    }
-
-    private isTradeTick(): boolean {
-        if (this.tradeTick <= 0) {
-            this.tradeTick = App.TRADE_TICK_COOL_DOWN;
-            return true;
-        } else {
-            this.tradeTick -= 1;
-            return false;
-        }
-    }
-
-    public handleServerLoop() {
-        if (this.isTradeTick()) {
-            Market.ComputeProfitableTradeDirectedGraph(this);
-        }
-
-        // expire smoke clouds
-        const expiredSmokeClouds: SmokeCloud[] = [];
-        for (const smokeCloud of this.smokeClouds) {
-            const isExpired = +smokeCloud.expires > Date.now();
-            if (isExpired) {
-                expiredSmokeClouds.push(smokeCloud);
-            }
-        }
-        for (const expiredSmokeCloud of expiredSmokeClouds) {
-            const index = this.smokeClouds.findIndex(s => s === expiredSmokeCloud);
-            if (index >= 0) {
-                this.smokeClouds.splice(index, 1);
-            }
-        }
-
-        // expire cannon balls and crates
-        const expirableArrays: Array<IExpirableTicks[]> = [
-            this.cannonBalls,
-            this.crates
-        ];
-        for (const expirableArray of expirableArrays) {
-
-            // collect expired entities
-            const expiredEntities: IExpirableTicks[] = [];
-            for (const entity of expirableArray) {
-                const isExpired = entity.life >= entity.maxLife;
-                if (isExpired) {
-                    expiredEntities.push(entity);
-                }
-            }
-
-            // remove expired entities
-            for (const expiredEntity of expiredEntities) {
-                const index = expirableArray.findIndex(s => s === expiredEntity);
-                if (index >= 0) {
-                    expirableArray.splice(index, 1);
-                }
-            }
-        }
-
-        // move cannon balls and crates
-        const movableArrays: Array<Array<ICameraState & IExpirableTicks>> = [
-            this.cannonBalls,
-            this.crates
-        ];
-        for (const movableArray of movableArrays) {
-            for (const entity of movableArray) {
-                entity.position = entity.position.clone().mul(entity.positionVelocity.clone());
-                entity.orientation = entity.orientation.clone().mul(entity.orientationVelocity.clone());
-                entity.life += 1;
-            }
-        }
-
-        // handle physics and collision detection
-        const collidableArrays: Array<{
-            arr: ICollidable[],
-            collideFn: (this: Server, ship: Ship, entity: ICollidable, hit: IHitTest) => void,
-            useRayCast: boolean
-        }> = [{
-            arr: this.cannonBalls,
-            collideFn(this: Server, ship: Ship, entity: ICollidable, hit: IHitTest) {
-                ship.applyDamage(entity as CannonBall);
-
-                // make collision smoke cloud
-                if (hit.point) {
-                    const smokeCloud = new SmokeCloud();
-                    smokeCloud.id = `${ship.id}-${Math.floor(Math.random() * 100000000)}`;
-                    smokeCloud.position = Quaternion.fromBetweenVectors([0, 0, 1], hit.point);
-                    smokeCloud.size = 2;
-                    this.smokeClouds.push(smokeCloud);
-                }
-            },
-            useRayCast: true
-        }, {
-            arr: this.crates,
-            collideFn(this: Server, ship: Ship, entity: ICollidable, hit: IHitTest) {
-                ship.pickUpCargo(entity as Crate);
-            },
-            useRayCast: false
-        }];
-        for (const {arr: collidableArray, collideFn, useRayCast} of collidableArrays) {
-            const entitiesToRemove = [];
-            for (const entity of collidableArray) {
-                // get nearby ships
-                const position = entity.position.rotateVector([0, 0, 1]);
-                const nearByShips = Array.from(this.voronoiShips.listItems(position));
-
-                // compute closest ship
-                let bestHit: IHitTest | null = null;
-                let bestShip: Ship | null = null;
-                for (const nearByShip of nearByShips) {
-                    if (useRayCast) {
-                        const hit = App.cannonBallCollision(entity, nearByShip, this.worldScale);
-                        if (hit.success && hit.time && (!bestHit || (bestHit && bestHit.time && hit.time < bestHit.time))) {
-                            bestHit = hit;
-                            bestShip = nearByShip;
-                        }
-                    } else {
-                        const point = nearByShip.position.rotateVector([0, 0, 1]);
-                        const distance = VoronoiGraph.angularDistance(
-                            point,
-                            position,
-                            this.worldScale
-                        );
-                        if (distance < PHYSICS_SCALE * (entity.size || 1) && (!bestHit || (bestHit && bestHit.distance && distance < bestHit.distance))) {
-                            bestHit = {
-                                success: true,
-                                distance,
-                                time: 0,
-                                point
-                            };
-                            bestShip = nearByShip;
-                        }
-                    }
-                }
-
-                // apply damage
-                const teamDamage = bestShip && bestShip.faction && entity.factionId && bestShip.faction.id === entity.factionId;
-                if (bestHit && bestShip && !teamDamage) {
-                    collideFn.call(this, bestShip, entity, bestHit);
-                    entitiesToRemove.push(entity);
-                }
-            }
-            // remove collided cannon balls
-            for (const entityToRemove of entitiesToRemove) {
-                const index = collidableArray.findIndex(c => c === entityToRemove);
-                if (index >= 0) {
-                    collidableArray.splice(index, 1);
-                }
-            }
-        }
-
-        // update collision acceleration structures
-        for (const ship of this.ships) {
-            this.voronoiShips.removeItem(ship);
-        }
-
-        // AI ship loop
-        const destroyedShips: Ship[] = [];
-        for (let i = 0; i < this.ships.length; i++) {
-            const ship = this.ships[i];
-
-            // handle ship health
-            if (ship.health <= 0) {
-                destroyedShips.push(ship);
-                const crates = ship.destroy();
-                for (const crate of crates) {
-                    this.crates.push(crate);
-                }
-                continue;
-            }
-
-            // handle ship orders
-            // handle automatic piracy orders
-            const hasPiracyOrder: boolean = ship.hasPirateOrder();
-            const hasPirateCargo: boolean = ship.hasPirateCargo();
-            if (!hasPiracyOrder && hasPirateCargo && ship.faction) {
-                const piracyOrder = new Order(this, ship, ship.faction);
-                piracyOrder.orderType = EOrderType.PIRATE;
-                ship.orders.splice(0, 0, piracyOrder);
-            }
-            // get new orders from faction
-            if (ship.orders.length === 0) {
-                if (ship.planet) {
-                    ship.orders.push(ship.planet.getOrder(ship));
-                }
-            }
-            // handle first priority order
-            const shipOrder = ship.orders[0];
-            if (shipOrder) {
-                shipOrder.handleOrderLoop();
-            }
-
-            if (ship.fireControl.targetShipId) {
-                // handle firing at ships
-                ship.fireControl.fireControlLoop();
-            }
-            // handle pathfinding
-            ship.pathFinding.pathFindingLoop(ship.fireControl.isAttacking);
-
-            const playerData = this.playerData.find(d => d.shipId === ship.id);
-            if (playerData && !playerData.autoPilotEnabled) {
-                // ship is player ship which has no auto pilot, accept player control
-                this.handleShipLoop(i, () => playerData.activeKeys, false);
-            } else {
-                // ship is npc ship if autoPilot is not enabled
-                this.handleShipLoop(i, () => ship.activeKeys, true);
-            }
-        }
-
-        // remove destroyed ships
-        for (const destroyedShip of destroyedShips) {
-            if (destroyedShip === this.playerShip) {
-                this.playerShip = null;
-                this.playerData.splice(0, this.playerData.length);
-                this.setState({
-                    showSpawnMenu: true
-                });
-            }
-            const index = this.ships.findIndex(s => s === destroyedShip);
-            if (index >= 0) {
-                this.ships.splice(index, 1);
-            }
-        }
-
-        // update collision acceleration structures
-        for (const ship of this.ships) {
-            this.voronoiShips.addItem(ship);
-        }
-
-        for (const ship of this.ships) {
-            // handle detecting ships to shoot at
-            if (!ship.fireControl.targetShipId || ship.fireControl.retargetCoolDown) {
-                // get a list of nearby ships
-                const shipPosition = ship.position.clone().rotateVector([0, 0, 1]);
-                const nearByShips = Array.from(this.voronoiShips.listItems(shipPosition));
-                const nearByEnemyShips: Ship[] = [];
-                const nearByFriendlyShips: Ship[] = [];
-                for (const nearByShip of nearByShips) {
-                    if (VoronoiGraph.angularDistance(
-                        nearByShip.position.clone().rotateVector([0, 0, 1]),
-                        shipPosition,
-                        this.worldScale
-                    ) < App.PROJECTILE_DETECTION_RANGE) {
-                        if (!(nearByShip.faction && ship.faction && nearByShip.faction.id === ship.faction.id)) {
-                            nearByEnemyShips.push(nearByShip);
-                        } else {
-                            nearByFriendlyShips.push(nearByShip);
-                        }
-                    }
-                }
-
-                // find closest target
-                let closestTarget: Ship | null = null;
-                let closestDistance: number | null = null;
-                // also count the number of cannons
-                let numEnemyCannons: number = 0;
-                let numFriendlyCannons: number = 0;
-                for (const nearByEnemyShip of nearByEnemyShips) {
-                    const distance = VoronoiGraph.angularDistance(
-                        shipPosition,
-                        nearByEnemyShip.position.clone().rotateVector([0, 0, 1]),
-                        this.worldScale
-                    );
-                    if (!closestDistance || distance < closestDistance) {
-                        closestDistance = distance;
-                        closestTarget = nearByEnemyShip;
-                    }
-
-                    const shipData = SHIP_DATA.find(s => s.shipType === nearByEnemyShip.shipType);
-                    if (!shipData) {
-                        throw new Error("Could not find ship type");
-                    }
-                    numEnemyCannons += shipData.cannons.numCannons;
-                }
-                for (const nearByFriendlyShip of nearByFriendlyShips) {
-                    const shipData = SHIP_DATA.find(s => s.shipType === nearByFriendlyShip.shipType);
-                    if (!shipData) {
-                        throw new Error("Could not find ship type");
-                    }
-                    numFriendlyCannons += shipData.cannons.numCannons;
-                }
-
-                // set closest target
-                if (closestTarget) {
-                    ship.fireControl.targetShipId = closestTarget.id;
-                    if (!this.demoAttackingShipId || +this.lastDemoAttackingShipTime + 30 * 1000 < +new Date()) {
-                        this.demoAttackingShipId = ship.id;
-                        this.lastDemoAttackingShipTime = new Date();
-                    }
-                }
-
-                // if too many ships, cancel order and stop attacking
-                const currentShipData = SHIP_DATA.find(s => s.shipType === ship.shipType);
-                if (!currentShipData) {
-                    throw new Error("Could not find ship type");
-                }
-                if (numEnemyCannons > (numFriendlyCannons + currentShipData.cannons.numCannons) * 1.5 && ship.hasPirateOrder()) {
-                    for (const order of ship.orders) {
-                        order.cancelOrder(numEnemyCannons);
-                        ship.fireControl.isAttacking = false;
-                    }
-                }
-            }
-        }
-
-        // handle planet loop
-        for (const planet of this.planets) {
-            planet.handlePlanetLoop();
-        }
-
-        // handle AI factions
-        for (const faction of Object.values(this.factions)) {
-            faction.handleFactionLoop();
-        }
-    }
-
-    private static MAX_TESSELLATION: number = 3;
-
-    private static randomRange(start: number = -1, end: number = 1): number {
-        const value = Math.random();
-        return start + (end - start) * value;
-    }
-
-    protected rotateDelaunayTriangle(earthLike: boolean, triangle: ICellData, index: number): IDrawableTile {
-        const {
-            position: cameraPosition,
-            orientation: cameraOrientation,
-        } = this.getPlayerShip();
-        const pointToQuaternion = (v: [number, number, number]): Quaternion => {
-            const q = Quaternion.fromBetweenVectors([0, 0, 1], v);
-            return cameraOrientation.clone().inverse()
-                .mul(cameraPosition.clone().inverse())
-                .mul(q);
-        };
-        const vertices = triangle.vertices.map(pointToQuaternion);
-        let color: string = "red";
-        if (earthLike) {
-            // earth colors
-            if (index % 6 < 2) {
-                color = "green";
-            } else {
-                color = "blue";
-            }
-        } else {
-            // beach ball colors
-            if (index % 6 === 0) {
-                color = "red";
-            } else if (index % 6 === 1) {
-                color = "orange";
-            } else if (index % 6 === 2) {
-                color = "yellow";
-            } else if (index % 6 === 3) {
-                color = "green";
-            } else if (index % 6 === 4) {
-                color = "blue";
-            } else if (index % 6 === 5) {
-                color = "purple";
-            }
-        }
-
-        const tile = new DelaunayTile();
-        tile.vertices = vertices;
-        tile.centroid = pointToQuaternion(triangle.centroid);
-        tile.color = color;
-        tile.id = `tile-${index}`;
-        return tile;
-    }
-
-    protected* getDelaunayTileTessellation(centroid: Quaternion, vertices: Quaternion[], maxStep: number = Server.MAX_TESSELLATION, step: number = 0): Generator<ITessellatedTriangle> {
-        if (step === maxStep) {
-            // max step, return current level of tessellation
-            const data: ITessellatedTriangle = {
-                vertices,
-            };
-            return yield data;
-        } else if (step === 0) {
-            // perform triangle fan
-            for (let i = 0; i < vertices.length; i++) {
-                const generator = this.getDelaunayTileTessellation(centroid, [
-                    centroid,
-                    vertices[i % vertices.length],
-                    vertices[(i + 1) % vertices.length],
-                ], maxStep, step + 1);
-                while (true) {
-                    const res = generator.next();
-                    if (res.done) {
-                        break;
-                    }
-                    yield res.value;
-                }
-            }
-
-        } else {
-            // perform triangle tessellation
-
-            // compute mid points used in tessellation
-            const midPoints: Quaternion[] = [];
-            for (let i = 0; i < vertices.length; i++) {
-                const a: Quaternion = vertices[i % vertices.length].clone();
-                const b: Quaternion = vertices[(i + 1) % vertices.length].clone();
-                let lerpPoint = App.lerp(
-                    a.rotateVector([0, 0, 1]),
-                    b.rotateVector([0, 0, 1]),
-                    0.5
-                )
-                if (DelaunayGraph.distanceFormula(lerpPoint, [0, 0, 0]) < 0.01) {
-                    lerpPoint = App.lerp(
-                        a.rotateVector([0, 0, 1]),
-                        b.rotateVector([0, 0, 1]),
-                        0.4
-                    );
-                }
-                const midPoint = Quaternion.fromBetweenVectors(
-                    [0, 0, 1],
-                    DelaunayGraph.normalize(lerpPoint)
-                );
-                midPoints.push(midPoint);
-            }
-
-            // return recursive tessellation of triangle into 4 triangles
-            const generators: Array<Generator<ITessellatedTriangle>> = [
-                this.getDelaunayTileTessellation(centroid, [
-                    vertices[0],
-                    midPoints[0],
-                    midPoints[2]
-                ], maxStep, step + 1),
-                this.getDelaunayTileTessellation(centroid, [
-                    vertices[1],
-                    midPoints[1],
-                    midPoints[0]
-                ], maxStep, step + 1),
-                this.getDelaunayTileTessellation(centroid, [
-                    vertices[2],
-                    midPoints[2],
-                    midPoints[1]
-                ], maxStep, step + 1),
-                this.getDelaunayTileTessellation(centroid, [
-                    midPoints[0],
-                    midPoints[1],
-                    midPoints[2]
-                ], maxStep, step + 1)
-            ];
-            for (const generator of generators) {
-                while (true) {
-                    const res = generator.next();
-                    if (res.done) {
-                        break;
-                    }
-                    yield res.value;
-                }
-            }
-        }
-    }
-
-    public static lerp(a: [number, number, number], b: [number, number, number], t: number): [number, number, number] {
-        const delta = DelaunayGraph.subtract(b, a);
-        return [
-            a[0] + delta[0] * t,
-            a[1] + delta[1] * t,
-            a[2] + delta[2] * t
-        ];
-    }
-
-    /**
-     * Initialize random position and orientation for an entity.
-     * @param entity The entity to add random position and orientation to.
-     * @private
-     */
-    public static addRandomPositionAndOrientationToEntity(entity: ICameraState) {
-        entity.position = new Quaternion(0, App.randomRange(), App.randomRange(), App.randomRange());
-        entity.position = entity.position.normalize();
-        entity.orientation = Quaternion.fromAxisAngle([0, 0, 1], Math.random() * 2 * Math.PI);
-    }
-
-    public generateGoodPoints<T extends ICameraState>(numPoints: number, numSteps: number): VoronoiCell[] {
-        if (numPoints < 4) {
-            throw new Error("Not enough points to initialize sphere");
-        }
-        let delaunayGraph = new DelaunayGraph<T>(this);
-        let voronoiGraph = new VoronoiGraph<T>(this);
-        delaunayGraph.initialize();
-        for (let i = 0; i < numPoints - 4; i++) {
-            delaunayGraph.incrementalInsert();
-        }
-        for (let step = 0; step < numSteps; step++) {
-            // this line is needed because inserting vertices could remove old vertices.
-            while (delaunayGraph.numRealVertices() < numPoints) {
-                delaunayGraph.incrementalInsert();
-            }
-            voronoiGraph = delaunayGraph.getVoronoiGraph();
-            const lloydPoints = voronoiGraph.lloydRelaxation();
-            delaunayGraph = new DelaunayGraph<T>(this);
-            delaunayGraph.initializeWithPoints(lloydPoints);
-        }
-        // this line is needed because inserting vertices could remove old vertices.
-        while (delaunayGraph.numRealVertices() < numPoints) {
-            delaunayGraph.incrementalInsert();
-        }
-        voronoiGraph = delaunayGraph.getVoronoiGraph();
-        return voronoiGraph.cells;
-    }
-
-    public generateTessellatedPoints<T extends ICameraState>(tessellationLevel: number, numSteps: number): VoronoiCell[] {
-        let delaunayGraph = new DelaunayGraph<T>(this);
-        let voronoiGraph = new VoronoiGraph<T>(this);
-        delaunayGraph.initialize();
-
-        // generate tessellated points to a tessellation level
-        const tessellatedPoints = Array.from(delaunayGraph.GetTriangles())
-            .map(this.rotateDelaunayTriangle.bind(this, false))
-            .reduce((acc, tile) => {
-                const tessellatedTriangles = Array.from(this.getDelaunayTileTessellation(tile.centroid, tile.vertices, tessellationLevel, 1));
-                return [
-                    ...acc,
-                    ...tessellatedTriangles.map(t => {
-                        return DelaunayGraph.normalize(
-                            App.getAveragePoint(t.vertices.map(v => v.rotateVector([0, 0, 1])))
-                        );
-                    })
-                ];
-            }, [] as Array<[number, number, number]>);
-        const jitteredTessellatedPoints = tessellatedPoints.map(t => {
-            const jitter = DelaunayGraph.randomPoint();
-            const jitterAmount = 0;
-            return DelaunayGraph.normalize([
-                t[0] + jitter[0] * jitterAmount,
-                t[1] + jitter[1] * jitterAmount,
-                t[2] + jitter[2] * jitterAmount
-            ]);
-        });
-
-        // add jittered tessellated points
-        for (const point of jitteredTessellatedPoints) {
-            delaunayGraph.incrementalInsert(point);
-        }
-
-        for (let step = 0; step < numSteps; step++) {
-            // this line is needed because inserting vertices could remove old vertices.
-            while (delaunayGraph.numRealVertices() < Math.pow(4, tessellationLevel) + 4) {
-                delaunayGraph.incrementalInsert();
-            }
-            voronoiGraph = delaunayGraph.getVoronoiGraph();
-            const lloydPoints = voronoiGraph.lloydRelaxation();
-            delaunayGraph = new DelaunayGraph<T>(this);
-            delaunayGraph.initializeWithPoints(lloydPoints);
-        }
-        // this line is needed because inserting vertices could remove old vertices.
-        while (delaunayGraph.numRealVertices() < Math.pow(4, tessellationLevel) + 4) {
-            delaunayGraph.incrementalInsert();
-        }
-        voronoiGraph = delaunayGraph.getVoronoiGraph();
-        return voronoiGraph.cells;
-    }
-
-    public buildStar(point: [number, number, number], index: number): Star {
-        const star = new Star(this);
-        star.id = `star-${index}`;
-        star.position = Quaternion.fromBetweenVectors([0, 0, 1], point);
-        if (index % 5 === 0 || index % 5 === 1) {
-            star.color = "blue";
-            star.size = 5;
-        } else if (index % 5 === 2 || index % 5 === 3) {
-            star.color = "yellow";
-            star.size = 2.5;
-        } else if (index % 5 === 4) {
-            star.color = "red";
-            star.size = 7.5;
-        }
-        return star;
-    }
-
-    public lerpColors(a: string, b: string, t: number): string {
-        const v1: number[] = [
-            parseInt(a.slice(1, 3), 16),
-            parseInt(a.slice(3, 5), 16),
-            parseInt(a.slice(5, 7), 16)
-        ];
-        const v2: number[] = [
-            parseInt(b.slice(1, 3), 16),
-            parseInt(b.slice(3, 5), 16),
-            parseInt(b.slice(5, 7), 16)
-        ];
-        const v3 = [
-            Math.floor(v1[0] * (1 - t) + v2[0] * t),
-            Math.floor(v1[1] * (1 - t) + v2[1] * t),
-            Math.floor(v1[2] * (1 - t) + v2[2] * t)
-        ];
-        const v4 = [v3[0].toString(16), v3[1].toString(16), v3[2].toString(16)];
-        return `#${v4[0].length === 2 ? v4[0] : `0${v4[0]}`}${v4[1].length === 2 ? v4[1] : `0${v4[1]}`}${v4[2].length === 2 ? v4[2] : `0${v4[2]}`}`;
-    }
-
-    /**
-     * Create a planet.
-     * @param planetPoint The point the planet is created at.
-     * @param county The feudal county of the planet.
-     * @param planetI The index of the planet.
-     * @param isCapital If the planet is a capital.
-     * @private
-     */
-    public createPlanet(planetPoint: [number, number, number], county: VoronoiCounty, planetI: number): Planet {
-        const planet = new Planet(this, county);
-        planet.id = `planet-${planetI}`;
-        planet.position = Quaternion.fromBetweenVectors([0, 0, 1], planetPoint);
-        planet.position = planet.position.normalize();
-        planet.orientation = Quaternion.fromAxisAngle([0, 0, 1], Math.random() * 2 * Math.PI);
-        const colorValue = Math.random();
-        if (colorValue > 0.875)
-            planet.color = this.lerpColors(planet.county.duchy.color, "#ff8888", 0.33);
-        else if (colorValue > 0.75)
-            planet.color = this.lerpColors(planet.county.duchy.color, "#88ff88", 0.33);
-        else if (colorValue > 0.625)
-            planet.color = this.lerpColors(planet.county.duchy.color, "#8888ff", 0.33);
-        else if (colorValue > 0.5)
-            planet.color = this.lerpColors(planet.county.duchy.color, "#ffff88", 0.33);
-        else if (colorValue > 0.375)
-            planet.color = this.lerpColors(planet.county.duchy.color, "#88ffff", 0.33);
-        else if (colorValue > 0.25)
-            planet.color = this.lerpColors(planet.county.duchy.color, "#ff88ff", 0.33);
-        else if (colorValue > 0.125)
-            planet.color = this.lerpColors(planet.county.duchy.color, "#ffffff", 0.33);
-        else
-            planet.color = this.lerpColors(planet.county.duchy.color, "#888888", 0.33);
-        planet.buildInitialResourceBuildings();
-        planet.recomputeResources();
-
-        // create pathing node
-        const position = planet.position.rotateVector([0, 0, 1]);
-        const pathingNode = new PathingNode<any>(this);
-        pathingNode.id = planetI;
-        pathingNode.instance = this;
-        pathingNode.position = position;
-
-        planet.pathingNode = pathingNode;
-        return planet;
-    }
-}
-
-export class App extends Server {
+export class App extends React.Component<IAppProps, IAppState> {
     state = {
         showNotes: false as boolean,
         showShips: false as boolean,
@@ -1448,6 +367,7 @@ export class App extends Server {
         showSpawnMenu: false as boolean,
     };
 
+    // ui ref
     private showNotesRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
     private showShipsRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
     private showItemsRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
@@ -1455,17 +375,30 @@ export class App extends Server {
     private autoPilotEnabledRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
     private audioEnabledRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
     private svgRef: React.RefObject<SVGSVGElement> = React.createRef<SVGSVGElement>();
+
+    // game loop stuff
     public rotateCameraInterval: any = null;
     private activeKeys: any[] = [];
     private keyDownHandlerInstance: any;
     private keyUpHandlerInstance: any;
+
+    // game data stuff
     public voronoiData: VoronoiCell[] = [];
     public refreshVoronoiDataTick: number = 0;
-    public money: MoneyAccount = new MoneyAccount(20000);
     public music: MusicPlayer = new MusicPlayer();
+    public server: Server = new Server();
 
+    /**
+     * ------------------------------------------------------------
+     * Get player data
+     * ------------------------------------------------------------
+     */
+
+    /**
+     * Get the home world of the player.
+     */
     getPlayerPlanet(): Planet | null {
-        const ship = this.playerShip;
+        const ship = this.server.playerShip;
         if (ship) {
             return ship.planet || null;
         } else {
@@ -1473,31 +406,34 @@ export class App extends Server {
         }
     }
 
+    /**
+     * Get the ship of the player.
+     */
     getPlayerShip(): ICameraState {
-        const ship = this.playerShip;
+        const ship = this.server.playerShip;
         if (ship) {
             return Server.GetCameraState(ship);
         }
         // show latest faction ship
         if (this.state.faction) {
             // faction selected, orbit the faction's home world
-            const faction = Object.values(this.factions).find(f => f.id === this.state.faction);
-            const ship = this.ships.find(s => faction && faction.shipIds.length > 0 && s.id === faction.shipIds[faction.shipIds.length - 1]);
+            const faction = Object.values(this.server.factions).find(f => f.id === this.state.faction);
+            const ship = this.server.ships.find(s => faction && faction.shipIds.length > 0 && s.id === faction.shipIds[faction.shipIds.length - 1]);
             if (ship) {
                 return Server.GetCameraState(ship);
             }
         }
         // show latest attacking ship
-        const attackingAIShip = this.ships.find(s => s.id === this.demoAttackingShipId);
-        if (attackingAIShip && !this.props.isVoronoiTestMode) {
+        const attackingAIShip = this.server.ships.find(s => s.id === this.server.demoAttackingShipId);
+        if (attackingAIShip) {
             return Server.GetCameraState(attackingAIShip);
         } else {
-            this.demoAttackingShipId = null;
+            this.server.demoAttackingShipId = null;
         }
         // no faction selected, orbit the world
-        const tempShip = new Ship(this, EShipType.CUTTER);
+        const tempShip = new Ship(this.server, EShipType.CUTTER);
         tempShip.id = "ghost-ship";
-        const numSecondsToCircle = 120 * this.worldScale;
+        const numSecondsToCircle = 120 * this.server.worldScale;
         const millisecondsPerSecond = 1000;
         const circleSlice = numSecondsToCircle * millisecondsPerSecond;
         const circleFraction = (+new Date() % circleSlice) / circleSlice;
@@ -1505,6 +441,12 @@ export class App extends Server {
         tempShip.position = Quaternion.fromAxisAngle([1, 0, 0], -angle);
         return Server.GetCameraState(tempShip);
     }
+
+    /**
+     * --------------------------------------------------------
+     * Transform objects to render them onto the screen.
+     * --------------------------------------------------------
+     */
 
     /**
      * Move an object over time, useful for graphics only objects which do not collide, like smoke clouds and sparks.
@@ -1532,6 +474,11 @@ export class App extends Server {
         }
     }
 
+    /**
+     * Rotate an object based on the current ship's position and orientation.
+     * @param planet The object to rotate.
+     * @private
+     */
     private rotatePlanet<T extends ICameraState>(planet: T): ICameraStateWithOriginal<T> {
         const {
             position: cameraPosition,
@@ -1553,11 +500,18 @@ export class App extends Server {
         };
     }
 
+    /**
+     * Convert the object to a drawable object, able to be sorted and drawn on the screen.
+     * @param layerPostfix
+     * @param size
+     * @param planet
+     * @private
+     */
     private convertToDrawable<T extends ICameraState>(layerPostfix: string, size: number, planet: ICameraStateWithOriginal<T>): IDrawable<T> {
         const rotatedPosition = planet.position.rotateVector([0, 0, 1]);
         const projection = this.stereographicProjection(planet, size);
         const reverseProjection = this.stereographicProjection(planet, size);
-        const distance = Math.max(MIN_DISTANCE, 5 * (1 - rotatedPosition[2] * size)) * this.worldScale;
+        const distance = Math.max(MIN_DISTANCE, 5 * (1 - rotatedPosition[2] * size)) * this.server.worldScale;
         const orientationPoint = planet.orientation.rotateVector([1, 0, 0]);
         const rotation = Math.atan2(-orientationPoint[1], orientationPoint[0]) / Math.PI * 180;
         return {
@@ -1576,8 +530,14 @@ export class App extends Server {
         };
     }
 
+    /**
+     * Perform a projection from 3d spherical space to 2d screen space.
+     * @param planet
+     * @param size
+     * @private
+     */
     private stereographicProjection(planet: ICameraState, size: number = 1): {x: number, y: number} {
-        const zoom = (this.state.zoom * this.worldScale);
+        const zoom = (this.state.zoom * this.server.worldScale);
         const vector = planet.position.rotateVector([0, 0, 1]);
         return {
             x: vector[0] * zoom * size,
@@ -1586,7 +546,7 @@ export class App extends Server {
     }
 
     /**
-     * Get the points of angular progress for a polygon pi chart.
+     * Get the points of angular progress for a polygon pi chart. Used for health bars and progress bars.
      * @param percent the percentage done from 0 to 1.
      * @param radius the size of the pi chart
      */
@@ -1597,6 +557,17 @@ export class App extends Server {
         }).join(" ");
     }
 
+    /**
+     * ----------------------------------------------------------------------------------------------
+     * Render functions used to draw stuff onto the screen. Each stuff has their own render function.
+     * ----------------------------------------------------------------------------------------------
+     */
+    /**
+     * Draw the planet onto the screen.
+     * @param uiPass
+     * @param planetDrawing
+     * @private
+     */
     private drawPlanet(uiPass: boolean, planetDrawing: IDrawable<Planet>) {
         const isReverseSide = planetDrawing.rotatedPosition[2] < 0;
         const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
@@ -1606,7 +577,7 @@ export class App extends Server {
 
         // extract faction information
         let factionColor: string | null = null;
-        const ownerFaction = Object.values(this.factions).find(faction => faction.planetIds.includes(planetDrawing.original.id));
+        const ownerFaction = Object.values(this.server.factions).find(faction => faction.planetIds.includes(planetDrawing.original.id));
         if (ownerFaction) {
             factionColor = ownerFaction.factionColor;
         }
@@ -1656,7 +627,7 @@ export class App extends Server {
                             transform={`translate(${x * this.state.width},${(1 - y) * this.state.height})`}
                             fill={factionColor}
                             style={{opacity: 0.8}}
-                            points={`0,0 ${this.getPointsOfAngularProgress.call(this, Math.max(0, Math.min(planetDrawing.original.settlementProgress, 1)), size * (this.state.zoom * this.worldScale) * 1.35)}`}
+                            points={`0,0 ${this.getPointsOfAngularProgress.call(this, Math.max(0, Math.min(planetDrawing.original.settlementProgress, 1)), size * (this.state.zoom * this.server.worldScale) * 1.35)}`}
                         />
                     )
                 }
@@ -1667,7 +638,7 @@ export class App extends Server {
                             transform={`translate(${x * this.state.width},${(1 - y) * this.state.height})`}
                             fill={factionColor}
                             style={{opacity: 0.8}}
-                            points={`0,0 ${this.getPointsOfAngularProgress.call(this, Math.max(0, Math.min((planetDrawing.original.settlementProgress - 1) / 4, 1)), size * (this.state.zoom * this.worldScale) * 1.70)}`}
+                            points={`0,0 ${this.getPointsOfAngularProgress.call(this, Math.max(0, Math.min((planetDrawing.original.settlementProgress - 1) / 4, 1)), size * (this.state.zoom * this.server.worldScale) * 1.70)}`}
                         />
                     )
                 }
@@ -1677,10 +648,10 @@ export class App extends Server {
                             key={`${planetDrawing.id}-planet`}
                             cx={x * this.state.width}
                             cy={(1 - y) * this.state.height}
-                            r={size * (this.state.zoom * this.worldScale)}
+                            r={size * (this.state.zoom * this.server.worldScale)}
                             fill={planetDrawing.color}
                             stroke="grey"
-                            strokeWidth={0.2 * size * (this.state.zoom * this.worldScale)}
+                            strokeWidth={0.2 * size * (this.state.zoom * this.server.worldScale)}
                             style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
                         />
                     )
@@ -1690,7 +661,7 @@ export class App extends Server {
                         <>
                             <text
                                 key={`${planetDrawing.id}-planet-title`}
-                                x={planetX + size * (this.state.zoom * this.worldScale) + 10}
+                                x={planetX + size * (this.state.zoom * this.server.worldScale) + 10}
                                 y={planetY - 6}
                                 fill="white"
                                 fontSize="12"
@@ -1703,7 +674,7 @@ export class App extends Server {
                                     return (
                                         <text
                                             key={`${planetDrawing.id}-planet-resource-${index}`}
-                                            x={planetX + size * (this.state.zoom * this.worldScale) + 10}
+                                            x={planetX + size * (this.state.zoom * this.server.worldScale) + 10}
                                             y={planetY + (index + 1) * 10}
                                             fill="white"
                                             fontSize="8"
@@ -1718,6 +689,11 @@ export class App extends Server {
         );
     }
 
+    /**
+     * Draw a star onto the screen.
+     * @param planetDrawing
+     * @private
+     */
     private drawStar(planetDrawing: IDrawable<Planet>) {
         const isReverseSide = planetDrawing.rotatedPosition[2] > 0;
         const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
@@ -1729,10 +705,10 @@ export class App extends Server {
                 <circle
                     cx={x * this.state.width}
                     cy={(1 - y) * this.state.height}
-                    r={size * (this.state.zoom * this.worldScale)}
+                    r={size * (this.state.zoom * this.server.worldScale)}
                     fill={planetDrawing.color}
                     stroke="grey"
-                    strokeWidth={0.2 * size * (this.state.zoom * this.worldScale)}
+                    strokeWidth={0.2 * size * (this.state.zoom * this.server.worldScale)}
                     style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
                 />
                 <line
@@ -1741,7 +717,7 @@ export class App extends Server {
                     x2={(x - 0.01) * this.state.width}
                     y2={(1 - y) * this.state.height}
                     stroke={planetDrawing.color}
-                    strokeWidth={0.2 * size * (this.state.zoom * this.worldScale)}
+                    strokeWidth={0.2 * size * (this.state.zoom * this.server.worldScale)}
                     style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
                 />
                 <line
@@ -1750,7 +726,7 @@ export class App extends Server {
                     x2={x * this.state.width}
                     y2={(1 - y - 0.01) * this.state.height}
                     stroke={planetDrawing.color}
-                    strokeWidth={0.2 * size * (this.state.zoom * this.worldScale)}
+                    strokeWidth={0.2 * size * (this.state.zoom * this.server.worldScale)}
                     style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
                 />
             </g>
@@ -1797,7 +773,7 @@ export class App extends Server {
                         aPoint[0] * 0.5,
                         aPoint[1] * 0.5,
                     ];
-                    const midPoint = DelaunayGraph.normalize(App.getAveragePoint([aPoint, bPoint]));
+                    const midPoint = DelaunayGraph.normalize(Server.getAveragePoint([aPoint, bPoint]));
                     const abNormal = DelaunayGraph.normalize(DelaunayGraph.crossProduct(
                         DelaunayGraph.normalize(aPoint),
                         DelaunayGraph.normalize(bPoint)
@@ -1818,7 +794,7 @@ export class App extends Server {
                         bPoint[0] * 0.5,
                         bPoint[1] * 0.5
                     ];
-                    const midPoint = DelaunayGraph.normalize(App.getAveragePoint([aPoint, bPoint]));
+                    const midPoint = DelaunayGraph.normalize(Server.getAveragePoint([aPoint, bPoint]));
                     const abNormal = DelaunayGraph.normalize(DelaunayGraph.crossProduct(
                         DelaunayGraph.normalize(aPoint),
                         DelaunayGraph.normalize(bPoint)
@@ -1868,7 +844,7 @@ export class App extends Server {
         }
         const hullPoints = shipData.hull;
 
-        const hullQuaternions = App.getPhysicsHull(hullPoints, this.worldScale);
+        const hullQuaternions = Server.getPhysicsHull(hullPoints, this.server.worldScale);
         const rotatedHullQuaternion = hullQuaternions.map((q): Quaternion => {
             return planetDrawing.position.clone()
                 .mul(q);
@@ -1881,7 +857,7 @@ export class App extends Server {
         return (
             <polygon
                 key={`${planetDrawing.id}-physics-hull`}
-                points={rotatedHullPoints.map(([x, y]) => `${(x * (this.state.zoom * this.worldScale) + 1) * 0.5 * this.state.width},${(1 - (y * (this.state.zoom * this.worldScale) + 1) * 0.5) * this.state.height}`).join(" ")}
+                points={rotatedHullPoints.map(([x, y]) => `${(x * (this.state.zoom * this.server.worldScale) + 1) * 0.5 * this.state.width},${(1 - (y * (this.state.zoom * this.server.worldScale) + 1) * 0.5) * this.state.height}`).join(" ")}
                 fill="white"
                 stroke="cyan"
                 opacity={0.5}
@@ -1889,6 +865,12 @@ export class App extends Server {
         );
     }
 
+    /**
+     * Render a ship into a rectangle, Useful for UI button or game world.
+     * @param planetDrawing
+     * @param size
+     * @private
+     */
     private renderShip(planetDrawing: IDrawable<Ship>, size: number) {
         const shipData = SHIP_DATA.find(item => item.shipType === planetDrawing.original.shipType);
         if (!shipData) {
@@ -1903,7 +885,7 @@ export class App extends Server {
                     points={`${shipData.hull.map(([x, y]) => `${x},${y}`).join(" ")}`}
                     fill={planetDrawing.color}
                     stroke="grey"
-                    strokeWidth={0.05 * size * (this.state.zoom * this.worldScale)}
+                    strokeWidth={0.05 * size * (this.state.zoom * this.server.worldScale)}
                     style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
                 />
                 {
@@ -1916,7 +898,7 @@ export class App extends Server {
                                 points="5,-2 0,-2 0,2 5,2"
                                 fill="darkgrey"
                                 stroke="grey"
-                                strokeWidth={0.05 * size * (this.state.zoom * this.worldScale)}
+                                strokeWidth={0.05 * size * (this.state.zoom * this.server.worldScale)}
                                 style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
                             />
                         );
@@ -1932,7 +914,7 @@ export class App extends Server {
                                 points="-5,-2 0,-2 0,2 -5,2"
                                 fill="darkgrey"
                                 stroke="grey"
-                                strokeWidth={0.05 * size * (this.state.zoom * this.worldScale)}
+                                strokeWidth={0.05 * size * (this.state.zoom * this.server.worldScale)}
                                 style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
                             />
                         );
@@ -1942,6 +924,11 @@ export class App extends Server {
         )
     }
 
+    /**
+     * Draw a ship into the game world.
+     * @param planetDrawing
+     * @private
+     */
     private drawShip(planetDrawing: IDrawable<Ship>) {
         const shipData = SHIP_DATA.find(s => s.shipType === planetDrawing.original.shipType);
         if (!shipData) {
@@ -1953,7 +940,7 @@ export class App extends Server {
         const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
         const distance = planetDrawing.distance;
         const size = 0.1 * Math.max(0, 2 * Math.atan(1 / (2 * distance)));
-        const scale = size * (this.state.zoom * this.worldScale);
+        const scale = size * (this.state.zoom * this.server.worldScale);
 
         // handle UI lines
         let velocityX: number = 0;
@@ -1972,20 +959,20 @@ export class App extends Server {
             targetLineData = App.getShipTargetLines.call(this, planetDrawing);
         }
         const rightCannonPointTop: [number, number] = [
-            Math.max(this.state.width / 2, this.state.height / 2) * Math.cos((10 / 180 * Math.PI)) * (this.state.zoom * this.worldScale),
-            Math.max(this.state.width / 2, this.state.height / 2) * Math.sin((10 / 180 * Math.PI)) * (this.state.zoom * this.worldScale),
+            Math.max(this.state.width / 2, this.state.height / 2) * Math.cos((10 / 180 * Math.PI)) * (this.state.zoom * this.server.worldScale),
+            Math.max(this.state.width / 2, this.state.height / 2) * Math.sin((10 / 180 * Math.PI)) * (this.state.zoom * this.server.worldScale),
         ]
         const rightCannonPointBottom: [number, number] = [
-            Math.max(this.state.width / 2, this.state.height / 2) * Math.cos(-(10 / 180 * Math.PI)) * (this.state.zoom * this.worldScale),
-            Math.max(this.state.width / 2, this.state.height / 2) * Math.sin(-(10 / 180 * Math.PI)) * (this.state.zoom * this.worldScale),
+            Math.max(this.state.width / 2, this.state.height / 2) * Math.cos(-(10 / 180 * Math.PI)) * (this.state.zoom * this.server.worldScale),
+            Math.max(this.state.width / 2, this.state.height / 2) * Math.sin(-(10 / 180 * Math.PI)) * (this.state.zoom * this.server.worldScale),
         ];
         const leftCannonPointTop: [number, number] = [
-            Math.max(this.state.width / 2, this.state.height / 2) * Math.cos(Math.PI - (10 / 180 * Math.PI)) * (this.state.zoom * this.worldScale),
-            Math.max(this.state.width / 2, this.state.height / 2) * Math.sin(Math.PI - (10 / 180 * Math.PI)) * (this.state.zoom * this.worldScale),
+            Math.max(this.state.width / 2, this.state.height / 2) * Math.cos(Math.PI - (10 / 180 * Math.PI)) * (this.state.zoom * this.server.worldScale),
+            Math.max(this.state.width / 2, this.state.height / 2) * Math.sin(Math.PI - (10 / 180 * Math.PI)) * (this.state.zoom * this.server.worldScale),
         ]
         const leftCannonPointBottom: [number, number] = [
-            Math.max(this.state.width / 2, this.state.height / 2) * Math.cos(Math.PI + (10 / 180 * Math.PI)) * (this.state.zoom * this.worldScale),
-            Math.max(this.state.width / 2, this.state.height / 2) * Math.sin(Math.PI + (10 / 180 * Math.PI)) * (this.state.zoom * this.worldScale),
+            Math.max(this.state.width / 2, this.state.height / 2) * Math.cos(Math.PI + (10 / 180 * Math.PI)) * (this.state.zoom * this.server.worldScale),
+            Math.max(this.state.width / 2, this.state.height / 2) * Math.sin(Math.PI + (10 / 180 * Math.PI)) * (this.state.zoom * this.server.worldScale),
         ];
         let cannonLoadingPercentage = 0;
         if (isPlayerShip && planetDrawing.original.cannonLoading) {
@@ -2012,10 +999,10 @@ export class App extends Server {
                         return (
                             <line
                                 key={`target-line-${index}`}
-                                x1={this.state.width * a[0] * (this.state.zoom * this.worldScale)}
-                                y1={this.state.height * -a[1] * (this.state.zoom * this.worldScale)}
-                                x2={this.state.width * b[0] * (this.state.zoom * this.worldScale)}
-                                y2={this.state.height * -b[1] * (this.state.zoom * this.worldScale)}
+                                x1={this.state.width * a[0] * (this.state.zoom * this.server.worldScale)}
+                                y1={this.state.height * -a[1] * (this.state.zoom * this.server.worldScale)}
+                                x2={this.state.width * b[0] * (this.state.zoom * this.server.worldScale)}
+                                y2={this.state.height * -b[1] * (this.state.zoom * this.server.worldScale)}
                                 stroke="blue"
                                 strokeWidth={2}
                                 strokeDasharray="1,5"
@@ -2030,16 +1017,16 @@ export class App extends Server {
                                 <circle
                                     key={`target-marker-${value}`}
                                     r={10}
-                                    cx={this.state.width * a[0] * (this.state.zoom * this.worldScale)}
-                                    cy={this.state.height * -a[1] * (this.state.zoom * this.worldScale)}
+                                    cx={this.state.width * a[0] * (this.state.zoom * this.server.worldScale)}
+                                    cy={this.state.height * -a[1] * (this.state.zoom * this.server.worldScale)}
                                     stroke="blue"
                                     fill="none"
                                 />
                                 <text
                                     key={`target-value-${value}`}
                                     textAnchor="middle"
-                                    x={this.state.width * a[0] * (this.state.zoom * this.worldScale)}
-                                    y={this.state.height * -a[1] * (this.state.zoom * this.worldScale) + 5}
+                                    x={this.state.width * a[0] * (this.state.zoom * this.server.worldScale)}
+                                    y={this.state.height * -a[1] * (this.state.zoom * this.server.worldScale) + 5}
                                     stroke="blue"
                                     fill="none"
                                 >{value}</text>
@@ -2068,14 +1055,14 @@ export class App extends Server {
                                     points={`10,-20 ${rightCannonPointBottom[0]},${rightCannonPointBottom[1]} ${rightCannonPointTop[0]},${rightCannonPointTop[1]} 10,20`}
                                     fill="grey"
                                     stroke="white"
-                                    strokeWidth={0.05 * size * (this.state.zoom * this.worldScale)}
+                                    strokeWidth={0.05 * size * (this.state.zoom * this.server.worldScale)}
                                     style={{opacity: 0.3}}
                                 />
                                 <polygon
                                     points={`-10,-20 ${leftCannonPointBottom[0]},${leftCannonPointBottom[1]} ${leftCannonPointTop[0]},${leftCannonPointTop[1]} -10,20`}
                                     fill="grey"
                                     stroke="white"
-                                    strokeWidth={0.05 * size * (this.state.zoom * this.worldScale)}
+                                    strokeWidth={0.05 * size * (this.state.zoom * this.server.worldScale)}
                                     style={{opacity: 0.3}}
                                 />
                                 <polygon
@@ -2096,6 +1083,11 @@ export class App extends Server {
         );
     }
 
+    /**
+     * Draw a smoke cloud from the space ship in the game world.
+     * @param planetDrawing
+     * @private
+     */
     private drawSmokeCloud(planetDrawing: IDrawable<SmokeCloud>) {
         const isReverseSide = planetDrawing.rotatedPosition[2] > 0;
         const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
@@ -2107,15 +1099,21 @@ export class App extends Server {
                 key={planetDrawing.id}
                 cx={x * this.state.width}
                 cy={(1 - y) * this.state.height}
-                r={size * (this.state.zoom * this.worldScale)}
+                r={size * (this.state.zoom * this.server.worldScale)}
                 fill={planetDrawing.color}
                 stroke="darkgray"
-                strokeWidth={0.02 * size * (this.state.zoom * this.worldScale)}
+                strokeWidth={0.02 * size * (this.state.zoom * this.server.worldScale)}
                 style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
             />
         );
     }
 
+    /**
+     * Draw a crate containing cargo, Crates are created when ships are destroyed and if that dead ship had cargo.
+     * @param uiPass
+     * @param planetDrawing
+     * @private
+     */
     private drawCrate(uiPass: boolean, planetDrawing: IDrawable<Crate>) {
         const isReverseSide = planetDrawing.rotatedPosition[2] > 0;
         const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
@@ -2140,7 +1138,7 @@ export class App extends Server {
                     uiPass && (
                         <text
                             stroke="white"
-                            x={size * (this.state.zoom * this.worldScale) + 10}
+                            x={size * (this.state.zoom * this.server.worldScale) + 10}
                             y={0}
                         >
                             {planetDrawing.original.resourceType}
@@ -2151,17 +1149,27 @@ export class App extends Server {
         );
     }
 
+    /**
+     * Get the mid point of a delaunay tile.
+     * @param tile
+     * @private
+     */
     private getDelaunayTileMidPoint(tile: DelaunayTile): {x: number, y: number} {
         const rotatedPoints = tile.vertices.map((v: Quaternion): [number, number, number] => {
             return v.rotateVector([0, 0, 1]);
         });
-        const averagePoint = DelaunayGraph.normalize(App.getAveragePoint(rotatedPoints));
+        const averagePoint = DelaunayGraph.normalize(Server.getAveragePoint(rotatedPoints));
         return {
-            x: (averagePoint[0] * (this.state.zoom * this.worldScale) + 1) * 0.5,
-            y: (averagePoint[1] * (this.state.zoom * this.worldScale) + 1) * 0.5,
+            x: (averagePoint[0] * (this.state.zoom * this.server.worldScale) + 1) * 0.5,
+            y: (averagePoint[1] * (this.state.zoom * this.server.worldScale) + 1) * 0.5,
         };
     }
 
+    /**
+     * Rotate a series of quaternion points.
+     * @param vertices
+     * @private
+     */
     private getPointsAndRotatedPoints(vertices: Quaternion[]) {
         const rotatedPoints = vertices.map((v: Quaternion): [number, number, number] => {
             return v.rotateVector([0, 0, 1]);
@@ -2173,8 +1181,8 @@ export class App extends Server {
             };
         }).map(p => {
             return {
-                x: (p.x - 0.5) * (this.state.zoom * this.worldScale) * 1.1 + 0.5,
-                y: (p.y - 0.5) * (this.state.zoom * this.worldScale) * 1.1 + 0.5,
+                x: (p.x - 0.5) * (this.state.zoom * this.server.worldScale) * 1.1 + 0.5,
+                y: (p.y - 0.5) * (this.state.zoom * this.server.worldScale) * 1.1 + 0.5,
             };
         });
 
@@ -2184,6 +1192,16 @@ export class App extends Server {
         };
     }
 
+    /**
+     * Draw a delaunay tessellated triangle. Tessellated triangles are triangles recursively broken into smaller triangles
+     * using the zelda pattern.
+     * @param earthLike
+     * @param tile
+     * @param triangle
+     * @param index
+     * @param arr
+     * @private
+     */
     private drawDelaunayTessellatedTriangle(earthLike: boolean, tile: DelaunayTile, triangle: ITessellatedTriangle, index: number, arr: ITessellatedTriangle[]) {
         const {
             points,
@@ -2231,8 +1249,14 @@ export class App extends Server {
         }
     }
 
+    /**
+     * Draw a delaunay tile.
+     * @param earthLike
+     * @param tile
+     * @private
+     */
     private drawDelaunayTile(earthLike: boolean, tile: IDrawableTile) {
-        const tessellationMesh = Array.from(this.getDelaunayTileTessellation(tile.centroid, tile.vertices));
+        const tessellationMesh = Array.from(this.server.getDelaunayTileTessellation(tile.centroid, tile.vertices));
         return (
             <g key={tile.id}>
                 {
@@ -2241,7 +1265,12 @@ export class App extends Server {
             </g>
         );
     }
+
+    /**
+     * Run the game loop. This function is called 10 times a second to simulate a video game.
+     */
     public gameLoop() {
+        // refresh voronoi data, refresh occasionally since this is expensive.
         if (this.refreshVoronoiDataTick <= 20) {
             this.refreshVoronoiDataTick += 1;
         } else {
@@ -2249,11 +1278,40 @@ export class App extends Server {
             this.refreshVoronoiData();
         }
 
-        this.handleServerLoop();
+        // run local server
+        this.server.handleServerLoop();
 
+        // handle server replies
+        while (true) {
+            const message = this.server.outgoingMessages.shift();
+            if (message) {
+                // has message, process message
+                if (message.messageType === EMessageType.DEATH) {
+                    this.setState({
+                        showSpawnMenu: true
+                    });
+                }
+            } else {
+                // no more messages, end message processing
+                break;
+            }
+        }
+
+        // draw onto screen
         this.forceUpdate();
     }
 
+    /**
+     * -----------------------------------------------------------
+     * Handle UI functions, responds to UI button clicks.
+     * -----------------------------------------------------------
+     */
+
+    /**
+     * Handle show notes of the UI. The notes contain the goals to program/write. The ultimate goal is a multiplayer game,
+     * but show notes contains about 20 bullet points to write over time.
+     * @private
+     */
     private handleShowNotes() {
         if (this.showNotesRef.current) {
             this.setState({
@@ -2263,6 +1321,11 @@ export class App extends Server {
         }
     }
 
+    /**
+     * Show different type of ships in the screen above the game. Used for debugging the appearance of each ship
+     * without buying the ship in game.
+     * @private
+     */
     private handleShowShips() {
         if (this.showShipsRef.current) {
             this.setState({
@@ -2272,6 +1335,11 @@ export class App extends Server {
         }
     }
 
+    /**
+     * Show different items in the screen above the game. Used for debugging the appearance of each item without buying
+     * the item in game.
+     * @private
+     */
     private handleShowItems() {
         if (this.showItemsRef.current) {
             this.setState({
@@ -2281,6 +1349,11 @@ export class App extends Server {
         }
     }
 
+    /**
+     * Show a voronoi map in game. Used for debugging the marking of land between each planet. Voronoi mode is used
+     * to display political information such as the boundaries of each kingdom.
+     * @private
+     */
     private handleShowVoronoi() {
         if (this.showVoronoiRef.current) {
             this.setState({
@@ -2290,6 +1363,11 @@ export class App extends Server {
         }
     }
 
+    /**
+     * Change voronoi mode in game. Switch between Kingdom, Duchy, or County boundaries.
+     * @param voronoiMode
+     * @private
+     */
     private handleChangeVoronoi(voronoiMode: EVoronoiMode) {
         this.setState({
             ...this.state,
@@ -2299,29 +1377,49 @@ export class App extends Server {
         });
     }
 
+    /**
+     * Change if auto pilot is enabled in game.
+     * @private
+     */
     private handleAutoPilotEnabled() {
         if (this.autoPilotEnabledRef.current) {
             this.setState({
                 ...this.state,
                 autoPilotEnabled: this.autoPilotEnabledRef.current.checked,
+            }, () => {
+                const message: IAutoPilotMessage = {
+                    messageType: EMessageType.AUTOPILOT,
+                    enabled: this.state.autoPilotEnabled
+                };
+                this.server.incomingMessages.push(message);
             });
         }
     }
 
+    /**
+     * Enable or disable in game audio such as music.
+     * @private
+     */
     private handleAudioEnabled() {
         if (this.audioEnabledRef.current) {
             this.setState({
                 ...this.state,
                 audioEnabled: this.audioEnabledRef.current.checked,
+            }, () => {
+                if (this.state.audioEnabled) {
+                    this.music.start();
+                } else {
+                    this.music.stop();
+                }
             });
-            if (this.audioEnabledRef.current.checked) {
-                this.music.start();
-            } else {
-                this.music.stop();
-            }
         }
     }
 
+    /**
+     * Convert keyboard keys into key events.
+     * @param event
+     * @private
+     */
     private static getKeyString(event: KeyboardEvent): string {
         switch (event.key) {
             case "ArrowUp": return "w";
@@ -2332,19 +1430,51 @@ export class App extends Server {
         }
     }
 
+    /**
+     * Add key down event, send message to server.
+     * @param event
+     * @private
+     */
     private handleKeyDown(event: KeyboardEvent) {
-        if (!this.activeKeys.includes(App.getKeyString(event))) {
-            this.activeKeys.push(App.getKeyString(event));
+        const key = App.getKeyString(event);
+        if (!this.activeKeys.includes(key)) {
+            this.activeKeys.push(key);
+
+            // send key down message to server
+            const message: IKeyboardMessage = {
+                messageType: EMessageType.KEYBOARD,
+                key,
+                enabled: true,
+            };
+            this.server.incomingMessages.push(message);
         }
     }
 
+    /**
+     * Send keyboard key up message to the server.
+     * @param event
+     * @private
+     */
     private handleKeyUp(event: KeyboardEvent) {
-        const index = this.activeKeys.findIndex(k => k === App.getKeyString(event));
+        const key = App.getKeyString(event);
+        const index = this.activeKeys.findIndex(k => k === key);
         if (index >= 0) {
             this.activeKeys.splice(index, 1);
+
+            // send key up message to server
+            const message: IKeyboardMessage = {
+                messageType: EMessageType.KEYBOARD,
+                key,
+                enabled: false,
+            };
+            this.server.incomingMessages.push(message);
         }
     }
 
+    /**
+     * Change the zoom of the client, Increase zoom, get closer to see smaller detail.
+     * @private
+     */
     private incrementZoom() {
         const zoom = Math.min(this.state.zoom * 2, 32);
         this.setState({
@@ -2353,6 +1483,10 @@ export class App extends Server {
         });
     }
 
+    /**
+     * Change the zoom of the client, Decrease zoom, get farther to see larger detail.
+     * @private
+     */
     private decrementZoom() {
         const zoom = Math.max(this.state.zoom / 2, 1);
         this.setState({
@@ -2361,13 +1495,17 @@ export class App extends Server {
         });
     }
 
+    /**
+     * Update the voronoi data which will update the political map. This function can be costly, running this too many
+     * times a second will lag the game, just to draw colored shapes on screen.
+     */
     refreshVoronoiData() {
         const position = this.getPlayerShip().position.rotateVector([0, 0, 1]);
 
         switch (this.state.voronoiMode) {
             default:
             case EVoronoiMode.KINGDOM: {
-                this.voronoiData = this.voronoiTerrain.kingdoms.reduce((acc, k) => {
+                this.voronoiData = this.server.voronoiTerrain.kingdoms.reduce((acc, k) => {
                     if (k.isNearBy(position)) {
                         return [
                             ...acc, k.voronoiCell
@@ -2379,7 +1517,7 @@ export class App extends Server {
                 break;
             }
             case EVoronoiMode.DUCHY: {
-                this.voronoiData = this.voronoiTerrain.kingdoms.reduce((acc, k) => {
+                this.voronoiData = this.server.voronoiTerrain.kingdoms.reduce((acc, k) => {
                     if (k.isNearBy(position)) {
                         return [
                             ...acc, ...k.duchies.map(d => d.voronoiCell)
@@ -2391,7 +1529,7 @@ export class App extends Server {
                 break;
             }
             case EVoronoiMode.COUNTY: {
-                this.voronoiData = this.voronoiTerrain.kingdoms.reduce((acc, k) => {
+                this.voronoiData = this.server.voronoiTerrain.kingdoms.reduce((acc, k) => {
                     if (k.isNearBy(position)) {
                         return [
                             ...acc, ...k.duchies.reduce((acc2, d) => [
@@ -2407,127 +1545,18 @@ export class App extends Server {
         }
     }
 
+    /**
+     * Perform the initialization of the game.
+     */
     componentDidMount() {
         // set initial world scale
-        if (this.props.isVoronoiTestMode) {
-            this.worldScale = 1;
-        }
         if (typeof(this.props.worldScale) === "number") {
-            this.worldScale = this.props.worldScale;
+            this.server.worldScale = this.props.worldScale;
         }
 
-        // initialize voronoi test mode parameters
-        if (this.props.isVoronoiTestMode) {
-            this.setState({
-                zoom: 1,
-                showVoronoi: true
-            });
-        }
-
-        // initialize 3d terrain stuff
-        this.voronoiTerrain.generateTerrain();
+        this.server.isTestMode = !!this.props.isTestMode;
+        this.server.initializeGame();
         this.refreshVoronoiData();
-
-        // initialize planets
-        this.planets = Array.from(this.voronoiTerrain.getPlanets());
-
-        // initialize factions
-        if (!this.props.isVoronoiTestMode) {
-            const factionStartingPoints = this.generateGoodPoints(5, 10).map(p => p.centroid);
-            let factionStartingKingdoms = this.voronoiTerrain.kingdoms;
-            const getStartingKingdom = (point: [number, number, number]): VoronoiKingdom => {
-                // get the closest kingdom to the point
-                const kingdom = factionStartingKingdoms.reduce((acc, k) => {
-                    if (!acc) {
-                        return k;
-                    } else {
-                        const distanceToAcc = VoronoiGraph.angularDistance(point, acc.voronoiCell.centroid, this.worldScale);
-                        const distanceToK = VoronoiGraph.angularDistance(point, k.voronoiCell.centroid, this.worldScale);
-                        if (distanceToK < distanceToAcc) {
-                            return k;
-                        } else {
-                            return acc;
-                        }
-                    }
-                }, null as VoronoiKingdom | null);
-
-                // handle empty value
-                if (!kingdom) {
-                    throw new Error("Could not find a kingdom to start a faction on");
-                }
-
-                // return closest kingdom
-                factionStartingKingdoms = factionStartingKingdoms.filter(k => k !== kingdom);
-                return kingdom;
-            };
-            const factionDataList = [{
-                id: EFaction.DUTCH,
-                color: "orange",
-                // the forth planet is always in a random location
-                // the dutch are a republic which means players can vote on things
-                // but the dutch are weaker compared to the kingdoms
-                kingdom: getStartingKingdom(factionStartingPoints[0])
-            }, {
-                id: EFaction.ENGLISH,
-                color: "red",
-                kingdom: getStartingKingdom(factionStartingPoints[1])
-            }, {
-                id: EFaction.FRENCH,
-                color: "blue",
-                kingdom: getStartingKingdom(factionStartingPoints[2])
-            }, {
-                id: EFaction.PORTUGUESE,
-                color: "green",
-                kingdom: getStartingKingdom(factionStartingPoints[3])
-            }, {
-                id: EFaction.SPANISH,
-                color: "yellow",
-                kingdom: getStartingKingdom(factionStartingPoints[4])
-            }];
-            for (const factionData of factionDataList) {
-                let planetId: string | null = null;
-                if (factionData.kingdom) {
-                    for (const duchy of factionData.kingdom.duchies) {
-                        for (const county of duchy.counties) {
-                            if (county.planet) {
-                                planetId = county.planet.id;
-                                break;
-                            }
-                        }
-                        if (planetId) {
-                            break;
-                        }
-                    }
-                }
-                if (!planetId) {
-                    throw new Error("Could not find planet to make faction");
-                }
-                const faction = new Faction(this, factionData.id, factionData.color, planetId);
-                this.factions[factionData.id] = faction;
-                const planet = this.planets.find(p => p.id === planetId);
-                if (planet) {
-                    planet.setAsStartingCapital();
-                    planet.claim(faction);
-                }
-                if (planet && !this.props.isTestMode) {
-                    for (let numShipsToStartWith = 0; numShipsToStartWith < 10; numShipsToStartWith++) {
-                        const shipType = planet.shipyard.getNextShipTypeToBuild();
-                        const shipData = SHIP_DATA.find(s => s.shipType === shipType);
-                        if (!shipData) {
-                            throw new Error("Could not find ship type");
-                        }
-                        planet.wood += shipData.cost;
-                        planet.cannons += shipData.cannons.numCannons;
-                        planet.cannonades += shipData.cannons.numCannonades;
-                        planet.shipyard.buildShip(shipType);
-                        const dock = planet.shipyard.docks[planet.shipyard.docks.length - 1];
-                        if (dock) {
-                            dock.progress = dock.shipCost - 1;
-                        }
-                    }
-                }
-            }
-        }
 
         if (!this.props.isTestMode) {
             this.rotateCameraInterval = setInterval(this.gameLoop.bind(this), 100);
@@ -2562,8 +1591,8 @@ export class App extends Server {
         const size = Math.min(this.state.width, this.state.height);
         if (x >= 0 && x <= size && y >= 0 && y <= size) {
             const clickScreenPoint: [number, number, number] = [
-                ((x / size) - 0.5) * 2 / (this.state.zoom * this.worldScale),
-                ((y / size) - 0.5) * 2 / (this.state.zoom * this.worldScale),
+                ((x / size) - 0.5) * 2 / (this.state.zoom * this.server.worldScale),
+                ((y / size) - 0.5) * 2 / (this.state.zoom * this.server.worldScale),
                 0
             ];
             clickScreenPoint[1] *= -1;
@@ -2597,57 +1626,57 @@ export class App extends Server {
                             return VoronoiGraph.angularDistance(
                                 this.getPlayerShip().position.rotateVector([0, 0, 1]),
                                 d.centroid,
-                                this.worldScale
-                            ) < (Math.PI / (this.worldScale * this.state.zoom)) + d.radius;
-                        }).map(this.rotateDelaunayTriangle.bind(this, !!this.props.isVoronoiTestMode))
-                            .map(this.drawDelaunayTile.bind(this, !!this.props.isVoronoiTestMode)) :
+                                this.server.worldScale
+                            ) < (Math.PI / (this.server.worldScale * this.state.zoom)) + d.radius;
+                        }).map(this.server.rotateDelaunayTriangle.bind(this.server, false))
+                            .map(this.drawDelaunayTile.bind(this, false)) :
                         null
                 }
                 {
                     ([
-                        ...Array.from(this.voronoiTerrain.getStars(shipPosition, 0.5)).map(this.rotatePlanet.bind(this))
+                        ...Array.from(this.server.voronoiTerrain.getStars(shipPosition, 0.5)).map(this.rotatePlanet.bind(this))
                             .map(this.convertToDrawable.bind(this, "-star2", 0.5)),
-                        ...Array.from(this.voronoiTerrain.getStars(shipPosition, 0.25)).map(this.rotatePlanet.bind(this))
+                        ...Array.from(this.server.voronoiTerrain.getStars(shipPosition, 0.25)).map(this.rotatePlanet.bind(this))
                             .map(this.convertToDrawable.bind(this, "-star3", 0.25)),
-                        ...Array.from(this.voronoiTerrain.getStars(shipPosition, 0.125)).map(this.rotatePlanet.bind(this))
+                        ...Array.from(this.server.voronoiTerrain.getStars(shipPosition, 0.125)).map(this.rotatePlanet.bind(this))
                             .map(this.convertToDrawable.bind(this, "-star4", 0.125))
                     ] as Array<IDrawable<Planet>>)
                         .sort((a: any, b: any) => b.distance - a.distance)
                         .map(this.drawStar.bind(this))
                 }
                 {
-                    (Array.from(this.voronoiTerrain.getPlanets(shipPosition)).map(this.rotatePlanet.bind(this))
+                    (Array.from(this.server.voronoiTerrain.getPlanets(shipPosition)).map(this.rotatePlanet.bind(this))
                         .map(this.convertToDrawable.bind(this, "-planet", 1)) as Array<IDrawable<Planet>>)
                         .map(this.drawPlanet.bind(this, false))
                 }
                 {
-                    (this.smokeClouds.map(App.applyKinematics.bind(this))
+                    (this.server.smokeClouds.map(App.applyKinematics.bind(this))
                         .map(this.rotatePlanet.bind(this))
                         .map(this.convertToDrawable.bind(this, "-smokeClouds", 1)) as Array<IDrawable<SmokeCloud>>)
                         .map(this.drawSmokeCloud.bind(this))
                 }
                 {
-                    (this.cannonBalls.map(this.rotatePlanet.bind(this))
+                    (this.server.cannonBalls.map(this.rotatePlanet.bind(this))
                         .map(this.convertToDrawable.bind(this, "-cannonBalls", 1)) as Array<IDrawable<SmokeCloud>>)
                         .map(this.drawSmokeCloud.bind(this))
                 }
                 {
-                    (this.crates.map(this.rotatePlanet.bind(this))
+                    (this.server.crates.map(this.rotatePlanet.bind(this))
                         .map(this.convertToDrawable.bind(this, "-crates", 1)) as Array<IDrawable<Crate>>)
                         .map(this.drawCrate.bind(this, false))
                 }
                 {
-                    (this.ships.map(this.rotatePlanet.bind(this))
+                    (this.server.ships.map(this.rotatePlanet.bind(this))
                         .map(this.convertToDrawable.bind(this, "-ships", 1)) as Array<IDrawable<Ship>>)
                         .map(this.drawShip.bind(this))
                 }
                 {
-                    (Array.from(this.voronoiTerrain.getPlanets(shipPosition)).map(this.rotatePlanet.bind(this))
+                    (Array.from(this.server.voronoiTerrain.getPlanets(shipPosition)).map(this.rotatePlanet.bind(this))
                         .map(this.convertToDrawable.bind(this, "-planet", 1)) as Array<IDrawable<Planet>>)
                         .map(this.drawPlanet.bind(this, true))
                 }
                 {
-                    (this.crates.map(this.rotatePlanet.bind(this))
+                    (this.server.crates.map(this.rotatePlanet.bind(this))
                         .map(this.convertToDrawable.bind(this, "-crates", 1)) as Array<IDrawable<Crate>>)
                         .map(this.drawCrate.bind(this, true))
                 }
@@ -2665,12 +1694,12 @@ export class App extends Server {
             <g key="game-controls">
                 <text x="0" y="30" fill="black">Zoom</text>
                 <rect x="0" y="45" width="20" height="20" fill="grey" onClick={this.decrementZoom.bind(this)}/>
-                <text x="25" y="60" textAnchor="center">{(this.state.zoom * this.worldScale)}</text>
+                <text x="25" y="60" textAnchor="center">{(this.state.zoom * this.server.worldScale)}</text>
                 <rect x="40" y="45" width="20" height="20" fill="grey" onClick={this.incrementZoom.bind(this)}/>
                 <text x="5" y="60" onClick={this.decrementZoom.bind(this)}>-</text>
                 <text x="40" y="60" onClick={this.incrementZoom.bind(this)}>+</text>
                 {
-                    this.playerShip && (
+                    this.server.playerShip && (
                         <>
                             <rect key="return-to-menu-rect" x="5" y="75" width="50" height="20" fill="red" onClick={this.returnToMainMenu.bind(this)}/>
                             <text key="return-to-menu-text" x="10" y="90" fill="white" onClick={this.returnToMainMenu.bind(this)}>Leave</text>
@@ -2682,16 +1711,16 @@ export class App extends Server {
     }
 
     private renderGameStatus() {
-        const numPathingNodes = this.playerShip && this.playerShip.pathFinding.points.length;
-        const distanceToNode = this.playerShip && this.playerShip.pathFinding.points.length > 0 ?
+        const numPathingNodes = this.server.playerShip && this.server.playerShip.pathFinding.points.length;
+        const distanceToNode = this.server.playerShip && this.server.playerShip.pathFinding.points.length > 0 ?
             VoronoiGraph.angularDistance(
-                this.playerShip.position.rotateVector([0, 0, 1]),
-                this.playerShip.pathFinding.points[0],
-                this.worldScale
+                this.server.playerShip.position.rotateVector([0, 0, 1]),
+                this.server.playerShip.pathFinding.points[0],
+                this.server.worldScale
             ) :
             0;
 
-        const order = this.playerShip && this.playerShip.orders[0];
+        const order = this.server.playerShip && this.server.playerShip.orders[0];
         const orderType = order ? order.orderType : "NONE";
 
         if (numPathingNodes) {
@@ -2708,15 +1737,15 @@ export class App extends Server {
     }
 
     private renderCargoStatus() {
-        if (this.playerShip) {
-            const shipType = this.playerShip.shipType;
+        if (this.server.playerShip) {
+            const shipType = this.server.playerShip.shipType;
             const shipData = SHIP_DATA.find(s => s.shipType === shipType);
             if (!shipData) {
                 throw new Error("Could not find ship type");
             }
 
             const cargoSlotSize = Math.min(50, this.state.width / shipData.cargoSize);
-            const cargos = this.playerShip.cargo;
+            const cargos = this.server.playerShip.cargo;
             const cargoSize = shipData.cargoSize;
             return (
                 <g key="cargo-status" transform={`translate(${this.state.width / 2},${this.state.height - 50})`}>
@@ -2766,10 +1795,10 @@ export class App extends Server {
     }
 
     private renderPlayerStatus() {
-        if (this.playerShip) {
+        if (this.server.playerShip) {
             return (
                 <g key="player-status" transform={`translate(0,${this.state.height - 80})`}>
-                    <text x="0" y="45" fontSize={8} color="black">Gold: {this.money.getGold()}</text>
+                    <text x="0" y="45" fontSize={8} color="black">Gold: {this.server.playerData[0].moneyAccount.getGold()}</text>
                 </g>
             );
         } else {
@@ -2849,18 +1878,12 @@ export class App extends Server {
             this.setState({
                 showSpawnMenu: false
             });
-            const planet = this.planets.find(p => p.id === planetId);
-            if (planet && this.money.hasEnough(planet.shipyard.quoteShip(shipType))) {
-                this.playerShip = planet.shipyard.buyShip(this.money, shipType);
-                this.playerData.push({
-                    shipId: this.playerShip.id,
-                    autoPilotEnabled: this.state.autoPilotEnabled,
-                    moneyAccount: new MoneyAccount(2000),
-                    activeKeys: []
-                });
-            } else {
-                this.returnToMainMenu();
-            }
+            const message: ISpawnMessage = {
+                messageType: EMessageType.SPAWN,
+                shipType,
+                planetId
+            };
+            this.server.incomingMessages.push(message);
         } else {
             this.returnToMainMenu();
         }
@@ -2872,8 +1895,8 @@ export class App extends Server {
             showMainMenu: true,
             faction: null
         });
-        this.playerShip = null;
-        this.playerData.splice(0, this.playerData.length);
+        this.server.playerShip = null;
+        this.server.playerData.splice(0, this.server.playerData.length);
     }
 
     private renderSpawnMenu() {
@@ -2884,10 +1907,10 @@ export class App extends Server {
         const spawnLocations = [];
         let faction: Faction | null = null;
         if (this.state.faction) {
-            faction = this.factions[this.state.faction];
+            faction = this.server.factions[this.state.faction];
         }
         if (faction) {
-            const planetsToSpawnAt = this.planets.filter(p => faction && faction.planetIds.includes(p.id))
+            const planetsToSpawnAt = this.server.planets.filter(p => faction && faction.planetIds.includes(p.id))
                 .sort((a, b) => {
                     const settlementLevelDifference = b.settlementLevel - a.settlementLevel;
                     if (settlementLevelDifference !== 0) {
@@ -2991,10 +2014,10 @@ export class App extends Server {
     }
 
     getShowShipDrawing(id: string, shipType: EShipType, factionType: EFaction | null = null): IDrawable<Ship> {
-        const original: Ship = new Ship(this, shipType);
+        const original: Ship = new Ship(this.server, shipType);
         original.id = id;
         if (factionType) {
-            const faction = Object.values(this.factions).find(f => f.id === factionType);
+            const faction = Object.values(this.server.factions).find(f => f.id === factionType);
             if (faction) {
                 original.color = faction.factionColor;
             }
@@ -3780,7 +2803,7 @@ export class App extends Server {
                             this.renderGameWorld.call(this)
                         }
                         {
-                            this.state.showMainMenu && !this.props.isVoronoiTestMode ? this.renderMainMenu.call(this) : null
+                            this.state.showMainMenu ? this.renderMainMenu.call(this) : null
                         }
                         {
                             this.state.showSpawnMenu ? this.renderSpawnMenu.call(this) : null

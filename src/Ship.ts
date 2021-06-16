@@ -1,13 +1,14 @@
 import {IAutomatedShip, ICameraState, MoneyAccount} from "./Interface";
 import Quaternion from "quaternion";
 import {EResourceType, ICargoItem} from "./Resource";
-import App, {Server} from "./App";
+import App from "./App";
 import {EOrderResult, EOrderType, Order} from "./Order";
 import {DelaunayGraph, PathFinder, VoronoiGraph} from "./Graph";
 import {computeConeLineIntersection, IConeHitTest} from "./Intersection";
 import {Faction} from "./Faction";
 import {CannonBall, Crate} from "./Item";
 import {IResourceExported, Planet} from "./Planet";
+import {Server} from "./Server";
 
 /**
  * The scale of the graphics engine to physics. All graphics is a plane scaled down by this factor, then projected
@@ -234,9 +235,9 @@ export class Ship implements IAutomatedShip {
     public health: number = 1;
     public maxHealth: number = 1;
     public cargo: ICargoItem[] = [];
-    public burnTicks: number[] = new Array(App.NUM_BURN_TICKS).fill(0);
-    public repairTicks: number[] = new Array(App.NUM_REPAIR_TICKS).fill(0);
-    public healthTickCoolDown = App.HEALTH_TICK_COOL_DOWN;
+    public burnTicks: number[] = new Array(Server.NUM_BURN_TICKS).fill(0);
+    public repairTicks: number[] = new Array(Server.NUM_REPAIR_TICKS).fill(0);
+    public healthTickCoolDown = Server.HEALTH_TICK_COOL_DOWN;
     public moneyAccount: MoneyAccount = new MoneyAccount();
 
     constructor(app: Server, shipType: EShipType) {
@@ -294,7 +295,7 @@ export class Ship implements IAutomatedShip {
             const cratePosition = c.position.clone().rotateVector([0, 0, 1]);
             const shipPosition = this.position.clone().rotateVector([0, 0, 1]);
             const distance = VoronoiGraph.angularDistance(cratePosition, shipPosition, this.app.worldScale);
-            return distance < App.PROJECTILE_DETECTION_RANGE * 1.4;
+            return distance < Server.PROJECTILE_DETECTION_RANGE * 1.4;
         });
         if (crate) {
             return crate;
@@ -316,9 +317,9 @@ export class Ship implements IAutomatedShip {
      */
     public applyDamage(cannonBall: CannonBall) {
         // compute damage properties
-        const physicalDamage = cannonBall.damage * (1 - App.BURN_DAMAGE_RATIO);
-        const burnDamage = cannonBall.damage * App.BURN_DAMAGE_RATIO;
-        const repairDamage = cannonBall.damage * App.REPAIR_DAMAGE_RATIO;
+        const physicalDamage = cannonBall.damage * (1 - Server.BURN_DAMAGE_RATIO);
+        const burnDamage = cannonBall.damage * Server.BURN_DAMAGE_RATIO;
+        const repairDamage = cannonBall.damage * Server.REPAIR_DAMAGE_RATIO;
 
         // apply instant physical damage
         this.health = Math.max(0, this.health - physicalDamage);
@@ -342,7 +343,7 @@ export class Ship implements IAutomatedShip {
     public handleHealthTick() {
         if (this.healthTickCoolDown <= 0) {
             // apply health tick
-            this.healthTickCoolDown = App.HEALTH_TICK_COOL_DOWN;
+            this.healthTickCoolDown = Server.HEALTH_TICK_COOL_DOWN;
 
             const shouldApplyBurnDamage = this.burnTicks.some(n => n > 0);
             if (shouldApplyBurnDamage) {
@@ -438,7 +439,7 @@ export class Ship implements IAutomatedShip {
         for (const cargo of this.cargo) {
             const randomDirection = Quaternion.fromAxisAngle([0, 0, 1], Math.random() * 2 * Math.PI - Math.PI)
                 .rotateVector([1, 0, 0]);
-            const randomVelocity = Quaternion.fromBetweenVectors([0, 0, 1], randomDirection).pow(App.VELOCITY_STEP / this.app.worldScale * 0.1);
+            const randomVelocity = Quaternion.fromBetweenVectors([0, 0, 1], randomDirection).pow(Server.VELOCITY_STEP / this.app.worldScale * 0.1);
 
             const crate = new Crate(cargo.resourceType, cargo.sourcePlanetId, cargo.amount);
             crate.id = `${this.id}-crate-${Math.floor(Math.random() * 100000)}`;
@@ -446,7 +447,7 @@ export class Ship implements IAutomatedShip {
             crate.positionVelocity = this.positionVelocity.clone().pow(1 / 50).mul(randomVelocity);
             crate.positionVelocity = Quaternion.ONE;
             crate.orientation = Quaternion.fromAxisAngle([0, 0, 1], Math.random() * 2 * Math.PI - Math.PI);
-            crate.orientationVelocity = Quaternion.fromAxisAngle([0, 0, 1], Math.random() > 0 ? App.ROTATION_STEP : -App.ROTATION_STEP);
+            crate.orientationVelocity = Quaternion.fromAxisAngle([0, 0, 1], Math.random() > 0 ? Server.ROTATION_STEP : -Server.ROTATION_STEP);
             crate.maxLife = 2 * 60 * 10;
             crate.size = 100;
             crates.push(crate);
@@ -552,7 +553,7 @@ export class FireControl<T extends IAutomatedShip> {
             shipDirectionPoint[0] - shipPosition[0],
             shipDirectionPoint[1] - shipPosition[1]
         ];
-        const projectileSpeed = App.PROJECTILE_SPEED / this.app.worldScale;
+        const projectileSpeed = Server.PROJECTILE_SPEED / this.app.worldScale;
         return computeConeLineIntersection(shipPosition, shipDirection, projectileSpeed);
     }
 
@@ -579,7 +580,7 @@ export class FireControl<T extends IAutomatedShip> {
             shipDirectionPoint[0] - shipPosition[0],
             shipDirectionPoint[1] - shipPosition[1]
         ];
-        const attackingShipSpeed = App.VELOCITY_STEP / App.VELOCITY_DRAG * this.owner.getSpeedFactor();
+        const attackingShipSpeed = Server.VELOCITY_STEP / Server.VELOCITY_DRAG * this.owner.getSpeedFactor();
         const interceptConeHit = computeConeLineIntersection(shipPosition, shipDirection, attackingShipSpeed, 0);
 
         // handle cone hit result
@@ -607,7 +608,7 @@ export class FireControl<T extends IAutomatedShip> {
             return null;
         }
         const coneHit = this.getConeHit(target);
-        if (!(coneHit.success && coneHit.point && coneHit.time && coneHit.time < App.PROJECTILE_LIFE)) {
+        if (!(coneHit.success && coneHit.point && coneHit.time && coneHit.time < Server.PROJECTILE_LIFE)) {
             // target is moving too fast, cannot hit it
             return null;
         }
@@ -619,7 +620,7 @@ export class FireControl<T extends IAutomatedShip> {
     }
 
     public integrateOrientationSpeedFrames(orientationSpeed: number): number {
-        const n = Math.floor(orientationSpeed / App.ROTATION_STEP / 2);
+        const n = Math.floor(orientationSpeed / Server.ROTATION_STEP / 2);
         return Math.max(5, (n * (n - 1)) / 2 * 0.8);
     }
 
@@ -678,7 +679,7 @@ export class FireControl<T extends IAutomatedShip> {
         //
         // compute moving projectile path to hit target
         const coneHit = this.getConeHit(target);
-        let detectionConeSizeInTicks = App.PROJECTILE_LIFE;
+        let detectionConeSizeInTicks = Server.PROJECTILE_LIFE;
         // if (this.owner.hasPirateOrder()) {
         //     // pirates get close to attack
         //     if (this.isAttacking) {
@@ -724,16 +725,16 @@ export class FireControl<T extends IAutomatedShip> {
             Math.atan2(targetOrientationPoint[1], targetOrientationPoint[0]);
         orientationDiffAngle = (orientationDiffAngle - Math.PI / 2) % (Math.PI * 2);
         const orientationSpeed = VoronoiGraph.angularDistanceQuaternion(this.owner.orientationVelocity, 1) * (orientationDiffAngle > 0 ? 1 : -1);
-        const desiredOrientationSpeed = Math.max(-App.ROTATION_STEP * 10, Math.min(Math.round(
+        const desiredOrientationSpeed = Math.max(-Server.ROTATION_STEP * 10, Math.min(Math.round(
             -(360 / 4) / Math.PI * orientationDiffAngle
-        ), App.ROTATION_STEP * 10));
+        ), Server.ROTATION_STEP * 10));
 
         // perform rotation and speed up
         // use a class variable to force more tight angle correction, and a more relaxed angle check while moving
         // should result in stop and go less often.
         const shouldRotate = this.lastStepShouldRotate ?
-            Math.abs(orientationDiffAngle) > 2 / 180 * Math.PI || Math.abs(desiredOrientationSpeed) >= App.ROTATION_STEP :
-            Math.abs(orientationDiffAngle) > 5 / 180 * Math.PI || Math.abs(desiredOrientationSpeed) >= App.ROTATION_STEP;
+            Math.abs(orientationDiffAngle) > 2 / 180 * Math.PI || Math.abs(desiredOrientationSpeed) >= Server.ROTATION_STEP :
+            Math.abs(orientationDiffAngle) > 5 / 180 * Math.PI || Math.abs(desiredOrientationSpeed) >= Server.ROTATION_STEP;
         this.lastStepShouldRotate = shouldRotate;
         const willReachTargetRotation = Math.abs(orientationDiffAngle) / Math.abs(orientationSpeed) < this.integrateOrientationSpeedFrames(orientationSpeed);
         if (shouldRotate && desiredOrientationSpeed > orientationSpeed && !willReachTargetRotation && !this.owner.activeKeys.includes("a")) {
