@@ -1,7 +1,7 @@
 import Quaternion from "quaternion";
 import {IAutomatedShip, ICameraState} from "./Interface";
 import App from "./App";
-import {Server} from "./Server";
+import {Game} from "./Game";
 
 export interface ITessellatedTriangle {
     vertices: Quaternion[];
@@ -67,7 +67,7 @@ export class VoronoiGraph<T extends ICameraState> {
     /**
      * The app containing world scale.
      */
-    app: Server;
+    app: Game;
     /**
      * A list of voronoi cell used for rendering and physics.
      */
@@ -83,7 +83,7 @@ export class VoronoiGraph<T extends ICameraState> {
      */
     drawableSet: Record<string, number> = {};
 
-    constructor(app: Server) {
+    constructor(app: Game) {
         this.app = app;
     }
 
@@ -192,7 +192,7 @@ export class VoronoiGraph<T extends ICameraState> {
 
             // compute triangle fan parameters
             const averagePoint = DelaunayGraph.normalize(
-                Server.getAveragePoint([cell.vertices[0], cell.vertices[i], cell.vertices[i + 1]])
+                Game.getAveragePoint([cell.vertices[0], cell.vertices[i], cell.vertices[i + 1]])
             );
             const area = DelaunayGraph.dotProduct(
                 DelaunayGraph.subtract(a, b),
@@ -247,7 +247,7 @@ export class VoronoiGraph<T extends ICameraState> {
 
         // re center points to evenly distribute around the sphere.
         for (let step = 0; step < 3; step++) {
-            const averagePoint = Server.getAveragePoint(relaxedPoints);
+            const averagePoint = Game.getAveragePoint(relaxedPoints);
             relaxedPoints = relaxedPoints.map(p => DelaunayGraph.normalize(DelaunayGraph.subtract(p, averagePoint)));
         }
         return relaxedPoints;
@@ -275,7 +275,7 @@ export class DelaunayTile implements IDrawableTile {
 interface IPathingGraph {
     vertices: Array<[number, number, number]>;
     edges: [number, number][];
-    app: Server;
+    app: Game;
 }
 
 interface IPathingNode<T extends IPathingGraph> {
@@ -314,7 +314,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
     /**
      * Reference to the app containing the delaunay graph.
      */
-    public app: Server;
+    public app: Game;
     /**
      * The vertices of the graph.
      */
@@ -333,7 +333,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
      */
     public pathingNodes: Record<number, PathingNode<DelaunayGraph<T>>> = {};
 
-    constructor(app: Server) {
+    constructor(app: Game) {
         this.app = app;
     }
 
@@ -678,7 +678,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                 const randomTriangleIndex = Math.floor(this.triangles.length * Math.random());
                 const triangle = this.triangles[randomTriangleIndex];
                 const triangleVertices = triangle.map(edgeIndex => this.vertices[this.edges[edgeIndex][0]]);
-                vertex = DelaunayGraph.normalize(Server.getAveragePoint(triangleVertices));
+                vertex = DelaunayGraph.normalize(Game.getAveragePoint(triangleVertices));
             } else {
                 break;
             }
@@ -785,7 +785,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                 DelaunayGraph.dotProduct(DelaunayGraph.crossProduct(
                     DelaunayGraph.subtract(vertices[1], vertices[0]),
                     DelaunayGraph.subtract(vertices[2], vertices[0])
-                ), DelaunayGraph.normalize(Server.getAveragePoint(vertices))) < 0
+                ), DelaunayGraph.normalize(Game.getAveragePoint(vertices))) < 0
             ) {
                 this.triangles[this.triangles.length - 1] = [
                     triangle[0],
@@ -834,7 +834,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                 const vertex = this.vertices[edge[0]];
                 data.vertices.push(vertex);
             }
-            data.centroid = DelaunayGraph.normalize(Server.getAveragePoint(data.vertices));
+            data.centroid = DelaunayGraph.normalize(Game.getAveragePoint(data.vertices));
             yield data;
         }
     }
@@ -900,7 +900,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                 const thetaAngle = Math.atan2(delta[1], delta[0]);
 
                 // compute the half plane to construct the dual graph, delaunay triangulation -> voronoi tessellation.
-                const averagePoint = DelaunayGraph.normalize(Server.getAveragePoint([aVertex, bVertex]));
+                const averagePoint = DelaunayGraph.normalize(Game.getAveragePoint([aVertex, bVertex]));
                 const rotation = Quaternion.fromAxisAngle(averagePoint, Math.PI / 2);
                 const a = rotation.rotateVector(aVertex);
                 const b = rotation.rotateVector(bVertex);
@@ -985,7 +985,7 @@ export class DelaunayGraph<T extends ICameraState> implements IPathingGraph {
                 }, [] as Array<[number, number, number]>);
 
                 // sort points counter clockwise
-                const averagePoint = DelaunayGraph.normalize(Server.getAveragePoint(points));
+                const averagePoint = DelaunayGraph.normalize(Game.getAveragePoint(points));
                 const averageTransform = Quaternion.fromBetweenVectors([0, 0, 1], averagePoint).inverse();
                 const sortedPoints = points.sort((a, b): number => {
                     const aPoint = averageTransform.rotateVector(a);
@@ -1051,12 +1051,12 @@ export class PathFinder<T extends IAutomatedShip> {
             this.owner.app.worldScale
         );
         return this.points.length > 1 ?
-            distance < Server.VELOCITY_STEP * this.owner.app.worldScale * Math.PI / 2 * 300 :
-            distance < Server.VELOCITY_STEP * this.owner.app.worldScale * Math.PI / 2 * 100;
+            distance < Game.VELOCITY_STEP * this.owner.app.worldScale * Math.PI / 2 * 300 :
+            distance < Game.VELOCITY_STEP * this.owner.app.worldScale * Math.PI / 2 * 100;
     }
 
     public integrateOrientationSpeedFrames(orientationSpeed: number): number {
-        const n = Math.floor(orientationSpeed / Server.ROTATION_STEP / 2);
+        const n = Math.floor(orientationSpeed / Game.ROTATION_STEP / 2);
         return Math.max(5, (n * (n - 1)) / 2 * 0.8);
     }
 
@@ -1089,9 +1089,9 @@ export class PathFinder<T extends IAutomatedShip> {
             targetOrientationPoint = DelaunayGraph.normalize(targetOrientationPoint);
             const orientationDiffAngle = Math.atan2(targetOrientationPoint[0], targetOrientationPoint[1]);
             const orientationSpeed = VoronoiGraph.angularDistanceQuaternion(this.owner.orientationVelocity, 1) * (orientationDiffAngle > 0 ? 1 : -1);
-            const desiredOrientationSpeed = Math.max(-Server.ROTATION_STEP * 10, Math.min(Math.round(
+            const desiredOrientationSpeed = Math.max(-Game.ROTATION_STEP * 10, Math.min(Math.round(
                 -(360 / 4) / Math.PI * orientationDiffAngle
-            ), Server.ROTATION_STEP * 10));
+            ), Game.ROTATION_STEP * 10));
 
             // compute speed towards target
             const positionAngularDistance = VoronoiGraph.angularDistanceQuaternion(positionDiff, this.owner.app.worldScale);
@@ -1102,8 +1102,8 @@ export class PathFinder<T extends IAutomatedShip> {
             // use a class variable to force more tight angle correction, and a more relaxed angle check while moving
             // should result in stop and go less often.
             const shouldRotate = this.lastStepShouldRotate ?
-                Math.abs(orientationDiffAngle) > 2 / 180 * Math.PI * (Math.pow(Math.PI - distance, 2) + 1) || Math.abs(desiredOrientationSpeed) >= Server.ROTATION_STEP :
-                Math.abs(orientationDiffAngle) > 5 / 180 * Math.PI * (Math.pow(Math.PI - distance, 2) + 1) || Math.abs(desiredOrientationSpeed) >= Server.ROTATION_STEP;
+                Math.abs(orientationDiffAngle) > 2 / 180 * Math.PI * (Math.pow(Math.PI - distance, 2) + 1) || Math.abs(desiredOrientationSpeed) >= Game.ROTATION_STEP :
+                Math.abs(orientationDiffAngle) > 5 / 180 * Math.PI * (Math.pow(Math.PI - distance, 2) + 1) || Math.abs(desiredOrientationSpeed) >= Game.ROTATION_STEP;
             this.lastStepShouldRotate = shouldRotate;
             if (!shouldRotate) {
                 desiredSpeed = 5;

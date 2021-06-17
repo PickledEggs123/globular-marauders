@@ -3,7 +3,7 @@ import {PathFinder} from "./Graph";
 import {EFaction} from "./Ship";
 import {Planet} from "./Planet";
 import {Crate} from "./Item";
-import {Server} from "./Server";
+import {Game} from "./Game";
 import {EResourceType} from "./Resource";
 
 export interface IExpirableTicks {
@@ -13,7 +13,7 @@ export interface IExpirableTicks {
 
 export interface IAutomatedShip extends ICameraState {
     activeKeys: string[];
-    app: Server;
+    app: Game;
 
     isInMissionArea(): boolean;
 

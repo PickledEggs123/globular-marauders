@@ -17,7 +17,7 @@ import {Faction} from "./Faction";
 import {EBuildingType, Manufactory, Planet, Plantation} from "./Planet";
 import {Crate, SmokeCloud} from "./Item";
 import * as Tone from "tone";
-import {EMessageType, IAutoPilotMessage, IKeyboardMessage, ISpawnMessage, Server} from "./Server";
+import {EMessageType, IAutoPilotMessage, IKeyboardMessage, ISpawnMessage, Game} from "./Game";
 
 /**
  * A class for playing music through a series of notes. The data is a list of musical notes to play in sequence.
@@ -386,7 +386,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     public voronoiData: VoronoiCell[] = [];
     public refreshVoronoiDataTick: number = 0;
     public music: MusicPlayer = new MusicPlayer();
-    public server: Server = new Server();
+    public game: Game = new Game();
 
     /**
      * ------------------------------------------------------------
@@ -398,7 +398,7 @@ export class App extends React.Component<IAppProps, IAppState> {
      * Get the home world of the player.
      */
     getPlayerPlanet(): Planet | null {
-        const ship = this.server.playerShip;
+        const ship = this.game.playerShip;
         if (ship) {
             return ship.planet || null;
         } else {
@@ -410,36 +410,36 @@ export class App extends React.Component<IAppProps, IAppState> {
      * Get the ship of the player.
      */
     getPlayerShip(): ICameraState {
-        const ship = this.server.playerShip;
+        const ship = this.game.playerShip;
         if (ship) {
-            return Server.GetCameraState(ship);
+            return Game.GetCameraState(ship);
         }
         // show latest faction ship
         if (this.state.faction) {
             // faction selected, orbit the faction's home world
-            const faction = Object.values(this.server.factions).find(f => f.id === this.state.faction);
-            const ship = this.server.ships.find(s => faction && faction.shipIds.length > 0 && s.id === faction.shipIds[faction.shipIds.length - 1]);
+            const faction = Object.values(this.game.factions).find(f => f.id === this.state.faction);
+            const ship = this.game.ships.find(s => faction && faction.shipIds.length > 0 && s.id === faction.shipIds[faction.shipIds.length - 1]);
             if (ship) {
-                return Server.GetCameraState(ship);
+                return Game.GetCameraState(ship);
             }
         }
         // show latest attacking ship
-        const attackingAIShip = this.server.ships.find(s => s.id === this.server.demoAttackingShipId);
+        const attackingAIShip = this.game.ships.find(s => s.id === this.game.demoAttackingShipId);
         if (attackingAIShip) {
-            return Server.GetCameraState(attackingAIShip);
+            return Game.GetCameraState(attackingAIShip);
         } else {
-            this.server.demoAttackingShipId = null;
+            this.game.demoAttackingShipId = null;
         }
         // no faction selected, orbit the world
-        const tempShip = new Ship(this.server, EShipType.CUTTER);
+        const tempShip = new Ship(this.game, EShipType.CUTTER);
         tempShip.id = "ghost-ship";
-        const numSecondsToCircle = 120 * this.server.worldScale;
+        const numSecondsToCircle = 120 * this.game.worldScale;
         const millisecondsPerSecond = 1000;
         const circleSlice = numSecondsToCircle * millisecondsPerSecond;
         const circleFraction = (+new Date() % circleSlice) / circleSlice;
         const angle = circleFraction * (Math.PI * 2);
         tempShip.position = Quaternion.fromAxisAngle([1, 0, 0], -angle);
-        return Server.GetCameraState(tempShip);
+        return Game.GetCameraState(tempShip);
     }
 
     /**
@@ -511,7 +511,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         const rotatedPosition = planet.position.rotateVector([0, 0, 1]);
         const projection = this.stereographicProjection(planet, size);
         const reverseProjection = this.stereographicProjection(planet, size);
-        const distance = Math.max(MIN_DISTANCE, 5 * (1 - rotatedPosition[2] * size)) * this.server.worldScale;
+        const distance = Math.max(MIN_DISTANCE, 5 * (1 - rotatedPosition[2] * size)) * this.game.worldScale;
         const orientationPoint = planet.orientation.rotateVector([1, 0, 0]);
         const rotation = Math.atan2(-orientationPoint[1], orientationPoint[0]) / Math.PI * 180;
         return {
@@ -537,7 +537,7 @@ export class App extends React.Component<IAppProps, IAppState> {
      * @private
      */
     private stereographicProjection(planet: ICameraState, size: number = 1): {x: number, y: number} {
-        const zoom = (this.state.zoom * this.server.worldScale);
+        const zoom = (this.state.zoom * this.game.worldScale);
         const vector = planet.position.rotateVector([0, 0, 1]);
         return {
             x: vector[0] * zoom * size,
@@ -577,7 +577,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         // extract faction information
         let factionColor: string | null = null;
-        const ownerFaction = Object.values(this.server.factions).find(faction => faction.planetIds.includes(planetDrawing.original.id));
+        const ownerFaction = Object.values(this.game.factions).find(faction => faction.planetIds.includes(planetDrawing.original.id));
         if (ownerFaction) {
             factionColor = ownerFaction.factionColor;
         }
@@ -627,7 +627,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                             transform={`translate(${x * this.state.width},${(1 - y) * this.state.height})`}
                             fill={factionColor}
                             style={{opacity: 0.8}}
-                            points={`0,0 ${this.getPointsOfAngularProgress.call(this, Math.max(0, Math.min(planetDrawing.original.settlementProgress, 1)), size * (this.state.zoom * this.server.worldScale) * 1.35)}`}
+                            points={`0,0 ${this.getPointsOfAngularProgress.call(this, Math.max(0, Math.min(planetDrawing.original.settlementProgress, 1)), size * (this.state.zoom * this.game.worldScale) * 1.35)}`}
                         />
                     )
                 }
@@ -638,7 +638,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                             transform={`translate(${x * this.state.width},${(1 - y) * this.state.height})`}
                             fill={factionColor}
                             style={{opacity: 0.8}}
-                            points={`0,0 ${this.getPointsOfAngularProgress.call(this, Math.max(0, Math.min((planetDrawing.original.settlementProgress - 1) / 4, 1)), size * (this.state.zoom * this.server.worldScale) * 1.70)}`}
+                            points={`0,0 ${this.getPointsOfAngularProgress.call(this, Math.max(0, Math.min((planetDrawing.original.settlementProgress - 1) / 4, 1)), size * (this.state.zoom * this.game.worldScale) * 1.70)}`}
                         />
                     )
                 }
@@ -648,10 +648,10 @@ export class App extends React.Component<IAppProps, IAppState> {
                             key={`${planetDrawing.id}-planet`}
                             cx={x * this.state.width}
                             cy={(1 - y) * this.state.height}
-                            r={size * (this.state.zoom * this.server.worldScale)}
+                            r={size * (this.state.zoom * this.game.worldScale)}
                             fill={planetDrawing.color}
                             stroke="grey"
-                            strokeWidth={0.2 * size * (this.state.zoom * this.server.worldScale)}
+                            strokeWidth={0.2 * size * (this.state.zoom * this.game.worldScale)}
                             style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
                         />
                     )
@@ -661,7 +661,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                         <>
                             <text
                                 key={`${planetDrawing.id}-planet-title`}
-                                x={planetX + size * (this.state.zoom * this.server.worldScale) + 10}
+                                x={planetX + size * (this.state.zoom * this.game.worldScale) + 10}
                                 y={planetY - 6}
                                 fill="white"
                                 fontSize="12"
@@ -674,7 +674,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                                     return (
                                         <text
                                             key={`${planetDrawing.id}-planet-resource-${index}`}
-                                            x={planetX + size * (this.state.zoom * this.server.worldScale) + 10}
+                                            x={planetX + size * (this.state.zoom * this.game.worldScale) + 10}
                                             y={planetY + (index + 1) * 10}
                                             fill="white"
                                             fontSize="8"
@@ -705,10 +705,10 @@ export class App extends React.Component<IAppProps, IAppState> {
                 <circle
                     cx={x * this.state.width}
                     cy={(1 - y) * this.state.height}
-                    r={size * (this.state.zoom * this.server.worldScale)}
+                    r={size * (this.state.zoom * this.game.worldScale)}
                     fill={planetDrawing.color}
                     stroke="grey"
-                    strokeWidth={0.2 * size * (this.state.zoom * this.server.worldScale)}
+                    strokeWidth={0.2 * size * (this.state.zoom * this.game.worldScale)}
                     style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
                 />
                 <line
@@ -717,7 +717,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                     x2={(x - 0.01) * this.state.width}
                     y2={(1 - y) * this.state.height}
                     stroke={planetDrawing.color}
-                    strokeWidth={0.2 * size * (this.state.zoom * this.server.worldScale)}
+                    strokeWidth={0.2 * size * (this.state.zoom * this.game.worldScale)}
                     style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
                 />
                 <line
@@ -726,7 +726,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                     x2={x * this.state.width}
                     y2={(1 - y - 0.01) * this.state.height}
                     stroke={planetDrawing.color}
-                    strokeWidth={0.2 * size * (this.state.zoom * this.server.worldScale)}
+                    strokeWidth={0.2 * size * (this.state.zoom * this.game.worldScale)}
                     style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
                 />
             </g>
@@ -773,7 +773,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                         aPoint[0] * 0.5,
                         aPoint[1] * 0.5,
                     ];
-                    const midPoint = DelaunayGraph.normalize(Server.getAveragePoint([aPoint, bPoint]));
+                    const midPoint = DelaunayGraph.normalize(Game.getAveragePoint([aPoint, bPoint]));
                     const abNormal = DelaunayGraph.normalize(DelaunayGraph.crossProduct(
                         DelaunayGraph.normalize(aPoint),
                         DelaunayGraph.normalize(bPoint)
@@ -794,7 +794,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                         bPoint[0] * 0.5,
                         bPoint[1] * 0.5
                     ];
-                    const midPoint = DelaunayGraph.normalize(Server.getAveragePoint([aPoint, bPoint]));
+                    const midPoint = DelaunayGraph.normalize(Game.getAveragePoint([aPoint, bPoint]));
                     const abNormal = DelaunayGraph.normalize(DelaunayGraph.crossProduct(
                         DelaunayGraph.normalize(aPoint),
                         DelaunayGraph.normalize(bPoint)
@@ -844,7 +844,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         }
         const hullPoints = shipData.hull;
 
-        const hullQuaternions = Server.getPhysicsHull(hullPoints, this.server.worldScale);
+        const hullQuaternions = Game.getPhysicsHull(hullPoints, this.game.worldScale);
         const rotatedHullQuaternion = hullQuaternions.map((q): Quaternion => {
             return planetDrawing.position.clone()
                 .mul(q);
@@ -857,7 +857,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         return (
             <polygon
                 key={`${planetDrawing.id}-physics-hull`}
-                points={rotatedHullPoints.map(([x, y]) => `${(x * (this.state.zoom * this.server.worldScale) + 1) * 0.5 * this.state.width},${(1 - (y * (this.state.zoom * this.server.worldScale) + 1) * 0.5) * this.state.height}`).join(" ")}
+                points={rotatedHullPoints.map(([x, y]) => `${(x * (this.state.zoom * this.game.worldScale) + 1) * 0.5 * this.state.width},${(1 - (y * (this.state.zoom * this.game.worldScale) + 1) * 0.5) * this.state.height}`).join(" ")}
                 fill="white"
                 stroke="cyan"
                 opacity={0.5}
@@ -885,7 +885,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                     points={`${shipData.hull.map(([x, y]) => `${x},${y}`).join(" ")}`}
                     fill={planetDrawing.color}
                     stroke="grey"
-                    strokeWidth={0.05 * size * (this.state.zoom * this.server.worldScale)}
+                    strokeWidth={0.05 * size * (this.state.zoom * this.game.worldScale)}
                     style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
                 />
                 {
@@ -898,7 +898,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                                 points="5,-2 0,-2 0,2 5,2"
                                 fill="darkgrey"
                                 stroke="grey"
-                                strokeWidth={0.05 * size * (this.state.zoom * this.server.worldScale)}
+                                strokeWidth={0.05 * size * (this.state.zoom * this.game.worldScale)}
                                 style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
                             />
                         );
@@ -914,7 +914,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                                 points="-5,-2 0,-2 0,2 -5,2"
                                 fill="darkgrey"
                                 stroke="grey"
-                                strokeWidth={0.05 * size * (this.state.zoom * this.server.worldScale)}
+                                strokeWidth={0.05 * size * (this.state.zoom * this.game.worldScale)}
                                 style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
                             />
                         );
@@ -940,7 +940,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
         const distance = planetDrawing.distance;
         const size = 0.1 * Math.max(0, 2 * Math.atan(1 / (2 * distance)));
-        const scale = size * (this.state.zoom * this.server.worldScale);
+        const scale = size * (this.state.zoom * this.game.worldScale);
 
         // handle UI lines
         let velocityX: number = 0;
@@ -959,20 +959,20 @@ export class App extends React.Component<IAppProps, IAppState> {
             targetLineData = App.getShipTargetLines.call(this, planetDrawing);
         }
         const rightCannonPointTop: [number, number] = [
-            Math.max(this.state.width / 2, this.state.height / 2) * Math.cos((10 / 180 * Math.PI)) * (this.state.zoom * this.server.worldScale),
-            Math.max(this.state.width / 2, this.state.height / 2) * Math.sin((10 / 180 * Math.PI)) * (this.state.zoom * this.server.worldScale),
+            Math.max(this.state.width / 2, this.state.height / 2) * Math.cos((10 / 180 * Math.PI)) * (this.state.zoom * this.game.worldScale),
+            Math.max(this.state.width / 2, this.state.height / 2) * Math.sin((10 / 180 * Math.PI)) * (this.state.zoom * this.game.worldScale),
         ]
         const rightCannonPointBottom: [number, number] = [
-            Math.max(this.state.width / 2, this.state.height / 2) * Math.cos(-(10 / 180 * Math.PI)) * (this.state.zoom * this.server.worldScale),
-            Math.max(this.state.width / 2, this.state.height / 2) * Math.sin(-(10 / 180 * Math.PI)) * (this.state.zoom * this.server.worldScale),
+            Math.max(this.state.width / 2, this.state.height / 2) * Math.cos(-(10 / 180 * Math.PI)) * (this.state.zoom * this.game.worldScale),
+            Math.max(this.state.width / 2, this.state.height / 2) * Math.sin(-(10 / 180 * Math.PI)) * (this.state.zoom * this.game.worldScale),
         ];
         const leftCannonPointTop: [number, number] = [
-            Math.max(this.state.width / 2, this.state.height / 2) * Math.cos(Math.PI - (10 / 180 * Math.PI)) * (this.state.zoom * this.server.worldScale),
-            Math.max(this.state.width / 2, this.state.height / 2) * Math.sin(Math.PI - (10 / 180 * Math.PI)) * (this.state.zoom * this.server.worldScale),
+            Math.max(this.state.width / 2, this.state.height / 2) * Math.cos(Math.PI - (10 / 180 * Math.PI)) * (this.state.zoom * this.game.worldScale),
+            Math.max(this.state.width / 2, this.state.height / 2) * Math.sin(Math.PI - (10 / 180 * Math.PI)) * (this.state.zoom * this.game.worldScale),
         ]
         const leftCannonPointBottom: [number, number] = [
-            Math.max(this.state.width / 2, this.state.height / 2) * Math.cos(Math.PI + (10 / 180 * Math.PI)) * (this.state.zoom * this.server.worldScale),
-            Math.max(this.state.width / 2, this.state.height / 2) * Math.sin(Math.PI + (10 / 180 * Math.PI)) * (this.state.zoom * this.server.worldScale),
+            Math.max(this.state.width / 2, this.state.height / 2) * Math.cos(Math.PI + (10 / 180 * Math.PI)) * (this.state.zoom * this.game.worldScale),
+            Math.max(this.state.width / 2, this.state.height / 2) * Math.sin(Math.PI + (10 / 180 * Math.PI)) * (this.state.zoom * this.game.worldScale),
         ];
         let cannonLoadingPercentage = 0;
         if (isPlayerShip && planetDrawing.original.cannonLoading) {
@@ -999,10 +999,10 @@ export class App extends React.Component<IAppProps, IAppState> {
                         return (
                             <line
                                 key={`target-line-${index}`}
-                                x1={this.state.width * a[0] * (this.state.zoom * this.server.worldScale)}
-                                y1={this.state.height * -a[1] * (this.state.zoom * this.server.worldScale)}
-                                x2={this.state.width * b[0] * (this.state.zoom * this.server.worldScale)}
-                                y2={this.state.height * -b[1] * (this.state.zoom * this.server.worldScale)}
+                                x1={this.state.width * a[0] * (this.state.zoom * this.game.worldScale)}
+                                y1={this.state.height * -a[1] * (this.state.zoom * this.game.worldScale)}
+                                x2={this.state.width * b[0] * (this.state.zoom * this.game.worldScale)}
+                                y2={this.state.height * -b[1] * (this.state.zoom * this.game.worldScale)}
                                 stroke="blue"
                                 strokeWidth={2}
                                 strokeDasharray="1,5"
@@ -1017,16 +1017,16 @@ export class App extends React.Component<IAppProps, IAppState> {
                                 <circle
                                     key={`target-marker-${value}`}
                                     r={10}
-                                    cx={this.state.width * a[0] * (this.state.zoom * this.server.worldScale)}
-                                    cy={this.state.height * -a[1] * (this.state.zoom * this.server.worldScale)}
+                                    cx={this.state.width * a[0] * (this.state.zoom * this.game.worldScale)}
+                                    cy={this.state.height * -a[1] * (this.state.zoom * this.game.worldScale)}
                                     stroke="blue"
                                     fill="none"
                                 />
                                 <text
                                     key={`target-value-${value}`}
                                     textAnchor="middle"
-                                    x={this.state.width * a[0] * (this.state.zoom * this.server.worldScale)}
-                                    y={this.state.height * -a[1] * (this.state.zoom * this.server.worldScale) + 5}
+                                    x={this.state.width * a[0] * (this.state.zoom * this.game.worldScale)}
+                                    y={this.state.height * -a[1] * (this.state.zoom * this.game.worldScale) + 5}
                                     stroke="blue"
                                     fill="none"
                                 >{value}</text>
@@ -1055,14 +1055,14 @@ export class App extends React.Component<IAppProps, IAppState> {
                                     points={`10,-20 ${rightCannonPointBottom[0]},${rightCannonPointBottom[1]} ${rightCannonPointTop[0]},${rightCannonPointTop[1]} 10,20`}
                                     fill="grey"
                                     stroke="white"
-                                    strokeWidth={0.05 * size * (this.state.zoom * this.server.worldScale)}
+                                    strokeWidth={0.05 * size * (this.state.zoom * this.game.worldScale)}
                                     style={{opacity: 0.3}}
                                 />
                                 <polygon
                                     points={`-10,-20 ${leftCannonPointBottom[0]},${leftCannonPointBottom[1]} ${leftCannonPointTop[0]},${leftCannonPointTop[1]} -10,20`}
                                     fill="grey"
                                     stroke="white"
-                                    strokeWidth={0.05 * size * (this.state.zoom * this.server.worldScale)}
+                                    strokeWidth={0.05 * size * (this.state.zoom * this.game.worldScale)}
                                     style={{opacity: 0.3}}
                                 />
                                 <polygon
@@ -1099,10 +1099,10 @@ export class App extends React.Component<IAppProps, IAppState> {
                 key={planetDrawing.id}
                 cx={x * this.state.width}
                 cy={(1 - y) * this.state.height}
-                r={size * (this.state.zoom * this.server.worldScale)}
+                r={size * (this.state.zoom * this.game.worldScale)}
                 fill={planetDrawing.color}
                 stroke="darkgray"
-                strokeWidth={0.02 * size * (this.state.zoom * this.server.worldScale)}
+                strokeWidth={0.02 * size * (this.state.zoom * this.game.worldScale)}
                 style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
             />
         );
@@ -1138,7 +1138,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                     uiPass && (
                         <text
                             stroke="white"
-                            x={size * (this.state.zoom * this.server.worldScale) + 10}
+                            x={size * (this.state.zoom * this.game.worldScale) + 10}
                             y={0}
                         >
                             {planetDrawing.original.resourceType}
@@ -1158,10 +1158,10 @@ export class App extends React.Component<IAppProps, IAppState> {
         const rotatedPoints = tile.vertices.map((v: Quaternion): [number, number, number] => {
             return v.rotateVector([0, 0, 1]);
         });
-        const averagePoint = DelaunayGraph.normalize(Server.getAveragePoint(rotatedPoints));
+        const averagePoint = DelaunayGraph.normalize(Game.getAveragePoint(rotatedPoints));
         return {
-            x: (averagePoint[0] * (this.state.zoom * this.server.worldScale) + 1) * 0.5,
-            y: (averagePoint[1] * (this.state.zoom * this.server.worldScale) + 1) * 0.5,
+            x: (averagePoint[0] * (this.state.zoom * this.game.worldScale) + 1) * 0.5,
+            y: (averagePoint[1] * (this.state.zoom * this.game.worldScale) + 1) * 0.5,
         };
     }
 
@@ -1181,8 +1181,8 @@ export class App extends React.Component<IAppProps, IAppState> {
             };
         }).map(p => {
             return {
-                x: (p.x - 0.5) * (this.state.zoom * this.server.worldScale) * 1.1 + 0.5,
-                y: (p.y - 0.5) * (this.state.zoom * this.server.worldScale) * 1.1 + 0.5,
+                x: (p.x - 0.5) * (this.state.zoom * this.game.worldScale) * 1.1 + 0.5,
+                y: (p.y - 0.5) * (this.state.zoom * this.game.worldScale) * 1.1 + 0.5,
             };
         });
 
@@ -1256,7 +1256,7 @@ export class App extends React.Component<IAppProps, IAppState> {
      * @private
      */
     private drawDelaunayTile(earthLike: boolean, tile: IDrawableTile) {
-        const tessellationMesh = Array.from(this.server.getDelaunayTileTessellation(tile.centroid, tile.vertices));
+        const tessellationMesh = Array.from(this.game.getDelaunayTileTessellation(tile.centroid, tile.vertices));
         return (
             <g key={tile.id}>
                 {
@@ -1279,11 +1279,11 @@ export class App extends React.Component<IAppProps, IAppState> {
         }
 
         // run local server
-        this.server.handleServerLoop();
+        this.game.handleServerLoop();
 
         // handle server replies
         while (true) {
-            const message = this.server.outgoingMessages.shift();
+            const message = this.game.outgoingMessages.shift();
             if (message) {
                 // has message, process message
                 if (message.messageType === EMessageType.DEATH) {
@@ -1391,7 +1391,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                     messageType: EMessageType.AUTOPILOT,
                     enabled: this.state.autoPilotEnabled
                 };
-                this.server.incomingMessages.push(message);
+                this.game.incomingMessages.push(message);
             });
         }
     }
@@ -1446,7 +1446,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 key,
                 enabled: true,
             };
-            this.server.incomingMessages.push(message);
+            this.game.incomingMessages.push(message);
         }
     }
 
@@ -1467,7 +1467,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 key,
                 enabled: false,
             };
-            this.server.incomingMessages.push(message);
+            this.game.incomingMessages.push(message);
         }
     }
 
@@ -1505,7 +1505,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         switch (this.state.voronoiMode) {
             default:
             case EVoronoiMode.KINGDOM: {
-                this.voronoiData = this.server.voronoiTerrain.kingdoms.reduce((acc, k) => {
+                this.voronoiData = this.game.voronoiTerrain.kingdoms.reduce((acc, k) => {
                     if (k.isNearBy(position)) {
                         return [
                             ...acc, k.voronoiCell
@@ -1517,7 +1517,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 break;
             }
             case EVoronoiMode.DUCHY: {
-                this.voronoiData = this.server.voronoiTerrain.kingdoms.reduce((acc, k) => {
+                this.voronoiData = this.game.voronoiTerrain.kingdoms.reduce((acc, k) => {
                     if (k.isNearBy(position)) {
                         return [
                             ...acc, ...k.duchies.map(d => d.voronoiCell)
@@ -1529,7 +1529,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 break;
             }
             case EVoronoiMode.COUNTY: {
-                this.voronoiData = this.server.voronoiTerrain.kingdoms.reduce((acc, k) => {
+                this.voronoiData = this.game.voronoiTerrain.kingdoms.reduce((acc, k) => {
                     if (k.isNearBy(position)) {
                         return [
                             ...acc, ...k.duchies.reduce((acc2, d) => [
@@ -1551,11 +1551,11 @@ export class App extends React.Component<IAppProps, IAppState> {
     componentDidMount() {
         // set initial world scale
         if (typeof(this.props.worldScale) === "number") {
-            this.server.worldScale = this.props.worldScale;
+            this.game.worldScale = this.props.worldScale;
         }
 
-        this.server.isTestMode = !!this.props.isTestMode;
-        this.server.initializeGame();
+        this.game.isTestMode = !!this.props.isTestMode;
+        this.game.initializeGame();
         this.refreshVoronoiData();
 
         if (!this.props.isTestMode) {
@@ -1591,8 +1591,8 @@ export class App extends React.Component<IAppProps, IAppState> {
         const size = Math.min(this.state.width, this.state.height);
         if (x >= 0 && x <= size && y >= 0 && y <= size) {
             const clickScreenPoint: [number, number, number] = [
-                ((x / size) - 0.5) * 2 / (this.state.zoom * this.server.worldScale),
-                ((y / size) - 0.5) * 2 / (this.state.zoom * this.server.worldScale),
+                ((x / size) - 0.5) * 2 / (this.state.zoom * this.game.worldScale),
+                ((y / size) - 0.5) * 2 / (this.state.zoom * this.game.worldScale),
                 0
             ];
             clickScreenPoint[1] *= -1;
@@ -1626,57 +1626,57 @@ export class App extends React.Component<IAppProps, IAppState> {
                             return VoronoiGraph.angularDistance(
                                 this.getPlayerShip().position.rotateVector([0, 0, 1]),
                                 d.centroid,
-                                this.server.worldScale
-                            ) < (Math.PI / (this.server.worldScale * this.state.zoom)) + d.radius;
-                        }).map(this.server.rotateDelaunayTriangle.bind(this.server, false))
+                                this.game.worldScale
+                            ) < (Math.PI / (this.game.worldScale * this.state.zoom)) + d.radius;
+                        }).map(this.game.rotateDelaunayTriangle.bind(this.game, this.getPlayerShip(),false))
                             .map(this.drawDelaunayTile.bind(this, false)) :
                         null
                 }
                 {
                     ([
-                        ...Array.from(this.server.voronoiTerrain.getStars(shipPosition, 0.5)).map(this.rotatePlanet.bind(this))
+                        ...Array.from(this.game.voronoiTerrain.getStars(shipPosition, 0.5)).map(this.rotatePlanet.bind(this))
                             .map(this.convertToDrawable.bind(this, "-star2", 0.5)),
-                        ...Array.from(this.server.voronoiTerrain.getStars(shipPosition, 0.25)).map(this.rotatePlanet.bind(this))
+                        ...Array.from(this.game.voronoiTerrain.getStars(shipPosition, 0.25)).map(this.rotatePlanet.bind(this))
                             .map(this.convertToDrawable.bind(this, "-star3", 0.25)),
-                        ...Array.from(this.server.voronoiTerrain.getStars(shipPosition, 0.125)).map(this.rotatePlanet.bind(this))
+                        ...Array.from(this.game.voronoiTerrain.getStars(shipPosition, 0.125)).map(this.rotatePlanet.bind(this))
                             .map(this.convertToDrawable.bind(this, "-star4", 0.125))
                     ] as Array<IDrawable<Planet>>)
                         .sort((a: any, b: any) => b.distance - a.distance)
                         .map(this.drawStar.bind(this))
                 }
                 {
-                    (Array.from(this.server.voronoiTerrain.getPlanets(shipPosition)).map(this.rotatePlanet.bind(this))
+                    (Array.from(this.game.voronoiTerrain.getPlanets(shipPosition)).map(this.rotatePlanet.bind(this))
                         .map(this.convertToDrawable.bind(this, "-planet", 1)) as Array<IDrawable<Planet>>)
                         .map(this.drawPlanet.bind(this, false))
                 }
                 {
-                    (this.server.smokeClouds.map(App.applyKinematics.bind(this))
+                    (this.game.smokeClouds.map(App.applyKinematics.bind(this))
                         .map(this.rotatePlanet.bind(this))
                         .map(this.convertToDrawable.bind(this, "-smokeClouds", 1)) as Array<IDrawable<SmokeCloud>>)
                         .map(this.drawSmokeCloud.bind(this))
                 }
                 {
-                    (this.server.cannonBalls.map(this.rotatePlanet.bind(this))
+                    (this.game.cannonBalls.map(this.rotatePlanet.bind(this))
                         .map(this.convertToDrawable.bind(this, "-cannonBalls", 1)) as Array<IDrawable<SmokeCloud>>)
                         .map(this.drawSmokeCloud.bind(this))
                 }
                 {
-                    (this.server.crates.map(this.rotatePlanet.bind(this))
+                    (this.game.crates.map(this.rotatePlanet.bind(this))
                         .map(this.convertToDrawable.bind(this, "-crates", 1)) as Array<IDrawable<Crate>>)
                         .map(this.drawCrate.bind(this, false))
                 }
                 {
-                    (this.server.ships.map(this.rotatePlanet.bind(this))
+                    (this.game.ships.map(this.rotatePlanet.bind(this))
                         .map(this.convertToDrawable.bind(this, "-ships", 1)) as Array<IDrawable<Ship>>)
                         .map(this.drawShip.bind(this))
                 }
                 {
-                    (Array.from(this.server.voronoiTerrain.getPlanets(shipPosition)).map(this.rotatePlanet.bind(this))
+                    (Array.from(this.game.voronoiTerrain.getPlanets(shipPosition)).map(this.rotatePlanet.bind(this))
                         .map(this.convertToDrawable.bind(this, "-planet", 1)) as Array<IDrawable<Planet>>)
                         .map(this.drawPlanet.bind(this, true))
                 }
                 {
-                    (this.server.crates.map(this.rotatePlanet.bind(this))
+                    (this.game.crates.map(this.rotatePlanet.bind(this))
                         .map(this.convertToDrawable.bind(this, "-crates", 1)) as Array<IDrawable<Crate>>)
                         .map(this.drawCrate.bind(this, true))
                 }
@@ -1694,12 +1694,12 @@ export class App extends React.Component<IAppProps, IAppState> {
             <g key="game-controls">
                 <text x="0" y="30" fill="black">Zoom</text>
                 <rect x="0" y="45" width="20" height="20" fill="grey" onClick={this.decrementZoom.bind(this)}/>
-                <text x="25" y="60" textAnchor="center">{(this.state.zoom * this.server.worldScale)}</text>
+                <text x="25" y="60" textAnchor="center">{(this.state.zoom * this.game.worldScale)}</text>
                 <rect x="40" y="45" width="20" height="20" fill="grey" onClick={this.incrementZoom.bind(this)}/>
                 <text x="5" y="60" onClick={this.decrementZoom.bind(this)}>-</text>
                 <text x="40" y="60" onClick={this.incrementZoom.bind(this)}>+</text>
                 {
-                    this.server.playerShip && (
+                    this.game.playerShip && (
                         <>
                             <rect key="return-to-menu-rect" x="5" y="75" width="50" height="20" fill="red" onClick={this.returnToMainMenu.bind(this)}/>
                             <text key="return-to-menu-text" x="10" y="90" fill="white" onClick={this.returnToMainMenu.bind(this)}>Leave</text>
@@ -1711,16 +1711,16 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     private renderGameStatus() {
-        const numPathingNodes = this.server.playerShip && this.server.playerShip.pathFinding.points.length;
-        const distanceToNode = this.server.playerShip && this.server.playerShip.pathFinding.points.length > 0 ?
+        const numPathingNodes = this.game.playerShip && this.game.playerShip.pathFinding.points.length;
+        const distanceToNode = this.game.playerShip && this.game.playerShip.pathFinding.points.length > 0 ?
             VoronoiGraph.angularDistance(
-                this.server.playerShip.position.rotateVector([0, 0, 1]),
-                this.server.playerShip.pathFinding.points[0],
-                this.server.worldScale
+                this.game.playerShip.position.rotateVector([0, 0, 1]),
+                this.game.playerShip.pathFinding.points[0],
+                this.game.worldScale
             ) :
             0;
 
-        const order = this.server.playerShip && this.server.playerShip.orders[0];
+        const order = this.game.playerShip && this.game.playerShip.orders[0];
         const orderType = order ? order.orderType : "NONE";
 
         if (numPathingNodes) {
@@ -1737,15 +1737,15 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     private renderCargoStatus() {
-        if (this.server.playerShip) {
-            const shipType = this.server.playerShip.shipType;
+        if (this.game.playerShip) {
+            const shipType = this.game.playerShip.shipType;
             const shipData = SHIP_DATA.find(s => s.shipType === shipType);
             if (!shipData) {
                 throw new Error("Could not find ship type");
             }
 
             const cargoSlotSize = Math.min(50, this.state.width / shipData.cargoSize);
-            const cargos = this.server.playerShip.cargo;
+            const cargos = this.game.playerShip.cargo;
             const cargoSize = shipData.cargoSize;
             return (
                 <g key="cargo-status" transform={`translate(${this.state.width / 2},${this.state.height - 50})`}>
@@ -1795,10 +1795,10 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     private renderPlayerStatus() {
-        if (this.server.playerShip) {
+        if (this.game.playerShip) {
             return (
                 <g key="player-status" transform={`translate(0,${this.state.height - 80})`}>
-                    <text x="0" y="45" fontSize={8} color="black">Gold: {this.server.playerData[0].moneyAccount.getGold()}</text>
+                    <text x="0" y="45" fontSize={8} color="black">Gold: {this.game.playerData[0].moneyAccount.getGold()}</text>
                 </g>
             );
         } else {
@@ -1883,7 +1883,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 shipType,
                 planetId
             };
-            this.server.incomingMessages.push(message);
+            this.game.incomingMessages.push(message);
         } else {
             this.returnToMainMenu();
         }
@@ -1895,8 +1895,8 @@ export class App extends React.Component<IAppProps, IAppState> {
             showMainMenu: true,
             faction: null
         });
-        this.server.playerShip = null;
-        this.server.playerData.splice(0, this.server.playerData.length);
+        this.game.playerShip = null;
+        this.game.playerData.splice(0, this.game.playerData.length);
     }
 
     private renderSpawnMenu() {
@@ -1907,10 +1907,10 @@ export class App extends React.Component<IAppProps, IAppState> {
         const spawnLocations = [];
         let faction: Faction | null = null;
         if (this.state.faction) {
-            faction = this.server.factions[this.state.faction];
+            faction = this.game.factions[this.state.faction];
         }
         if (faction) {
-            const planetsToSpawnAt = this.server.planets.filter(p => faction && faction.planetIds.includes(p.id))
+            const planetsToSpawnAt = this.game.planets.filter(p => faction && faction.planetIds.includes(p.id))
                 .sort((a, b) => {
                     const settlementLevelDifference = b.settlementLevel - a.settlementLevel;
                     if (settlementLevelDifference !== 0) {
@@ -2014,10 +2014,10 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     getShowShipDrawing(id: string, shipType: EShipType, factionType: EFaction | null = null): IDrawable<Ship> {
-        const original: Ship = new Ship(this.server, shipType);
+        const original: Ship = new Ship(this.game, shipType);
         original.id = id;
         if (factionType) {
-            const faction = Object.values(this.server.factions).find(f => f.id === factionType);
+            const faction = Object.values(this.game.factions).find(f => f.id === factionType);
             if (faction) {
                 original.color = faction.factionColor;
             }

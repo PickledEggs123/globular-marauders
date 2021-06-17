@@ -2,7 +2,7 @@ import {CAPITAL_GOODS, EResourceType, ITEM_DATA} from "./Resource";
 import {EFaction, EShipType, Ship} from "./Ship";
 import App from "./App";
 import {Planet} from "./Planet";
-import {Server} from "./Server";
+import {Game} from "./Game";
 
 export enum ERoyalRank {
     EMPEROR = "EMPEROR",
@@ -16,7 +16,7 @@ export enum ERoyalRank {
  * A special buff applied to factions when they accumulate luxuries.
  */
 export class LuxuryBuff {
-    public instance: Server;
+    public instance: Game;
     public faction: Faction;
     public planet: Planet;
     public resourceType: EResourceType;
@@ -25,7 +25,7 @@ export class LuxuryBuff {
     private expires: number = 10 * 60 * 10;
     private ticks: number = 0;
 
-    constructor(instance: Server, faction: Faction, planet: Planet, resourceType: EResourceType, planetId: string, amount: number) {
+    constructor(instance: Game, faction: Faction, planet: Planet, resourceType: EResourceType, planetId: string, amount: number) {
         this.instance = instance;
         this.faction = faction;
         this.planet = planet;
@@ -90,7 +90,7 @@ export class Faction {
     /**
      * An instance of app to retrieve faction data.
      */
-    public instance: Server;
+    public instance: Game;
     /**
      * The id of the faction.
      */
@@ -138,7 +138,7 @@ export class Faction {
      * @param factionColor The color of the faction.
      * @param homeWorldPlanetId The home world of the faction.
      */
-    constructor(instance: Server, id: EFaction, factionColor: string, homeWorldPlanetId: string) {
+    constructor(instance: Game, id: EFaction, factionColor: string, homeWorldPlanetId: string) {
         this.instance = instance;
         this.id = id;
         this.factionColor = factionColor;

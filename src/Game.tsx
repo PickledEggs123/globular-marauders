@@ -66,7 +66,7 @@ export interface IKeyboardMessage extends IMessage {
     enabled: boolean;
 }
 
-export class Server {
+export class Game {
     public voronoiShips: VoronoiTree<Ship> = new VoronoiTree(this);
     public voronoiTerrain: VoronoiTerrain = new VoronoiTerrain(this);
     public factions: { [key: string]: Faction } = {};
@@ -94,7 +94,7 @@ export class Server {
     /**
      * The speed of the cannon ball projectiles.
      */
-    public static PROJECTILE_SPEED: number = Server.VELOCITY_STEP * 100;
+    public static PROJECTILE_SPEED: number = Game.VELOCITY_STEP * 100;
     /**
      * How long a cannon ball will live for in ticks.
      */
@@ -102,7 +102,7 @@ export class Server {
     /**
      * The enemy detection range.
      */
-    public static PROJECTILE_DETECTION_RANGE: number = Server.PROJECTILE_SPEED * Server.PROJECTILE_LIFE * 1.2;
+    public static PROJECTILE_DETECTION_RANGE: number = Game.PROJECTILE_SPEED * Game.PROJECTILE_LIFE * 1.2;
     /**
      * The number of burn ticks.
      */
@@ -270,7 +270,7 @@ export class Server {
         // no faction selected, orbit the world
         const tempShip = new Ship(this, EShipType.CUTTER);
         tempShip.id = "ghost-ship";
-        return Server.GetCameraState(tempShip);
+        return Game.GetCameraState(tempShip);
     }
 
 
@@ -339,27 +339,27 @@ export class Server {
 
         // handle movement
         if (activeKeys.includes("a")) {
-            const rotation = Quaternion.fromAxisAngle([0, 0, 1], Math.PI).pow(Server.ROTATION_STEP);
-            const rotationDrag = cameraOrientationVelocity.pow(Server.ROTATION_DRAG).inverse();
+            const rotation = Quaternion.fromAxisAngle([0, 0, 1], Math.PI).pow(Game.ROTATION_STEP);
+            const rotationDrag = cameraOrientationVelocity.pow(Game.ROTATION_DRAG).inverse();
             cameraOrientationVelocity = cameraOrientationVelocity.clone().mul(rotation).mul(rotationDrag);
-            if (VoronoiGraph.angularDistanceQuaternion(cameraOrientationVelocity, 1) < Math.PI * Server.ROTATION_STEP * 0.9) {
+            if (VoronoiGraph.angularDistanceQuaternion(cameraOrientationVelocity, 1) < Math.PI * Game.ROTATION_STEP * 0.9) {
                 cameraOrientationVelocity = Quaternion.ONE;
             }
         }
         if (activeKeys.includes("d")) {
-            const rotation = Quaternion.fromAxisAngle([0, 0, 1], -Math.PI).pow(Server.ROTATION_STEP);
-            const rotationDrag = cameraOrientationVelocity.pow(Server.ROTATION_DRAG).inverse();
+            const rotation = Quaternion.fromAxisAngle([0, 0, 1], -Math.PI).pow(Game.ROTATION_STEP);
+            const rotationDrag = cameraOrientationVelocity.pow(Game.ROTATION_DRAG).inverse();
             cameraOrientationVelocity = cameraOrientationVelocity.clone().mul(rotation).mul(rotationDrag);
-            if (VoronoiGraph.angularDistanceQuaternion(cameraOrientationVelocity, 1) < Math.PI * Server.ROTATION_STEP * 0.9) {
+            if (VoronoiGraph.angularDistanceQuaternion(cameraOrientationVelocity, 1) < Math.PI * Game.ROTATION_STEP * 0.9) {
                 cameraOrientationVelocity = Quaternion.ONE;
             }
         }
         if (activeKeys.includes("w")) {
             const forward = cameraOrientation.clone().rotateVector([0, 1, 0]);
-            const rotation = Quaternion.fromBetweenVectors([0, 0, 1], forward).pow(Server.VELOCITY_STEP / this.worldScale);
-            const rotationDrag = cameraPositionVelocity.pow(Server.VELOCITY_DRAG / this.worldScale).inverse();
+            const rotation = Quaternion.fromBetweenVectors([0, 0, 1], forward).pow(Game.VELOCITY_STEP / this.worldScale);
+            const rotationDrag = cameraPositionVelocity.pow(Game.VELOCITY_DRAG / this.worldScale).inverse();
             cameraPositionVelocity = cameraPositionVelocity.clone().mul(rotation).mul(rotationDrag);
-            if (VoronoiGraph.angularDistanceQuaternion(cameraPositionVelocity, this.worldScale) < Math.PI / 2 * Server.VELOCITY_STEP / this.worldScale) {
+            if (VoronoiGraph.angularDistanceQuaternion(cameraPositionVelocity, this.worldScale) < Math.PI / 2 * Game.VELOCITY_STEP / this.worldScale) {
                 cameraPositionVelocity = Quaternion.ONE;
             }
 
@@ -376,9 +376,9 @@ export class Server {
             smokeClouds.push(smokeCloud);
         }
         if (activeKeys.includes("s")) {
-            const rotation = cameraPositionVelocity.clone().inverse().pow(Server.BRAKE_POWER / this.worldScale);
+            const rotation = cameraPositionVelocity.clone().inverse().pow(Game.BRAKE_POWER / this.worldScale);
             cameraPositionVelocity = cameraPositionVelocity.clone().mul(rotation);
-            if (VoronoiGraph.angularDistanceQuaternion(cameraPositionVelocity, this.worldScale) < Math.PI / 2 * Server.VELOCITY_STEP / this.worldScale) {
+            if (VoronoiGraph.angularDistanceQuaternion(cameraPositionVelocity, this.worldScale) < Math.PI / 2 * Game.VELOCITY_STEP / this.worldScale) {
                 cameraPositionVelocity = Quaternion.ONE;
             }
 
@@ -386,7 +386,7 @@ export class Server {
             const engineBackwardsPointInitial = rotation.rotateVector([0, 0, 1]);
             engineBackwardsPointInitial[2] = 0;
             const engineBackwardsPoint = DelaunayGraph.normalize(engineBackwardsPointInitial);
-            const engineBackwards = Quaternion.fromBetweenVectors([0, 0, 1], engineBackwardsPoint).pow(Server.VELOCITY_STEP / this.worldScale);
+            const engineBackwards = Quaternion.fromBetweenVectors([0, 0, 1], engineBackwardsPoint).pow(Game.VELOCITY_STEP / this.worldScale);
 
             // make left smoke cloud
             const smokeCloudLeft = new SmokeCloud();
@@ -432,7 +432,7 @@ export class Server {
                 jitterPoint[1] += DelaunayGraph.randomInt() * 0.15;
                 jitterPoint = DelaunayGraph.normalize(jitterPoint);
                 const fireDirection = cameraOrientation.clone().rotateVector(jitterPoint);
-                const fireVelocity = Quaternion.fromBetweenVectors([0, 0, 1], fireDirection).pow(Server.PROJECTILE_SPEED / this.worldScale);
+                const fireVelocity = Quaternion.fromBetweenVectors([0, 0, 1], fireDirection).pow(Game.PROJECTILE_SPEED / this.worldScale);
 
                 // create a cannon ball
                 const cannonBall = new CannonBall(faction.id);
@@ -468,7 +468,7 @@ export class Server {
                     0
                 ];
                 const fireDirection = cameraOrientation.clone().rotateVector(jitterPoint);
-                const fireVelocity = Quaternion.fromBetweenVectors([0, 0, 1], fireDirection).pow(Server.PROJECTILE_SPEED / this.worldScale);
+                const fireVelocity = Quaternion.fromBetweenVectors([0, 0, 1], fireDirection).pow(Game.PROJECTILE_SPEED / this.worldScale);
 
                 // no faction, no cannon balls
                 if (!faction) {
@@ -533,7 +533,7 @@ export class Server {
     }
 
     public static computeIntercept(a: [number, number, number], b: [number, number, number], c: [number, number, number], d: [number, number, number]): [number, number, number] {
-        const midPoint = DelaunayGraph.normalize(Server.getAveragePoint([a, b]));
+        const midPoint = DelaunayGraph.normalize(Game.getAveragePoint([a, b]));
         const n1 = DelaunayGraph.crossProduct(a, b);
         const n2 = DelaunayGraph.crossProduct(c, d);
         const n = DelaunayGraph.crossProduct(n1, n2);
@@ -565,13 +565,13 @@ export class Server {
 
         let hitPoint: [number, number, number] | null = null;
         let hitDistance: number | null = null;
-        const hull = Server.getPhysicsHull(shipData.hull, worldScale).map((q): Quaternion => {
+        const hull = Game.getPhysicsHull(shipData.hull, worldScale).map((q): Quaternion => {
             return ship.position.clone().mul(ship.orientation.clone()).mul(q);
         });
         for (let i = 0; i < hull.length; i++) {
             const a = hull[i % hull.length].rotateVector([0, 0, 1]);
             const b = hull[(i + 1) % hull.length].rotateVector([0, 0, 1]);
-            const intercept = Server.computeIntercept(a, b, c, d);
+            const intercept = Game.computeIntercept(a, b, c, d);
             const segmentLength = VoronoiGraph.angularDistance(a, b, worldScale);
             const interceptSegmentLength = VoronoiGraph.angularDistance(a, intercept, worldScale) + VoronoiGraph.angularDistance(intercept, b, worldScale);
             const isInsideSegment = interceptSegmentLength - PHYSICS_SCALE / worldScale * cannonBall.size * 2 <= segmentLength;
@@ -595,7 +595,7 @@ export class Server {
 
     private isTradeTick(): boolean {
         if (this.tradeTick <= 0) {
-            this.tradeTick = Server.TRADE_TICK_COOL_DOWN;
+            this.tradeTick = Game.TRADE_TICK_COOL_DOWN;
             return true;
         } else {
             this.tradeTick -= 1;
@@ -714,11 +714,11 @@ export class Server {
         // handle physics and collision detection
         const collidableArrays: Array<{
             arr: ICollidable[],
-            collideFn: (this: Server, ship: Ship, entity: ICollidable, hit: IHitTest) => void,
+            collideFn: (this: Game, ship: Ship, entity: ICollidable, hit: IHitTest) => void,
             useRayCast: boolean
         }> = [{
             arr: this.cannonBalls,
-            collideFn(this: Server, ship: Ship, entity: ICollidable, hit: IHitTest) {
+            collideFn(this: Game, ship: Ship, entity: ICollidable, hit: IHitTest) {
                 ship.applyDamage(entity as CannonBall);
 
                 // make collision smoke cloud
@@ -733,7 +733,7 @@ export class Server {
             useRayCast: true
         }, {
             arr: this.crates,
-            collideFn(this: Server, ship: Ship, entity: ICollidable, hit: IHitTest) {
+            collideFn(this: Game, ship: Ship, entity: ICollidable, hit: IHitTest) {
                 ship.pickUpCargo(entity as Crate);
             },
             useRayCast: false
@@ -750,7 +750,7 @@ export class Server {
                 let bestShip: Ship | null = null;
                 for (const nearByShip of nearByShips) {
                     if (useRayCast) {
-                        const hit = Server.cannonBallCollision(entity, nearByShip, this.worldScale);
+                        const hit = Game.cannonBallCollision(entity, nearByShip, this.worldScale);
                         if (hit.success && hit.time && (!bestHit || (bestHit && bestHit.time && hit.time < bestHit.time))) {
                             bestHit = hit;
                             bestShip = nearByShip;
@@ -882,7 +882,7 @@ export class Server {
                         nearByShip.position.clone().rotateVector([0, 0, 1]),
                         shipPosition,
                         this.worldScale
-                    ) < Server.PROJECTILE_DETECTION_RANGE) {
+                    ) < Game.PROJECTILE_DETECTION_RANGE) {
                         if (!(nearByShip.faction && ship.faction && nearByShip.faction.id === ship.faction.id)) {
                             nearByEnemyShips.push(nearByShip);
                         } else {
@@ -963,11 +963,11 @@ export class Server {
         return start + (end - start) * value;
     }
 
-    public rotateDelaunayTriangle(earthLike: boolean, triangle: ICellData, index: number): IDrawableTile {
+    public rotateDelaunayTriangle(camera: ICameraState, earthLike: boolean, triangle: ICellData, index: number): IDrawableTile {
         const {
             position: cameraPosition,
             orientation: cameraOrientation,
-        } = this.getPlayerShip();
+        } = camera;
         const pointToQuaternion = (v: [number, number, number]): Quaternion => {
             const q = Quaternion.fromBetweenVectors([0, 0, 1], v);
             return cameraOrientation.clone().inverse()
@@ -1008,7 +1008,7 @@ export class Server {
         return tile;
     }
 
-    public* getDelaunayTileTessellation(centroid: Quaternion, vertices: Quaternion[], maxStep: number = Server.MAX_TESSELLATION, step: number = 0): Generator<ITessellatedTriangle> {
+    public* getDelaunayTileTessellation(centroid: Quaternion, vertices: Quaternion[], maxStep: number = Game.MAX_TESSELLATION, step: number = 0): Generator<ITessellatedTriangle> {
         if (step === maxStep) {
             // max step, return current level of tessellation
             const data: ITessellatedTriangle = {
@@ -1040,13 +1040,13 @@ export class Server {
             for (let i = 0; i < vertices.length; i++) {
                 const a: Quaternion = vertices[i % vertices.length].clone();
                 const b: Quaternion = vertices[(i + 1) % vertices.length].clone();
-                let lerpPoint = Server.lerp(
+                let lerpPoint = Game.lerp(
                     a.rotateVector([0, 0, 1]),
                     b.rotateVector([0, 0, 1]),
                     0.5
                 )
                 if (DelaunayGraph.distanceFormula(lerpPoint, [0, 0, 0]) < 0.01) {
-                    lerpPoint = Server.lerp(
+                    lerpPoint = Game.lerp(
                         a.rotateVector([0, 0, 1]),
                         b.rotateVector([0, 0, 1]),
                         0.4
@@ -1109,7 +1109,7 @@ export class Server {
      * @private
      */
     public static addRandomPositionAndOrientationToEntity(entity: ICameraState) {
-        entity.position = new Quaternion(0, Server.randomRange(), Server.randomRange(), Server.randomRange());
+        entity.position = new Quaternion(0, Game.randomRange(), Game.randomRange(), Game.randomRange());
         entity.position = entity.position.normalize();
         entity.orientation = Quaternion.fromAxisAngle([0, 0, 1], Math.random() * 2 * Math.PI);
     }
@@ -1149,14 +1149,14 @@ export class Server {
 
         // generate tessellated points to a tessellation level
         const tessellatedPoints = Array.from(delaunayGraph.GetTriangles())
-            .map(this.rotateDelaunayTriangle.bind(this, false))
+            .map(this.rotateDelaunayTriangle.bind(this, this.getPlayerShip(), false))
             .reduce((acc, tile) => {
                 const tessellatedTriangles = Array.from(this.getDelaunayTileTessellation(tile.centroid, tile.vertices, tessellationLevel, 1));
                 return [
                     ...acc,
                     ...tessellatedTriangles.map(t => {
                         return DelaunayGraph.normalize(
-                            Server.getAveragePoint(t.vertices.map(v => v.rotateVector([0, 0, 1])))
+                            Game.getAveragePoint(t.vertices.map(v => v.rotateVector([0, 0, 1])))
                         );
                     })
                 ];

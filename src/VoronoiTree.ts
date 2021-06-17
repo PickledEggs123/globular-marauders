@@ -4,11 +4,11 @@ import Quaternion from "quaternion";
 import App from "./App";
 import {Planet, Star} from "./Planet";
 import {Faction} from "./Faction";
-import {Server} from "./Server";
+import {Game} from "./Game";
 
 interface IVoronoiTreeNodeParent<T extends ICameraState> {
     nodes: Array<VoronoiTreeNode<T>>;
-    app: Server;
+    app: Game;
 
     /**
      * How a voronoi tree will break down into smaller parts.
@@ -28,13 +28,13 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
     public parent: IVoronoiTreeNodeParent<T>;
     public neighbors: Array<VoronoiTreeNode<T>> = [];
     public items: T[] = [];
-    public app: Server;
+    public app: Game;
 
     public recursionNodeLevels(): number[] {
         return this.parent.recursionNodeLevels();
     }
 
-    constructor(app: Server, voronoiCell: VoronoiCell, level: number, parent: IVoronoiTreeNodeParent<T>) {
+    constructor(app: Game, voronoiCell: VoronoiCell, level: number, parent: IVoronoiTreeNodeParent<T>) {
         this.app = app;
         this.voronoiCell = voronoiCell;
         this.point = voronoiCell.centroid;
@@ -238,7 +238,7 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
                 // compute intersection with line segment and infinite culling line
                 const innerA = vertices[innerIndex % vertices.length];
                 const innerB = vertices[(innerIndex + 1) % vertices.length];
-                const midPoint = DelaunayGraph.normalize(Server.getAveragePoint([innerA, innerB]));
+                const midPoint = DelaunayGraph.normalize(Game.getAveragePoint([innerA, innerB]));
                 const innerN = DelaunayGraph.normalize(DelaunayGraph.crossProduct(innerA, innerB));
                 const line = DelaunayGraph.normalize(DelaunayGraph.crossProduct(outerN, innerN));
                 const intercept: [number, number, number] = DelaunayGraph.dotProduct(line, midPoint) >= 0 ? line : [
@@ -285,7 +285,7 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
         // compute new voronoi cell
         const copy = new VoronoiCell();
         copy.vertices = vertices;
-        copy.centroid = DelaunayGraph.normalize(Server.getAveragePoint(copy.vertices));
+        copy.centroid = DelaunayGraph.normalize(Game.getAveragePoint(copy.vertices));
         copy.vertex = polygon.vertex;
         copy.radius = copy.vertices.reduce((acc: number, vertex): number => {
             return Math.max(
@@ -452,13 +452,13 @@ export class VoronoiTreeNode<T extends ICameraState> implements IVoronoiTreeNode
  */
 export class VoronoiTree<T extends ICameraState> implements IVoronoiTreeNodeParent<T> {
     public nodes: Array<VoronoiTreeNode<T>> = [];
-    public app: Server;
+    public app: Game;
 
     public recursionNodeLevels(): number[] {
         return [30, 5, 5];
     }
 
-    constructor(app: Server) {
+    constructor(app: Game) {
         this.app = app;
     }
 
@@ -635,7 +635,7 @@ export class VoronoiCounty extends VoronoiTreeNode<ICameraState> {
     capital: Planet | null = null;
 
     constructor(
-        app: Server,
+        app: Game,
         voronoiCell: VoronoiCell,
         level: number,
         parent: IVoronoiTreeNodeParent<ICameraState>,
@@ -707,7 +707,7 @@ export class VoronoiDuchy extends VoronoiTreeNode<ICameraState> {
     color: string = "red";
 
     constructor(
-        app: Server,
+        app: Game,
         voronoiCell: VoronoiCell,
         level: number,
         parent: IVoronoiTreeNodeParent<ICameraState>,
@@ -786,7 +786,7 @@ export class VoronoiKingdom extends VoronoiTreeNode<ICameraState> {
     getStarId: () => number;
 
     constructor(
-        app: Server,
+        app: Game,
         voronoiCell: VoronoiCell,
         level: number,
         parent: IVoronoiTreeNodeParent<ICameraState>,

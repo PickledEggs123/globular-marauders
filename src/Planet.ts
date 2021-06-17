@@ -26,7 +26,7 @@ import App from "./App";
 import {FeudalGovernment, VoronoiCounty} from "./VoronoiTree";
 import {ERoyalRank, Faction, LuxuryBuff} from "./Faction";
 import {EOrderType, Order} from "./Order";
-import {Server} from "./Server";
+import {Game} from "./Game";
 
 export interface IResourceExported {
     resourceType: EResourceType;
@@ -39,7 +39,7 @@ export interface IResourceProduced extends IItemRecipe {
 }
 
 export class ShipyardDock {
-    public instance: Server;
+    public instance: Game;
     public planet: Planet;
     public shipyard: Shipyard;
     public progress: number = 0;
@@ -47,7 +47,7 @@ export class ShipyardDock {
     public shipType: EShipType | null = null;
     private sentDoneSignal: boolean = false;
 
-    constructor(instance: Server, planet: Planet, shipyard: Shipyard) {
+    constructor(instance: Game, planet: Planet, shipyard: Shipyard) {
         this.instance = instance;
         this.planet = planet;
         this.shipyard = shipyard;
@@ -120,7 +120,7 @@ export enum EBuildingType {
  * A building on a planet which can produce resources, to help the island planet function.
  */
 export abstract class Building {
-    public instance: Server;
+    public instance: Game;
     public planet: Planet;
     /**
      * The type of a building.
@@ -166,7 +166,7 @@ export abstract class Building {
         this.upgradeProgress = upgradeCost;
     }
 
-    constructor(instance: Server, planet: Planet) {
+    constructor(instance: Game, planet: Planet) {
         this.instance = instance;
         this.planet = planet;
     }
@@ -363,7 +363,7 @@ export class Plantation extends Building {
     buildingType: EBuildingType = EBuildingType.PLANTATION;
     resourceType: EResourceType;
 
-    constructor(instance: Server, planet: Planet, resourceType: EResourceType) {
+    constructor(instance: Game, planet: Planet, resourceType: EResourceType) {
         super(instance, planet);
         this.resourceType = resourceType;
     }
@@ -399,7 +399,7 @@ export class Manufactory extends Building {
     buildingType: EBuildingType = EBuildingType.MANUFACTORY;
     recipe: IItemRecipe;
 
-    constructor(instance: Server, planet: Planet, recipe: IItemRecipe) {
+    constructor(instance: Game, planet: Planet, recipe: IItemRecipe) {
         super(instance, planet);
         this.recipe = recipe;
         this.buildingLevel = 0;
@@ -518,7 +518,7 @@ export class Blacksmith extends Building {
 }
 
 export class Star implements ICameraState {
-    public instance: Server;
+    public instance: Game;
     public id: string = "";
     public position: Quaternion = Quaternion.ONE;
     public positionVelocity: Quaternion = Quaternion.ONE;
@@ -527,7 +527,7 @@ export class Star implements ICameraState {
     public color: string = "blue";
     public size: number = 3;
 
-    constructor(instance: Server) {
+    constructor(instance: Game) {
         this.instance = instance;
     }
 }
@@ -1289,7 +1289,7 @@ export class Market {
         return profitableResources;
     }
 
-    static ComputeProfitableTradeDirectedGraph(instance: Server) {
+    static ComputeProfitableTradeDirectedGraph(instance: Game) {
         // setup best profitable trades for the entire game
         for (const planet of instance.planets) {
             if (planet.moneyAccount) {
@@ -1361,7 +1361,7 @@ export class Market {
 }
 
 export class Planet implements ICameraState {
-    public instance: Server;
+    public instance: Game;
 
     // planet properties
     public id: string = "";
@@ -1502,7 +1502,7 @@ export class Planet implements ICameraState {
         return this.shipyard.shipsAvailable[shipType];
     }
 
-    constructor(instance: Server, county: VoronoiCounty) {
+    constructor(instance: Game, county: VoronoiCounty) {
         this.instance = instance;
         this.county = county;
 
@@ -2807,7 +2807,7 @@ export class Planet implements ICameraState {
         ship.faction = faction;
         ship.planet = this;
         ship.id = `ship-${this.id}-${faction.getShipAutoIncrement()}`;
-        Server.addRandomPositionAndOrientationToEntity(ship);
+        Game.addRandomPositionAndOrientationToEntity(ship);
         ship.position = Quaternion.fromBetweenVectors([0, 0, 1], shipPoint);
         ship.color = faction.factionColor;
 

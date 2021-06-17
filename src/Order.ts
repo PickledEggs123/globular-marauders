@@ -7,7 +7,7 @@ import {DelaunayGraph, VoronoiGraph} from "./Graph";
 import {ESettlementLevel, ITradeDeal} from "./Interface";
 import {Faction} from "./Faction";
 import {Planet} from "./Planet";
-import {Server} from "./Server";
+import {Game} from "./Game";
 
 /**
  * Different type of orders a faction can issue its ships.
@@ -54,7 +54,7 @@ export enum EOrderResult {
 }
 
 export class Order {
-    public app: Server;
+    public app: Game;
     public owner: Ship;
     public faction: Faction;
     public orderType: EOrderType = EOrderType.ROAM;
@@ -66,7 +66,7 @@ export class Order {
     private stage: number = 0;
     private runningTicks: number = 0;
 
-    constructor(app: Server, owner: Ship, faction: Faction) {
+    constructor(app: Game, owner: Ship, faction: Faction) {
         this.app = app;
         this.owner = owner;
         this.faction = faction;
@@ -160,7 +160,7 @@ export class Order {
         }
 
         // compute hiding spot of the pirate
-        const hidingSpot = DelaunayGraph.normalize(Server.lerp(
+        const hidingSpot = DelaunayGraph.normalize(Game.lerp(
             colonyWorld.position.rotateVector([0, 0, 1]),
             enemyHomeWorld.position.rotateVector([0, 0, 1]),
             0.25
