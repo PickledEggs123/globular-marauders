@@ -1,23 +1,23 @@
 import React from 'react';
 import './App.css';
-import Quaternion from 'quaternion';
-import {EResourceType, ITEM_DATA} from "./Resource";
+import Quaternion from "quaternion";
+import * as Tone from "tone";
+import {io, Socket} from "socket.io-client";
+import {EResourceType, ITEM_DATA} from "@pickledeggs123/globular-marauders-game/lib/src/Resource";
 import {
     ESettlementLevel,
     ICameraState,
     ICameraStateWithOriginal,
     IDrawable,
     IExpirable,
-    MIN_DISTANCE,
-    MoneyAccount
-} from "./Interface";
-import {EFaction, EShipType, Ship, SHIP_DATA} from "./Ship";
-import {DelaunayGraph, DelaunayTile, IDrawableTile, ITessellatedTriangle, VoronoiCell, VoronoiGraph} from "./Graph";
-import {Faction} from "./Faction";
-import {EBuildingType, Manufactory, Planet, Plantation} from "./Planet";
-import {Crate, SmokeCloud} from "./Item";
-import * as Tone from "tone";
-import {EMessageType, IAutoPilotMessage, IKeyboardMessage, ISpawnMessage, Game} from "./Game";
+    MIN_DISTANCE
+} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
+import {EFaction, EShipType, Ship, SHIP_DATA} from "@pickledeggs123/globular-marauders-game/lib/src/Ship";
+import {DelaunayGraph, DelaunayTile, IDrawableTile, ITessellatedTriangle, VoronoiCell, VoronoiGraph} from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
+import {Faction} from "@pickledeggs123/globular-marauders-game/lib/src/Faction";
+import {EBuildingType, Manufactory, Planet, Plantation} from "@pickledeggs123/globular-marauders-game/lib/src/Planet";
+import {Crate, SmokeCloud} from "@pickledeggs123/globular-marauders-game/lib/src/Item";
+import {EMessageType, IAutoPilotMessage, IKeyboardMessage, ISpawnMessage, Game} from "@pickledeggs123/globular-marauders-game/lib/src/Game";
 
 /**
  * A class for playing music through a series of notes. The data is a list of musical notes to play in sequence.
@@ -386,7 +386,29 @@ export class App extends React.Component<IAppProps, IAppState> {
     public voronoiData: VoronoiCell[] = [];
     public refreshVoronoiDataTick: number = 0;
     public music: MusicPlayer = new MusicPlayer();
+    public initialized: boolean = false;
     public game: Game = new Game();
+    public socket: Socket;
+
+    constructor(props: IAppProps) {
+        super(props);
+
+        this.socket = io("http://localhost:4000");
+        this.socket.on("connect", () => {
+            console.log("CONNECTED");
+            this.socket.emit("get-world");
+        });
+        this.socket.on("error", (err) => {
+            console.log("Failed to connect", err);
+        });
+        this.socket.on("send-world", (data) => {
+            this.game.applyGameInitializationFrame(data);
+            this.initialized = true;
+        });
+        this.socket.on("send-frame", (data) => {
+            this.game.applyGameSyncFrame(data);
+        });
+    }
 
     /**
      * ------------------------------------------------------------
@@ -1270,6 +1292,14 @@ export class App extends React.Component<IAppProps, IAppState> {
      * Run the game loop. This function is called 10 times a second to simulate a video game.
      */
     public gameLoop() {
+        if (!this.initialized) {
+            return;
+        }
+
+        if (this.socket) {
+            this.socket.emit("get-frame");
+        }
+
         // refresh voronoi data, refresh occasionally since this is expensive.
         if (this.refreshVoronoiDataTick <= 20) {
             this.refreshVoronoiDataTick += 1;
@@ -1277,9 +1307,6 @@ export class App extends React.Component<IAppProps, IAppState> {
             this.refreshVoronoiDataTick = 0;
             this.refreshVoronoiData();
         }
-
-        // run local server
-        this.game.handleServerLoop();
 
         // handle server replies
         while (true) {
@@ -1549,15 +1576,6 @@ export class App extends React.Component<IAppProps, IAppState> {
      * Perform the initialization of the game.
      */
     componentDidMount() {
-        // set initial world scale
-        if (typeof(this.props.worldScale) === "number") {
-            this.game.worldScale = this.props.worldScale;
-        }
-
-        this.game.isTestMode = !!this.props.isTestMode;
-        this.game.initializeGame();
-        this.refreshVoronoiData();
-
         if (!this.props.isTestMode) {
             this.rotateCameraInterval = setInterval(this.gameLoop.bind(this), 100);
         }
