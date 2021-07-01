@@ -10,14 +10,31 @@ import {
     ICameraStateWithOriginal,
     IDrawable,
     IExpirable,
-    MIN_DISTANCE
+    MIN_DISTANCE, MoneyAccount
 } from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
 import {EFaction, EShipType, Ship, SHIP_DATA} from "@pickledeggs123/globular-marauders-game/lib/src/Ship";
-import {DelaunayGraph, DelaunayTile, IDrawableTile, ITessellatedTriangle, VoronoiCell, VoronoiGraph} from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
-import {Faction} from "@pickledeggs123/globular-marauders-game/lib/src/Faction";
+import {
+    DelaunayGraph,
+    DelaunayTile,
+    IDrawableTile,
+    ITessellatedTriangle,
+    VoronoiCell,
+    VoronoiGraph
+} from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
 import {EBuildingType, Manufactory, Planet, Plantation} from "@pickledeggs123/globular-marauders-game/lib/src/Planet";
 import {Crate, SmokeCloud} from "@pickledeggs123/globular-marauders-game/lib/src/Item";
-import {EMessageType, IAutoPilotMessage, IKeyboardMessage, ISpawnMessage, Game} from "@pickledeggs123/globular-marauders-game/lib/src/Game";
+import {
+    EMessageType,
+    Game,
+    IAutoPilotMessage,
+    IChooseFactionMessage,
+    IChoosePlanetMessage,
+    IKeyboardMessage,
+    IMessage, IPlayerData,
+    ISpawnLocation,
+    ISpawnMessage,
+    ISpawnPlanet
+} from "@pickledeggs123/globular-marauders-game/lib/src/Game";
 
 /**
  * A class for playing music through a series of notes. The data is a list of musical notes to play in sequence.
@@ -346,8 +363,10 @@ interface IAppState {
     autoPilotEnabled: boolean;
     audioEnabled: boolean;
     showMainMenu: boolean;
+    showPlanetMenu: boolean;
     showSpawnMenu: boolean;
     faction: EFaction | null;
+    planetId: string | null;
 }
 
 export class App extends React.Component<IAppProps, IAppState> {
@@ -363,7 +382,9 @@ export class App extends React.Component<IAppProps, IAppState> {
         autoPilotEnabled: true as boolean,
         audioEnabled: false as boolean,
         faction: null as EFaction | null,
+        planetId: null as string | null,
         showMainMenu: true as boolean,
+        showPlanetMenu: false as boolean,
         showSpawnMenu: false as boolean,
     };
 
@@ -389,11 +410,15 @@ export class App extends React.Component<IAppProps, IAppState> {
     public initialized: boolean = false;
     public game: Game = new Game();
     public socket: Socket;
+    public spawnPlanets: ISpawnPlanet[] = [];
+    public spawnLocations: ISpawnLocation[] = [];
+    public playerId: string | null = null;
+    public messages: IMessage[] = [];
 
     constructor(props: IAppProps) {
         super(props);
 
-        this.socket = io("http://localhost:4000");
+        this.socket = io();
         this.socket.on("connect", () => {
             console.log("CONNECTED");
             this.socket.emit("get-world");
@@ -408,6 +433,19 @@ export class App extends React.Component<IAppProps, IAppState> {
         this.socket.on("send-frame", (data) => {
             this.game.applyGameSyncFrame(data);
         });
+        this.socket.on("send-players", (data) => {
+            this.game.playerData = data.players;
+            this.playerId = data.playerId;
+        });
+        this.socket.on("generic-message", (data) => {
+            this.messages.push(data);
+        });
+        this.socket.on("send-spawn-planets", (data) => {
+            this.spawnPlanets = data;
+        });
+        this.socket.on("send-spawn-locations", (data) => {
+            this.spawnLocations = data;
+        });
     }
 
     /**
@@ -416,11 +454,24 @@ export class App extends React.Component<IAppProps, IAppState> {
      * ------------------------------------------------------------
      */
 
+    private findPlayer(): IPlayerData | null {
+        return this.game.playerData.find(p => p.id === this.playerId) || null;
+    }
+
+    private findPlayerShip(): Ship | null {
+        const player = this.findPlayer();
+        if (player) {
+            return this.game.ships.find(s => s.id === player.shipId) || null;
+        } else {
+            return null;
+        }
+    }
+
     /**
      * Get the home world of the player.
      */
     getPlayerPlanet(): Planet | null {
-        const ship = this.game.playerShip;
+        const ship = this.findPlayerShip();
         if (ship) {
             return ship.planet || null;
         } else {
@@ -432,7 +483,7 @@ export class App extends React.Component<IAppProps, IAppState> {
      * Get the ship of the player.
      */
     getPlayerShip(): ICameraState {
-        const ship = this.game.playerShip;
+        const ship = this.findPlayerShip();
         if (ship) {
             return Game.GetCameraState(ship);
         }
@@ -957,6 +1008,8 @@ export class App extends React.Component<IAppProps, IAppState> {
             throw new Error("Could not find ship type");
         }
 
+        const playerData = this.game.playerData.find(p => p.shipId === planetDrawing.original.id) || null;
+
         const isReverseSide = planetDrawing.rotatedPosition[2] > 0;
         const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
         const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
@@ -1101,6 +1154,13 @@ export class App extends React.Component<IAppProps, IAppState> {
                         )
                     }
                 </g>
+                {
+                    playerData ? (
+                        <g>
+                            <text x={0} y={this.state.height > 0.5 ? -20 : 10} fill="white" textAnchor="middle">{playerData.id}</text>
+                        </g>
+                    ) : null
+                }
             </g>
         );
     }
@@ -1298,6 +1358,12 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         if (this.socket) {
             this.socket.emit("get-frame");
+            if (this.state.showPlanetMenu) {
+                this.socket.emit("get-spawn-planets");
+            }
+            if (this.state.showSpawnMenu) {
+                this.socket.emit("get-spawn-locations");
+            }
         }
 
         // refresh voronoi data, refresh occasionally since this is expensive.
@@ -1310,7 +1376,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         // handle server replies
         while (true) {
-            const message = this.game.outgoingMessages.shift();
+            const message = this.messages.shift();
             if (message) {
                 // has message, process message
                 if (message.messageType === EMessageType.DEATH) {
@@ -1418,7 +1484,9 @@ export class App extends React.Component<IAppProps, IAppState> {
                     messageType: EMessageType.AUTOPILOT,
                     enabled: this.state.autoPilotEnabled
                 };
-                this.game.incomingMessages.push(message);
+                if (this.socket) {
+                    this.socket.emit("generic-message", message);
+                }
             });
         }
     }
@@ -1473,7 +1541,9 @@ export class App extends React.Component<IAppProps, IAppState> {
                 key,
                 enabled: true,
             };
-            this.game.incomingMessages.push(message);
+            if (this.socket) {
+                this.socket.emit("generic-message", message);
+            }
         }
     }
 
@@ -1494,7 +1564,9 @@ export class App extends React.Component<IAppProps, IAppState> {
                 key,
                 enabled: false,
             };
-            this.game.incomingMessages.push(message);
+            if (this.socket) {
+                this.socket.emit("generic-message", message);
+            }
         }
     }
 
@@ -1717,7 +1789,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 <text x="5" y="60" onClick={this.decrementZoom.bind(this)}>-</text>
                 <text x="40" y="60" onClick={this.incrementZoom.bind(this)}>+</text>
                 {
-                    this.game.playerShip && (
+                    this.findPlayerShip() && (
                         <>
                             <rect key="return-to-menu-rect" x="5" y="75" width="50" height="20" fill="red" onClick={this.returnToMainMenu.bind(this)}/>
                             <text key="return-to-menu-text" x="10" y="90" fill="white" onClick={this.returnToMainMenu.bind(this)}>Leave</text>
@@ -1729,16 +1801,17 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     private renderGameStatus() {
-        const numPathingNodes = this.game.playerShip && this.game.playerShip.pathFinding.points.length;
-        const distanceToNode = this.game.playerShip && this.game.playerShip.pathFinding.points.length > 0 ?
+        const playerShip = this.findPlayerShip();
+        const numPathingNodes = playerShip && playerShip.pathFinding.points.length;
+        const distanceToNode = playerShip && playerShip.pathFinding.points.length > 0 ?
             VoronoiGraph.angularDistance(
-                this.game.playerShip.position.rotateVector([0, 0, 1]),
-                this.game.playerShip.pathFinding.points[0],
+                playerShip.position.rotateVector([0, 0, 1]),
+                playerShip.pathFinding.points[0],
                 this.game.worldScale
             ) :
             0;
 
-        const order = this.game.playerShip && this.game.playerShip.orders[0];
+        const order = playerShip && playerShip.orders[0];
         const orderType = order ? order.orderType : "NONE";
 
         if (numPathingNodes) {
@@ -1755,15 +1828,16 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     private renderCargoStatus() {
-        if (this.game.playerShip) {
-            const shipType = this.game.playerShip.shipType;
+        const playerShip = this.findPlayerShip();
+        if (playerShip) {
+            const shipType = playerShip.shipType;
             const shipData = SHIP_DATA.find(s => s.shipType === shipType);
             if (!shipData) {
                 throw new Error("Could not find ship type");
             }
 
             const cargoSlotSize = Math.min(50, this.state.width / shipData.cargoSize);
-            const cargos = this.game.playerShip.cargo;
+            const cargos = playerShip.cargo;
             const cargoSize = shipData.cargoSize;
             return (
                 <g key="cargo-status" transform={`translate(${this.state.width / 2},${this.state.height - 50})`}>
@@ -1813,10 +1887,12 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     private renderPlayerStatus() {
-        if (this.game.playerShip) {
+        const player = this.findPlayer();
+        if (player) {
+            const moneyAccount = MoneyAccount.deserialize(player.moneyAccount as any);
             return (
                 <g key="player-status" transform={`translate(0,${this.state.height - 80})`}>
-                    <text x="0" y="45" fontSize={8} color="black">Gold: {this.game.playerData[0].moneyAccount.getGold()}</text>
+                    <text x="0" y="45" fontSize={8} color="black">Gold: {moneyAccount.getGold()}</text>
                 </g>
             );
         } else {
@@ -1827,8 +1903,17 @@ export class App extends React.Component<IAppProps, IAppState> {
     public selectFaction(faction: EFaction) {
         this.setState({
             faction,
+            showSpawnMenu: false,
+            showPlanetMenu: true,
             showMainMenu: false,
-            showSpawnMenu: true,
+        }, () => {
+            if (this.socket) {
+                const message: IChooseFactionMessage = {
+                    messageType: EMessageType.CHOOSE_FACTION,
+                    factionId: faction
+                };
+                this.socket.emit("generic-message", message);
+            }
         });
     }
 
@@ -1891,30 +1976,156 @@ export class App extends React.Component<IAppProps, IAppState> {
         );
     }
 
+    public beginPickPlanet(planetId: string) {
+        if (this.state.faction) {
+            this.setState({
+                showSpawnMenu: true,
+                showPlanetMenu: false,
+                showMainMenu: false,
+            });
+            const message: IChoosePlanetMessage = {
+                messageType: EMessageType.CHOOSE_PLANET,
+                planetId
+            };
+            if (this.socket) {
+                this.socket.emit("generic-message", message);
+            }
+        } else {
+            this.returnToFactionMenu();
+        }
+    }
+
+    public returnToFactionMenu() {
+        this.setState({
+            showSpawnMenu: false,
+            showPlanetMenu: false,
+            showMainMenu: true,
+            planetId: null,
+        }, () => {
+            if (this.socket) {
+                const message: IChoosePlanetMessage = {
+                    messageType: EMessageType.CHOOSE_PLANET,
+                    planetId: null
+                };
+                this.socket.emit("generic-message", message);
+            }
+        });
+    }
+
+    private renderPlanetMenu() {
+        const x = this.state.width / 3;
+        const y = this.state.height / 2 + 50;
+        const width = (this.state.width / 3) - 20;
+        const height = 40;
+        return (
+            <g key="planet-menu">
+                <text
+                    fill="white"
+                    fontSize="28"
+                    x={this.state.width / 2}
+                    y={this.state.height / 2 - 14 - 50}
+                    textAnchor="middle"
+                >{this.state.faction}</text>
+                {
+                    this.spawnPlanets.map((spawnPlanet, index) => {
+                        return (
+                            <>
+                                <rect
+                                    key={`${spawnPlanet.planetId}-spawn-planet-rect`}
+                                    stroke="white"
+                                    fill="black"
+                                    x={x * (index + 0.5) - width / 2}
+                                    y={y - 20 - 50}
+                                    width={width}
+                                    height={height + 50}
+                                    style={{opacity: 0.3}}
+                                    onClick={this.beginPickPlanet.bind(this, spawnPlanet.planetId)}
+                                />
+                                <text
+                                    key={`${spawnPlanet.planetId}-spawn-planet-text`}
+                                    fill="white"
+                                    x={x * (index + 0.5)}
+                                    y={y + 5}
+                                    textAnchor="middle"
+                                    onClick={this.beginPickPlanet.bind(this, spawnPlanet.planetId)}
+                                >{spawnPlanet.planetId} ({spawnPlanet.numShipsAvailable} ships)</text>
+                            </>
+                        );
+                    })
+                }
+                <rect
+                    stroke="white"
+                    fill="transparent"
+                    x={x * 1.5 - width / 2}
+                    y={y - 20 + height}
+                    width={width}
+                    height={height}
+                    onClick={this.returnToMainMenu.bind(this)}
+                />
+                <text
+                    fill="white"
+                    x={x * 1.5}
+                    y={y + 5 + height}
+                    textAnchor="middle"
+                    onClick={this.returnToMainMenu.bind(this)}
+                >Back</text>
+            </g>
+        );
+    }
+
     public beginSpawnShip(planetId: string, shipType: EShipType) {
         if (this.state.faction) {
             this.setState({
-                showSpawnMenu: false
+                showSpawnMenu: false,
+                showPlanetMenu: false,
+                showMainMenu: false,
             });
             const message: ISpawnMessage = {
                 messageType: EMessageType.SPAWN,
                 shipType,
                 planetId
             };
-            this.game.incomingMessages.push(message);
+            if (this.socket) {
+                this.socket.emit("generic-message", message);
+            }
         } else {
-            this.returnToMainMenu();
+            this.returnToPlanetMenu();
         }
+    }
+
+    public returnToPlanetMenu() {
+        this.setState({
+            showSpawnMenu: false,
+            showPlanetMenu: true,
+            showMainMenu: false,
+            planetId: null,
+        }, () => {
+            if (this.socket) {
+                const message: IChoosePlanetMessage = {
+                    messageType: EMessageType.CHOOSE_PLANET,
+                    planetId: null
+                };
+                this.socket.emit("generic-message", message);
+            }
+        });
     }
 
     public returnToMainMenu() {
         this.setState({
             showSpawnMenu: false,
+            showPlanetMenu: false,
             showMainMenu: true,
-            faction: null
+            faction: null,
+            planetId: null,
+        }, () => {
+            if (this.socket) {
+                const message: IChooseFactionMessage = {
+                    messageType: EMessageType.CHOOSE_FACTION,
+                    factionId: null
+                };
+                this.socket.emit("generic-message", message);
+            }
         });
-        this.game.playerShip = null;
-        this.game.playerData.splice(0, this.game.playerData.length);
     }
 
     private renderSpawnMenu() {
@@ -1922,44 +2133,6 @@ export class App extends React.Component<IAppProps, IAppState> {
         const y = this.state.height / 2 + 50;
         const width = (this.state.width / 3) - 20;
         const height = 40;
-        const spawnLocations = [];
-        let faction: Faction | null = null;
-        if (this.state.faction) {
-            faction = this.game.factions[this.state.faction];
-        }
-        if (faction) {
-            const planetsToSpawnAt = this.game.planets.filter(p => faction && faction.planetIds.includes(p.id))
-                .sort((a, b) => {
-                    const settlementLevelDifference = b.settlementLevel - a.settlementLevel;
-                    if (settlementLevelDifference !== 0) {
-                        return settlementLevelDifference;
-                    }
-                    const settlementProgressDifference = b.settlementProgress - a.settlementProgress;
-                    if (settlementProgressDifference !== 0) {
-                        return settlementProgressDifference;
-                    }
-                    if (a.id > b.id) {
-                        return -1;
-                    } else {
-                        return 1;
-                    }
-                }
-            );
-
-            for (const planet of planetsToSpawnAt) {
-                for (const shipType of Object.values(EShipType)) {
-                    const numShipsAvailable = planet.getNumShipsAvailable(shipType);
-                    if (numShipsAvailable > 0) {
-                        spawnLocations.push({
-                            id: planet.id,
-                            numShipsAvailable,
-                            price: planet.shipyard.quoteShip(shipType)[0].amount,
-                            shipType
-                        });
-                    }
-                }
-            }
-        }
         return (
             <g key="spawn-menu">
                 <text
@@ -1970,7 +2143,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                     textAnchor="middle"
                 >{this.state.faction}</text>
                 {
-                    spawnLocations.map((spawnLocation, index) => {
+                    this.spawnLocations.map((spawnLocation, index) => {
                         return (
                             <>
                                 <rect
@@ -2018,14 +2191,14 @@ export class App extends React.Component<IAppProps, IAppState> {
                     y={y - 20 + height}
                     width={width}
                     height={height}
-                    onClick={this.returnToMainMenu.bind(this)}
+                    onClick={this.returnToPlanetMenu.bind(this)}
                 />
                 <text
                     fill="white"
                     x={x * 1.5}
                     y={y + 5 + height}
                     textAnchor="middle"
-                    onClick={this.returnToMainMenu.bind(this)}
+                    onClick={this.returnToPlanetMenu.bind(this)}
                 >Back</text>
             </g>
         );
@@ -2822,6 +2995,9 @@ export class App extends React.Component<IAppProps, IAppState> {
                         }
                         {
                             this.state.showMainMenu ? this.renderMainMenu.call(this) : null
+                        }
+                        {
+                            this.state.showPlanetMenu ? this.renderPlanetMenu.call(this) : null
                         }
                         {
                             this.state.showSpawnMenu ? this.renderSpawnMenu.call(this) : null
