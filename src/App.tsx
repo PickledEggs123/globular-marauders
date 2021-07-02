@@ -1390,6 +1390,9 @@ export class App extends React.Component<IAppProps, IAppState> {
             }
         }
 
+        // remove smoke clouds for performance
+        this.game.smokeClouds.splice(0, this.game.smokeClouds.length);
+
         // draw onto screen
         this.forceUpdate();
     }
