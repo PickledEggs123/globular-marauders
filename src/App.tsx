@@ -2,7 +2,7 @@ import React from 'react';
 import './App.css';
 import Quaternion from "quaternion";
 import * as Tone from "tone";
-import {io, Socket} from "socket.io-client";
+import SockJS from "sockjs-client";
 import {EResourceType, ITEM_DATA} from "@pickledeggs123/globular-marauders-game/lib/src/Resource";
 import {
     ESettlementLevel,
@@ -408,44 +408,105 @@ export class App extends React.Component<IAppProps, IAppState> {
     public refreshVoronoiDataTick: number = 0;
     public music: MusicPlayer = new MusicPlayer();
     public initialized: boolean = false;
+    public frameCounter: number = 0;
     public game: Game = new Game();
-    public socket: Socket;
+    public socket: WebSocket;
+    public socketEvents: Record<string, (data: any) => void> = {};
     public spawnPlanets: ISpawnPlanet[] = [];
     public spawnLocations: ISpawnLocation[] = [];
     public playerId: string | null = null;
     public messages: IMessage[] = [];
 
+    // client loop stuff
+    public clientLoopStart: number = performance.now();
+    public clientLoopDelta: number = 1000 / 10;
+    public clientLoopDeltaStart: number = performance.now();
+
+    public resetClientLoop() {
+        const now = performance.now();
+        const difference = now - this.clientLoopStart;
+        if (difference < 10) {
+            return;
+        }
+        this.clientLoopDelta = difference;
+        this.clientLoopStart = now;
+    }
+
+    public handleClientLoop() {
+        const now = performance.now();
+        const delta = (now - this.clientLoopDeltaStart) / this.clientLoopDelta;
+        this.clientLoopDeltaStart = now;
+
+        const movableArrays: Array<{
+            array: ICameraState[]
+        }> = [{
+            array: this.game.ships,
+        }, {
+            array: this.game.cannonBalls,
+        }, {
+            array: this.game.crates,
+        }];
+
+        for (const {array: movableArray} of movableArrays) {
+            for (const item of movableArray) {
+                item.position = item.position.clone().mul(item.positionVelocity.clone().pow(delta));
+                item.orientation = item.orientation.clone().mul(item.orientationVelocity.clone().pow(delta));
+            }
+        }
+    }
+
+    public sendMessage(event: string, message: any = undefined) {
+        this.socket.send(JSON.stringify({
+            event,
+            message
+        }));
+    }
+
     constructor(props: IAppProps) {
         super(props);
 
-        this.socket = io();
-        this.socket.on("connect", () => {
-            console.log("CONNECTED");
-            this.socket.emit("get-world");
-        });
-        this.socket.on("error", (err) => {
+        this.socket = new SockJS("/game");
+        this.socket.onopen = () => {
+            this.sendMessage("get-world");
+        };
+        this.socket.onerror = (err) => {
             console.log("Failed to connect", err);
-        });
-        this.socket.on("send-world", (data) => {
+        };
+        this.socket.onmessage = (message) => {
+            let data: {event: string, message: any} | null = null;
+            try {
+                data = JSON.parse(message.data) as {event: string, message: any};
+            } catch {}
+            if (data) {
+                const matchingHandler = this.socketEvents[data.event];
+                if (matchingHandler) {
+                    matchingHandler(data.message);
+                }
+            }
+        };
+        this.socketEvents["send-world"] = (data) => {
             this.game.applyGameInitializationFrame(data);
             this.initialized = true;
-        });
-        this.socket.on("send-frame", (data) => {
+            this.sendMessage("init-loop");
+        };
+        this.socketEvents["send-frame"] = (data) => {
             this.game.applyGameSyncFrame(data);
-        });
-        this.socket.on("send-players", (data) => {
+            //this.game.resetClientLoop();
+            this.resetClientLoop();
+        };
+        this.socketEvents["send-players"] = (data) => {
             this.game.playerData = data.players;
             this.playerId = data.playerId;
-        });
-        this.socket.on("generic-message", (data) => {
+        };
+        this.socketEvents["generic-message"] = (data) => {
             this.messages.push(data);
-        });
-        this.socket.on("send-spawn-planets", (data) => {
+        };
+        this.socketEvents["send-spawn-planets"] = (data) => {
             this.spawnPlanets = data;
-        });
-        this.socket.on("send-spawn-locations", (data) => {
+        };
+        this.socketEvents["send-spawn-locations"] = (data) => {
             this.spawnLocations = data;
-        });
+        };
     }
 
     /**
@@ -1356,44 +1417,38 @@ export class App extends React.Component<IAppProps, IAppState> {
             return;
         }
 
-        if (this.socket) {
-            this.socket.emit("get-frame");
-            if (this.state.showPlanetMenu) {
-                this.socket.emit("get-spawn-planets");
-            }
-            if (this.state.showSpawnMenu) {
-                this.socket.emit("get-spawn-locations");
-            }
-        }
-
-        // refresh voronoi data, refresh occasionally since this is expensive.
-        if (this.refreshVoronoiDataTick <= 20) {
-            this.refreshVoronoiDataTick += 1;
-        } else {
-            this.refreshVoronoiDataTick = 0;
-            this.refreshVoronoiData();
-        }
-
-        // handle server replies
-        while (true) {
-            const message = this.messages.shift();
-            if (message) {
-                // has message, process message
-                if (message.messageType === EMessageType.DEATH) {
-                    this.setState({
-                        showSpawnMenu: true
-                    });
-                }
+        if (this.frameCounter++ % 3 === 0) {
+            // refresh voronoi data, refresh occasionally since this is expensive.
+            if (this.refreshVoronoiDataTick <= 20) {
+                this.refreshVoronoiDataTick += 1;
             } else {
-                // no more messages, end message processing
-                break;
+                this.refreshVoronoiDataTick = 0;
+                this.refreshVoronoiData();
             }
-        }
 
-        // remove smoke clouds for performance
-        this.game.smokeClouds.splice(0, this.game.smokeClouds.length);
+            // handle server replies
+            while (true) {
+                const message = this.messages.shift();
+                if (message) {
+                    // has message, process message
+                    if (message.messageType === EMessageType.DEATH) {
+                        this.setState({
+                            showSpawnMenu: true
+                        });
+                    }
+                } else {
+                    // no more messages, end message processing
+                    break;
+                }
+            }
+
+            // remove smoke clouds for performance
+            this.game.smokeClouds.splice(0, this.game.smokeClouds.length);
+        }
 
         // draw onto screen
+        //this.game.handleClientLoop();
+        this.handleClientLoop();
         this.forceUpdate();
     }
 
@@ -1488,7 +1543,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                     enabled: this.state.autoPilotEnabled
                 };
                 if (this.socket) {
-                    this.socket.emit("generic-message", message);
+                    this.sendMessage("generic-message", message);
                 }
             });
         }
@@ -1545,7 +1600,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 enabled: true,
             };
             if (this.socket) {
-                this.socket.emit("generic-message", message);
+                this.sendMessage("generic-message", message);
             }
         }
     }
@@ -1568,7 +1623,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 enabled: false,
             };
             if (this.socket) {
-                this.socket.emit("generic-message", message);
+                this.sendMessage("generic-message", message);
             }
         }
     }
@@ -1652,7 +1707,7 @@ export class App extends React.Component<IAppProps, IAppState> {
      */
     componentDidMount() {
         if (!this.props.isTestMode) {
-            this.rotateCameraInterval = setInterval(this.gameLoop.bind(this), 100);
+            this.rotateCameraInterval = setInterval(this.gameLoop.bind(this), 30);
         }
         this.keyDownHandlerInstance = this.handleKeyDown.bind(this);
         this.keyUpHandlerInstance = this.handleKeyUp.bind(this);
@@ -1915,7 +1970,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                     messageType: EMessageType.CHOOSE_FACTION,
                     factionId: faction
                 };
-                this.socket.emit("generic-message", message);
+                this.sendMessage("generic-message", message);
             }
         });
     }
@@ -1991,7 +2046,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 planetId
             };
             if (this.socket) {
-                this.socket.emit("generic-message", message);
+                this.sendMessage("generic-message", message);
             }
         } else {
             this.returnToFactionMenu();
@@ -2010,7 +2065,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                     messageType: EMessageType.CHOOSE_PLANET,
                     planetId: null
                 };
-                this.socket.emit("generic-message", message);
+                this.sendMessage("generic-message", message);
             }
         });
     }
@@ -2089,7 +2144,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 planetId
             };
             if (this.socket) {
-                this.socket.emit("generic-message", message);
+                this.sendMessage("generic-message", message);
             }
         } else {
             this.returnToPlanetMenu();
@@ -2108,7 +2163,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                     messageType: EMessageType.CHOOSE_PLANET,
                     planetId: null
                 };
-                this.socket.emit("generic-message", message);
+                this.sendMessage("generic-message", message);
             }
         });
     }
@@ -2126,7 +2181,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                     messageType: EMessageType.CHOOSE_FACTION,
                     factionId: null
                 };
-                this.socket.emit("generic-message", message);
+                this.sendMessage("generic-message", message);
             }
         });
     }
