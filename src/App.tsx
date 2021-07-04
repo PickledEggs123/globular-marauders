@@ -10,7 +10,8 @@ import {
     ICameraStateWithOriginal,
     IDrawable,
     IExpirable,
-    MIN_DISTANCE, MoneyAccount
+    MIN_DISTANCE,
+    MoneyAccount
 } from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
 import {EFaction, EShipType, Ship, SHIP_DATA} from "@pickledeggs123/globular-marauders-game/lib/src/Ship";
 import {
@@ -22,15 +23,22 @@ import {
     VoronoiGraph
 } from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
 import {EBuildingType, Manufactory, Planet, Plantation} from "@pickledeggs123/globular-marauders-game/lib/src/Planet";
-import {Crate, SmokeCloud} from "@pickledeggs123/globular-marauders-game/lib/src/Item";
+import {
+    Crate,
+    DeserializeQuaternion,
+    SerializeQuaternion,
+    SmokeCloud
+} from "@pickledeggs123/globular-marauders-game/lib/src/Item";
 import {
     EMessageType,
     Game,
     IAutoPilotMessage,
     IChooseFactionMessage,
     IChoosePlanetMessage,
-    IKeyboardMessage,
-    IMessage, IPlayerData,
+    IGameInitializationFrame,
+    IGameSyncFrame,
+    IMessage,
+    IPlayerData,
     ISpawnLocation,
     ISpawnMessage,
     ISpawnPlanet
@@ -362,11 +370,13 @@ interface IAppState {
     voronoiMode: EVoronoiMode;
     autoPilotEnabled: boolean;
     audioEnabled: boolean;
+    showLoginMenu: boolean;
     showMainMenu: boolean;
     showPlanetMenu: boolean;
     showSpawnMenu: boolean;
     faction: EFaction | null;
     planetId: string | null;
+    userName: string;
 }
 
 export class App extends React.Component<IAppProps, IAppState> {
@@ -380,12 +390,14 @@ export class App extends React.Component<IAppProps, IAppState> {
         showVoronoi: false as boolean,
         voronoiMode: EVoronoiMode.KINGDOM as EVoronoiMode,
         autoPilotEnabled: true as boolean,
-        audioEnabled: false as boolean,
+        audioEnabled: true as boolean,
         faction: null as EFaction | null,
         planetId: null as string | null,
-        showMainMenu: true as boolean,
+        showLoginMenu: true as boolean,
+        showMainMenu: false as boolean,
         showPlanetMenu: false as boolean,
         showSpawnMenu: false as boolean,
+        userName: "" as string,
     };
 
     // ui ref
@@ -466,9 +478,6 @@ export class App extends React.Component<IAppProps, IAppState> {
         super(props);
 
         this.socket = new SockJS("/game");
-        this.socket.onopen = () => {
-            this.sendMessage("get-world");
-        };
         this.socket.onerror = (err) => {
             console.log("Failed to connect", err);
         };
@@ -478,33 +487,69 @@ export class App extends React.Component<IAppProps, IAppState> {
                 data = JSON.parse(message.data) as {event: string, message: any};
             } catch {}
             if (data) {
+                if (data.event === "send-frame") {
+                    // send a message back to stop effects of nagle algorithm
+                    // do not want messages to clump or buffer
+                    // old message delays 100 100 100 300 0 0 100
+                    // this line fixes the bug so it is 100 100 100 100 100 100 100
+                    // clumpy messages will cause interpolation bugs
+                    this.sendMessage("ack", "ACK");
+                }
                 const matchingHandler = this.socketEvents[data.event];
                 if (matchingHandler) {
                     matchingHandler(data.message);
                 }
             }
         };
-        this.socketEvents["send-world"] = (data) => {
+        this.socketEvents["send-world"] = (data: IGameInitializationFrame) => {
+            this.setState({
+                showSpawnMenu: false,
+                showPlanetMenu: false,
+                showMainMenu: true,
+                showLoginMenu: false,
+            });
             this.game.applyGameInitializationFrame(data);
             this.initialized = true;
-            this.sendMessage("init-loop");
+            setTimeout(() => {
+                this.sendMessage("init-loop");
+            }, 500);
         };
-        this.socketEvents["send-frame"] = (data) => {
+        this.socketEvents["send-frame"] = (data: IGameSyncFrame) => {
+            const playerData = this.game.playerData.find(p => p.id === this.playerId);
+            if (playerData) {
+                const ship = this.game.ships.find(s => s.id === playerData.shipId);
+                const shipData = data.ships.find(s => s.id === playerData.shipId);
+                if (ship && shipData) {
+                    // cancel server position if the position difference is small
+                    if (VoronoiGraph.angularDistance(
+                        ship.position.rotateVector([0, 0, 1]),
+                        DeserializeQuaternion(shipData.position).rotateVector([0, 0, 1]),
+                        this.game.worldScale
+                    ) < Game.VELOCITY_STEP * 10 * 3 * 10 * Math.PI * 2) {
+                        shipData.position = SerializeQuaternion(ship.position);
+                        shipData.positionVelocity = SerializeQuaternion(ship.positionVelocity);
+                        shipData.orientation = SerializeQuaternion(ship.orientation);
+                        shipData.orientationVelocity = SerializeQuaternion(ship.orientationVelocity);
+                        shipData.cannonLoading = ship.cannonLoading;
+                        shipData.cannonCoolDown = ship.cannonCoolDown;
+                        shipData.cannonadeCoolDown = ship.cannonadeCoolDown;
+                    }
+                }
+            }
             this.game.applyGameSyncFrame(data);
-            //this.game.resetClientLoop();
             this.resetClientLoop();
         };
         this.socketEvents["send-players"] = (data) => {
             this.game.playerData = data.players;
             this.playerId = data.playerId;
         };
-        this.socketEvents["generic-message"] = (data) => {
+        this.socketEvents["generic-message"] = (data: IMessage) => {
             this.messages.push(data);
         };
-        this.socketEvents["send-spawn-planets"] = (data) => {
+        this.socketEvents["send-spawn-planets"] = (data: ISpawnPlanet[]) => {
             this.spawnPlanets = data;
         };
-        this.socketEvents["send-spawn-locations"] = (data) => {
+        this.socketEvents["send-spawn-locations"] = (data: ISpawnLocation[]) => {
             this.spawnLocations = data;
         };
     }
@@ -1218,7 +1263,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 {
                     playerData ? (
                         <g>
-                            <text x={0} y={this.state.height > 0.5 ? -20 : 10} fill="white" textAnchor="middle">{playerData.id}</text>
+                            <text x={0} y={this.state.height > 0.5 ? -20 : 10} fill="white" textAnchor="middle">{playerData.name}</text>
                         </g>
                     ) : null
                 }
@@ -1442,12 +1487,33 @@ export class App extends React.Component<IAppProps, IAppState> {
                 }
             }
 
+            // perform client side movement
+            const playerData = this.game.playerData.find(p => p.id === this.playerId);
+            if (playerData && !playerData.autoPilotEnabled) {
+                const shipIndex = this.game.ships.findIndex(s => s.id === playerData.shipId);
+                if (shipIndex >= 0) {
+                    this.game.handleShipLoop(shipIndex, () => this.activeKeys, false);
+                }
+            }
+
             // remove smoke clouds for performance
             this.game.smokeClouds.splice(0, this.game.smokeClouds.length);
+
+            // move client side data to server
+            while (true) {
+                const message = this.game.outgoingMessages.shift();
+                if (message) {
+                    const [playerId, m] = message;
+                    if (playerId === this.playerId) {
+                        this.sendMessage("generic-message", m);
+                    }
+                } else {
+                    break;
+                }
+            }
         }
 
         // draw onto screen
-        //this.game.handleClientLoop();
         this.handleClientLoop();
         this.forceUpdate();
     }
@@ -1592,16 +1658,6 @@ export class App extends React.Component<IAppProps, IAppState> {
         const key = App.getKeyString(event);
         if (!this.activeKeys.includes(key)) {
             this.activeKeys.push(key);
-
-            // send key down message to server
-            const message: IKeyboardMessage = {
-                messageType: EMessageType.KEYBOARD,
-                key,
-                enabled: true,
-            };
-            if (this.socket) {
-                this.sendMessage("generic-message", message);
-            }
         }
     }
 
@@ -1615,16 +1671,6 @@ export class App extends React.Component<IAppProps, IAppState> {
         const index = this.activeKeys.findIndex(k => k === key);
         if (index >= 0) {
             this.activeKeys.splice(index, 1);
-
-            // send key up message to server
-            const message: IKeyboardMessage = {
-                messageType: EMessageType.KEYBOARD,
-                key,
-                enabled: false,
-            };
-            if (this.socket) {
-                this.sendMessage("generic-message", message);
-            }
         }
     }
 
@@ -1964,6 +2010,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             showSpawnMenu: false,
             showPlanetMenu: true,
             showMainMenu: false,
+            showLoginMenu: false,
         }, () => {
             if (this.socket) {
                 const message: IChooseFactionMessage = {
@@ -1973,6 +2020,29 @@ export class App extends React.Component<IAppProps, IAppState> {
                 this.sendMessage("generic-message", message);
             }
         });
+    }
+
+    private handleUserName(e: React.ChangeEvent<HTMLInputElement>) {
+        this.setState({userName: e.target.value});
+    }
+
+    private handleLogin() {
+        this.sendMessage("join-game", {name: this.state.userName});
+        this.sendMessage("get-world");
+        if (this.state.audioEnabled) {
+            this.music.start();
+        }
+    }
+
+    private renderLoginMenu() {
+        return (
+            <div key="login-menu">
+                <label>UserName
+                    <input value={this.state.userName} onChange={this.handleUserName.bind(this)}/>
+                </label>
+                <button onClick={this.handleLogin.bind(this)}>Login</button>
+            </div>
+        );
     }
 
     private renderMainMenu() {
@@ -2040,6 +2110,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 showSpawnMenu: true,
                 showPlanetMenu: false,
                 showMainMenu: false,
+                showLoginMenu: false,
             });
             const message: IChoosePlanetMessage = {
                 messageType: EMessageType.CHOOSE_PLANET,
@@ -2058,6 +2129,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             showSpawnMenu: false,
             showPlanetMenu: false,
             showMainMenu: true,
+            showLoginMenu: false,
             planetId: null,
         }, () => {
             if (this.socket) {
@@ -2137,6 +2209,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 showSpawnMenu: false,
                 showPlanetMenu: false,
                 showMainMenu: false,
+                showLoginMenu: false,
             });
             const message: ISpawnMessage = {
                 messageType: EMessageType.SPAWN,
@@ -2156,6 +2229,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             showSpawnMenu: false,
             showPlanetMenu: true,
             showMainMenu: false,
+            showLoginMenu: false,
             planetId: null,
         }, () => {
             if (this.socket) {
@@ -2173,6 +2247,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             showSpawnMenu: false,
             showPlanetMenu: false,
             showMainMenu: true,
+            showLoginMenu: false,
             faction: null,
             planetId: null,
         }, () => {
@@ -3036,47 +3111,51 @@ export class App extends React.Component<IAppProps, IAppState> {
                         </ul>
                     )
                 }
-                <svg ref={this.svgRef} width={this.state.width} height={this.state.height}>
-                    <defs>
-                        <mask id="worldMask">
-                            <circle
-                                cx={this.state.width * 0.5}
-                                cy={this.state.height * 0.5}
-                                r={Math.min(this.state.width, this.state.height) * 0.5}
-                                fill="white"
-                            />
-                        </mask>
-                    </defs>
-                    <g mask="url(#worldMask)" onClick={this.handleSvgClick.bind(this)}>
-                        {
-                            this.renderGameWorld.call(this)
-                        }
-                        {
-                            this.state.showMainMenu ? this.renderMainMenu.call(this) : null
-                        }
-                        {
-                            this.state.showPlanetMenu ? this.renderPlanetMenu.call(this) : null
-                        }
-                        {
-                            this.state.showSpawnMenu ? this.renderSpawnMenu.call(this) : null
-                        }
-                    </g>
-                    {
-                        this.renderGameControls()
-                    }
-                    {
-                        this.renderGameStatus()
-                    }
-                    {
-                        this.renderCargoStatus()
-                    }
-                    {
-                        this.renderFactionStatus()
-                    }
-                    {
-                        this.renderPlayerStatus()
-                    }
-                </svg>
+                {
+                    this.state.showLoginMenu ? this.renderLoginMenu.call(this) : (
+                        <svg ref={this.svgRef} width={this.state.width} height={this.state.height}>
+                            <defs>
+                                <mask id="worldMask">
+                                    <circle
+                                        cx={this.state.width * 0.5}
+                                        cy={this.state.height * 0.5}
+                                        r={Math.min(this.state.width, this.state.height) * 0.5}
+                                        fill="white"
+                                    />
+                                </mask>
+                            </defs>
+                            <g mask="url(#worldMask)" onClick={this.handleSvgClick.bind(this)}>
+                                {
+                                    this.renderGameWorld.call(this)
+                                }
+                                {
+                                    this.state.showMainMenu ? this.renderMainMenu.call(this) : null
+                                }
+                                {
+                                    this.state.showPlanetMenu ? this.renderPlanetMenu.call(this) : null
+                                }
+                                {
+                                    this.state.showSpawnMenu ? this.renderSpawnMenu.call(this) : null
+                                }
+                            </g>
+                            {
+                                this.renderGameControls()
+                            }
+                            {
+                                this.renderGameStatus()
+                            }
+                            {
+                                this.renderCargoStatus()
+                            }
+                            {
+                                this.renderFactionStatus()
+                            }
+                            {
+                                this.renderPlayerStatus()
+                            }
+                        </svg>
+                    )
+                }
             </div>
         );
     }
