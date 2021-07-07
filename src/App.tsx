@@ -3,6 +3,7 @@ import './App.css';
 import Quaternion from "quaternion";
 import * as Tone from "tone";
 import SockJS from "sockjs-client";
+import * as PIXI from "pixi.js";
 import {EResourceType, ITEM_DATA} from "@pickledeggs123/globular-marauders-game/lib/src/Resource";
 import {
     ESettlementLevel,
@@ -13,7 +14,13 @@ import {
     MIN_DISTANCE,
     MoneyAccount
 } from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
-import {EFaction, EShipType, Ship, SHIP_DATA} from "@pickledeggs123/globular-marauders-game/lib/src/Ship";
+import {
+    EFaction,
+    EShipType,
+    PHYSICS_SCALE,
+    Ship,
+    SHIP_DATA
+} from "@pickledeggs123/globular-marauders-game/lib/src/Ship";
 import {
     DelaunayGraph,
     DelaunayTile,
@@ -401,6 +408,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     };
 
     // ui ref
+    private showAppBodyRef: React.RefObject<HTMLDivElement> = React.createRef<HTMLDivElement>();
     private showNotesRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
     private showShipsRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
     private showItemsRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
@@ -467,6 +475,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         }
     }
 
+    // networking messages, outgoing
     public sendMessage(event: string, message: any = undefined) {
         this.socket.send(JSON.stringify({
             event,
@@ -474,9 +483,190 @@ export class App extends React.Component<IAppProps, IAppState> {
         }));
     }
 
+    // pixi.js renderer
+    public application: PIXI.Application;
+
     constructor(props: IAppProps) {
         super(props);
 
+        // setup rendering
+        this.application = new PIXI.Application();
+
+        // create geometry
+        const starGeometry = new PIXI.Geometry();
+        starGeometry.addAttribute("aPosition", (new Array(32).fill(0).reduce((acc, v, i) => {
+            acc.push(Math.cos(i * Math.PI * 2 / 32), Math.sin(i * Math.PI * 2 / 32), 0);
+            return acc;
+        }, [0, 0, 0] as number[])), 3);
+        starGeometry.addIndex((new Array(33).fill(0).reduce((acc, v, i) => {
+            acc.push(0, (i % 32) + 1, ((i + 1) % 32) + 1);
+            return acc;
+        }, [] as number[])));
+
+        // create material
+        const starVertexShader = `
+            precision mediump float;
+            
+            attribute vec3 aPosition;
+            
+            uniform mat4 uCameraPosition;
+            uniform float uCameraScale;
+            uniform mat4 uPosition;
+            uniform float uScale;
+            
+            void main() {
+                gl_Position = uCameraPosition * uPosition * vec4(aPosition * uScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
+            }
+        `;
+        const starFragmentShader = `
+            precision mediump float;
+            
+            uniform vec4 uColor;
+            
+            void main() {
+                gl_FragColor = uColor;
+            }
+        `;
+        const starProgram = new PIXI.Program(starVertexShader, starFragmentShader);
+
+        // draw app
+        this.game.initializeGame();
+
+        // draw rotating app
+        let cameraPosition: Quaternion = Quaternion.ONE;
+        const hexToRgb = (hex: string): [number, number, number, number] => {
+            if (hex === "red") return [1, 0, 0, 1];
+            if (hex === "yellow") return [1, 1, 0, 1];
+            if (hex === "blue") return [0, 0, 1, 1];
+            return [
+                parseInt(hex.slice(1, 3), 16) / 255,
+                parseInt(hex.slice(3, 5), 16) / 255,
+                parseInt(hex.slice(5, 7), 16) / 255,
+                1
+            ];
+        };
+
+        // generate stars
+        const starMeshes: PIXI.Mesh<PIXI.Shader>[] = [];
+        for (const star of Array.from(this.game.voronoiTerrain.getStars())) {
+            // create mesh
+            const uniforms = {
+                uCameraPosition: cameraPosition.toMatrix4(),
+                uCameraScale: this.game.worldScale,
+                uPosition: star.position.toMatrix4(),
+                uColor: hexToRgb(star.color),
+                uScale: star.size * PHYSICS_SCALE / this.game.worldScale
+            };
+            const shader = new PIXI.Shader(starProgram, uniforms);
+            const mesh = new PIXI.Mesh(starGeometry, shader);
+
+            this.application.stage.addChild(mesh);
+            starMeshes.push(mesh);
+        }
+
+        // generate planets
+        const planetVoronoiCells = this.game.generateGoodPoints(100, 10);
+        const planetGeometry = new PIXI.Geometry();
+        const planetGeometryData = planetVoronoiCells.reduce((acc, v) => {
+            // color of voronoi tile
+            const color: [number, number, number] = Math.random() > 0.33 ? [0, 0, 1] : [0, 1, 0];
+
+            // initial center index
+            const startingIndex = Math.floor(acc.position.length / 3) + 1;
+            acc.position.push.apply(acc.position, v.centroid);
+            acc.color.push.apply(acc.color, color);
+
+            for (let i = 0; i < v.vertices.length; i++) {
+                // vertex data
+                const a = v.vertices[i % v.vertices.length];
+                acc.position.push.apply(acc.position, a);
+                acc.color.push.apply(acc.color, color);
+
+                // triangle data
+                acc.index.push(
+                    startingIndex,
+                    startingIndex + (i % v.vertices.length) + 1,
+                    startingIndex + ((i + 1) % v.vertices.length) + 1
+                );
+            }
+            return acc;
+        }, {position: [], color: [], index: []} as {position: number[], color: number[], index: number[]});
+        planetGeometry.addAttribute("aPosition", planetGeometryData.position, 3);
+        planetGeometry.addAttribute("aColor", planetGeometryData.color, 3);
+        planetGeometry.addIndex(planetGeometryData.index);
+
+        // create material
+        const planetVertexShader = `
+                precision mediump float;
+                
+                attribute vec3 aPosition;
+                attribute vec3 aColor;
+                
+                uniform mat4 uCameraPosition;
+                uniform float uCameraScale;
+                uniform mat4 uPosition;
+                uniform mat4 uOrientation;
+                uniform float uScale;
+                
+                varying vec3 vColor;
+                
+                void main() {
+                    vColor = aColor;
+                    gl_Position = uCameraPosition * uPosition * vec4((uOrientation * vec4(aPosition, 1.0)).xyz * uScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
+                }
+            `;
+        const planetFragmentShader = `
+                precision mediump float;
+                
+                varying vec3 vColor;
+                
+                void main() {
+                    gl_FragColor = vec4(vColor, 1.0);
+                }
+            `;
+        const planetProgram = new PIXI.Program(planetVertexShader, planetFragmentShader);
+
+        const planetMeshes: PIXI.Mesh<PIXI.Shader>[] = [];
+        let planetOrientation: Quaternion = Quaternion.ONE;
+        const planetRotation: Quaternion = Quaternion.fromAxisAngle(DelaunayGraph.randomPoint(), Math.PI * 2 / 60 / 10);
+        for (const planet of Array.from(this.game.voronoiTerrain.getPlanets())) {
+            // create mesh
+            const uniforms = {
+                uCameraPosition: cameraPosition.toMatrix4(),
+                uCameraScale: this.game.worldScale,
+                uPosition: planet.position.toMatrix4(),
+                uOrientation: planetOrientation.toMatrix4(),
+                uScale: 100 * planet.size * PHYSICS_SCALE / this.game.worldScale
+            };
+            const shader = new PIXI.Shader(planetProgram, uniforms);
+            const state = PIXI.State.for2d();
+            state.depthTest = true;
+            const mesh = new PIXI.Mesh(planetGeometry, shader, state);
+
+            this.application.stage.addChild(mesh);
+            planetMeshes.push(mesh);
+        }
+
+        // draw rotating app
+        this.application.ticker.add(() => {
+            cameraPosition = cameraPosition.clone().mul(Quaternion.fromAxisAngle([1, 0, 0], Math.PI * 2 / 60 / 120));
+            planetOrientation = planetOrientation.clone().mul(planetRotation);
+
+            // update each star
+            for (const mesh of starMeshes) {
+                const shader = mesh.shader;
+                shader.uniforms.uCameraPosition = cameraPosition.toMatrix4();
+            }
+
+            // update each planet
+            for (const mesh of planetMeshes) {
+                const shader = mesh.shader;
+                shader.uniforms.uCameraPosition = cameraPosition.toMatrix4();
+                shader.uniforms.uOrientation = planetOrientation.toMatrix4();
+            }
+        });
+
+        // setup networking
         this.socket = new SockJS("/game");
         this.socket.onerror = (err) => {
             console.log("Failed to connect", err);
@@ -1752,6 +1942,12 @@ export class App extends React.Component<IAppProps, IAppState> {
      * Perform the initialization of the game.
      */
     componentDidMount() {
+        // add renderer
+        if (this.showAppBodyRef.current) {
+            this.showAppBodyRef.current.appendChild(this.application.view);
+        }
+
+        // handle keyboard input
         if (!this.props.isTestMode) {
             this.rotateCameraInterval = setInterval(this.gameLoop.bind(this), 30);
         }
@@ -1762,12 +1958,17 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     componentWillUnmount() {
+        // clean up renderer
+        if (this.showAppBodyRef.current) {
+            this.showAppBodyRef.current.removeChild(this.application.view);
+        }
+
+        // clean up game stuff
         if (this.rotateCameraInterval) {
             clearInterval(this.rotateCameraInterval);
         }
         document.removeEventListener("keydown", this.keyDownHandlerInstance);
         document.removeEventListener("keyup", this.keyUpHandlerInstance);
-
         this.music.stop();
     }
 
@@ -2997,6 +3198,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                         </label>
                     </div>
                 </div>
+                <div ref={this.showAppBodyRef}/>
                 {
                     this.state.showNotes && (
                         <ul>
