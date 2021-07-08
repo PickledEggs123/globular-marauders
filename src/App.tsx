@@ -15,8 +15,10 @@ import {
     MoneyAccount
 } from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
 import {
+    CorvetteHull,
     EFaction,
     EShipType,
+    IShipData,
     PHYSICS_SCALE,
     Ship,
     SHIP_DATA
@@ -492,6 +494,23 @@ export class App extends React.Component<IAppProps, IAppState> {
         // setup rendering
         this.application = new PIXI.Application();
 
+        // draw app
+        this.game.initializeGame();
+
+        // draw rotating app
+        let cameraPosition: Quaternion = Quaternion.ONE;
+        const hexToRgb = (hex: string): [number, number, number, number] => {
+            if (hex === "red") return [1, 0, 0, 1];
+            if (hex === "yellow") return [1, 1, 0, 1];
+            if (hex === "blue") return [0, 0, 1, 1];
+            return [
+                parseInt(hex.slice(1, 3), 16) / 255,
+                parseInt(hex.slice(3, 5), 16) / 255,
+                parseInt(hex.slice(5, 7), 16) / 255,
+                1
+            ];
+        };
+
         // create geometry
         const starGeometry = new PIXI.Geometry();
         starGeometry.addAttribute("aPosition", (new Array(32).fill(0).reduce((acc, v, i) => {
@@ -528,23 +547,6 @@ export class App extends React.Component<IAppProps, IAppState> {
             }
         `;
         const starProgram = new PIXI.Program(starVertexShader, starFragmentShader);
-
-        // draw app
-        this.game.initializeGame();
-
-        // draw rotating app
-        let cameraPosition: Quaternion = Quaternion.ONE;
-        const hexToRgb = (hex: string): [number, number, number, number] => {
-            if (hex === "red") return [1, 0, 0, 1];
-            if (hex === "yellow") return [1, 1, 0, 1];
-            if (hex === "blue") return [0, 0, 1, 1];
-            return [
-                parseInt(hex.slice(1, 3), 16) / 255,
-                parseInt(hex.slice(3, 5), 16) / 255,
-                parseInt(hex.slice(5, 7), 16) / 255,
-                1
-            ];
-        };
 
         // generate stars
         const starMeshes: PIXI.Mesh<PIXI.Shader>[] = [];
@@ -626,16 +628,23 @@ export class App extends React.Component<IAppProps, IAppState> {
             `;
         const planetProgram = new PIXI.Program(planetVertexShader, planetFragmentShader);
 
-        const planetMeshes: PIXI.Mesh<PIXI.Shader>[] = [];
-        let planetOrientation: Quaternion = Quaternion.ONE;
-        const planetRotation: Quaternion = Quaternion.fromAxisAngle(DelaunayGraph.randomPoint(), Math.PI * 2 / 60 / 10);
+        // create planets
+        const planetMeshes: Array<{
+            mesh: PIXI.Mesh<PIXI.Shader>,
+            orientation: Quaternion,
+            rotation: Quaternion
+        }> = [];
         for (const planet of Array.from(this.game.voronoiTerrain.getPlanets())) {
+            // create planet properties
+            const orientation: Quaternion = Quaternion.ONE;
+            const rotation: Quaternion = Quaternion.fromAxisAngle(DelaunayGraph.randomPoint(), Math.PI * 2 / 60 / 10);
+
             // create mesh
             const uniforms = {
                 uCameraPosition: cameraPosition.toMatrix4(),
                 uCameraScale: this.game.worldScale,
                 uPosition: planet.position.toMatrix4(),
-                uOrientation: planetOrientation.toMatrix4(),
+                uOrientation: orientation.toMatrix4(),
                 uScale: 100 * planet.size * PHYSICS_SCALE / this.game.worldScale
             };
             const shader = new PIXI.Shader(planetProgram, uniforms);
@@ -644,13 +653,134 @@ export class App extends React.Component<IAppProps, IAppState> {
             const mesh = new PIXI.Mesh(planetGeometry, shader, state);
 
             this.application.stage.addChild(mesh);
-            planetMeshes.push(mesh);
+            planetMeshes.push({
+                mesh,
+                orientation,
+                rotation,
+            });
+        }
+
+        // generate ships
+        const GetHullPoint = ([x, y]: [number, number]): [number, number, number] => {
+            const z = Math.sqrt(1 -
+                Math.pow(x * PHYSICS_SCALE / this.game.worldScale, 2) -
+                Math.pow(y * PHYSICS_SCALE / this.game.worldScale, 2)
+            );
+            return [x, y, z];
+        };
+        const shipGeometryMap: { [key: string]: PIXI.Geometry } = {};
+        for (const shipType of Object.values(EShipType)) {
+            const shipToDraw = SHIP_DATA.find(i => i.shipType === shipType);
+            if (!shipToDraw) {
+                continue;
+            }
+
+            const shipGeometry = new PIXI.Geometry();
+            const shipGeometryData: {position: number[], color: number[], index: number[]} = {
+                position: [],
+                color: [],
+                index: []
+            };
+            shipGeometryData.position.push.apply(shipGeometryData.position, GetHullPoint([0, 0]));
+            shipGeometryData.color.push.apply(shipGeometryData.color, [1, 0, 0]);
+            for (let i = 0; i < shipToDraw.hull.length; i++) {
+                const a = shipToDraw.hull[i % shipToDraw.hull.length];
+
+                shipGeometryData.position.push.apply(shipGeometryData.position, GetHullPoint(a));
+                shipGeometryData.color.push.apply(shipGeometryData.color, [1, 0, 0]);
+                shipGeometryData.index.push(
+                    0,
+                    (i % CorvetteHull.length) + 1,
+                    ((i + 1) % CorvetteHull.length) + 1,
+                );
+            }
+            const numCannonPositions = Math.floor(shipToDraw.cannons.numCannons / 2);
+            const cannonSpacing = (shipToDraw.cannons.endY - shipToDraw.cannons.startY) / numCannonPositions;
+            for (let cannonIndex = 0; cannonIndex < shipToDraw.cannons.numCannons; cannonIndex++) {
+                const position = Math.floor(cannonIndex / 2);
+                const isLeftSide = Math.floor(cannonIndex % 2) === 0;
+                const startIndex = Math.floor(shipGeometryData.position.length / 3);
+
+                if (isLeftSide) {
+                    shipGeometryData.position.push(
+                        shipToDraw.cannons.leftWall, shipToDraw.cannons.startY + (position + 0.25) * cannonSpacing, 1,
+                        shipToDraw.cannons.leftWall, shipToDraw.cannons.startY + (position + 0.75) * cannonSpacing, 1,
+                        shipToDraw.cannons.leftWall + 5, shipToDraw.cannons.startY + (position + 0.75) * cannonSpacing, 1,
+                        shipToDraw.cannons.leftWall + 5, shipToDraw.cannons.startY + (position + 0.25) * cannonSpacing, 1
+                    );
+                    shipGeometryData.color.push(
+                        0.75, 0.75, 0.75,
+                        0.75, 0.75, 0.75,
+                        0.75, 0.75, 0.75,
+                        0.75, 0.75, 0.75,
+                    );
+                } else {
+                    shipGeometryData.position.push(
+                        shipToDraw.cannons.rightWall - 5, shipToDraw.cannons.startY + (position + 0.25) * cannonSpacing, 1,
+                        shipToDraw.cannons.rightWall - 5, shipToDraw.cannons.startY + (position + 0.75) * cannonSpacing, 1,
+                        shipToDraw.cannons.rightWall, shipToDraw.cannons.startY + (position + 0.75) * cannonSpacing, 1,
+                        shipToDraw.cannons.rightWall, shipToDraw.cannons.startY + (position + 0.25) * cannonSpacing, 1
+                    );
+                    shipGeometryData.color.push(
+                        0.75, 0.75, 0.75,
+                        0.75, 0.75, 0.75,
+                        0.75, 0.75, 0.75,
+                        0.75, 0.75, 0.75,
+                    );
+                }
+                shipGeometryData.index.push(
+                    startIndex,
+                    startIndex + 1,
+                    startIndex + 2,
+                    startIndex,
+                    startIndex + 2,
+                    startIndex + 3
+                );
+            }
+            shipGeometry.addAttribute("aPosition", shipGeometryData.position, 3);
+            shipGeometry.addAttribute("aColor", shipGeometryData.color, 3);
+            shipGeometry.addIndex(shipGeometryData.index);
+
+            shipGeometryMap[shipType] = shipGeometry;
+        }
+
+        // create material
+        const shipProgram = planetProgram;
+
+        // create ships
+        const shipMeshes: Array<{
+            mesh: PIXI.Mesh<PIXI.Shader>,
+            orientation: Quaternion,
+            rotation: Quaternion
+        }> = [];
+        for (const cell of this.game.generateGoodPoints(100, 10)) {
+            const orientation: Quaternion = Quaternion.fromAxisAngle([0, 0, 1], Math.PI * 2 * Math.random());
+            const rotation: Quaternion = Quaternion.fromAxisAngle([0, 0, 1], Math.PI * 2 / 60 / 10);
+
+            // create mesh
+            const uniforms = {
+                uCameraPosition: cameraPosition.toMatrix4(),
+                uCameraScale: this.game.worldScale,
+                uPosition: Quaternion.fromBetweenVectors([0, 0, 1], cell.centroid).toMatrix4(),
+                uOrientation: orientation.toMatrix4(),
+                uScale: 10 * PHYSICS_SCALE / this.game.worldScale
+            };
+            const shader = new PIXI.Shader(shipProgram, uniforms);
+            const randomShipTypeIndex = Math.floor(Math.random() * 5);
+            const randomShipType = Object.values(EShipType)[randomShipTypeIndex];
+            const mesh = new PIXI.Mesh(shipGeometryMap[randomShipType], shader);
+
+            this.application.stage.addChild(mesh);
+            shipMeshes.push({
+                mesh,
+                orientation,
+                rotation,
+            });
         }
 
         // draw rotating app
         this.application.ticker.add(() => {
             cameraPosition = cameraPosition.clone().mul(Quaternion.fromAxisAngle([1, 0, 0], Math.PI * 2 / 60 / 120));
-            planetOrientation = planetOrientation.clone().mul(planetRotation);
 
             // update each star
             for (const mesh of starMeshes) {
@@ -659,10 +789,21 @@ export class App extends React.Component<IAppProps, IAppState> {
             }
 
             // update each planet
-            for (const mesh of planetMeshes) {
-                const shader = mesh.shader;
+            for (const item of planetMeshes) {
+                item.orientation = item.orientation.clone().mul(item.rotation.clone());
+
+                const shader = item.mesh.shader;
                 shader.uniforms.uCameraPosition = cameraPosition.toMatrix4();
-                shader.uniforms.uOrientation = planetOrientation.toMatrix4();
+                shader.uniforms.uOrientation = item.orientation.toMatrix4();
+            }
+
+            // update each ship
+            for (const item of shipMeshes) {
+                item.orientation = item.orientation.clone().mul(item.rotation.clone());
+
+                const shader = item.mesh.shader;
+                shader.uniforms.uCameraPosition = cameraPosition.toMatrix4();
+                shader.uniforms.uOrientation = item.orientation.toMatrix4();
             }
         });
 
