@@ -574,7 +574,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             const color: [number, number, number] = Math.random() > 0.33 ? [0, 0, 1] : [0, 1, 0];
 
             // initial center index
-            const startingIndex = Math.floor(acc.position.length / 3) + 1;
+            const startingIndex = acc.index.reduce((acc, a) => Math.max(acc, a + 1), 0);
             acc.position.push.apply(acc.position, v.centroid);
             acc.color.push.apply(acc.color, color);
 
@@ -699,7 +699,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             for (let cannonIndex = 0; cannonIndex < shipToDraw.cannons.numCannons; cannonIndex++) {
                 const position = Math.floor(cannonIndex / 2);
                 const isLeftSide = Math.floor(cannonIndex % 2) === 0;
-                const startIndex = Math.floor(shipGeometryData.position.length / 3);
+                const startIndex = shipGeometryData.index.reduce((acc, a) => Math.max(acc, a + 1), 0);
 
                 if (isLeftSide) {
                     shipGeometryData.position.push(
@@ -778,6 +778,68 @@ export class App extends React.Component<IAppProps, IAppState> {
             });
         }
 
+        // create geometry
+        const cannonBallGeometry = new PIXI.Geometry();
+        cannonBallGeometry.addAttribute("aPosition", (new Array(32).fill(0).reduce((acc, v, i) => {
+            acc.push(Math.cos(i * Math.PI * 2 / 32), Math.sin(i * Math.PI * 2 / 32), 0);
+            return acc;
+        }, [0, 0, 0] as number[])), 3);
+        cannonBallGeometry.addIndex((new Array(33).fill(0).reduce((acc, v, i) => {
+            acc.push(0, (i % 32) + 1, ((i + 1) % 32) + 1);
+            return acc;
+        }, [] as number[])));
+
+        // create material
+        const cannonBallVertexShader = `
+            precision mediump float;
+            
+            attribute vec3 aPosition;
+            
+            uniform mat4 uCameraPosition;
+            uniform float uCameraScale;
+            uniform mat4 uPosition;
+            uniform float uScale;
+            
+            void main() {
+                gl_Position = uCameraPosition * uPosition * vec4(aPosition * uScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
+            }
+        `;
+        const cannonBallFragmentShader = `
+            precision mediump float;
+            
+            uniform vec4 uColor;
+            
+            void main() {
+                gl_FragColor = uColor;
+            }
+        `;
+        const cannonBallProgram = new PIXI.Program(cannonBallVertexShader, cannonBallFragmentShader);
+
+        // generate stars
+        const cannonBallMeshes: Array<{mesh: PIXI.Mesh<PIXI.Shader>, position: Quaternion, positionVelocity: Quaternion}> = [];
+        for (let i = 0; i < 300; i++) {
+            const position = Quaternion.fromBetweenVectors([0, 0, 1], DelaunayGraph.randomPoint());
+            const positionVelocity = position.clone().mul(
+                Quaternion.fromBetweenVectors([0, 0, 1], [1, 0, 0]).pow(Game.PROJECTILE_SPEED).mul(
+                    Quaternion.fromAxisAngle([0, 0, 1], Math.random() * 2 * Math.PI)
+                )
+            );
+
+            // create mesh
+            const uniforms = {
+                uCameraPosition: cameraPosition.toMatrix4(),
+                uCameraScale: this.game.worldScale,
+                uPosition: position.toMatrix4(),
+                uColor: [0.75, 0.75, 0.75, 1],
+                uScale: 10 * PHYSICS_SCALE / this.game.worldScale
+            };
+            const shader = new PIXI.Shader(cannonBallProgram, uniforms);
+            const mesh = new PIXI.Mesh(cannonBallGeometry, shader);
+
+            this.application.stage.addChild(mesh);
+            cannonBallMeshes.push({mesh, position, positionVelocity});
+        }
+
         // draw rotating app
         this.application.ticker.add(() => {
             cameraPosition = cameraPosition.clone().mul(Quaternion.fromAxisAngle([1, 0, 0], Math.PI * 2 / 60 / 120));
@@ -804,6 +866,15 @@ export class App extends React.Component<IAppProps, IAppState> {
                 const shader = item.mesh.shader;
                 shader.uniforms.uCameraPosition = cameraPosition.toMatrix4();
                 shader.uniforms.uOrientation = item.orientation.toMatrix4();
+            }
+
+            // update each cannon ball
+            for (const item of cannonBallMeshes) {
+                item.position = item.position.clone().mul(item.positionVelocity.clone().pow(1/60));
+
+                const shader = item.mesh.shader;
+                shader.uniforms.uCameraPosition = cameraPosition.toMatrix4();
+                shader.uniforms.uPosition = item.position.toMatrix4();
             }
         });
 
