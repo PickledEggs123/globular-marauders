@@ -840,6 +840,106 @@ export class App extends React.Component<IAppProps, IAppState> {
             cannonBallMeshes.push({mesh, position, positionVelocity});
         }
 
+        // generate crates
+        const crateGeometry = new PIXI.Geometry();
+        const crateGeometryData: {position: number[], color: number[], index: number[]} = {
+            position: [
+                ...GetHullPoint([0, 0]),
+                ...GetHullPoint([0.1, 0.1]),
+                ...GetHullPoint([0, 1]),
+                ...GetHullPoint([0.1, 0.9]),
+                ...GetHullPoint([1, 0]),
+                ...GetHullPoint([0.9, 0.1]),
+                ...GetHullPoint([1, 1]),
+                ...GetHullPoint([0.9, 0.9]),
+                ...GetHullPoint([0.1, 0.8]),
+                ...GetHullPoint([0.2, 0.9]),
+                ...GetHullPoint([0.8, 0.1]),
+                ...GetHullPoint([0.9, 0.2]),
+
+                ...GetHullPoint([0.1, 0.1]),
+                ...GetHullPoint([0.1, 0.8]),
+                ...GetHullPoint([0.2, 0.9]),
+                ...GetHullPoint([0.9, 0.9]),
+                ...GetHullPoint([0.8, 0.1]),
+                ...GetHullPoint([0.9, 0.2])
+            ].map(i => i * 2 - 1),
+            color: [
+                0.2, 0.2, 0.0,
+                0.2, 0.2, 0.0,
+                0.2, 0.2, 0.0,
+                0.2, 0.2, 0.0,
+                0.2, 0.2, 0.0,
+                0.2, 0.2, 0.0,
+                0.2, 0.2, 0.0,
+                0.2, 0.2, 0.0,
+                0.2, 0.2, 0.0,
+                0.2, 0.2, 0.0,
+                0.2, 0.2, 0.0,
+                0.2, 0.2, 0.0,
+
+                0.5, 0.5, 0.3,
+                0.5, 0.5, 0.3,
+                0.5, 0.5, 0.3,
+                0.5, 0.5, 0.3,
+                0.5, 0.5, 0.3,
+                0.5, 0.5, 0.3,
+            ],
+            index: [
+                0, 1, 2,
+                1, 2, 3,
+                2, 3, 6,
+                3, 6, 7,
+                6, 7, 4,
+                7, 4, 5,
+                4, 5, 0,
+                5, 1, 0,
+
+                3, 9, 8,
+                9, 11, 8,
+                8, 11, 10,
+                10, 11, 5,
+
+                12, 13, 16,
+                15, 17, 14
+            ]
+        };
+        crateGeometry.addAttribute("aPosition", crateGeometryData.position, 3);
+        crateGeometry.addAttribute("aColor", crateGeometryData.color, 3);
+        crateGeometry.addIndex(crateGeometryData.index);
+
+        // create material
+        const crateProgram = planetProgram;
+
+        // create crates
+        const crateMeshes: Array<{
+            mesh: PIXI.Mesh<PIXI.Shader>,
+            orientation: Quaternion,
+            rotation: Quaternion
+        }> = [];
+        for (const cell of this.game.generateGoodPoints(100, 10)) {
+            const orientation: Quaternion = Quaternion.fromAxisAngle([0, 0, 1], Math.PI * 2 * Math.random());
+            const rotation: Quaternion = Quaternion.fromAxisAngle([0, 0, 1], Math.PI * 2 / 60 / 10);
+
+            // create mesh
+            const uniforms = {
+                uCameraPosition: cameraPosition.toMatrix4(),
+                uCameraScale: this.game.worldScale,
+                uPosition: Quaternion.fromBetweenVectors([0, 0, 1], cell.centroid).toMatrix4(),
+                uOrientation: orientation.toMatrix4(),
+                uScale: 300 * PHYSICS_SCALE / this.game.worldScale
+            };
+            const shader = new PIXI.Shader(crateProgram, uniforms);
+            const mesh = new PIXI.Mesh(crateGeometry, shader);
+
+            this.application.stage.addChild(mesh);
+            crateMeshes.push({
+                mesh,
+                orientation,
+                rotation,
+            });
+        }
+
         // draw rotating app
         this.application.ticker.add(() => {
             cameraPosition = cameraPosition.clone().mul(Quaternion.fromAxisAngle([1, 0, 0], Math.PI * 2 / 60 / 120));
@@ -875,6 +975,15 @@ export class App extends React.Component<IAppProps, IAppState> {
                 const shader = item.mesh.shader;
                 shader.uniforms.uCameraPosition = cameraPosition.toMatrix4();
                 shader.uniforms.uPosition = item.position.toMatrix4();
+            }
+
+            // update each crate
+            for (const item of crateMeshes) {
+                item.orientation = item.orientation.clone().mul(item.rotation.clone());
+
+                const shader = item.mesh.shader;
+                shader.uniforms.uCameraPosition = cameraPosition.toMatrix4();
+                shader.uniforms.uOrientation = item.orientation.toMatrix4();
             }
         });
 
