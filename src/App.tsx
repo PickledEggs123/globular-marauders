@@ -908,12 +908,70 @@ export class App extends React.Component<IAppProps, IAppState> {
         crateGeometry.addAttribute("aColor", crateGeometryData.color, 3);
         crateGeometry.addIndex(crateGeometryData.index);
 
+        // create crate image geometry
+        const crateImageGeometry = new PIXI.Geometry();
+        const crateImageGeometryData: {position: number[], uv: number[], index: number[]} = {
+            position: [
+                ...GetHullPoint([0, 0]),
+                ...GetHullPoint([1, 0]),
+                ...GetHullPoint([0, 1]),
+                ...GetHullPoint([1, 1]),
+            ].map(i => i * 2 - 1),
+            uv: [
+                0, 0,
+                1, 0,
+                0, 1,
+                1, 1,
+            ],
+            index: [
+                0, 1, 2,
+                1, 3, 2,
+            ]
+        };
+        crateImageGeometry.addAttribute("aPosition", crateImageGeometryData.position, 3);
+        crateImageGeometry.addAttribute("aUv", crateImageGeometryData.uv, 2);
+        crateImageGeometry.addIndex(crateImageGeometryData.index);
+
         // create material
         const crateProgram = planetProgram;
+
+        // create material
+        const crateImageVertexShader = `
+                precision mediump float;
+                
+                attribute vec3 aPosition;
+                attribute vec2 aUv;
+                
+                uniform mat4 uCameraPosition;
+                uniform float uCameraScale;
+                uniform mat4 uPosition;
+                uniform mat4 uOrientation;
+                uniform float uScale;
+                
+                varying highp vec2 vUv;
+                
+                void main() {
+                    vUv = aUv;
+                    gl_Position = uCameraPosition * uPosition * vec4((uOrientation * vec4(aPosition, 1.0)).xyz * uScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
+                }
+            `;
+        const crateImageFragmentShader = `
+                precision mediump float;
+                
+                uniform sampler2D uSampler;
+                
+                varying highp vec2 vUv;
+                
+                void main() {
+                    gl_FragColor = texture2D(uSampler, vUv);
+                }
+            `;
+        const crateImageProgram = new PIXI.Program(crateImageVertexShader, crateImageFragmentShader);
 
         // create crates
         const crateMeshes: Array<{
             mesh: PIXI.Mesh<PIXI.Shader>,
+            // image: PIXI.Mesh<PIXI.Shader>,
             orientation: Quaternion,
             rotation: Quaternion
         }> = [];
@@ -922,19 +980,31 @@ export class App extends React.Component<IAppProps, IAppState> {
             const rotation: Quaternion = Quaternion.fromAxisAngle([0, 0, 1], Math.PI * 2 / 60 / 10);
 
             // create mesh
-            const uniforms = {
+            const meshUniforms = {
                 uCameraPosition: cameraPosition.toMatrix4(),
                 uCameraScale: this.game.worldScale,
                 uPosition: Quaternion.fromBetweenVectors([0, 0, 1], cell.centroid).toMatrix4(),
                 uOrientation: orientation.toMatrix4(),
                 uScale: 300 * PHYSICS_SCALE / this.game.worldScale
             };
-            const shader = new PIXI.Shader(crateProgram, uniforms);
-            const mesh = new PIXI.Mesh(crateGeometry, shader);
+            const meshShader = new PIXI.Shader(crateProgram, meshUniforms);
+            const mesh = new PIXI.Mesh(crateGeometry, meshShader);
+
+            // // crate texture sprite
+            // const imageUniforms = {
+            //     uCameraPosition: cameraPosition.toMatrix4(),
+            //     uCameraScale: this.game.worldScale,
+            //     uPosition: Quaternion.fromBetweenVectors([0, 0, 1], cell.centroid).toMatrix4(),
+            //     uOrientation: orientation.toMatrix4(),
+            //     uScale: 300 * PHYSICS_SCALE / this.game.worldScale
+            // };
+            // const imageShader = new PIXI.Shader(crateImageProgram, imageUniforms);
+            // const image = new PIXI.Mesh(crateImageGeometry, imageShader);
 
             this.application.stage.addChild(mesh);
             crateMeshes.push({
                 mesh,
+                // image,
                 orientation,
                 rotation,
             });
@@ -981,9 +1051,13 @@ export class App extends React.Component<IAppProps, IAppState> {
             for (const item of crateMeshes) {
                 item.orientation = item.orientation.clone().mul(item.rotation.clone());
 
-                const shader = item.mesh.shader;
-                shader.uniforms.uCameraPosition = cameraPosition.toMatrix4();
-                shader.uniforms.uOrientation = item.orientation.toMatrix4();
+                const meshShader = item.mesh.shader;
+                meshShader.uniforms.uCameraPosition = cameraPosition.toMatrix4();
+                meshShader.uniforms.uOrientation = item.orientation.toMatrix4();
+
+                // const imageShader = item.image.shader;
+                // imageShader.uniforms.uCameraPosition = cameraPosition.toMatrix4();
+                // meshShader.uniforms.uOrientation = item.orientation.toMatrix4();
             }
         });
 
@@ -2875,590 +2949,77 @@ export class App extends React.Component<IAppProps, IAppState> {
         switch (resourceType) {
             case EResourceType.RATION: {
                 return (
-                    <>
-                        <polygon
-                            key={`ration-bar-1-${index}`}
-                            fill="tan"
-                            stroke="brown"
-                            strokeWidth="3"
-                            points="40,40 -40,40 -40,-40 40,-40"
-                        />
-                        <line
-                            key={`ration-line-1-${index}`}
-                            stroke="brown"
-                            strokeWidth="3"
-                            x1={40}
-                            x2={40}
-                            y1={-40}
-                            y2={40}
-                        />
-                        <line
-                            key={`ration-line-2-${index}`}
-                            stroke="brown"
-                            strokeWidth="3"
-                            x1={30}
-                            x2={30}
-                            y1={-40}
-                            y2={40}
-                        />
-                        <line
-                            key={`ration-line-3-${index}`}
-                            stroke="brown"
-                            strokeWidth="3"
-                            x1={20}
-                            x2={20}
-                            y1={-40}
-                            y2={40}
-                        />
-                        <line
-                            key={`ration-line-4-${index}`}
-                            stroke="brown"
-                            strokeWidth="3"
-                            x1={10}
-                            x2={10}
-                            y1={-40}
-                            y2={40}
-                        />
-                        <line
-                            key={`ration-line-5-${index}`}
-                            stroke="brown"
-                            strokeWidth="3"
-                            x1={0}
-                            x2={0}
-                            y1={-40}
-                            y2={40}
-                        />
-                        <line
-                            key={`ration-line-6-${index}`}
-                            stroke="brown"
-                            strokeWidth="3"
-                            x1={-10}
-                            x2={-10}
-                            y1={-40}
-                            y2={40}
-                        />
-                        <line
-                            key={`ration-line-7-${index}`}
-                            stroke="brown"
-                            strokeWidth="3"
-                            x1={-20}
-                            x2={-20}
-                            y1={-40}
-                            y2={40}
-                        />
-                        <line
-                            key={`ration-line-8-${index}`}
-                            stroke="brown"
-                            strokeWidth="3"
-                            x1={-30}
-                            x2={-30}
-                            y1={-40}
-                            y2={40}
-                        />
-                    </>
+                    <img src="images/ration.svg" width={100} height={100} alt="ration"/>
                 );
             }
             case EResourceType.IRON: {
                 return (
-                    <>
-                        <polygon
-                            key={`iron-bar-1-${index}`}
-                            fill="darkgrey"
-                            stroke="grey"
-                            strokeWidth="3"
-                            points="50,50 40,30 10,30 0,50"
-                        />
-                        <polygon
-                            key={`iron-bar-2-${index}`}
-                            fill="darkgrey"
-                            stroke="grey"
-                            strokeWidth="3"
-                            points="-50,50 -40,30 -10,30 0,50"
-                        />
-                        <polygon
-                            key={`iron-bar-3-${index}`}
-                            fill="darkgrey"
-                            stroke="grey"
-                            strokeWidth="3"
-                            points="25,30 15,10 -15,10 -25,30"
-                        />
-                    </>
+                    <img src="images/iron.svg" width={100} height={100} alt="iron"/>
                 );
             }
             case EResourceType.GUNPOWDER: {
                 return (
-                    <>
-                        <polygon
-                            key={`gunpowder-cone-${index}`}
-                            fill="darkgrey"
-                            stroke="grey"
-                            strokeWidth="3"
-                            points="-40,40 0,-40 40,40 30,45 0,50 -30,45"
-                        />
-                    </>
+                    <img src="images/gunpowder.svg" width={100} height={100} alt="gunpowder"/>
                 );
             }
             case EResourceType.FIREARM: {
                 return (
-                    <>
-                        <polygon
-                            key={`firearm-handle-${index}`}
-                            fill="tan"
-                            stroke="brown"
-                            strokeWidth="3"
-                            points="10,-20 40,-20 50,-10 40,10 30,0 30,-10"
-                        />
-                        <rect
-                            key={`firearm-barrel-${index}`}
-                            fill="grey"
-                            stroke="darkgrey"
-                            strokeWidth="3"
-                            x={-20}
-                            y={-20}
-                            width={60}
-                            height={10}
-                        />
-                    </>
+                    <img src="images/firearm.svg" width={100} height={100} alt="firearm"/>
                 );
             }
             case EResourceType.MAHOGANY: {
                 return (
-                    <>
-                        <polygon
-                            key={`mahogany-log-1-${index}`}
-                            fill="tan"
-                            stroke="brown"
-                            strokeWidth="3"
-                            points="-40,-40 40,-40 45,-25 50,0 45,25 40,40 -40,40"
-                        />
-                        <ellipse
-                            key={`mahogany-log-2-${index}`}
-                            fill="tan"
-                            stroke="brown"
-                            strokeWidth="3"
-                            cx={-40}
-                            cy={0}
-                            rx={10}
-                            ry={40}
-                        />
-                    </>
+                    <img src="images/mahogany.svg" width={100} height={100} alt="mahogany"/>
                 );
             }
             case EResourceType.FUR: {
                 return (
-                    <>
-                        <polygon
-                            key={`fur-${index}`}
-                            fill="orange"
-                            stroke="brown"
-                            strokeWidth="3"
-                            points="-40,-40 -30,-50 -20,-40 0,-50 20,-40 30,-50 40,-40 40,50 30,40 20,50 0,40 -20,50 -30,40 -40,50"
-                        />
-                        <line
-                            key={`fur-line-1-${index}`}
-                            stroke="brown"
-                            strokeWidth="3"
-                            x1={-30}
-                            y1={-40}
-                            x2={-30}
-                            y2={30}
-                        />
-                        <line
-                            key={`fur-line-2-${index}`}
-                            stroke="brown"
-                            strokeWidth="3"
-                            x1={30}
-                            y1={-40}
-                            x2={30}
-                            y2={30}
-                        />
-                        <line
-                            key={`fur-line-3-${index}`}
-                            stroke="brown"
-                            strokeWidth="3"
-                            x1={-20}
-                            y1={-30}
-                            x2={-20}
-                            y2={40}
-                        />
-                        <line
-                            key={`fur-line-4-${index}`}
-                            stroke="brown"
-                            strokeWidth="3"
-                            x1={20}
-                            y1={-30}
-                            x2={20}
-                            y2={40}
-                        />
-                        <line
-                            key={`fur-line-5-${index}`}
-                            stroke="brown"
-                            strokeWidth="3"
-                            x1={0}
-                            y1={-40}
-                            x2={0}
-                            y2={30}
-                        />
-                    </>
+                    <img src="images/fur.svg" width={100} height={100} alt="fur"/>
                 );
             }
             case EResourceType.RUBBER: {
                 return (
-                    <>
-                        <polygon
-                            key={`rubber-bowl-${index}`}
-                            fill="tan"
-                            stroke="brown"
-                            strokeWidth="3"
-                            points="-50,-30 50,-30 40,0 30,20, 20,30, 10,35, 0,38 -10,35, -20,30, -30,20, -40,0"
-                        />
-                        <ellipse
-                            key={`rubber-powder-${index}`}
-                            fill="white"
-                            stroke="darkgray"
-                            strokeWidth="3"
-                            cx="0"
-                            cy="-30"
-                            rx="50"
-                            ry="20"
-                        />
-                    </>
+                    <img src="images/rubber.svg" width={100} height={100} alt="rubber"/>
                 );
             }
             case EResourceType.CACAO: {
                 return (
-                    <>
-                        <polygon
-                            key={`cacao-bowl-${index}`}
-                            fill="grey"
-                            stroke="darkgray"
-                            strokeWidth="3"
-                            points="-50,-30 50,-30 40,0 30,20, 20,30, 10,35, 0,38 -10,35, -20,30, -30,20, -40,0"
-                        />
-                        <ellipse
-                            key={`cacao-powder-${index}`}
-                            fill="brown"
-                            stroke="darkgray"
-                            strokeWidth="3"
-                            cx="0"
-                            cy="-30"
-                            rx="50"
-                            ry="20"
-                        />
-                    </>
+                    <img src="images/cacao.svg" width={100} height={100} alt="cacao"/>
                 );
             }
             case EResourceType.COFFEE: {
-                const coffeeBeanLocations: Array<{x: number, y: number}> = [{
-                    x: -30, y: 40
-                }, {
-                    x: -10, y: 40
-                }, {
-                    x: 10, y: 40
-                }, {
-                    x: 30, y: 40
-                }, {
-                    x: -20, y: 20
-                }, {
-                    x: 0, y: 20
-                }, {
-                    x: 20, y: 20
-                }, {
-                    x: -10, y: 0
-                }, {
-                    x: 10, y: 0
-                }, {
-                    x: 0, y: -20
-                }]
-                return coffeeBeanLocations.map(({x, y}, beanIndex) => (
-                    <>
-                        <ellipse
-                            key={`coffee-beans-${beanIndex}-${index}`}
-                            fill="brown"
-                            stroke="#330C00"
-                            strokeWidth="3"
-                            cx={x}
-                            cy={y}
-                            rx="20"
-                            ry="10"
-                        />
-                        <line
-                            key={`coffee-beans-${beanIndex}-line-${index}`}
-                            stroke="#330C00"
-                            strokeWidth="3"
-                            x1={x - 20}
-                            x2={x + 20}
-                            y1={y}
-                            y2={y}
-                        />
-                    </>
-                ));
+                return (
+                    <img src="images/coffee.svg" width={100} height={100} alt="coffee"/>
+                );
             }
             case EResourceType.RUM: {
                 return (
-                    <>
-                        <polygon
-                            key={`rum-bottle-${index}`}
-                            fill="maroon"
-                            stroke="#330C00"
-                            strokeWidth="3"
-                            points="-10,-40 10,-40 10,-20 20,-15 30,-10 30,50 -30,50 -30,-10 -20,-15 -10,-20"
-                        />
-                        <polygon
-                            key={`rum-bottle-label-${index}`}
-                            fill="tan"
-                            stroke="#330C00"
-                            strokeWidth="3"
-                            points="30,-10 30,20 -30,20 -30,-10"
-                        />
-                        <text
-                            key={`rum-bottle-text-${index}`}
-                            stroke="#330C00"
-                            strokeWidth="3"
-                            textAnchor="middle"
-                            x={0}
-                            y={10}
-                        >XXX</text>
-                    </>
+                    <img src="images/rum.svg" width={100} height={100} alt="rum"/>
                 );
             }
             case EResourceType.MOLASSES: {
                 return (
-                    <>
-                        <polygon
-                            key={`molasses-jar-${index}`}
-                            fill="maroon"
-                            stroke="#330C00"
-                            strokeWidth="3"
-                            points="-30,-40 30,-40 30,40 20,45 0,50 -20,45 -30,40"
-                        />
-                        <ellipse
-                            key={`molasses-jar-lid-${index}`}
-                            fill="grey"
-                            stroke="darkgrey"
-                            strokeWidth="3"
-                            cx={0}
-                            cy={-40}
-                            rx={30}
-                            ry={10}
-                        />
-                    </>
+                    <img src="images/molasses.svg" width={100} height={100} alt="molasses"/>
                 );
             }
             case EResourceType.COTTON: {
                 return (
-                    <>
-                        <polyline
-                            key={`cotton-stem-1-${index}`}
-                            stroke="brown"
-                            strokeWidth="3"
-                            points="-30,-30 50,50"
-                        />
-                        <polyline
-                            key={`cotton-stem-2-${index}`}
-                            stroke="brown"
-                            strokeWidth="3"
-                            points="-30,20 20,20"
-                        />
-                        <ellipse
-                            key={`cotton-leaf-1-${index}`}
-                            fill="green"
-                            stroke="darkgreen"
-                            strokeWidth="3"
-                            cx={20}
-                            cy={0}
-                            rx={20}
-                            ry={10}
-                        />
-                        <ellipse
-                            key={`cotton-leaf-2-${index}`}
-                            fill="green"
-                            stroke="darkgreen"
-                            strokeWidth="3"
-                            cx={-20}
-                            cy={0}
-                            rx={25}
-                            ry={10}
-                        />
-                        <circle
-                            key={`cotton-1-${index}`}
-                            fill="white"
-                            stroke="grey"
-                            strokeWidth="3"
-                            cx={-30}
-                            cy={-30}
-                            r={20}
-                        />
-                        <circle
-                            key={`cotton-2-${index}`}
-                            fill="white"
-                            stroke="grey"
-                            strokeWidth="3"
-                            cx={-10}
-                            cy={0}
-                            r={10}
-                        />
-                        <circle
-                            key={`cotton-2-${index}`}
-                            fill="white"
-                            stroke="grey"
-                            strokeWidth="3"
-                            cx={-15}
-                            cy={-20}
-                            r={15}
-                        />
-                        <circle
-                            key={`cotton-2-${index}`}
-                            fill="white"
-                            stroke="grey"
-                            strokeWidth="3"
-                            cx={-25}
-                            cy={20}
-                            r={15}
-                        />
-                    </>
+                    <img src="images/cotton.svg" width={100} height={100} alt="cotton"/>
                 );
             }
             case EResourceType.FLAX: {
                 return (
-                    <>
-                        <polyline
-                            key={`flax-stem-1-${index}`}
-                            stroke="green"
-                            strokeWidth="3"
-                            points="0,-50 0,50"
-                        />
-                        <polyline
-                            key={`flax-stem-2-${index}`}
-                            stroke="green"
-                            strokeWidth="3"
-                            points="10,-40 0,50"
-                        />
-                        <polyline
-                            key={`flax-stem-3-${index}`}
-                            stroke="green"
-                            strokeWidth="3"
-                            points="-10,-40 0,50"
-                        />
-                        <polyline
-                            key={`flax-stem-4-${index}`}
-                            stroke="green"
-                            strokeWidth="3"
-                            points="20,-35 0,50"
-                        />
-                        <polyline
-                            key={`flax-stem-5-${index}`}
-                            stroke="green"
-                            strokeWidth="3"
-                            points="-20,-35 0,50"
-                        />
-                    </>
+                    <img src="images/flax.svg" width={100} height={100} alt="flax"/>
                 );
             }
             case EResourceType.TOBACCO: {
                 return (
-                    <>
-                        <polyline
-                            key={`tobacco-stem-1-${index}`}
-                            stroke="green"
-                            strokeWidth="3"
-                            points="0,-50 0,50"
-                        />
-                        <ellipse
-                            key={`tobacco-leaf-1-${index}`}
-                            fill="green"
-                            stroke="darkgreen"
-                            strokeWidth="3"
-                            cx={-25}
-                            cy={40}
-                            rx={25}
-                            ry={10}
-                        />
-                        <ellipse
-                            key={`tobacco-leaf-2-${index}`}
-                            fill="green"
-                            stroke="darkgreen"
-                            strokeWidth="3"
-                            cx={25}
-                            cy={40}
-                            rx={25}
-                            ry={10}
-                        />
-                        <ellipse
-                            key={`tobacco-leaf-3-${index}`}
-                            fill="green"
-                            stroke="darkgreen"
-                            strokeWidth="3"
-                            cx={20}
-                            cy={10}
-                            rx={20}
-                            ry={10}
-                        />
-                        <ellipse
-                            key={`tobacco-leaf-4-${index}`}
-                            fill="green"
-                            stroke="darkgreen"
-                            strokeWidth="3"
-                            cx={-20}
-                            cy={10}
-                            rx={20}
-                            ry={10}
-                        />
-                        <ellipse
-                            key={`tobacco-leaf-5-${index}`}
-                            fill="green"
-                            stroke="darkgreen"
-                            strokeWidth="3"
-                            cx={-15}
-                            cy={-20}
-                            rx={15}
-                            ry={10}
-                        />
-                        <ellipse
-                            key={`tobacco-leaf-6-${index}`}
-                            fill="green"
-                            stroke="darkgreen"
-                            strokeWidth="3"
-                            cx={15}
-                            cy={-20}
-                            rx={15}
-                            ry={10}
-                        />
-                    </>
+                    <img src="images/tobacco.svg" width={100} height={100} alt="tobacco"/>
                 );
             }
             default: {
                 return (
-                    <>
-                        <rect
-                            key={`item-rect-${index}`}
-                            fill="white"
-                            stroke="red"
-                            strokeWidth="5"
-                            x={-50}
-                            y={-50}
-                            width="100"
-                            height="100"
-                        />
-                        <line
-                            key={`item-line-1-${index}`}
-                            stroke="red"
-                            strokeWidth="5"
-                            x1={-50}
-                            x2={50}
-                            y1={-50}
-                            y2={50}
-                        />
-                        <line
-                            key={`item-line-2-${index}`}
-                            stroke="red"
-                            strokeWidth="5"
-                            x1={-50}
-                            x2={50}
-                            y1={50}
-                            y2={-50}
-                        />
-                    </>
+                    <img src="images/no_image.svg" width={100} height={100} alt="missing"/>
                 );
             }
         }
@@ -3618,16 +3179,13 @@ export class App extends React.Component<IAppProps, IAppState> {
                             {
                                 ITEM_DATA.map(item => {
                                     return (
-                                        <svg key={`show-item-${item.resourceType}`} width="100" height="100">
-                                            <g transform="translate(50, 50)">
-                                                {
-                                                    this.renderItem(item.resourceType)
-                                                }
-                                                {
-                                                    <text textAnchor="middle">{item.resourceType}</text>
-                                                }
-                                            </g>
-                                        </svg>
+                                        <div key={`show-item-${item.resourceType}`} style={{display: "inline-block"}}>
+                                            {
+                                                this.renderItem(item.resourceType)
+                                            }
+                                            <br/>
+                                            {item.resourceType}
+                                        </div>
                                     );
                                 })
                             }

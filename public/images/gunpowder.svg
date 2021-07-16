@@ -1,0 +1,8 @@
+<svg viewBox="-50 -50 100 100" fill="transparent" xmlns="http://www.w3.org/2000/svg">
+    <polygon
+    fill="darkgrey"
+    stroke="grey"
+    stroke-width="3"
+    points="-40,40 0,-40 40,40 30,45 0,50 -30,45"
+    />
+</svg>

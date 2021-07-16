@@ -1,0 +1,21 @@
+<svg viewBox="-50 -50 100 100" fill="transparent" xmlns="http://www.w3.org/2000/svg">
+    <polygon
+    fill="maroon"
+    stroke="#330C00"
+    stroke-width="3"
+    points="-10,-40 10,-40 10,-20 20,-15 30,-10 30,50 -30,50 -30,-10 -20,-15 -10,-20"
+    />
+    <polygon
+    fill="tan"
+    stroke="#330C00"
+    stroke-width="3"
+    points="30,0 30,30 -30,30 -30,00"
+    />
+    <text
+    stroke="#330C00"
+    stroke-width="3"
+    text-anchor="middle"
+    x="0"
+    y="20"
+    >R U M</text>
+</svg>

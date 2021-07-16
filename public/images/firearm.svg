@@ -1,0 +1,17 @@
+<svg viewBox="-50 -50 100 100" fill="transparent" xmlns="http://www.w3.org/2000/svg">
+    <rect
+            fill="grey"
+            stroke="darkgrey"
+            stroke-width="3"
+            x="-40"
+            y="-20"
+            width="70"
+            height="10"
+    />
+    <polygon
+    fill="tan"
+    stroke="brown"
+    stroke-width="3"
+    points="10,-20 40,-20 40,-20 50,10 30,0 30,-10"
+    />
+</svg>

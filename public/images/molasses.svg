@@ -1,0 +1,17 @@
+<svg viewBox="-50 -50 100 100" fill="transparent" xmlns="http://www.w3.org/2000/svg">
+    <polygon
+    fill="maroon"
+    stroke="#330C00"
+    stroke-width="3"
+    points="-30,-40 30,-40 30,40 20,45 0,50 -20,45 -30,40"
+    />
+    <ellipse
+    fill="grey"
+    stroke="darkgrey"
+    stroke-width="3"
+    cx="0"
+    cy="-40"
+    rx="30"
+    ry="10"
+    />
+</svg>
