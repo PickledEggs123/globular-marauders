@@ -18,7 +18,6 @@ import {
     CorvetteHull,
     EFaction,
     EShipType,
-    IShipData,
     PHYSICS_SCALE,
     Ship,
     SHIP_DATA
@@ -350,6 +349,78 @@ enum EVoronoiMode {
     DUCHY = "DUCHY",
     COUNTY = "COUNTY"
 }
+
+/**
+ * An object which contains a texture match for a resource type.
+ */
+interface IResourceTypeTexturePair {
+    resourceType: EResourceType | null;
+    name: string;
+    url: string;
+}
+const RESOURCE_TYPE_TEXTURE_PAIRS: IResourceTypeTexturePair[] = [{
+    resourceType: EResourceType.RUM,
+    name: "rum",
+    url: "images/rum.svg"
+}, {
+    resourceType: EResourceType.RATION,
+    name: "ration",
+    url:"images/ration.svg"
+}, {
+    resourceType: EResourceType.IRON,
+    name: "iron",
+    url:"images/iron.svg"
+}, {
+    resourceType: EResourceType.GUNPOWDER,
+    name: "gunpowder",
+    url:"images/gunpowder.svg"
+}, {
+    resourceType: EResourceType.FIREARM,
+    name: "firearm",
+    url:"images/firearm.svg"
+}, {
+    resourceType: EResourceType.MAHOGANY,
+    name: "mahogany",
+    url:"images/mahogany.svg"
+}, {
+    resourceType: EResourceType.FUR,
+    name: "fur",
+    url:"images/fur.svg"
+}, {
+    resourceType: EResourceType.RUBBER,
+    name: "rubber",
+    url:"images/rubber.svg"
+}, {
+    resourceType: EResourceType.CACAO,
+    name: "cacao",
+    url:"images/cacao.svg"
+}, {
+    resourceType: EResourceType.COFFEE,
+    name: "coffee",
+    url:"images/coffee.svg"
+}, {
+    resourceType: EResourceType.RUM,
+    name: "rum",
+    url:"images/rum.svg"
+}, {
+    resourceType: EResourceType.MOLASSES,
+    name: "molasses",
+    url:"images/molasses.svg"
+}, {
+    resourceType: EResourceType.COTTON,
+    name: "cotton",
+    url:"images/cotton.svg"
+}, {
+    resourceType: EResourceType.FLAX,
+    name: "flax",
+    url:"images/flax.svg"
+}, {
+    resourceType: EResourceType.TOBACCO,
+    name: "tobacco",
+    url:"images/tobacco.svg"
+}];
+
+const DEFAULT_IMAGE: string = "images/no_image.svg";
 
 /**
  * The input parameters of the app.
@@ -971,44 +1042,78 @@ export class App extends React.Component<IAppProps, IAppState> {
         // create crates
         const crateMeshes: Array<{
             mesh: PIXI.Mesh<PIXI.Shader>,
-            // image: PIXI.Mesh<PIXI.Shader>,
+            image: PIXI.Mesh<PIXI.Shader>,
             orientation: Quaternion,
-            rotation: Quaternion
+            rotation: Quaternion,
+            resourceType: EResourceType
         }> = [];
-        for (const cell of this.game.generateGoodPoints(100, 10)) {
-            const orientation: Quaternion = Quaternion.fromAxisAngle([0, 0, 1], Math.PI * 2 * Math.random());
-            const rotation: Quaternion = Quaternion.fromAxisAngle([0, 0, 1], Math.PI * 2 / 60 / 10);
 
-            // create mesh
-            const meshUniforms = {
-                uCameraPosition: cameraPosition.toMatrix4(),
-                uCameraScale: this.game.worldScale,
-                uPosition: Quaternion.fromBetweenVectors([0, 0, 1], cell.centroid).toMatrix4(),
-                uOrientation: orientation.toMatrix4(),
-                uScale: 300 * PHYSICS_SCALE / this.game.worldScale
-            };
-            const meshShader = new PIXI.Shader(crateProgram, meshUniforms);
-            const mesh = new PIXI.Mesh(crateGeometry, meshShader);
+        // load sprites into memory
+        const loader = new PIXI.Loader();
+        const sprites: Record<string, PIXI.Texture> = {};
 
-            // // crate texture sprite
-            // const imageUniforms = {
-            //     uCameraPosition: cameraPosition.toMatrix4(),
-            //     uCameraScale: this.game.worldScale,
-            //     uPosition: Quaternion.fromBetweenVectors([0, 0, 1], cell.centroid).toMatrix4(),
-            //     uOrientation: orientation.toMatrix4(),
-            //     uScale: 300 * PHYSICS_SCALE / this.game.worldScale
-            // };
-            // const imageShader = new PIXI.Shader(crateImageProgram, imageUniforms);
-            // const image = new PIXI.Mesh(crateImageGeometry, imageShader);
-
-            this.application.stage.addChild(mesh);
-            crateMeshes.push({
-                mesh,
-                // image,
-                orientation,
-                rotation,
-            });
+        // queue images to be loaded
+        loader.add("missing", DEFAULT_IMAGE);
+        for (const resourceType of Object.values(EResourceType)) {
+            const item = RESOURCE_TYPE_TEXTURE_PAIRS.find(i => i.resourceType === resourceType);
+            if (item) {
+                loader.add(item.name, item.url);
+            }
         }
+        loader.load((loader, resources) => {
+            // load images into cache
+            for (const resourceType of Object.values(EResourceType)) {
+                const resourceTypeTextureItem = RESOURCE_TYPE_TEXTURE_PAIRS.find(i => i.resourceType === resourceType);
+                const textureName = resourceTypeTextureItem ? resourceTypeTextureItem.name : "missing";
+                const item = resources[textureName];
+                if (item) {
+                    sprites[resourceType] = item.texture;
+                } else {
+                    sprites[resourceType] = resources.missing.texture;
+                }
+            }
+            console.log("A", sprites);
+
+            // create crates
+            for (const cell of this.game.generateGoodPoints(100, 10)) {
+                const orientation: Quaternion = Quaternion.fromAxisAngle([0, 0, 1], Math.PI * 2 * Math.random());
+                const rotation: Quaternion = Quaternion.fromAxisAngle([0, 0, 1], Math.PI * 2 / 60 / 10);
+                const resourceType = Object.values(EResourceType)[Math.floor(Object.values(EResourceType).length * Math.random())];
+
+                // create mesh
+                const meshUniforms = {
+                    uCameraPosition: cameraPosition.toMatrix4(),
+                    uCameraScale: this.game.worldScale,
+                    uPosition: Quaternion.fromBetweenVectors([0, 0, 1], cell.centroid).toMatrix4(),
+                    uOrientation: orientation.toMatrix4(),
+                    uScale: 300 * PHYSICS_SCALE / this.game.worldScale
+                };
+                const meshShader = new PIXI.Shader(crateProgram, meshUniforms);
+                const mesh = new PIXI.Mesh(crateGeometry, meshShader);
+
+                // crate texture sprite
+                const imageUniforms = {
+                    uCameraPosition: cameraPosition.toMatrix4(),
+                    uCameraScale: this.game.worldScale,
+                    uPosition: Quaternion.fromBetweenVectors([0, 0, 1], cell.centroid).toMatrix4(),
+                    uOrientation: orientation.toMatrix4(),
+                    uScale: 100 * PHYSICS_SCALE / this.game.worldScale,
+                    uSampler: sprites[resourceType]
+                };
+                const imageShader = new PIXI.Shader(crateImageProgram, imageUniforms);
+                const image = new PIXI.Mesh(crateImageGeometry, imageShader);
+
+                this.application.stage.addChild(mesh);
+                this.application.stage.addChild(image);
+                crateMeshes.push({
+                    mesh,
+                    image,
+                    orientation,
+                    rotation,
+                    resourceType,
+                });
+            }
+        });
 
         // draw rotating app
         this.application.ticker.add(() => {
@@ -1055,9 +1160,9 @@ export class App extends React.Component<IAppProps, IAppState> {
                 meshShader.uniforms.uCameraPosition = cameraPosition.toMatrix4();
                 meshShader.uniforms.uOrientation = item.orientation.toMatrix4();
 
-                // const imageShader = item.image.shader;
-                // imageShader.uniforms.uCameraPosition = cameraPosition.toMatrix4();
-                // meshShader.uniforms.uOrientation = item.orientation.toMatrix4();
+                const imageShader = item.image.shader;
+                imageShader.uniforms.uCameraPosition = cameraPosition.toMatrix4();
+                imageShader.uniforms.uOrientation = item.orientation.toMatrix4();
             }
         });
 
@@ -2946,82 +3051,11 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     renderItem(resourceType: EResourceType, index: number = 0) {
-        switch (resourceType) {
-            case EResourceType.RATION: {
-                return (
-                    <img src="images/ration.svg" width={100} height={100} alt="ration"/>
-                );
-            }
-            case EResourceType.IRON: {
-                return (
-                    <img src="images/iron.svg" width={100} height={100} alt="iron"/>
-                );
-            }
-            case EResourceType.GUNPOWDER: {
-                return (
-                    <img src="images/gunpowder.svg" width={100} height={100} alt="gunpowder"/>
-                );
-            }
-            case EResourceType.FIREARM: {
-                return (
-                    <img src="images/firearm.svg" width={100} height={100} alt="firearm"/>
-                );
-            }
-            case EResourceType.MAHOGANY: {
-                return (
-                    <img src="images/mahogany.svg" width={100} height={100} alt="mahogany"/>
-                );
-            }
-            case EResourceType.FUR: {
-                return (
-                    <img src="images/fur.svg" width={100} height={100} alt="fur"/>
-                );
-            }
-            case EResourceType.RUBBER: {
-                return (
-                    <img src="images/rubber.svg" width={100} height={100} alt="rubber"/>
-                );
-            }
-            case EResourceType.CACAO: {
-                return (
-                    <img src="images/cacao.svg" width={100} height={100} alt="cacao"/>
-                );
-            }
-            case EResourceType.COFFEE: {
-                return (
-                    <img src="images/coffee.svg" width={100} height={100} alt="coffee"/>
-                );
-            }
-            case EResourceType.RUM: {
-                return (
-                    <img src="images/rum.svg" width={100} height={100} alt="rum"/>
-                );
-            }
-            case EResourceType.MOLASSES: {
-                return (
-                    <img src="images/molasses.svg" width={100} height={100} alt="molasses"/>
-                );
-            }
-            case EResourceType.COTTON: {
-                return (
-                    <img src="images/cotton.svg" width={100} height={100} alt="cotton"/>
-                );
-            }
-            case EResourceType.FLAX: {
-                return (
-                    <img src="images/flax.svg" width={100} height={100} alt="flax"/>
-                );
-            }
-            case EResourceType.TOBACCO: {
-                return (
-                    <img src="images/tobacco.svg" width={100} height={100} alt="tobacco"/>
-                );
-            }
-            default: {
-                return (
-                    <img src="images/no_image.svg" width={100} height={100} alt="missing"/>
-                );
-            }
+        const item = RESOURCE_TYPE_TEXTURE_PAIRS.find(i => i.resourceType === resourceType);
+        if (item) {
+            return <img src={item.url} width={100} height={100} alt={item.name}/>;
+        } else {
+            return <img src={DEFAULT_IMAGE} width={100} height={100} alt="missing"/>;
         }
     }
 
