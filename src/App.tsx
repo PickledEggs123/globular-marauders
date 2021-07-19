@@ -624,7 +624,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         for (const star of Array.from(this.game.voronoiTerrain.getStars())) {
             // create mesh
             const uniforms = {
-                uCameraPosition: cameraPosition.toMatrix4(),
+                uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
                 uCameraScale: this.game.worldScale,
                 uPosition: star.position.toMatrix4(),
                 uColor: hexToRgb(star.color),
@@ -712,7 +712,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
             // create mesh
             const uniforms = {
-                uCameraPosition: cameraPosition.toMatrix4(),
+                uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
                 uCameraScale: this.game.worldScale,
                 uPosition: planet.position.toMatrix4(),
                 uOrientation: orientation.toMatrix4(),
@@ -821,18 +821,21 @@ export class App extends React.Component<IAppProps, IAppState> {
         // create ships
         const shipMeshes: Array<{
             mesh: PIXI.Mesh<PIXI.Shader>,
+            text: PIXI.Text,
+            position: Quaternion,
             orientation: Quaternion,
             rotation: Quaternion
         }> = [];
         for (const cell of this.game.generateGoodPoints(100, 10)) {
+            const position: Quaternion = Quaternion.fromBetweenVectors([0, 0, 1], cell.centroid);
             const orientation: Quaternion = Quaternion.fromAxisAngle([0, 0, 1], Math.PI * 2 * Math.random());
             const rotation: Quaternion = Quaternion.fromAxisAngle([0, 0, 1], Math.PI * 2 / 60 / 10);
 
             // create mesh
             const uniforms = {
-                uCameraPosition: cameraPosition.toMatrix4(),
+                uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
                 uCameraScale: this.game.worldScale,
-                uPosition: Quaternion.fromBetweenVectors([0, 0, 1], cell.centroid).toMatrix4(),
+                uPosition: position.toMatrix4(),
                 uOrientation: orientation.toMatrix4(),
                 uScale: 10 * PHYSICS_SCALE / this.game.worldScale
             };
@@ -841,9 +844,16 @@ export class App extends React.Component<IAppProps, IAppState> {
             const randomShipType = Object.values(EShipType)[randomShipTypeIndex];
             const mesh = new PIXI.Mesh(shipGeometryMap[randomShipType], shader);
 
+            const text = new PIXI.Text(randomShipType);
+            text.style.fill = "white";
+            text.style.fontSize = 15;
+
             this.application.stage.addChild(mesh);
+            this.application.stage.addChild(text);
             shipMeshes.push({
                 mesh,
+                text,
+                position,
                 orientation,
                 rotation,
             });
@@ -898,7 +908,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
             // create mesh
             const uniforms = {
-                uCameraPosition: cameraPosition.toMatrix4(),
+                uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
                 uCameraScale: this.game.worldScale,
                 uPosition: position.toMatrix4(),
                 uColor: [0.75, 0.75, 0.75, 1],
@@ -1043,6 +1053,8 @@ export class App extends React.Component<IAppProps, IAppState> {
         const crateMeshes: Array<{
             mesh: PIXI.Mesh<PIXI.Shader>,
             image: PIXI.Mesh<PIXI.Shader>,
+            text: PIXI.Text,
+            position: Quaternion,
             orientation: Quaternion,
             rotation: Quaternion,
             resourceType: EResourceType
@@ -1072,19 +1084,19 @@ export class App extends React.Component<IAppProps, IAppState> {
                     sprites[resourceType] = resources.missing.texture;
                 }
             }
-            console.log("A", sprites);
 
             // create crates
             for (const cell of this.game.generateGoodPoints(100, 10)) {
+                const position: Quaternion = Quaternion.fromBetweenVectors([0, 0, 1], cell.centroid);
                 const orientation: Quaternion = Quaternion.fromAxisAngle([0, 0, 1], Math.PI * 2 * Math.random());
                 const rotation: Quaternion = Quaternion.fromAxisAngle([0, 0, 1], Math.PI * 2 / 60 / 10);
                 const resourceType = Object.values(EResourceType)[Math.floor(Object.values(EResourceType).length * Math.random())];
 
                 // create mesh
                 const meshUniforms = {
-                    uCameraPosition: cameraPosition.toMatrix4(),
+                    uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
                     uCameraScale: this.game.worldScale,
-                    uPosition: Quaternion.fromBetweenVectors([0, 0, 1], cell.centroid).toMatrix4(),
+                    uPosition: position.toMatrix4(),
                     uOrientation: orientation.toMatrix4(),
                     uScale: 300 * PHYSICS_SCALE / this.game.worldScale
                 };
@@ -1093,7 +1105,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
                 // crate texture sprite
                 const imageUniforms = {
-                    uCameraPosition: cameraPosition.toMatrix4(),
+                    uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
                     uCameraScale: this.game.worldScale,
                     uPosition: Quaternion.fromBetweenVectors([0, 0, 1], cell.centroid).toMatrix4(),
                     uOrientation: orientation.toMatrix4(),
@@ -1103,17 +1115,46 @@ export class App extends React.Component<IAppProps, IAppState> {
                 const imageShader = new PIXI.Shader(crateImageProgram, imageUniforms);
                 const image = new PIXI.Mesh(crateImageGeometry, imageShader);
 
+                const text = new PIXI.Text(resourceType);
+                text.style.fill = "white";
+                text.style.fontSize = 12;
+
                 this.application.stage.addChild(mesh);
                 this.application.stage.addChild(image);
+                this.application.stage.addChild(text);
                 crateMeshes.push({
                     mesh,
                     image,
+                    text,
+                    position,
                     orientation,
                     rotation,
                     resourceType,
                 });
             }
         });
+
+        const handleDrawingOfText = (text: PIXI.Text, position: Quaternion) => {
+            const textPosition = cameraPosition.clone().inverse().mul(position.clone()).rotateVector([0, 0, 1]);
+            text.x = ((-textPosition[0] * this.game.worldScale) / 2 + 0.5) * this.application.renderer.width;
+            text.y = ((textPosition[1] * this.game.worldScale) / 2 + 0.5) * this.application.renderer.height;
+            const center: [number, number] = [
+                this.application.renderer.width / 2,
+                this.application.renderer.height / 2
+            ];
+            const directionTowardsCenter: [number, number] = [
+                center[0] - text.x,
+                center[1] - text.y
+            ];
+            const directionTowardsCenterLength = Math.sqrt(Math.pow(directionTowardsCenter[0], 2) + Math.pow(directionTowardsCenter[1], 2));
+            const normalizedDirectionTowardsCenter: [number, number] = [
+                directionTowardsCenter[0] / directionTowardsCenterLength,
+                directionTowardsCenter[1] / directionTowardsCenterLength
+            ];
+            text.x += normalizedDirectionTowardsCenter[0] * 25;
+            text.y += normalizedDirectionTowardsCenter[1] * 25;
+            text.visible = textPosition[2] > 0;
+        }
 
         // draw rotating app
         this.application.ticker.add(() => {
@@ -1122,7 +1163,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             // update each star
             for (const mesh of starMeshes) {
                 const shader = mesh.shader;
-                shader.uniforms.uCameraPosition = cameraPosition.toMatrix4();
+                shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
             }
 
             // update each planet
@@ -1130,7 +1171,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 item.orientation = item.orientation.clone().mul(item.rotation.clone());
 
                 const shader = item.mesh.shader;
-                shader.uniforms.uCameraPosition = cameraPosition.toMatrix4();
+                shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
                 shader.uniforms.uOrientation = item.orientation.toMatrix4();
             }
 
@@ -1139,8 +1180,10 @@ export class App extends React.Component<IAppProps, IAppState> {
                 item.orientation = item.orientation.clone().mul(item.rotation.clone());
 
                 const shader = item.mesh.shader;
-                shader.uniforms.uCameraPosition = cameraPosition.toMatrix4();
+                shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
                 shader.uniforms.uOrientation = item.orientation.toMatrix4();
+
+                handleDrawingOfText(item.text, item.position);
             }
 
             // update each cannon ball
@@ -1148,7 +1191,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 item.position = item.position.clone().mul(item.positionVelocity.clone().pow(1/60));
 
                 const shader = item.mesh.shader;
-                shader.uniforms.uCameraPosition = cameraPosition.toMatrix4();
+                shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
                 shader.uniforms.uPosition = item.position.toMatrix4();
             }
 
@@ -1157,12 +1200,14 @@ export class App extends React.Component<IAppProps, IAppState> {
                 item.orientation = item.orientation.clone().mul(item.rotation.clone());
 
                 const meshShader = item.mesh.shader;
-                meshShader.uniforms.uCameraPosition = cameraPosition.toMatrix4();
+                meshShader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
                 meshShader.uniforms.uOrientation = item.orientation.toMatrix4();
 
                 const imageShader = item.image.shader;
-                imageShader.uniforms.uCameraPosition = cameraPosition.toMatrix4();
+                imageShader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
                 imageShader.uniforms.uOrientation = item.orientation.toMatrix4();
+
+                handleDrawingOfText(item.text, item.position);
             }
         });
 
