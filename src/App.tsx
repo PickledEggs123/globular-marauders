@@ -30,8 +30,14 @@ import {
     VoronoiCell,
     VoronoiGraph
 } from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
-import {EBuildingType, Manufactory, Planet, Plantation} from "@pickledeggs123/globular-marauders-game/lib/src/Planet";
 import {
+    EBuildingType,
+    Manufactory,
+    Planet,
+    Plantation, Star
+} from "@pickledeggs123/globular-marauders-game/lib/src/Planet";
+import {
+    CannonBall,
     Crate,
     DeserializeQuaternion,
     SerializeQuaternion,
@@ -559,29 +565,26 @@ export class App extends React.Component<IAppProps, IAppState> {
     // pixi.js renderer
     public application: PIXI.Application;
 
-    constructor(props: IAppProps) {
-        super(props);
+    GetHullPoint = ([x, y]: [number, number]): [number, number, number] => {
+        const z = Math.sqrt(1 -
+            Math.pow(x * PHYSICS_SCALE / this.game.worldScale, 2) -
+            Math.pow(y * PHYSICS_SCALE / this.game.worldScale, 2)
+        );
+        return [x, y, z];
+    };
+    hexToRgb = (hex: string): [number, number, number, number] => {
+        if (hex === "red") return [1, 0, 0, 1];
+        if (hex === "yellow") return [1, 1, 0, 1];
+        if (hex === "blue") return [0, 0, 1, 1];
+        return [
+            parseInt(hex.slice(1, 3), 16) / 255,
+            parseInt(hex.slice(3, 5), 16) / 255,
+            parseInt(hex.slice(5, 7), 16) / 255,
+            1
+        ];
+    };
 
-        // setup rendering
-        this.application = new PIXI.Application();
-
-        // draw app
-        this.game.initializeGame();
-
-        // draw rotating app
-        let cameraPosition: Quaternion = Quaternion.ONE;
-        const hexToRgb = (hex: string): [number, number, number, number] => {
-            if (hex === "red") return [1, 0, 0, 1];
-            if (hex === "yellow") return [1, 1, 0, 1];
-            if (hex === "blue") return [0, 0, 1, 1];
-            return [
-                parseInt(hex.slice(1, 3), 16) / 255,
-                parseInt(hex.slice(3, 5), 16) / 255,
-                parseInt(hex.slice(5, 7), 16) / 255,
-                1
-            ];
-        };
-
+    pixiStarResources = (() => {
         // create geometry
         const starGeometry = new PIXI.Geometry();
         starGeometry.addAttribute("aPosition", (new Array(32).fill(0).reduce((acc, v, i) => {
@@ -619,24 +622,13 @@ export class App extends React.Component<IAppProps, IAppState> {
         `;
         const starProgram = new PIXI.Program(starVertexShader, starFragmentShader);
 
-        // generate stars
-        const starMeshes: PIXI.Mesh<PIXI.Shader>[] = [];
-        for (const star of Array.from(this.game.voronoiTerrain.getStars())) {
-            // create mesh
-            const uniforms = {
-                uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
-                uCameraScale: this.game.worldScale,
-                uPosition: star.position.toMatrix4(),
-                uColor: hexToRgb(star.color),
-                uScale: star.size * PHYSICS_SCALE / this.game.worldScale
-            };
-            const shader = new PIXI.Shader(starProgram, uniforms);
-            const mesh = new PIXI.Mesh(starGeometry, shader);
+        return {
+            starGeometry,
+            starProgram
+        };
+    })();
 
-            this.application.stage.addChild(mesh);
-            starMeshes.push(mesh);
-        }
-
+    pixiPlanetResources = (() => {
         // generate planets
         const planetVoronoiCells = this.game.generateGoodPoints(100, 10);
         const planetGeometry = new PIXI.Geometry();
@@ -699,46 +691,14 @@ export class App extends React.Component<IAppProps, IAppState> {
             `;
         const planetProgram = new PIXI.Program(planetVertexShader, planetFragmentShader);
 
-        // create planets
-        const planetMeshes: Array<{
-            mesh: PIXI.Mesh<PIXI.Shader>,
-            orientation: Quaternion,
-            rotation: Quaternion
-        }> = [];
-        for (const planet of Array.from(this.game.voronoiTerrain.getPlanets())) {
-            // create planet properties
-            const orientation: Quaternion = Quaternion.ONE;
-            const rotation: Quaternion = Quaternion.fromAxisAngle(DelaunayGraph.randomPoint(), Math.PI * 2 / 60 / 10);
-
-            // create mesh
-            const uniforms = {
-                uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
-                uCameraScale: this.game.worldScale,
-                uPosition: planet.position.toMatrix4(),
-                uOrientation: orientation.toMatrix4(),
-                uScale: 100 * planet.size * PHYSICS_SCALE / this.game.worldScale
-            };
-            const shader = new PIXI.Shader(planetProgram, uniforms);
-            const state = PIXI.State.for2d();
-            state.depthTest = true;
-            const mesh = new PIXI.Mesh(planetGeometry, shader, state);
-
-            this.application.stage.addChild(mesh);
-            planetMeshes.push({
-                mesh,
-                orientation,
-                rotation,
-            });
-        }
-
-        // generate ships
-        const GetHullPoint = ([x, y]: [number, number]): [number, number, number] => {
-            const z = Math.sqrt(1 -
-                Math.pow(x * PHYSICS_SCALE / this.game.worldScale, 2) -
-                Math.pow(y * PHYSICS_SCALE / this.game.worldScale, 2)
-            );
-            return [x, y, z];
+        return {
+            planetGeometry,
+            planetProgram
         };
+    })();
+
+    pixiShipResources = (() => {
+        // generate ships
         const shipGeometryMap: { [key: string]: PIXI.Geometry } = {};
         for (const shipType of Object.values(EShipType)) {
             const shipToDraw = SHIP_DATA.find(i => i.shipType === shipType);
@@ -752,12 +712,12 @@ export class App extends React.Component<IAppProps, IAppState> {
                 color: [],
                 index: []
             };
-            shipGeometryData.position.push.apply(shipGeometryData.position, GetHullPoint([0, 0]));
+            shipGeometryData.position.push.apply(shipGeometryData.position, this.GetHullPoint([0, 0]));
             shipGeometryData.color.push.apply(shipGeometryData.color, [1, 0, 0]);
             for (let i = 0; i < shipToDraw.hull.length; i++) {
                 const a = shipToDraw.hull[i % shipToDraw.hull.length];
 
-                shipGeometryData.position.push.apply(shipGeometryData.position, GetHullPoint(a));
+                shipGeometryData.position.push.apply(shipGeometryData.position, this.GetHullPoint(a));
                 shipGeometryData.color.push.apply(shipGeometryData.color, [1, 0, 0]);
                 shipGeometryData.index.push(
                     0,
@@ -816,49 +776,15 @@ export class App extends React.Component<IAppProps, IAppState> {
         }
 
         // create material
-        const shipProgram = planetProgram;
+        const shipProgram = this.pixiPlanetResources.planetProgram;
 
-        // create ships
-        const shipMeshes: Array<{
-            mesh: PIXI.Mesh<PIXI.Shader>,
-            text: PIXI.Text,
-            position: Quaternion,
-            orientation: Quaternion,
-            rotation: Quaternion
-        }> = [];
-        for (const cell of this.game.generateGoodPoints(100, 10)) {
-            const position: Quaternion = Quaternion.fromBetweenVectors([0, 0, 1], cell.centroid);
-            const orientation: Quaternion = Quaternion.fromAxisAngle([0, 0, 1], Math.PI * 2 * Math.random());
-            const rotation: Quaternion = Quaternion.fromAxisAngle([0, 0, 1], Math.PI * 2 / 60 / 10);
+        return {
+            shipGeometryMap,
+            shipProgram
+        };
+    })();
 
-            // create mesh
-            const uniforms = {
-                uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
-                uCameraScale: this.game.worldScale,
-                uPosition: position.toMatrix4(),
-                uOrientation: orientation.toMatrix4(),
-                uScale: 10 * PHYSICS_SCALE / this.game.worldScale
-            };
-            const shader = new PIXI.Shader(shipProgram, uniforms);
-            const randomShipTypeIndex = Math.floor(Math.random() * 5);
-            const randomShipType = Object.values(EShipType)[randomShipTypeIndex];
-            const mesh = new PIXI.Mesh(shipGeometryMap[randomShipType], shader);
-
-            const text = new PIXI.Text(randomShipType);
-            text.style.fill = "white";
-            text.style.fontSize = 15;
-
-            this.application.stage.addChild(mesh);
-            this.application.stage.addChild(text);
-            shipMeshes.push({
-                mesh,
-                text,
-                position,
-                orientation,
-                rotation,
-            });
-        }
-
+    pixiCannonBallResources = (() => {
         // create geometry
         const cannonBallGeometry = new PIXI.Geometry();
         cannonBallGeometry.addAttribute("aPosition", (new Array(32).fill(0).reduce((acc, v, i) => {
@@ -896,54 +822,36 @@ export class App extends React.Component<IAppProps, IAppState> {
         `;
         const cannonBallProgram = new PIXI.Program(cannonBallVertexShader, cannonBallFragmentShader);
 
-        // generate stars
-        const cannonBallMeshes: Array<{mesh: PIXI.Mesh<PIXI.Shader>, position: Quaternion, positionVelocity: Quaternion}> = [];
-        for (let i = 0; i < 300; i++) {
-            const position = Quaternion.fromBetweenVectors([0, 0, 1], DelaunayGraph.randomPoint());
-            const positionVelocity = position.clone().mul(
-                Quaternion.fromBetweenVectors([0, 0, 1], [1, 0, 0]).pow(Game.PROJECTILE_SPEED).mul(
-                    Quaternion.fromAxisAngle([0, 0, 1], Math.random() * 2 * Math.PI)
-                )
-            );
+        return {
+            cannonBallGeometry,
+            cannonBallProgram
+        };
+    })();
 
-            // create mesh
-            const uniforms = {
-                uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
-                uCameraScale: this.game.worldScale,
-                uPosition: position.toMatrix4(),
-                uColor: [0.75, 0.75, 0.75, 1],
-                uScale: 10 * PHYSICS_SCALE / this.game.worldScale
-            };
-            const shader = new PIXI.Shader(cannonBallProgram, uniforms);
-            const mesh = new PIXI.Mesh(cannonBallGeometry, shader);
-
-            this.application.stage.addChild(mesh);
-            cannonBallMeshes.push({mesh, position, positionVelocity});
-        }
-
+    pixiCrateResources = (() => {
         // generate crates
         const crateGeometry = new PIXI.Geometry();
         const crateGeometryData: {position: number[], color: number[], index: number[]} = {
             position: [
-                ...GetHullPoint([0, 0]),
-                ...GetHullPoint([0.1, 0.1]),
-                ...GetHullPoint([0, 1]),
-                ...GetHullPoint([0.1, 0.9]),
-                ...GetHullPoint([1, 0]),
-                ...GetHullPoint([0.9, 0.1]),
-                ...GetHullPoint([1, 1]),
-                ...GetHullPoint([0.9, 0.9]),
-                ...GetHullPoint([0.1, 0.8]),
-                ...GetHullPoint([0.2, 0.9]),
-                ...GetHullPoint([0.8, 0.1]),
-                ...GetHullPoint([0.9, 0.2]),
+                ...this.GetHullPoint([0, 0]),
+                ...this.GetHullPoint([0.1, 0.1]),
+                ...this.GetHullPoint([0, 1]),
+                ...this.GetHullPoint([0.1, 0.9]),
+                ...this.GetHullPoint([1, 0]),
+                ...this.GetHullPoint([0.9, 0.1]),
+                ...this.GetHullPoint([1, 1]),
+                ...this.GetHullPoint([0.9, 0.9]),
+                ...this.GetHullPoint([0.1, 0.8]),
+                ...this.GetHullPoint([0.2, 0.9]),
+                ...this.GetHullPoint([0.8, 0.1]),
+                ...this.GetHullPoint([0.9, 0.2]),
 
-                ...GetHullPoint([0.1, 0.1]),
-                ...GetHullPoint([0.1, 0.8]),
-                ...GetHullPoint([0.2, 0.9]),
-                ...GetHullPoint([0.9, 0.9]),
-                ...GetHullPoint([0.8, 0.1]),
-                ...GetHullPoint([0.9, 0.2])
+                ...this.GetHullPoint([0.1, 0.1]),
+                ...this.GetHullPoint([0.1, 0.8]),
+                ...this.GetHullPoint([0.2, 0.9]),
+                ...this.GetHullPoint([0.9, 0.9]),
+                ...this.GetHullPoint([0.8, 0.1]),
+                ...this.GetHullPoint([0.9, 0.2])
             ].map(i => i * 2 - 1),
             color: [
                 0.2, 0.2, 0.0,
@@ -993,10 +901,10 @@ export class App extends React.Component<IAppProps, IAppState> {
         const crateImageGeometry = new PIXI.Geometry();
         const crateImageGeometryData: {position: number[], uv: number[], index: number[]} = {
             position: [
-                ...GetHullPoint([0, 0]),
-                ...GetHullPoint([1, 0]),
-                ...GetHullPoint([0, 1]),
-                ...GetHullPoint([1, 1]),
+                ...this.GetHullPoint([0, 0]),
+                ...this.GetHullPoint([1, 0]),
+                ...this.GetHullPoint([0, 1]),
+                ...this.GetHullPoint([1, 1]),
             ].map(i => i * 2 - 1),
             uv: [
                 0, 0,
@@ -1014,7 +922,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         crateImageGeometry.addIndex(crateImageGeometryData.index);
 
         // create material
-        const crateProgram = planetProgram;
+        const crateProgram = this.pixiPlanetResources.planetProgram;
 
         // create material
         const crateImageVertexShader = `
@@ -1049,20 +957,233 @@ export class App extends React.Component<IAppProps, IAppState> {
             `;
         const crateImageProgram = new PIXI.Program(crateImageVertexShader, crateImageFragmentShader);
 
-        // create crates
-        const crateMeshes: Array<{
-            mesh: PIXI.Mesh<PIXI.Shader>,
-            image: PIXI.Mesh<PIXI.Shader>,
-            text: PIXI.Text,
-            position: Quaternion,
-            orientation: Quaternion,
-            rotation: Quaternion,
-            resourceType: EResourceType
-        }> = [];
+        return {
+            crateGeometry,
+            crateProgram,
+            crateImageGeometry,
+            crateImageProgram
+        };
+    })();
+
+    starMeshes: Array<{
+        id: string, mesh: PIXI.Mesh<PIXI.Shader>,
+        tick: number
+    }> = [];
+    planetMeshes: Array<{
+        id: string,
+        mesh: PIXI.Mesh<PIXI.Shader>,
+        orientation: Quaternion,
+        rotation: Quaternion,
+        tick: number
+    }> = [];
+    shipMeshes: Array<{
+        id: string,
+        mesh: PIXI.Mesh<PIXI.Shader>,
+        text: PIXI.Text,
+        position: Quaternion,
+        orientation: Quaternion,
+        rotation: Quaternion,
+        tick: number
+    }> = [];
+    cannonBallMeshes: Array<{
+        id: string,
+        mesh: PIXI.Mesh<PIXI.Shader>,
+        position: Quaternion,
+        positionVelocity: Quaternion,
+        tick: number
+    }> = [];
+    crateMeshes: Array<{
+        id: string,
+        mesh: PIXI.Mesh<PIXI.Shader>,
+        image: PIXI.Mesh<PIXI.Shader>,
+        text: PIXI.Text,
+        position: Quaternion,
+        orientation: Quaternion,
+        rotation: Quaternion,
+        resourceType: EResourceType,
+        tick: number
+    }> = [];
+    sprites: Record<string, PIXI.Texture> = {};
+
+    addStar = ({star, cameraPosition, tick}: {star: Star, cameraPosition: Quaternion, tick: number}) => {
+        // create mesh
+        const uniforms = {
+            uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
+            uCameraScale: this.game.worldScale * this.state.zoom,
+            uPosition: star.position.toMatrix4(),
+            uColor: this.hexToRgb(star.color),
+            uScale: star.size * PHYSICS_SCALE / this.game.worldScale
+        };
+        const shader = new PIXI.Shader(this.pixiStarResources.starProgram, uniforms);
+        const mesh = new PIXI.Mesh(this.pixiStarResources.starGeometry, shader);
+
+        this.application.stage.addChild(mesh);
+        this.starMeshes.push({
+            id: star.id,
+            mesh,
+            tick
+        });
+    };
+
+    addPlanet = ({planet, cameraPosition, tick}: {planet: Planet, cameraPosition: Quaternion, tick: number}) => {
+        // create planet properties
+        const orientation: Quaternion = Quaternion.ONE;
+        const rotation: Quaternion = Quaternion.fromAxisAngle(DelaunayGraph.randomPoint(), Math.PI * 2 / 60 / 10);
+
+        // create mesh
+        const uniforms = {
+            uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
+            uCameraScale: this.game.worldScale * this.state.zoom,
+            uPosition: planet.position.toMatrix4(),
+            uOrientation: orientation.toMatrix4(),
+            uScale: 100 * planet.size * PHYSICS_SCALE / this.game.worldScale
+        };
+        const shader = new PIXI.Shader(this.pixiPlanetResources.planetProgram, uniforms);
+        const state = PIXI.State.for2d();
+        state.depthTest = true;
+        const mesh = new PIXI.Mesh(this.pixiPlanetResources.planetGeometry, shader, state);
+
+        this.application.stage.addChild(mesh);
+        this.planetMeshes.push({
+            id: planet.id,
+            mesh,
+            orientation,
+            rotation,
+            tick,
+        });
+    };
+
+    addShip = ({ship, cameraPosition, tick}: {ship: Ship, cameraPosition: Quaternion, tick: number}) => {
+        const position: Quaternion = ship.position;
+        const orientation: Quaternion = Quaternion.fromAxisAngle([0, 0, 1], Math.PI * 2 * Math.random());
+        const rotation: Quaternion = Quaternion.fromAxisAngle([0, 0, 1], Math.PI * 2 / 60 / 10);
+
+        // create mesh
+        const uniforms = {
+            uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
+            uCameraScale: this.game.worldScale * this.state.zoom,
+            uPosition: position.toMatrix4(),
+            uOrientation: orientation.toMatrix4(),
+            uScale: 10 * PHYSICS_SCALE / this.game.worldScale
+        };
+        const shader = new PIXI.Shader(this.pixiShipResources.shipProgram, uniforms);
+        const randomShipTypeIndex = Math.floor(Math.random() * 5);
+        const randomShipType = Object.values(EShipType)[randomShipTypeIndex];
+        const mesh = new PIXI.Mesh(this.pixiShipResources.shipGeometryMap[randomShipType], shader);
+
+        const text = new PIXI.Text(randomShipType);
+        text.style.fill = "white";
+        text.style.fontSize = 15;
+
+        this.application.stage.addChild(mesh);
+        this.application.stage.addChild(text);
+        this.shipMeshes.push({
+            id: ship.id,
+            mesh,
+            text,
+            position,
+            orientation,
+            rotation,
+            tick,
+        });
+    };
+
+    addCannonBall = ({cannonBall, cameraPosition, tick}: {cannonBall: CannonBall, cameraPosition: Quaternion, tick: number}) => {
+        const position: Quaternion = cannonBall.position;
+        const positionVelocity: Quaternion = cannonBall.positionVelocity;
+
+        // create mesh
+        const uniforms = {
+            uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
+            uCameraScale: this.game.worldScale * this.state.zoom,
+            uPosition: position.toMatrix4(),
+            uColor: [0.75, 0.75, 0.75, 1],
+            uScale: 10 * PHYSICS_SCALE / this.game.worldScale
+        };
+        const shader = new PIXI.Shader(this.pixiCannonBallResources.cannonBallProgram, uniforms);
+        const mesh = new PIXI.Mesh(this.pixiCannonBallResources.cannonBallGeometry, shader);
+
+        this.application.stage.addChild(mesh);
+        this.cannonBallMeshes.push({
+            id: cannonBall.id,
+            mesh,
+            position,
+            positionVelocity,
+            tick,
+        });
+    };
+
+    addCrate = ({
+        crate,
+        cameraPosition,
+        tick
+    }: {
+        crate: Crate,
+        cameraPosition: Quaternion,
+        tick: number
+    }) => {
+        const position: Quaternion = crate.position;
+        const orientation: Quaternion = crate.orientation;
+        const rotation: Quaternion = crate.orientationVelocity;
+        const resourceType: EResourceType = crate.resourceType;
+
+        // create mesh
+        const meshUniforms = {
+            uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
+            uCameraScale: this.game.worldScale * this.state.zoom,
+            uPosition: position.toMatrix4(),
+            uOrientation: orientation.toMatrix4(),
+            uScale: 300 * PHYSICS_SCALE / this.game.worldScale
+        };
+        const meshShader = new PIXI.Shader(this.pixiCrateResources.crateProgram, meshUniforms);
+        const mesh = new PIXI.Mesh(this.pixiCrateResources.crateGeometry, meshShader);
+
+        // crate texture sprite
+        const imageUniforms = {
+            uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
+            uCameraScale: this.game.worldScale * this.state.zoom,
+            uPosition: position.toMatrix4(),
+            uOrientation: orientation.toMatrix4(),
+            uScale: 100 * PHYSICS_SCALE / this.game.worldScale,
+            uSampler: this.sprites[resourceType]
+        };
+        const imageShader = new PIXI.Shader(this.pixiCrateResources.crateImageProgram, imageUniforms);
+        const image = new PIXI.Mesh(this.pixiCrateResources.crateImageGeometry, imageShader);
+
+        const text = new PIXI.Text(resourceType);
+        text.style.fill = "white";
+        text.style.fontSize = 12;
+
+        this.application.stage.addChild(mesh);
+        this.application.stage.addChild(image);
+        this.application.stage.addChild(text);
+        this.crateMeshes.push({
+            id: crate.id,
+            mesh,
+            image,
+            text,
+            position,
+            orientation,
+            rotation,
+            resourceType,
+            tick,
+        });
+    };
+
+    constructor(props: IAppProps) {
+        super(props);
+
+        // setup rendering
+        this.application = new PIXI.Application();
+
+        // draw app
+        this.game.initializeGame();
+
+        // draw rotating app
+        let cameraPosition: Quaternion = Quaternion.ONE;
 
         // load sprites into memory
         const loader = new PIXI.Loader();
-        const sprites: Record<string, PIXI.Texture> = {};
 
         // queue images to be loaded
         loader.add("missing", DEFAULT_IMAGE);
@@ -1079,58 +1200,10 @@ export class App extends React.Component<IAppProps, IAppState> {
                 const textureName = resourceTypeTextureItem ? resourceTypeTextureItem.name : "missing";
                 const item = resources[textureName];
                 if (item) {
-                    sprites[resourceType] = item.texture;
+                    this.sprites[resourceType] = item.texture;
                 } else {
-                    sprites[resourceType] = resources.missing.texture;
+                    this.sprites[resourceType] = resources.missing.texture;
                 }
-            }
-
-            // create crates
-            for (const cell of this.game.generateGoodPoints(100, 10)) {
-                const position: Quaternion = Quaternion.fromBetweenVectors([0, 0, 1], cell.centroid);
-                const orientation: Quaternion = Quaternion.fromAxisAngle([0, 0, 1], Math.PI * 2 * Math.random());
-                const rotation: Quaternion = Quaternion.fromAxisAngle([0, 0, 1], Math.PI * 2 / 60 / 10);
-                const resourceType = Object.values(EResourceType)[Math.floor(Object.values(EResourceType).length * Math.random())];
-
-                // create mesh
-                const meshUniforms = {
-                    uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
-                    uCameraScale: this.game.worldScale,
-                    uPosition: position.toMatrix4(),
-                    uOrientation: orientation.toMatrix4(),
-                    uScale: 300 * PHYSICS_SCALE / this.game.worldScale
-                };
-                const meshShader = new PIXI.Shader(crateProgram, meshUniforms);
-                const mesh = new PIXI.Mesh(crateGeometry, meshShader);
-
-                // crate texture sprite
-                const imageUniforms = {
-                    uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
-                    uCameraScale: this.game.worldScale,
-                    uPosition: Quaternion.fromBetweenVectors([0, 0, 1], cell.centroid).toMatrix4(),
-                    uOrientation: orientation.toMatrix4(),
-                    uScale: 100 * PHYSICS_SCALE / this.game.worldScale,
-                    uSampler: sprites[resourceType]
-                };
-                const imageShader = new PIXI.Shader(crateImageProgram, imageUniforms);
-                const image = new PIXI.Mesh(crateImageGeometry, imageShader);
-
-                const text = new PIXI.Text(resourceType);
-                text.style.fill = "white";
-                text.style.fontSize = 12;
-
-                this.application.stage.addChild(mesh);
-                this.application.stage.addChild(image);
-                this.application.stage.addChild(text);
-                crateMeshes.push({
-                    mesh,
-                    image,
-                    text,
-                    position,
-                    orientation,
-                    rotation,
-                    resourceType,
-                });
             }
         });
 
@@ -1157,54 +1230,144 @@ export class App extends React.Component<IAppProps, IAppState> {
         }
 
         // draw rotating app
+        let pixiTick: number = 0;
         this.application.ticker.add(() => {
-            cameraPosition = cameraPosition.clone().mul(Quaternion.fromAxisAngle([1, 0, 0], Math.PI * 2 / 60 / 120));
+            cameraPosition = this.getPlayerShip().position;
+            pixiTick += 1;
+
+            // sync game to Pixi renderer
+            // stars
+            for (const star of [
+                ...Array.from(this.game.voronoiTerrain.getStars(cameraPosition.rotateVector([0, 0, 1]), 0.5)),
+                ...Array.from(this.game.voronoiTerrain.getStars(cameraPosition.rotateVector([0, 0, 1]), 0.25)),
+                ...Array.from(this.game.voronoiTerrain.getStars(cameraPosition.rotateVector([0, 0, 1]), 0.125))
+            ]) {
+                const starMesh = this.starMeshes.find(p => p.id === star.id);
+                if (starMesh) {
+                    starMesh.tick = pixiTick;
+                } else {
+                    this.addStar({star, cameraPosition, tick: pixiTick});
+                }
+            }
+            for (const item of this.starMeshes.filter(m => m.tick !== pixiTick)) {
+                this.application.stage.removeChild(item.mesh);
+            }
+            this.starMeshes = this.starMeshes.filter(m => m.tick === pixiTick);
+            // planets
+            for (const planet of Array.from(this.game.voronoiTerrain.getPlanets(cameraPosition.rotateVector([0, 0, 1])))) {
+                const planetMesh = this.planetMeshes.find(p => p.id === planet.id);
+                if (planetMesh) {
+                    planetMesh.orientation = planet.orientation;
+                    planetMesh.tick = pixiTick;
+                } else {
+                    this.addPlanet({planet, cameraPosition, tick: pixiTick});
+                }
+            }
+            for (const item of this.planetMeshes.filter(m => m.tick !== pixiTick)) {
+                this.application.stage.removeChild(item.mesh);
+            }
+            this.planetMeshes = this.planetMeshes.filter(m => m.tick === pixiTick);
+            // ships
+            for (const ship of this.game.ships) {
+                const shipMesh = this.shipMeshes.find(s => s.id === ship.id);
+                if (shipMesh) {
+                    shipMesh.position = ship.position;
+                    shipMesh.orientation = ship.orientation;
+                    shipMesh.tick = pixiTick;
+                } else {
+                    this.addShip({ship, cameraPosition, tick: pixiTick});
+                }
+            }
+            for (const item of this.shipMeshes.filter(m => m.tick !== pixiTick)) {
+                this.application.stage.removeChild(item.mesh);
+            }
+            this.shipMeshes = this.shipMeshes.filter(m => m.tick === pixiTick);
+            // cannonBalls
+            for (const cannonBall of this.game.cannonBalls) {
+                const cannonBallMesh = this.cannonBallMeshes.find(c => c.id === cannonBall.id);
+                if (cannonBallMesh) {
+                    cannonBallMesh.position = cannonBall.position;
+                    cannonBallMesh.positionVelocity = cannonBall.positionVelocity;
+                    cannonBallMesh.tick = pixiTick;
+                } else {
+                    this.addCannonBall({cannonBall, cameraPosition, tick: pixiTick});
+                }
+            }
+            for (const item of this.cannonBallMeshes.filter(m => m.tick !== pixiTick)) {
+                this.application.stage.removeChild(item.mesh);
+            }
+            this.cannonBallMeshes = this.cannonBallMeshes.filter(m => m.tick === pixiTick);
+            // crates
+            for (const crate of this.game.crates) {
+                const crateMeshes = this.crateMeshes.find(c => c.id === crate.id);
+                if (crateMeshes) {
+                    crateMeshes.position = crate.position;
+                    crateMeshes.orientation = crate.orientation;
+                    crateMeshes.tick = pixiTick;
+                } else {
+                    this.addCrate({crate, cameraPosition, tick: pixiTick});
+                }
+            }
+            for (const item of this.crateMeshes.filter(m => m.tick !== pixiTick)) {
+                this.application.stage.removeChild(item.mesh);
+                this.application.stage.removeChild(item.image);
+            }
+            this.crateMeshes = this.crateMeshes.filter(m => m.tick === pixiTick);
 
             // update each star
-            for (const mesh of starMeshes) {
-                const shader = mesh.shader;
+            for (const item of this.starMeshes) {
+                const shader = item.mesh.shader;
                 shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
+                shader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
             }
 
             // update each planet
-            for (const item of planetMeshes) {
+            for (const item of this.planetMeshes) {
                 item.orientation = item.orientation.clone().mul(item.rotation.clone());
 
                 const shader = item.mesh.shader;
                 shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
+                shader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
                 shader.uniforms.uOrientation = item.orientation.toMatrix4();
             }
 
             // update each ship
-            for (const item of shipMeshes) {
-                item.orientation = item.orientation.clone().mul(item.rotation.clone());
+            for (const item of this.shipMeshes) {
+                // item.orientation = item.orientation.clone().mul(item.rotation.clone());
 
                 const shader = item.mesh.shader;
                 shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
+                shader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
+                shader.uniforms.uPosition = item.position.toMatrix4();
                 shader.uniforms.uOrientation = item.orientation.toMatrix4();
 
                 handleDrawingOfText(item.text, item.position);
             }
 
             // update each cannon ball
-            for (const item of cannonBallMeshes) {
+            for (const item of this.cannonBallMeshes) {
                 item.position = item.position.clone().mul(item.positionVelocity.clone().pow(1/60));
 
                 const shader = item.mesh.shader;
                 shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
+                shader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
                 shader.uniforms.uPosition = item.position.toMatrix4();
             }
 
             // update each crate
-            for (const item of crateMeshes) {
+            for (const item of this.crateMeshes) {
                 item.orientation = item.orientation.clone().mul(item.rotation.clone());
 
                 const meshShader = item.mesh.shader;
                 meshShader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
+                meshShader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
+                meshShader.uniforms.uPosition = item.position.toMatrix4();
                 meshShader.uniforms.uOrientation = item.orientation.toMatrix4();
 
                 const imageShader = item.image.shader;
                 imageShader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
+                imageShader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
+                imageShader.uniforms.uPosition = item.position.toMatrix4();
                 imageShader.uniforms.uOrientation = item.orientation.toMatrix4();
 
                 handleDrawingOfText(item.text, item.position);
@@ -2572,44 +2735,44 @@ export class App extends React.Component<IAppProps, IAppState> {
                             .map(this.drawDelaunayTile.bind(this, false)) :
                         null
                 }
-                {
-                    ([
-                        ...Array.from(this.game.voronoiTerrain.getStars(shipPosition, 0.5)).map(this.rotatePlanet.bind(this))
-                            .map(this.convertToDrawable.bind(this, "-star2", 0.5)),
-                        ...Array.from(this.game.voronoiTerrain.getStars(shipPosition, 0.25)).map(this.rotatePlanet.bind(this))
-                            .map(this.convertToDrawable.bind(this, "-star3", 0.25)),
-                        ...Array.from(this.game.voronoiTerrain.getStars(shipPosition, 0.125)).map(this.rotatePlanet.bind(this))
-                            .map(this.convertToDrawable.bind(this, "-star4", 0.125))
-                    ] as Array<IDrawable<Planet>>)
-                        .sort((a: any, b: any) => b.distance - a.distance)
-                        .map(this.drawStar.bind(this))
-                }
-                {
-                    (Array.from(this.game.voronoiTerrain.getPlanets(shipPosition)).map(this.rotatePlanet.bind(this))
-                        .map(this.convertToDrawable.bind(this, "-planet", 1)) as Array<IDrawable<Planet>>)
-                        .map(this.drawPlanet.bind(this, false))
-                }
-                {
-                    (this.game.smokeClouds.map(App.applyKinematics.bind(this))
-                        .map(this.rotatePlanet.bind(this))
-                        .map(this.convertToDrawable.bind(this, "-smokeClouds", 1)) as Array<IDrawable<SmokeCloud>>)
-                        .map(this.drawSmokeCloud.bind(this))
-                }
-                {
-                    (this.game.cannonBalls.map(this.rotatePlanet.bind(this))
-                        .map(this.convertToDrawable.bind(this, "-cannonBalls", 1)) as Array<IDrawable<SmokeCloud>>)
-                        .map(this.drawSmokeCloud.bind(this))
-                }
-                {
-                    (this.game.crates.map(this.rotatePlanet.bind(this))
-                        .map(this.convertToDrawable.bind(this, "-crates", 1)) as Array<IDrawable<Crate>>)
-                        .map(this.drawCrate.bind(this, false))
-                }
-                {
-                    (this.game.ships.map(this.rotatePlanet.bind(this))
-                        .map(this.convertToDrawable.bind(this, "-ships", 1)) as Array<IDrawable<Ship>>)
-                        .map(this.drawShip.bind(this))
-                }
+                {/*{*/}
+                {/*    ([*/}
+                {/*        ...Array.from(this.game.voronoiTerrain.getStars(shipPosition, 0.5)).map(this.rotatePlanet.bind(this))*/}
+                {/*            .map(this.convertToDrawable.bind(this, "-star2", 0.5)),*/}
+                {/*        ...Array.from(this.game.voronoiTerrain.getStars(shipPosition, 0.25)).map(this.rotatePlanet.bind(this))*/}
+                {/*            .map(this.convertToDrawable.bind(this, "-star3", 0.25)),*/}
+                {/*        ...Array.from(this.game.voronoiTerrain.getStars(shipPosition, 0.125)).map(this.rotatePlanet.bind(this))*/}
+                {/*            .map(this.convertToDrawable.bind(this, "-star4", 0.125))*/}
+                {/*    ] as Array<IDrawable<Planet>>)*/}
+                {/*        .sort((a: any, b: any) => b.distance - a.distance)*/}
+                {/*        .map(this.drawStar.bind(this))*/}
+                {/*}*/}
+                {/*{*/}
+                {/*    (Array.from(this.game.voronoiTerrain.getPlanets(shipPosition)).map(this.rotatePlanet.bind(this))*/}
+                {/*        .map(this.convertToDrawable.bind(this, "-planet", 1)) as Array<IDrawable<Planet>>)*/}
+                {/*        .map(this.drawPlanet.bind(this, false))*/}
+                {/*}*/}
+                {/*{*/}
+                {/*    (this.game.smokeClouds.map(App.applyKinematics.bind(this))*/}
+                {/*        .map(this.rotatePlanet.bind(this))*/}
+                {/*        .map(this.convertToDrawable.bind(this, "-smokeClouds", 1)) as Array<IDrawable<SmokeCloud>>)*/}
+                {/*        .map(this.drawSmokeCloud.bind(this))*/}
+                {/*}*/}
+                {/*{*/}
+                {/*    (this.game.cannonBalls.map(this.rotatePlanet.bind(this))*/}
+                {/*        .map(this.convertToDrawable.bind(this, "-cannonBalls", 1)) as Array<IDrawable<SmokeCloud>>)*/}
+                {/*        .map(this.drawSmokeCloud.bind(this))*/}
+                {/*}*/}
+                {/*{*/}
+                {/*    (this.game.crates.map(this.rotatePlanet.bind(this))*/}
+                {/*        .map(this.convertToDrawable.bind(this, "-crates", 1)) as Array<IDrawable<Crate>>)*/}
+                {/*        .map(this.drawCrate.bind(this, false))*/}
+                {/*}*/}
+                {/*{*/}
+                {/*    (this.game.ships.map(this.rotatePlanet.bind(this))*/}
+                {/*        .map(this.convertToDrawable.bind(this, "-ships", 1)) as Array<IDrawable<Ship>>)*/}
+                {/*        .map(this.drawShip.bind(this))*/}
+                {/*}*/}
                 {
                     (Array.from(this.game.voronoiTerrain.getPlanets(shipPosition)).map(this.rotatePlanet.bind(this))
                         .map(this.convertToDrawable.bind(this, "-planet", 1)) as Array<IDrawable<Planet>>)
@@ -2620,11 +2783,6 @@ export class App extends React.Component<IAppProps, IAppState> {
                         .map(this.convertToDrawable.bind(this, "-crates", 1)) as Array<IDrawable<Crate>>)
                         .map(this.drawCrate.bind(this, true))
                 }
-                {/*{*/}
-                {/*    (this.ships.map(this.rotatePlanet.bind(this))*/}
-                {/*        .map(this.convertToDrawable.bind(this, "-physics-hulls", 1)) as Array<IDrawable<Ship>>)*/}
-                {/*        .map(this.renderPhysicsHull.bind(this))*/}
-                {/*}*/}
             </>
         );
     }
