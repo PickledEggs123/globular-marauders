@@ -695,92 +695,140 @@ export class App extends React.Component<IAppProps, IAppState> {
         };
     })();
 
-    pixiShipResources = (() => {
+    cachedPixiShipResources: any;
+    pixiShipResources = () => {
+        if (this.cachedPixiShipResources) {
+            return this.cachedPixiShipResources;
+        }
+
         // generate ships
-        const shipGeometryMap: { [key: string]: PIXI.Geometry } = {};
-        for (const shipType of Object.values(EShipType)) {
-            const shipToDraw = SHIP_DATA.find(i => i.shipType === shipType);
-            if (!shipToDraw) {
-                continue;
-            }
+        const shipGeometryMap: Map<EFaction, Map<string, PIXI.Geometry>> = new Map();
+        for (const factionType of Object.values(EFaction)) {
+            for (const shipType of Object.values(EShipType)) {
+                const shipToDraw = SHIP_DATA.find(i => i.shipType === shipType);
+                if (!shipToDraw) {
+                    continue;
+                }
 
-            const shipGeometry = new PIXI.Geometry();
-            const shipGeometryData: {position: number[], color: number[], index: number[]} = {
-                position: [],
-                color: [],
-                index: []
-            };
-            shipGeometryData.position.push.apply(shipGeometryData.position, this.GetHullPoint([0, 0]));
-            shipGeometryData.color.push.apply(shipGeometryData.color, [1, 0, 0]);
-            for (let i = 0; i < shipToDraw.hull.length; i++) {
-                const a = shipToDraw.hull[i % shipToDraw.hull.length];
+                const shipGeometry = new PIXI.Geometry();
+                const shipGeometryData: {position: number[], color: number[], index: number[]} = {
+                    position: [],
+                    color: [],
+                    index: []
+                };
+                let shipColor = [1, 1, 1];
+                const factionData = this.game.factions[factionType];
+                if (factionData) {
+                    switch (factionData.factionColor) {
+                        case "orange":
+                            shipColor = [1, 0.5, 0];
+                            break;
+                        case "red":
+                            shipColor = [1, 0, 0];
+                            break;
+                        case "blue":
+                            shipColor = [0, 0, 1];
+                            break;
+                        case "green":
+                            shipColor = [0, 1, 0];
+                            break;
+                        case "yellow":
+                            shipColor = [1, 1, 0];
+                            break;
+                        default:
+                            if (factionData.factionColor.startsWith("#")) {
+                                shipColor = this.hexToRgb(factionData.factionColor);
+                            } else {
+                                shipColor = [1, 1, 1];
+                            }
+                    }
+                }
 
-                shipGeometryData.position.push.apply(shipGeometryData.position, this.GetHullPoint(a));
-                shipGeometryData.color.push.apply(shipGeometryData.color, [1, 0, 0]);
-                shipGeometryData.index.push(
-                    0,
-                    (i % CorvetteHull.length) + 1,
-                    ((i + 1) % CorvetteHull.length) + 1,
-                );
-            }
-            const numCannonPositions = Math.floor(shipToDraw.cannons.numCannons / 2);
-            const cannonSpacing = (shipToDraw.cannons.endY - shipToDraw.cannons.startY) / numCannonPositions;
-            for (let cannonIndex = 0; cannonIndex < shipToDraw.cannons.numCannons; cannonIndex++) {
-                const position = Math.floor(cannonIndex / 2);
-                const isLeftSide = Math.floor(cannonIndex % 2) === 0;
-                const startIndex = shipGeometryData.index.reduce((acc, a) => Math.max(acc, a + 1), 0);
+                // draw hull
+                shipGeometryData.position.push.apply(shipGeometryData.position, this.GetHullPoint([0, 0]));
+                shipGeometryData.color.push.apply(shipGeometryData.color, shipColor);
+                for (let i = 0; i < shipToDraw.hull.length; i++) {
+                    const a = shipToDraw.hull[i % shipToDraw.hull.length];
 
-                if (isLeftSide) {
-                    shipGeometryData.position.push(
-                        shipToDraw.cannons.leftWall, shipToDraw.cannons.startY + (position + 0.25) * cannonSpacing, 1,
-                        shipToDraw.cannons.leftWall, shipToDraw.cannons.startY + (position + 0.75) * cannonSpacing, 1,
-                        shipToDraw.cannons.leftWall + 5, shipToDraw.cannons.startY + (position + 0.75) * cannonSpacing, 1,
-                        shipToDraw.cannons.leftWall + 5, shipToDraw.cannons.startY + (position + 0.25) * cannonSpacing, 1
-                    );
-                    shipGeometryData.color.push(
-                        0.75, 0.75, 0.75,
-                        0.75, 0.75, 0.75,
-                        0.75, 0.75, 0.75,
-                        0.75, 0.75, 0.75,
-                    );
-                } else {
-                    shipGeometryData.position.push(
-                        shipToDraw.cannons.rightWall - 5, shipToDraw.cannons.startY + (position + 0.25) * cannonSpacing, 1,
-                        shipToDraw.cannons.rightWall - 5, shipToDraw.cannons.startY + (position + 0.75) * cannonSpacing, 1,
-                        shipToDraw.cannons.rightWall, shipToDraw.cannons.startY + (position + 0.75) * cannonSpacing, 1,
-                        shipToDraw.cannons.rightWall, shipToDraw.cannons.startY + (position + 0.25) * cannonSpacing, 1
-                    );
-                    shipGeometryData.color.push(
-                        0.75, 0.75, 0.75,
-                        0.75, 0.75, 0.75,
-                        0.75, 0.75, 0.75,
-                        0.75, 0.75, 0.75,
+                    shipGeometryData.position.push.apply(shipGeometryData.position, this.GetHullPoint(a));
+                    shipGeometryData.color.push.apply(shipGeometryData.color, shipColor);
+                    shipGeometryData.index.push(
+                        0,
+                        (i % CorvetteHull.length) + 1,
+                        ((i + 1) % CorvetteHull.length) + 1,
                     );
                 }
-                shipGeometryData.index.push(
-                    startIndex,
-                    startIndex + 1,
-                    startIndex + 2,
-                    startIndex,
-                    startIndex + 2,
-                    startIndex + 3
-                );
-            }
-            shipGeometry.addAttribute("aPosition", shipGeometryData.position, 3);
-            shipGeometry.addAttribute("aColor", shipGeometryData.color, 3);
-            shipGeometry.addIndex(shipGeometryData.index);
 
-            shipGeometryMap[shipType] = shipGeometry;
+                // draw cannons
+                const numCannonPositions = Math.floor(shipToDraw.cannons.numCannons / 2);
+                const cannonSpacing = (shipToDraw.cannons.endY - shipToDraw.cannons.startY) / numCannonPositions;
+                for (let cannonIndex = 0; cannonIndex < shipToDraw.cannons.numCannons; cannonIndex++) {
+                    const position = Math.floor(cannonIndex / 2);
+                    const isLeftSide = Math.floor(cannonIndex % 2) === 0;
+                    const startIndex = shipGeometryData.index.reduce((acc, a) => Math.max(acc, a + 1), 0);
+
+                    if (isLeftSide) {
+                        shipGeometryData.position.push(
+                            shipToDraw.cannons.leftWall, shipToDraw.cannons.startY + (position + 0.25) * cannonSpacing, 1,
+                            shipToDraw.cannons.leftWall, shipToDraw.cannons.startY + (position + 0.75) * cannonSpacing, 1,
+                            shipToDraw.cannons.leftWall + 5, shipToDraw.cannons.startY + (position + 0.75) * cannonSpacing, 1,
+                            shipToDraw.cannons.leftWall + 5, shipToDraw.cannons.startY + (position + 0.25) * cannonSpacing, 1
+                        );
+                        shipGeometryData.color.push(
+                            0.75, 0.75, 0.75,
+                            0.75, 0.75, 0.75,
+                            0.75, 0.75, 0.75,
+                            0.75, 0.75, 0.75,
+                        );
+                    } else {
+                        shipGeometryData.position.push(
+                            shipToDraw.cannons.rightWall - 5, shipToDraw.cannons.startY + (position + 0.25) * cannonSpacing, 1,
+                            shipToDraw.cannons.rightWall - 5, shipToDraw.cannons.startY + (position + 0.75) * cannonSpacing, 1,
+                            shipToDraw.cannons.rightWall, shipToDraw.cannons.startY + (position + 0.75) * cannonSpacing, 1,
+                            shipToDraw.cannons.rightWall, shipToDraw.cannons.startY + (position + 0.25) * cannonSpacing, 1
+                        );
+                        shipGeometryData.color.push(
+                            0.75, 0.75, 0.75,
+                            0.75, 0.75, 0.75,
+                            0.75, 0.75, 0.75,
+                            0.75, 0.75, 0.75,
+                        );
+                    }
+                    shipGeometryData.index.push(
+                        startIndex,
+                        startIndex + 1,
+                        startIndex + 2,
+                        startIndex,
+                        startIndex + 2,
+                        startIndex + 3
+                    );
+                }
+
+                // flip ship along y axis
+                shipGeometryData.position = shipGeometryData.position.map((v, i) => i % 3 === 2 ? -v : v);
+
+                // construct geometry
+                shipGeometry.addAttribute("aPosition", shipGeometryData.position, 3);
+                shipGeometry.addAttribute("aColor", shipGeometryData.color, 3);
+                shipGeometry.addIndex(shipGeometryData.index);
+
+                // add to map
+                if (!shipGeometryMap.has(factionType)) {
+                    shipGeometryMap.set(factionType, new Map<string, PIXI.Geometry>());
+                }
+                shipGeometryMap.get(factionType)?.set(shipType, shipGeometry);
+            }
         }
 
         // create material
         const shipProgram = this.pixiPlanetResources.planetProgram;
 
-        return {
+        this.cachedPixiShipResources = {
             shipGeometryMap,
             shipProgram
         };
-    })();
+        return this.cachedPixiShipResources;
+    }
 
     pixiCannonBallResources = (() => {
         // create geometry
@@ -969,12 +1017,10 @@ export class App extends React.Component<IAppProps, IAppState> {
         // create geometry
         const getVoronoiGeometry = (voronoi: VoronoiCell): PIXI.Geometry => {
             const voronoiGeometry = new PIXI.Geometry();
-            voronoiGeometry.addAttribute("aPosition", (voronoi.vertices.reduce((acc, v, i) => {
-                acc.push(...voronoi.centroid);
-                acc.push(...voronoi.vertices[(i + 1) % voronoi.vertices.length]);
-                acc.push(...voronoi.vertices[i % voronoi.vertices.length]);
+            voronoiGeometry.addAttribute("aPosition", (voronoi.vertices.reduce((acc, v) => {
+                acc.push(...v);
                 return acc;
-            }, [] as number[])), 3);
+            }, [...voronoi.centroid] as number[])), 3);
             voronoiGeometry.addIndex(voronoi.vertices.reduce((acc, v, i) => {
                 acc.push(0, ((i + 1) % voronoi.vertices.length) + 1, (i % voronoi.vertices.length) + 1);
                 return acc;
@@ -1030,7 +1076,6 @@ export class App extends React.Component<IAppProps, IAppState> {
         text: PIXI.Text,
         position: Quaternion,
         orientation: Quaternion,
-        rotation: Quaternion,
         tick: number
     }> = [];
     cannonBallMeshes: Array<{
@@ -1067,7 +1112,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         // create mesh
         const uniforms = {
             uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
-            uCameraOrientation: cameraOrientation.clone().toMatrix4(),
+            uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
             uCameraScale: this.game.worldScale * this.state.zoom,
             uPosition: star.position.toMatrix4(),
             uColor: this.hexToRgb(star.color),
@@ -1093,8 +1138,8 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         // create mesh
         const uniforms = {
-            uCameraPosition: cameraPosition.clone().toMatrix4(),
-            uCameraOrientation: cameraOrientation.clone().toMatrix4(),
+            uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
+            uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
             uCameraScale: this.game.worldScale * this.state.zoom,
             uPosition: planet.position.toMatrix4(),
             uOrientation: orientation.toMatrix4(),
@@ -1119,24 +1164,21 @@ export class App extends React.Component<IAppProps, IAppState> {
         ship: Ship, cameraPosition: Quaternion, cameraOrientation: Quaternion, tick: number
     }) => {
         const position: Quaternion = ship.position;
-        const orientation: Quaternion = Quaternion.fromAxisAngle([0, 0, 1], Math.PI * 2 * Math.random());
-        const rotation: Quaternion = Quaternion.fromAxisAngle([0, 0, 1], Math.PI * 2 / 60 / 10);
+        const orientation: Quaternion = ship.orientation;
 
         // create mesh
         const uniforms = {
-            uCameraPosition: cameraPosition.clone().toMatrix4(),
-            uCameraOrientation: cameraOrientation.clone().toMatrix4(),
+            uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
+            uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
             uCameraScale: this.game.worldScale * this.state.zoom,
             uPosition: position.toMatrix4(),
             uOrientation: orientation.toMatrix4(),
             uScale: 10 * PHYSICS_SCALE / this.game.worldScale
         };
-        const shader = new PIXI.Shader(this.pixiShipResources.shipProgram, uniforms);
-        const randomShipTypeIndex = Math.floor(Math.random() * 5);
-        const randomShipType = Object.values(EShipType)[randomShipTypeIndex];
-        const mesh = new PIXI.Mesh(this.pixiShipResources.shipGeometryMap[randomShipType], shader);
+        const shader = new PIXI.Shader(this.pixiShipResources().shipProgram, uniforms);
+        const mesh = new PIXI.Mesh(this.pixiShipResources().shipGeometryMap.get(ship.faction?.id ?? EFaction.DUTCH)?.get(ship.shipType) as any, shader);
 
-        const text = new PIXI.Text(randomShipType);
+        const text = new PIXI.Text(ship.shipType);
         text.style.fill = "white";
         text.style.fontSize = 15;
 
@@ -1148,7 +1190,6 @@ export class App extends React.Component<IAppProps, IAppState> {
             text,
             position,
             orientation,
-            rotation,
             tick,
         });
     };
@@ -1161,8 +1202,8 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         // create mesh
         const uniforms = {
-            uCameraPosition: cameraPosition.clone().toMatrix4(),
-            uCameraOrientation: cameraOrientation.clone().toMatrix4(),
+            uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
+            uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
             uCameraScale: this.game.worldScale * this.state.zoom,
             uPosition: position.toMatrix4(),
             uColor: [0.75, 0.75, 0.75, 1],
@@ -1199,8 +1240,8 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         // create mesh
         const meshUniforms = {
-            uCameraPosition: cameraPosition.clone().toMatrix4(),
-            uCameraOrientation: cameraOrientation.clone().toMatrix4(),
+            uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
+            uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
             uCameraScale: this.game.worldScale * this.state.zoom,
             uPosition: position.toMatrix4(),
             uOrientation: orientation.toMatrix4(),
@@ -1211,8 +1252,8 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         // crate texture sprite
         const imageUniforms = {
-            uCameraPosition: cameraPosition.clone().toMatrix4(),
-            uCameraOrientation: cameraOrientation.clone().toMatrix4(),
+            uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
+            uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
             uCameraScale: this.game.worldScale * this.state.zoom,
             uPosition: position.toMatrix4(),
             uOrientation: orientation.toMatrix4(),
@@ -1259,8 +1300,8 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         // create mesh
         const uniforms = {
-            uCameraPosition: cameraPosition.clone().toMatrix4(),
-            uCameraOrientation: cameraOrientation.clone().toMatrix4(),
+            uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
+            uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
             uCameraScale: this.game.worldScale * this.state.zoom,
             uColor
         };
@@ -1375,7 +1416,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             for (const planet of Array.from(this.game.voronoiTerrain.getPlanets(cameraPosition.rotateVector([0, 0, 1])))) {
                 const planetMesh = this.planetMeshes.find(p => p.id === planet.id);
                 if (planetMesh) {
-                    planetMesh.orientation = planet.orientation;
+                    planetMesh.orientation = planetMesh.rotation.clone().mul(planet.orientation.clone());
                     planetMesh.tick = pixiTick;
                 } else {
                     this.addPlanet({
@@ -1483,7 +1524,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             for (const item of this.starMeshes) {
                 const shader = item.mesh.shader;
                 shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
-                shader.uniforms.uCameraOrientation = cameraOrientation.clone().toMatrix4();
+                shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
             }
 
@@ -1492,8 +1533,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                 item.orientation = item.orientation.clone().mul(item.rotation.clone());
 
                 const shader = item.mesh.shader;
-                shader.uniforms.uCameraPosition = cameraPosition.clone().toMatrix4();
-                shader.uniforms.uCameraOrientation = cameraOrientation.clone().toMatrix4();
+                shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
+                shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
                 shader.uniforms.uOrientation = item.orientation.toMatrix4();
             }
@@ -1503,8 +1544,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                 // item.orientation = item.orientation.clone().mul(item.rotation.clone());
 
                 const shader = item.mesh.shader;
-                shader.uniforms.uCameraPosition = cameraPosition.clone().toMatrix4();
-                shader.uniforms.uCameraOrientation = cameraOrientation.clone().toMatrix4();
+                shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
+                shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
                 shader.uniforms.uPosition = item.position.toMatrix4();
                 shader.uniforms.uOrientation = item.orientation.toMatrix4();
@@ -1517,8 +1558,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                 item.position = item.position.clone().mul(item.positionVelocity.clone().pow(1/60));
 
                 const shader = item.mesh.shader;
-                shader.uniforms.uCameraPosition = cameraPosition.clone().toMatrix4();
-                shader.uniforms.uCameraOrientation = cameraOrientation.clone().toMatrix4();
+                shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
+                shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
                 shader.uniforms.uPosition = item.position.toMatrix4();
             }
@@ -1528,15 +1569,15 @@ export class App extends React.Component<IAppProps, IAppState> {
                 item.orientation = item.orientation.clone().mul(item.rotation.clone());
 
                 const meshShader = item.mesh.shader;
-                meshShader.uniforms.uCameraPosition = cameraPosition.clone().toMatrix4();
-                meshShader.uniforms.uCameraOrientation = cameraOrientation.clone().toMatrix4();
+                meshShader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
+                meshShader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
                 meshShader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
                 meshShader.uniforms.uPosition = item.position.toMatrix4();
                 meshShader.uniforms.uOrientation = item.orientation.toMatrix4();
 
                 const imageShader = item.image.shader;
-                imageShader.uniforms.uCameraPosition = cameraPosition.clone().toMatrix4();
-                imageShader.uniforms.uCameraOrientation = cameraOrientation.clone().toMatrix4();
+                imageShader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
+                imageShader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
                 imageShader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
                 imageShader.uniforms.uPosition = item.position.toMatrix4();
                 imageShader.uniforms.uOrientation = item.orientation.toMatrix4();
@@ -1548,8 +1589,8 @@ export class App extends React.Component<IAppProps, IAppState> {
             if (this.state.showVoronoi) {
                 for (const item of this.voronoiMeshes) {
                     const shader = item.mesh.shader;
-                    shader.uniforms.uCameraPosition = cameraPosition.clone().toMatrix4();
-                    shader.uniforms.uCameraOrientation = cameraOrientation.clone().toMatrix4();
+                    shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
+                    shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
                     shader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
                 }
             }
