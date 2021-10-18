@@ -24,9 +24,6 @@ import {
 } from "@pickledeggs123/globular-marauders-game/lib/src/Ship";
 import {
     DelaunayGraph,
-    DelaunayTile,
-    IDrawableTile,
-    ITessellatedTriangle,
     VoronoiCell,
     VoronoiGraph
 } from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
@@ -41,7 +38,6 @@ import {
     Crate,
     DeserializeQuaternion,
     SerializeQuaternion,
-    SmokeCloud
 } from "@pickledeggs123/globular-marauders-game/lib/src/Item";
 import {
     EMessageType,
@@ -603,12 +599,13 @@ export class App extends React.Component<IAppProps, IAppState> {
             attribute vec3 aPosition;
             
             uniform mat4 uCameraPosition;
+            uniform mat4 uCameraOrientation;
             uniform float uCameraScale;
             uniform mat4 uPosition;
             uniform float uScale;
             
             void main() {
-                gl_Position = uCameraPosition * uPosition * vec4(aPosition * uScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
+                gl_Position = uCameraOrientation * uCameraPosition * uPosition * vec4(aPosition * uScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
             }
         `;
         const starFragmentShader = `
@@ -668,6 +665,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 attribute vec3 aColor;
                 
                 uniform mat4 uCameraPosition;
+                uniform mat4 uCameraOrientation;
                 uniform float uCameraScale;
                 uniform mat4 uPosition;
                 uniform mat4 uOrientation;
@@ -677,7 +675,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 
                 void main() {
                     vColor = aColor;
-                    gl_Position = uCameraPosition * uPosition * vec4((uOrientation * vec4(aPosition, 1.0)).xyz * uScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
+                    gl_Position = uCameraOrientation * uCameraPosition * uPosition * vec4((uOrientation * vec4(aPosition, 1.0)).xyz * uScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
                 }
             `;
         const planetFragmentShader = `
@@ -803,12 +801,13 @@ export class App extends React.Component<IAppProps, IAppState> {
             attribute vec3 aPosition;
             
             uniform mat4 uCameraPosition;
+            uniform mat4 uCameraOrientation;
             uniform float uCameraScale;
             uniform mat4 uPosition;
             uniform float uScale;
             
             void main() {
-                gl_Position = uCameraPosition * uPosition * vec4(aPosition * uScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
+                gl_Position = uCameraOrientation * uCameraPosition * uPosition * vec4(aPosition * uScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
             }
         `;
         const cannonBallFragmentShader = `
@@ -932,6 +931,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 attribute vec2 aUv;
                 
                 uniform mat4 uCameraPosition;
+                uniform mat4 uCameraOrientation;
                 uniform float uCameraScale;
                 uniform mat4 uPosition;
                 uniform mat4 uOrientation;
@@ -941,7 +941,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 
                 void main() {
                     vUv = aUv;
-                    gl_Position = uCameraPosition * uPosition * vec4((uOrientation * vec4(aPosition, 1.0)).xyz * uScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
+                    gl_Position = uCameraOrientation * uCameraPosition * uPosition * vec4((uOrientation * vec4(aPosition, 1.0)).xyz * uScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
                 }
             `;
         const crateImageFragmentShader = `
@@ -962,6 +962,54 @@ export class App extends React.Component<IAppProps, IAppState> {
             crateProgram,
             crateImageGeometry,
             crateImageProgram
+        };
+    })();
+
+    pixiVoronoiResources = (() => {
+        // create geometry
+        const getVoronoiGeometry = (voronoi: VoronoiCell): PIXI.Geometry => {
+            const voronoiGeometry = new PIXI.Geometry();
+            voronoiGeometry.addAttribute("aPosition", (voronoi.vertices.reduce((acc, v, i) => {
+                acc.push(...voronoi.centroid);
+                acc.push(...voronoi.vertices[(i + 1) % voronoi.vertices.length]);
+                acc.push(...voronoi.vertices[i % voronoi.vertices.length]);
+                return acc;
+            }, [] as number[])), 3);
+            voronoiGeometry.addIndex(voronoi.vertices.reduce((acc, v, i) => {
+                acc.push(0, ((i + 1) % voronoi.vertices.length) + 1, (i % voronoi.vertices.length) + 1);
+                return acc;
+            }, [] as number[]));
+            return voronoiGeometry;
+        };
+
+        // create material
+        const voronoiVertexShader = `
+            precision mediump float;
+            
+            attribute vec3 aPosition;
+            
+            uniform mat4 uCameraPosition;
+            uniform mat4 uCameraOrientation;
+            uniform float uCameraScale;
+            
+            void main() {
+                gl_Position = uCameraOrientation * uCameraPosition * vec4(aPosition + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
+            }
+        `;
+        const voronoiFragmentShader = `
+            precision mediump float;
+            
+            uniform vec4 uColor;
+            
+            void main() {
+                gl_FragColor = uColor;
+            }
+        `;
+        const voronoiProgram = new PIXI.Program(voronoiVertexShader, voronoiFragmentShader);
+
+        return {
+            getVoronoiGeometry,
+            voronoiProgram
         };
     })();
 
@@ -1004,11 +1052,22 @@ export class App extends React.Component<IAppProps, IAppState> {
         tick: number
     }> = [];
     sprites: Record<string, PIXI.Texture> = {};
+    voronoiMeshes: Array<{
+        id: string,
+        mesh: PIXI.Mesh<PIXI.Shader>,
+        tick: number
+    }> = [];
 
-    addStar = ({star, cameraPosition, tick}: {star: Star, cameraPosition: Quaternion, tick: number}) => {
+    addStar = ({star, cameraPosition, cameraOrientation, tick}: {
+        star: Star,
+        cameraPosition: Quaternion,
+        cameraOrientation: Quaternion,
+        tick: number
+    }) => {
         // create mesh
         const uniforms = {
             uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
+            uCameraOrientation: cameraOrientation.clone().toMatrix4(),
             uCameraScale: this.game.worldScale * this.state.zoom,
             uPosition: star.position.toMatrix4(),
             uColor: this.hexToRgb(star.color),
@@ -1025,14 +1084,17 @@ export class App extends React.Component<IAppProps, IAppState> {
         });
     };
 
-    addPlanet = ({planet, cameraPosition, tick}: {planet: Planet, cameraPosition: Quaternion, tick: number}) => {
+    addPlanet = ({planet, cameraPosition, cameraOrientation, tick}: {
+        planet: Planet, cameraPosition: Quaternion, cameraOrientation: Quaternion, tick: number
+    }) => {
         // create planet properties
         const orientation: Quaternion = Quaternion.ONE;
         const rotation: Quaternion = Quaternion.fromAxisAngle(DelaunayGraph.randomPoint(), Math.PI * 2 / 60 / 10);
 
         // create mesh
         const uniforms = {
-            uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
+            uCameraPosition: cameraPosition.clone().toMatrix4(),
+            uCameraOrientation: cameraOrientation.clone().toMatrix4(),
             uCameraScale: this.game.worldScale * this.state.zoom,
             uPosition: planet.position.toMatrix4(),
             uOrientation: orientation.toMatrix4(),
@@ -1053,14 +1115,17 @@ export class App extends React.Component<IAppProps, IAppState> {
         });
     };
 
-    addShip = ({ship, cameraPosition, tick}: {ship: Ship, cameraPosition: Quaternion, tick: number}) => {
+    addShip = ({ship, cameraPosition, cameraOrientation, tick}: {
+        ship: Ship, cameraPosition: Quaternion, cameraOrientation: Quaternion, tick: number
+    }) => {
         const position: Quaternion = ship.position;
         const orientation: Quaternion = Quaternion.fromAxisAngle([0, 0, 1], Math.PI * 2 * Math.random());
         const rotation: Quaternion = Quaternion.fromAxisAngle([0, 0, 1], Math.PI * 2 / 60 / 10);
 
         // create mesh
         const uniforms = {
-            uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
+            uCameraPosition: cameraPosition.clone().toMatrix4(),
+            uCameraOrientation: cameraOrientation.clone().toMatrix4(),
             uCameraScale: this.game.worldScale * this.state.zoom,
             uPosition: position.toMatrix4(),
             uOrientation: orientation.toMatrix4(),
@@ -1088,13 +1153,16 @@ export class App extends React.Component<IAppProps, IAppState> {
         });
     };
 
-    addCannonBall = ({cannonBall, cameraPosition, tick}: {cannonBall: CannonBall, cameraPosition: Quaternion, tick: number}) => {
+    addCannonBall = ({cannonBall, cameraPosition, cameraOrientation, tick}: {
+        cannonBall: CannonBall, cameraPosition: Quaternion, cameraOrientation: Quaternion, tick: number
+    }) => {
         const position: Quaternion = cannonBall.position;
         const positionVelocity: Quaternion = cannonBall.positionVelocity;
 
         // create mesh
         const uniforms = {
-            uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
+            uCameraPosition: cameraPosition.clone().toMatrix4(),
+            uCameraOrientation: cameraOrientation.clone().toMatrix4(),
             uCameraScale: this.game.worldScale * this.state.zoom,
             uPosition: position.toMatrix4(),
             uColor: [0.75, 0.75, 0.75, 1],
@@ -1116,10 +1184,12 @@ export class App extends React.Component<IAppProps, IAppState> {
     addCrate = ({
         crate,
         cameraPosition,
+        cameraOrientation,
         tick
     }: {
         crate: Crate,
         cameraPosition: Quaternion,
+        cameraOrientation: Quaternion,
         tick: number
     }) => {
         const position: Quaternion = crate.position;
@@ -1129,7 +1199,8 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         // create mesh
         const meshUniforms = {
-            uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
+            uCameraPosition: cameraPosition.clone().toMatrix4(),
+            uCameraOrientation: cameraOrientation.clone().toMatrix4(),
             uCameraScale: this.game.worldScale * this.state.zoom,
             uPosition: position.toMatrix4(),
             uOrientation: orientation.toMatrix4(),
@@ -1140,7 +1211,8 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         // crate texture sprite
         const imageUniforms = {
-            uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
+            uCameraPosition: cameraPosition.clone().toMatrix4(),
+            uCameraOrientation: cameraOrientation.clone().toMatrix4(),
             uCameraScale: this.game.worldScale * this.state.zoom,
             uPosition: position.toMatrix4(),
             uOrientation: orientation.toMatrix4(),
@@ -1170,17 +1242,56 @@ export class App extends React.Component<IAppProps, IAppState> {
         });
     };
 
+    addVoronoi = ({id, voronoi, cameraPosition, cameraOrientation, tick}: {
+        id: string, voronoi: VoronoiCell, cameraPosition: Quaternion, cameraOrientation: Quaternion, tick: number
+    }) => {
+        const initialIndex = parseInt(id);
+        const index = isNaN(initialIndex) ? 0 : initialIndex;
+        const colors: Array<[number, number, number, number]> = [
+            [0.75, 0.00, 0.00, 0.25],
+            [0.75, 0.75, 0.00, 0.25],
+            [0.00, 0.75, 0.00, 0.25],
+            [0.00, 0.75, 0.75, 0.25],
+            [0.00, 0.00, 0.75, 0.25],
+            [0.75, 0.00, 0.75, 0.25]
+        ];
+        const uColor = colors[index % colors.length];
+
+        // create mesh
+        const uniforms = {
+            uCameraPosition: cameraPosition.clone().toMatrix4(),
+            uCameraOrientation: cameraOrientation.clone().toMatrix4(),
+            uCameraScale: this.game.worldScale * this.state.zoom,
+            uColor
+        };
+        const shader = new PIXI.Shader(this.pixiVoronoiResources.voronoiProgram, uniforms);
+        const mesh = new PIXI.Mesh(this.pixiVoronoiResources.getVoronoiGeometry(voronoi), shader);
+
+        this.application.stage.addChild(mesh);
+        this.voronoiMeshes.push({
+            id,
+            mesh,
+            tick,
+        });
+    };
+
     constructor(props: IAppProps) {
         super(props);
 
         // setup rendering
         this.application = new PIXI.Application();
+        // this.application.stage.mask = new Graphics()
+        //     .beginFill(0xffffff)
+        //     .drawCircle(this.application.stage.width / 2, this.application.stage.height / 2,
+        //         Math.min(this.application.stage.width, this.application.stage.height) / 2)
+        //     .endFill();
 
         // draw app
         this.game.initializeGame();
 
         // draw rotating app
         let cameraPosition: Quaternion = Quaternion.ONE;
+        let cameraOrientation: Quaternion = Quaternion.ONE;
 
         // load sprites into memory
         const loader = new PIXI.Loader();
@@ -1232,7 +1343,9 @@ export class App extends React.Component<IAppProps, IAppState> {
         // draw rotating app
         let pixiTick: number = 0;
         this.application.ticker.add(() => {
-            cameraPosition = this.getPlayerShip().position;
+            const playerShip = this.getPlayerShip();
+            cameraPosition = playerShip.position;
+            cameraOrientation = playerShip.orientation;
             pixiTick += 1;
 
             // sync game to Pixi renderer
@@ -1246,7 +1359,12 @@ export class App extends React.Component<IAppProps, IAppState> {
                 if (starMesh) {
                     starMesh.tick = pixiTick;
                 } else {
-                    this.addStar({star, cameraPosition, tick: pixiTick});
+                    this.addStar({
+                        star,
+                        cameraPosition,
+                        cameraOrientation,
+                        tick: pixiTick
+                    });
                 }
             }
             for (const item of this.starMeshes.filter(m => m.tick !== pixiTick)) {
@@ -1260,7 +1378,12 @@ export class App extends React.Component<IAppProps, IAppState> {
                     planetMesh.orientation = planet.orientation;
                     planetMesh.tick = pixiTick;
                 } else {
-                    this.addPlanet({planet, cameraPosition, tick: pixiTick});
+                    this.addPlanet({
+                        planet,
+                        cameraPosition,
+                        cameraOrientation,
+                        tick: pixiTick
+                    });
                 }
             }
             for (const item of this.planetMeshes.filter(m => m.tick !== pixiTick)) {
@@ -1275,7 +1398,12 @@ export class App extends React.Component<IAppProps, IAppState> {
                     shipMesh.orientation = ship.orientation;
                     shipMesh.tick = pixiTick;
                 } else {
-                    this.addShip({ship, cameraPosition, tick: pixiTick});
+                    this.addShip({
+                        ship,
+                        cameraPosition,
+                        cameraOrientation,
+                        tick: pixiTick
+                    });
                 }
             }
             for (const item of this.shipMeshes.filter(m => m.tick !== pixiTick)) {
@@ -1290,7 +1418,12 @@ export class App extends React.Component<IAppProps, IAppState> {
                     cannonBallMesh.positionVelocity = cannonBall.positionVelocity;
                     cannonBallMesh.tick = pixiTick;
                 } else {
-                    this.addCannonBall({cannonBall, cameraPosition, tick: pixiTick});
+                    this.addCannonBall({
+                        cannonBall,
+                        cameraPosition,
+                        cameraOrientation,
+                        tick: pixiTick
+                    });
                 }
             }
             for (const item of this.cannonBallMeshes.filter(m => m.tick !== pixiTick)) {
@@ -1305,7 +1438,12 @@ export class App extends React.Component<IAppProps, IAppState> {
                     crateMeshes.orientation = crate.orientation;
                     crateMeshes.tick = pixiTick;
                 } else {
-                    this.addCrate({crate, cameraPosition, tick: pixiTick});
+                    this.addCrate({
+                        crate,
+                        cameraPosition,
+                        cameraOrientation,
+                        tick: pixiTick
+                    });
                 }
             }
             for (const item of this.crateMeshes.filter(m => m.tick !== pixiTick)) {
@@ -1313,11 +1451,39 @@ export class App extends React.Component<IAppProps, IAppState> {
                 this.application.stage.removeChild(item.image);
             }
             this.crateMeshes = this.crateMeshes.filter(m => m.tick === pixiTick);
+            // voronoi tiles
+            if (this.state.showVoronoi) {
+                for (const {id, voronoi} of this.voronoiData.map((voronoi, id) => ({id: `${id}`, voronoi})).filter(({voronoi}) => {
+                    return true || VoronoiGraph.angularDistance(
+                        this.getPlayerShip().position.rotateVector([0, 0, 1]),
+                        voronoi.centroid,
+                        this.game.worldScale
+                    ) < (Math.PI / (this.game.worldScale * this.state.zoom)) + voronoi.radius;
+                })) {
+                    const voronoiMesh = this.voronoiMeshes.find(p => p.id === id);
+                    if (voronoiMesh) {
+                        voronoiMesh.tick = pixiTick;
+                    } else {
+                        this.addVoronoi({
+                            id,
+                            voronoi,
+                            cameraPosition,
+                            cameraOrientation,
+                            tick: pixiTick
+                        });
+                    }
+                }
+            }
+            for (const item of this.voronoiMeshes.filter(m => m.tick !== pixiTick)) {
+                this.application.stage.removeChild(item.mesh);
+            }
+            this.voronoiMeshes = this.voronoiMeshes.filter(m => m.tick === pixiTick);
 
             // update each star
             for (const item of this.starMeshes) {
                 const shader = item.mesh.shader;
                 shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
+                shader.uniforms.uCameraOrientation = cameraOrientation.clone().toMatrix4();
                 shader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
             }
 
@@ -1326,7 +1492,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                 item.orientation = item.orientation.clone().mul(item.rotation.clone());
 
                 const shader = item.mesh.shader;
-                shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
+                shader.uniforms.uCameraPosition = cameraPosition.clone().toMatrix4();
+                shader.uniforms.uCameraOrientation = cameraOrientation.clone().toMatrix4();
                 shader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
                 shader.uniforms.uOrientation = item.orientation.toMatrix4();
             }
@@ -1336,7 +1503,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                 // item.orientation = item.orientation.clone().mul(item.rotation.clone());
 
                 const shader = item.mesh.shader;
-                shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
+                shader.uniforms.uCameraPosition = cameraPosition.clone().toMatrix4();
+                shader.uniforms.uCameraOrientation = cameraOrientation.clone().toMatrix4();
                 shader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
                 shader.uniforms.uPosition = item.position.toMatrix4();
                 shader.uniforms.uOrientation = item.orientation.toMatrix4();
@@ -1349,7 +1517,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                 item.position = item.position.clone().mul(item.positionVelocity.clone().pow(1/60));
 
                 const shader = item.mesh.shader;
-                shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
+                shader.uniforms.uCameraPosition = cameraPosition.clone().toMatrix4();
+                shader.uniforms.uCameraOrientation = cameraOrientation.clone().toMatrix4();
                 shader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
                 shader.uniforms.uPosition = item.position.toMatrix4();
             }
@@ -1359,18 +1528,30 @@ export class App extends React.Component<IAppProps, IAppState> {
                 item.orientation = item.orientation.clone().mul(item.rotation.clone());
 
                 const meshShader = item.mesh.shader;
-                meshShader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
+                meshShader.uniforms.uCameraPosition = cameraPosition.clone().toMatrix4();
+                meshShader.uniforms.uCameraOrientation = cameraOrientation.clone().toMatrix4();
                 meshShader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
                 meshShader.uniforms.uPosition = item.position.toMatrix4();
                 meshShader.uniforms.uOrientation = item.orientation.toMatrix4();
 
                 const imageShader = item.image.shader;
-                imageShader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
+                imageShader.uniforms.uCameraPosition = cameraPosition.clone().toMatrix4();
+                imageShader.uniforms.uCameraOrientation = cameraOrientation.clone().toMatrix4();
                 imageShader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
                 imageShader.uniforms.uPosition = item.position.toMatrix4();
                 imageShader.uniforms.uOrientation = item.orientation.toMatrix4();
 
                 handleDrawingOfText(item.text, item.position);
+            }
+
+            // draw voronoi terrain tiles for political boundaries
+            if (this.state.showVoronoi) {
+                for (const item of this.voronoiMeshes) {
+                    const shader = item.mesh.shader;
+                    shader.uniforms.uCameraPosition = cameraPosition.clone().toMatrix4();
+                    shader.uniforms.uCameraOrientation = cameraOrientation.clone().toMatrix4();
+                    shader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
+                }
             }
         });
 
@@ -1767,50 +1948,6 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     /**
-     * Draw a star onto the screen.
-     * @param planetDrawing
-     * @private
-     */
-    private drawStar(planetDrawing: IDrawable<Planet>) {
-        const isReverseSide = planetDrawing.rotatedPosition[2] > 0;
-        const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
-        const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
-        const distance = planetDrawing.distance;
-        const size = 0.1 * Math.max(0, 2 * Math.atan((planetDrawing.original.size || 1) / (2 * distance)));
-        return (
-            <g key={planetDrawing.id}>
-                <circle
-                    cx={x * this.state.width}
-                    cy={(1 - y) * this.state.height}
-                    r={size * (this.state.zoom * this.game.worldScale)}
-                    fill={planetDrawing.color}
-                    stroke="grey"
-                    strokeWidth={0.2 * size * (this.state.zoom * this.game.worldScale)}
-                    style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
-                />
-                <line
-                    x1={(x + 0.01) * this.state.width}
-                    y1={(1 - y) * this.state.height}
-                    x2={(x - 0.01) * this.state.width}
-                    y2={(1 - y) * this.state.height}
-                    stroke={planetDrawing.color}
-                    strokeWidth={0.2 * size * (this.state.zoom * this.game.worldScale)}
-                    style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
-                />
-                <line
-                    x1={x * this.state.width}
-                    y1={(1 - y + 0.01) * this.state.height}
-                    x2={x * this.state.width}
-                    y2={(1 - y - 0.01) * this.state.height}
-                    stroke={planetDrawing.color}
-                    strokeWidth={0.2 * size * (this.state.zoom * this.game.worldScale)}
-                    style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
-                />
-            </g>
-        );
-    }
-
-    /**
      * Get the target lines for a ship.
      * @param planetDrawing The ship to get target lines for.
      * @private
@@ -1905,44 +2042,6 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     /**
-     * Draw a physics hull.
-     * @param planetDrawing
-     * @private
-     */
-    private renderPhysicsHull(planetDrawing: IDrawable<Ship>) {
-        // do not draw hulls on the other side of the world
-        if (planetDrawing.rotatedPosition[2] < 0) {
-            return null;
-        }
-
-        const shipData = SHIP_DATA.find(s => s.shipType === planetDrawing.original.shipType);
-        if (!shipData) {
-            throw new Error("Could not find ship type");
-        }
-        const hullPoints = shipData.hull;
-
-        const hullQuaternions = Game.getPhysicsHull(hullPoints, this.game.worldScale);
-        const rotatedHullQuaternion = hullQuaternions.map((q): Quaternion => {
-            return planetDrawing.position.clone()
-                .mul(q);
-        });
-        const rotatedHullPoints = rotatedHullQuaternion.map((q): [number, number] => {
-            const point = q.rotateVector([0, 0, 1]);
-            return [point[0], point[1]]
-        });
-
-        return (
-            <polygon
-                key={`${planetDrawing.id}-physics-hull`}
-                points={rotatedHullPoints.map(([x, y]) => `${(x * (this.state.zoom * this.game.worldScale) + 1) * 0.5 * this.state.width},${(1 - (y * (this.state.zoom * this.game.worldScale) + 1) * 0.5) * this.state.height}`).join(" ")}
-                fill="white"
-                stroke="cyan"
-                opacity={0.5}
-            />
-        );
-    }
-
-    /**
      * Render a ship into a rectangle, Useful for UI button or game world.
      * @param planetDrawing
      * @param size
@@ -2002,199 +2101,6 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     /**
-     * Draw a ship into the game world.
-     * @param planetDrawing
-     * @private
-     */
-    private drawShip(planetDrawing: IDrawable<Ship>) {
-        const shipData = SHIP_DATA.find(s => s.shipType === planetDrawing.original.shipType);
-        if (!shipData) {
-            throw new Error("Could not find ship type");
-        }
-
-        const playerData = this.game.playerData.find(p => p.shipId === planetDrawing.original.id) || null;
-
-        const isReverseSide = planetDrawing.rotatedPosition[2] > 0;
-        const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
-        const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
-        const distance = planetDrawing.distance;
-        const size = 0.1 * Math.max(0, 2 * Math.atan(1 / (2 * distance)));
-        const scale = size * (this.state.zoom * this.game.worldScale);
-
-        // handle UI lines
-        let velocityX: number = 0;
-        let velocityY: number = 0;
-        let targetLineData: ITargetLineData | null = null;
-        const isPlayerShip = planetDrawing.original.id === this.getPlayerShip().id;
-        if (isPlayerShip) {
-            // handle velocity line
-            let velocityPoint = planetDrawing.positionVelocity.clone()
-                .rotateVector([0, 0, 1]);
-            velocityPoint[2] = 0;
-            velocityPoint = DelaunayGraph.normalize(velocityPoint);
-            velocityX = velocityPoint[0];
-            velocityY = velocityPoint[1];
-
-            targetLineData = App.getShipTargetLines.call(this, planetDrawing);
-        }
-        const rightCannonPointTop: [number, number] = [
-            Math.max(this.state.width / 2, this.state.height / 2) * Math.cos((10 / 180 * Math.PI)) * (this.state.zoom * this.game.worldScale),
-            Math.max(this.state.width / 2, this.state.height / 2) * Math.sin((10 / 180 * Math.PI)) * (this.state.zoom * this.game.worldScale),
-        ]
-        const rightCannonPointBottom: [number, number] = [
-            Math.max(this.state.width / 2, this.state.height / 2) * Math.cos(-(10 / 180 * Math.PI)) * (this.state.zoom * this.game.worldScale),
-            Math.max(this.state.width / 2, this.state.height / 2) * Math.sin(-(10 / 180 * Math.PI)) * (this.state.zoom * this.game.worldScale),
-        ];
-        const leftCannonPointTop: [number, number] = [
-            Math.max(this.state.width / 2, this.state.height / 2) * Math.cos(Math.PI - (10 / 180 * Math.PI)) * (this.state.zoom * this.game.worldScale),
-            Math.max(this.state.width / 2, this.state.height / 2) * Math.sin(Math.PI - (10 / 180 * Math.PI)) * (this.state.zoom * this.game.worldScale),
-        ]
-        const leftCannonPointBottom: [number, number] = [
-            Math.max(this.state.width / 2, this.state.height / 2) * Math.cos(Math.PI + (10 / 180 * Math.PI)) * (this.state.zoom * this.game.worldScale),
-            Math.max(this.state.width / 2, this.state.height / 2) * Math.sin(Math.PI + (10 / 180 * Math.PI)) * (this.state.zoom * this.game.worldScale),
-        ];
-        let cannonLoadingPercentage = 0;
-        if (isPlayerShip && planetDrawing.original.cannonLoading) {
-            cannonLoadingPercentage = (Date.now() - +planetDrawing.original.cannonLoading) / 3000;
-        }
-        return (
-            <g key={planetDrawing.id} transform={`translate(${x * this.state.width},${(1 - y) * this.state.height})`}>
-                {
-                    isPlayerShip && !isNaN(velocityX) && !isNaN(velocityY) && (
-                        <line
-                            key="velocity-line"
-                            x1={0}
-                            y1={0}
-                            x2={this.state.width * 0.5 * velocityX}
-                            y2={this.state.height * 0.5 * -velocityY}
-                            stroke="white"
-                            strokeWidth={2}
-                            strokeDasharray="1,5"
-                        />
-                    )
-                }
-                {
-                    isPlayerShip && targetLineData && targetLineData.targetLines.map(([a, b], index) => {
-                        return (
-                            <line
-                                key={`target-line-${index}`}
-                                x1={this.state.width * a[0] * (this.state.zoom * this.game.worldScale)}
-                                y1={this.state.height * -a[1] * (this.state.zoom * this.game.worldScale)}
-                                x2={this.state.width * b[0] * (this.state.zoom * this.game.worldScale)}
-                                y2={this.state.height * -b[1] * (this.state.zoom * this.game.worldScale)}
-                                stroke="blue"
-                                strokeWidth={2}
-                                strokeDasharray="1,5"
-                            />
-                        );
-                    })
-                }
-                {
-                    isPlayerShip && targetLineData && targetLineData.targetNodes.map(([a, value]) => {
-                        return (
-                            <>
-                                <circle
-                                    key={`target-marker-${value}`}
-                                    r={10}
-                                    cx={this.state.width * a[0] * (this.state.zoom * this.game.worldScale)}
-                                    cy={this.state.height * -a[1] * (this.state.zoom * this.game.worldScale)}
-                                    stroke="blue"
-                                    fill="none"
-                                />
-                                <text
-                                    key={`target-value-${value}`}
-                                    textAnchor="middle"
-                                    x={this.state.width * a[0] * (this.state.zoom * this.game.worldScale)}
-                                    y={this.state.height * -a[1] * (this.state.zoom * this.game.worldScale) + 5}
-                                    stroke="blue"
-                                    fill="none"
-                                >{value}</text>
-                            </>
-                        );
-                    })
-                }
-                <g transform={`rotate(${planetDrawing.rotation}) scale(${scale})`}>
-                    {
-                        this.renderShip(planetDrawing, size)
-                    }
-                    <polyline
-                        key={`${planetDrawing.id}-health`}
-                        fill="none"
-                        stroke="green"
-                        strokeWidth={5}
-                        points={`${this.getPointsOfAngularProgress.call(
-                            this, planetDrawing.original.health / planetDrawing.original.maxHealth,
-                            shipData.hull[0][1] * 3 + 5
-                        )}`}
-                    />
-                    {
-                        isPlayerShip && planetDrawing.original.cannonLoading && (
-                            <>
-                                <polygon
-                                    points={`10,-20 ${rightCannonPointBottom[0]},${rightCannonPointBottom[1]} ${rightCannonPointTop[0]},${rightCannonPointTop[1]} 10,20`}
-                                    fill="grey"
-                                    stroke="white"
-                                    strokeWidth={0.05 * size * (this.state.zoom * this.game.worldScale)}
-                                    style={{opacity: 0.3}}
-                                />
-                                <polygon
-                                    points={`-10,-20 ${leftCannonPointBottom[0]},${leftCannonPointBottom[1]} ${leftCannonPointTop[0]},${leftCannonPointTop[1]} -10,20`}
-                                    fill="grey"
-                                    stroke="white"
-                                    strokeWidth={0.05 * size * (this.state.zoom * this.game.worldScale)}
-                                    style={{opacity: 0.3}}
-                                />
-                                <polygon
-                                    points={`10,-20 ${rightCannonPointBottom[0] * cannonLoadingPercentage},${rightCannonPointBottom[1] * cannonLoadingPercentage} ${rightCannonPointTop[0] * cannonLoadingPercentage},${rightCannonPointTop[1] * cannonLoadingPercentage} 10,20`}
-                                    fill="white"
-                                    style={{opacity: 0.3}}
-                                />
-                                <polygon
-                                    points={`-10,-20 ${leftCannonPointBottom[0] * cannonLoadingPercentage},${leftCannonPointBottom[1] * cannonLoadingPercentage} ${leftCannonPointTop[0] * cannonLoadingPercentage},${leftCannonPointTop[1] * cannonLoadingPercentage} -10,20`}
-                                    fill="white"
-                                    style={{opacity: 0.3}}
-                                />
-                            </>
-                        )
-                    }
-                </g>
-                {
-                    playerData ? (
-                        <g>
-                            <text x={0} y={this.state.height > 0.5 ? -20 : 10} fill="white" textAnchor="middle">{playerData.name}</text>
-                        </g>
-                    ) : null
-                }
-            </g>
-        );
-    }
-
-    /**
-     * Draw a smoke cloud from the space ship in the game world.
-     * @param planetDrawing
-     * @private
-     */
-    private drawSmokeCloud(planetDrawing: IDrawable<SmokeCloud>) {
-        const isReverseSide = planetDrawing.rotatedPosition[2] > 0;
-        const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
-        const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
-        const distance = planetDrawing.distance;
-        const size = 0.1 * Math.max(0, 2 * Math.atan(planetDrawing.original.size / (2 * distance)));
-        return (
-            <circle
-                key={planetDrawing.id}
-                cx={x * this.state.width}
-                cy={(1 - y) * this.state.height}
-                r={size * (this.state.zoom * this.game.worldScale)}
-                fill={planetDrawing.color}
-                stroke="darkgray"
-                strokeWidth={0.02 * size * (this.state.zoom * this.game.worldScale)}
-                style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
-            />
-        );
-    }
-
-    /**
      * Draw a crate containing cargo, Crates are created when ships are destroyed and if that dead ship had cargo.
      * @param uiPass
      * @param planetDrawing
@@ -2230,123 +2136,6 @@ export class App extends React.Component<IAppProps, IAppState> {
                             {planetDrawing.original.resourceType}
                         </text>
                     )
-                }
-            </g>
-        );
-    }
-
-    /**
-     * Get the mid point of a delaunay tile.
-     * @param tile
-     * @private
-     */
-    private getDelaunayTileMidPoint(tile: DelaunayTile): {x: number, y: number} {
-        const rotatedPoints = tile.vertices.map((v: Quaternion): [number, number, number] => {
-            return v.rotateVector([0, 0, 1]);
-        });
-        const averagePoint = DelaunayGraph.normalize(Game.getAveragePoint(rotatedPoints));
-        return {
-            x: (averagePoint[0] * (this.state.zoom * this.game.worldScale) + 1) * 0.5,
-            y: (averagePoint[1] * (this.state.zoom * this.game.worldScale) + 1) * 0.5,
-        };
-    }
-
-    /**
-     * Rotate a series of quaternion points.
-     * @param vertices
-     * @private
-     */
-    private getPointsAndRotatedPoints(vertices: Quaternion[]) {
-        const rotatedPoints = vertices.map((v: Quaternion): [number, number, number] => {
-            return v.rotateVector([0, 0, 1]);
-        });
-        const points: Array<{x: number, y: number}> = rotatedPoints.map(point => {
-            return {
-                x: (point[0] + 1) * 0.5,
-                y: (point[1] + 1) * 0.5,
-            };
-        }).map(p => {
-            return {
-                x: (p.x - 0.5) * (this.state.zoom * this.game.worldScale) * 1.1 + 0.5,
-                y: (p.y - 0.5) * (this.state.zoom * this.game.worldScale) * 1.1 + 0.5,
-            };
-        });
-
-        return {
-            points,
-            rotatedPoints
-        };
-    }
-
-    /**
-     * Draw a delaunay tessellated triangle. Tessellated triangles are triangles recursively broken into smaller triangles
-     * using the zelda pattern.
-     * @param earthLike
-     * @param tile
-     * @param triangle
-     * @param index
-     * @param arr
-     * @private
-     */
-    private drawDelaunayTessellatedTriangle(earthLike: boolean, tile: DelaunayTile, triangle: ITessellatedTriangle, index: number, arr: ITessellatedTriangle[]) {
-        const {
-            points,
-            rotatedPoints
-        } = this.getPointsAndRotatedPoints(triangle.vertices);
-
-        // determine if the triangle is facing the camera, do not draw triangles facing away from the camera
-        const triangleNormal = DelaunayGraph.crossProduct(
-            DelaunayGraph.subtract(rotatedPoints[1], rotatedPoints[0]),
-            DelaunayGraph.subtract(rotatedPoints[2], rotatedPoints[0]),
-        );
-
-        const triangleFacingCamera = DelaunayGraph.dotProduct([0, 0, 1], triangleNormal) > 0;
-
-        // get a point position for the text box on the area
-        let averageDrawingPoint: {x: number, y: number} | null = null;
-        if (index === arr.length - 1 && triangleFacingCamera) {
-            averageDrawingPoint = this.getDelaunayTileMidPoint(tile);
-        }
-
-        if (triangleFacingCamera) {
-            return (
-                <g key={`${tile.id}-${index}`}>
-                    <polygon
-                        points={points.map(p => `${p.x * this.state.width},${(1 - p.y) * this.state.height}`).join(" ")}
-                        fill={tile.color}
-                        stroke={!earthLike ? "white" : undefined}
-                        strokeWidth={!earthLike ? 2 : 0}
-                        style={{opacity: !earthLike ? 0.1 : 1}}
-                    />
-                    {
-                        averageDrawingPoint && !earthLike && (
-                            <text
-                                x={averageDrawingPoint.x * this.state.width}
-                                y={(1 - averageDrawingPoint.y) * this.state.height}
-                                stroke="white"
-                                style={{opacity: 0.1}}
-                            >{tile.id}</text>
-                        )
-                    }
-                </g>
-            );
-        } else {
-            return null;
-        }
-    }
-
-    /**
-     * Draw a delaunay tile.
-     * @param earthLike
-     * @param tile
-     * @private
-     */
-    private drawDelaunayTile(earthLike: boolean, tile: IDrawableTile) {
-        const tessellationMesh = Array.from(this.game.getDelaunayTileTessellation(tile.centroid, tile.vertices));
-        return (
-            <g key={tile.id}>
-                {
-                    tessellationMesh.map(this.drawDelaunayTessellatedTriangle.bind(this, earthLike, tile))
                 }
             </g>
         );
@@ -2709,82 +2498,6 @@ export class App extends React.Component<IAppProps, IAppState> {
             //     .mul(clickQuaternion)
             //     .rotateVector([0, 0, 1]);
         }
-    }
-
-    private renderGameWorld() {
-        const shipPosition = this.getPlayerShip().position.rotateVector([0, 0, 1]);
-
-        return (
-            <>
-                <circle
-                    key="game-world-background"
-                    cx={this.state.width * 0.5}
-                    cy={this.state.height * 0.5}
-                    r={Math.min(this.state.width, this.state.height) * 0.5}
-                    fill="black"
-                />
-                {
-                    this.state.showVoronoi ?
-                        this.voronoiData.filter(d => {
-                            return VoronoiGraph.angularDistance(
-                                this.getPlayerShip().position.rotateVector([0, 0, 1]),
-                                d.centroid,
-                                this.game.worldScale
-                            ) < (Math.PI / (this.game.worldScale * this.state.zoom)) + d.radius;
-                        }).map(this.game.rotateDelaunayTriangle.bind(this.game, this.getPlayerShip(),false))
-                            .map(this.drawDelaunayTile.bind(this, false)) :
-                        null
-                }
-                {/*{*/}
-                {/*    ([*/}
-                {/*        ...Array.from(this.game.voronoiTerrain.getStars(shipPosition, 0.5)).map(this.rotatePlanet.bind(this))*/}
-                {/*            .map(this.convertToDrawable.bind(this, "-star2", 0.5)),*/}
-                {/*        ...Array.from(this.game.voronoiTerrain.getStars(shipPosition, 0.25)).map(this.rotatePlanet.bind(this))*/}
-                {/*            .map(this.convertToDrawable.bind(this, "-star3", 0.25)),*/}
-                {/*        ...Array.from(this.game.voronoiTerrain.getStars(shipPosition, 0.125)).map(this.rotatePlanet.bind(this))*/}
-                {/*            .map(this.convertToDrawable.bind(this, "-star4", 0.125))*/}
-                {/*    ] as Array<IDrawable<Planet>>)*/}
-                {/*        .sort((a: any, b: any) => b.distance - a.distance)*/}
-                {/*        .map(this.drawStar.bind(this))*/}
-                {/*}*/}
-                {/*{*/}
-                {/*    (Array.from(this.game.voronoiTerrain.getPlanets(shipPosition)).map(this.rotatePlanet.bind(this))*/}
-                {/*        .map(this.convertToDrawable.bind(this, "-planet", 1)) as Array<IDrawable<Planet>>)*/}
-                {/*        .map(this.drawPlanet.bind(this, false))*/}
-                {/*}*/}
-                {/*{*/}
-                {/*    (this.game.smokeClouds.map(App.applyKinematics.bind(this))*/}
-                {/*        .map(this.rotatePlanet.bind(this))*/}
-                {/*        .map(this.convertToDrawable.bind(this, "-smokeClouds", 1)) as Array<IDrawable<SmokeCloud>>)*/}
-                {/*        .map(this.drawSmokeCloud.bind(this))*/}
-                {/*}*/}
-                {/*{*/}
-                {/*    (this.game.cannonBalls.map(this.rotatePlanet.bind(this))*/}
-                {/*        .map(this.convertToDrawable.bind(this, "-cannonBalls", 1)) as Array<IDrawable<SmokeCloud>>)*/}
-                {/*        .map(this.drawSmokeCloud.bind(this))*/}
-                {/*}*/}
-                {/*{*/}
-                {/*    (this.game.crates.map(this.rotatePlanet.bind(this))*/}
-                {/*        .map(this.convertToDrawable.bind(this, "-crates", 1)) as Array<IDrawable<Crate>>)*/}
-                {/*        .map(this.drawCrate.bind(this, false))*/}
-                {/*}*/}
-                {/*{*/}
-                {/*    (this.game.ships.map(this.rotatePlanet.bind(this))*/}
-                {/*        .map(this.convertToDrawable.bind(this, "-ships", 1)) as Array<IDrawable<Ship>>)*/}
-                {/*        .map(this.drawShip.bind(this))*/}
-                {/*}*/}
-                {
-                    (Array.from(this.game.voronoiTerrain.getPlanets(shipPosition)).map(this.rotatePlanet.bind(this))
-                        .map(this.convertToDrawable.bind(this, "-planet", 1)) as Array<IDrawable<Planet>>)
-                        .map(this.drawPlanet.bind(this, true))
-                }
-                {
-                    (this.game.crates.map(this.rotatePlanet.bind(this))
-                        .map(this.convertToDrawable.bind(this, "-crates", 1)) as Array<IDrawable<Crate>>)
-                        .map(this.drawCrate.bind(this, true))
-                }
-            </>
-        );
     }
 
     private renderGameControls() {
@@ -3253,7 +2966,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         return this.convertToDrawable("draw-ships", 1, this.rotatePlanet(original));
     }
 
-    renderItem(resourceType: EResourceType, index: number = 0) {
+    renderItem(resourceType: EResourceType) {
         const item = RESOURCE_TYPE_TEXTURE_PAIRS.find(i => i.resourceType === resourceType);
         if (item) {
             return <img src={item.url} width={100} height={100} alt={item.name}/>;
@@ -3317,7 +3030,6 @@ export class App extends React.Component<IAppProps, IAppState> {
                         </label>
                     </div>
                 </div>
-                <div ref={this.showAppBodyRef}/>
                 {
                     this.state.showNotes && (
                         <ul>
@@ -3444,9 +3156,6 @@ export class App extends React.Component<IAppProps, IAppState> {
                             </defs>
                             <g mask="url(#worldMask)" onClick={this.handleSvgClick.bind(this)}>
                                 {
-                                    this.renderGameWorld.call(this)
-                                }
-                                {
                                     this.state.showMainMenu ? this.renderMainMenu.call(this) : null
                                 }
                                 {
@@ -3474,6 +3183,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                         </svg>
                     )
                 }
+                <div ref={this.showAppBodyRef}/>
             </div>
         );
     }
