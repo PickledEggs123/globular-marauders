@@ -499,7 +499,10 @@ export class App extends React.Component<IAppProps, IAppState> {
     private keyUpHandlerInstance: any;
 
     // game data stuff
-    public voronoiData: VoronoiCell[] = [];
+    public voronoiData: Array<{
+        id: string,
+        voronoi: VoronoiCell
+    }> = [];
     public refreshVoronoiDataTick: number = 0;
     public music: MusicPlayer = new MusicPlayer();
     public initialized: boolean = false;
@@ -1022,7 +1025,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         const getVoronoiGeometry = (tile: ITessellatedTriangle): PIXI.Geometry => {
             const voronoiGeometry = new PIXI.Geometry();
             voronoiGeometry.addAttribute("aPosition", (tile.vertices.reduce((acc, v) => {
-                acc.push(...v.rotateVector([0, 0, -1]));
+                acc.push(...v.rotateVector([0, 0, 1]));
                 return acc;
             }, [] as number[])), 3);
             const indices: number[] = [];
@@ -1044,7 +1047,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             uniform float uCameraScale;
             
             void main() {
-                vec4 pos = uCameraOrientation * uCameraPosition * vec4(aPosition * uCameraScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
+                vec4 pos = uCameraOrientation * uCameraPosition * vec4(aPosition * uCameraScale, 1.0);
                 gl_Position = pos * vec4(1, -1, 0.0625, 1);
             }
         `;
@@ -1294,12 +1297,30 @@ export class App extends React.Component<IAppProps, IAppState> {
             tick,
         });
     };
+    hashCode = (str: string): number => {
+        let hash: number = 0;
+        for (let i = 0; i < str.length; i++) {
+            const character: number = str.charCodeAt(i);
+            hash = ((hash<<5)-hash)+character;
+            hash = hash & hash; // Convert to 32bit integer
+        }
+        return Math.abs(hash);
+    }
 
     addVoronoi = ({id, tile, cameraPosition, cameraOrientation, tick}: {
         id: string, tile: ITessellatedTriangle, cameraPosition: Quaternion, cameraOrientation: Quaternion, tick: number
     }) => {
-        const initialIndex = parseInt(id);
-        const index = isNaN(initialIndex) ? 0 : initialIndex;
+        const digits: number[] = [];
+        for (const match of id.split("-")) {
+            const int = parseInt(match);
+            if (!isNaN(int)) {
+                digits.push(int);
+            }
+        }
+
+        const initialIndex = this.hashCode(id);
+        const primaryIndex = digits[0] ?? 0;
+        const secondaryIndex = digits[digits.length - 1] ?? 0;
         const colors: Array<[number, number, number, number]> = [
             [0.75, 0.00, 0.00, 0.25],
             [0.75, 0.75, 0.00, 0.25],
@@ -1308,7 +1329,10 @@ export class App extends React.Component<IAppProps, IAppState> {
             [0.00, 0.00, 0.75, 0.25],
             [0.75, 0.00, 0.75, 0.25]
         ];
-        const uColor = colors[index % colors.length];
+        const color = colors[primaryIndex % colors.length];
+        const shades = [0.75, 0.65, 0.55, 0.45];
+        const shade = shades[Math.floor(secondaryIndex / colors.length) % shades.length];
+        const uColor = color.map(i => i === 0.75 ? shade : i);
 
         // create mesh
         const uniforms = {
@@ -1405,9 +1429,8 @@ export class App extends React.Component<IAppProps, IAppState> {
         let pixiTick: number = 0;
         this.application.ticker.add(() => {
             const playerShip = this.getPlayerShip();
-            cameraPosition = playerShip.position;
-            cameraOrientation = playerShip.orientation;
-            this.application.stage.scale.set(1 / this.state.zoom, 1 / this.state.zoom);
+            cameraPosition = playerShip.position.clone();
+            cameraOrientation = playerShip.orientation.clone();
             pixiTick += 1;
 
             // sync game to Pixi renderer
@@ -1456,8 +1479,8 @@ export class App extends React.Component<IAppProps, IAppState> {
             for (const ship of this.game.ships) {
                 const shipMesh = this.shipMeshes.find(s => s.id === ship.id);
                 if (shipMesh) {
-                    shipMesh.position = ship.position;
-                    shipMesh.orientation = ship.orientation;
+                    shipMesh.position = ship.position.clone();
+                    shipMesh.orientation = ship.orientation.clone();
                     shipMesh.tick = pixiTick;
                 } else {
                     this.addShip({
@@ -1515,10 +1538,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             this.crateMeshes = this.crateMeshes.filter(m => m.tick === pixiTick);
             // voronoi tiles
             if (this.state.showVoronoi) {
-                const voronoiDataStuff = this.voronoiData.map((voronoi, id) => ({
-                    id: `${id}`,
-                    voronoi
-                })).reduce((acc, {id, voronoi}) => {
+                const voronoiDataStuff = this.voronoiData.reduce((acc, {id, voronoi}) => {
                     const tiles = this.game.getDelaunayTileTessellation(
                         Quaternion.fromBetweenVectors([0, 0, 1], voronoi.centroid),
                         voronoi.vertices.map(v => Quaternion.fromBetweenVectors([0, 0, 1], v))
@@ -1529,10 +1549,18 @@ export class App extends React.Component<IAppProps, IAppState> {
                     })));
                     return acc;
                 }, [] as Array<{id: string, tile: ITessellatedTriangle}>).filter(({tile}) => {
+                    const vertices = tile.vertices.map(v => {
+                        const item = v.rotateVector([0, 0, 1]);
+                        return [
+                            item[0],
+                            -item[1],
+                            item[2]
+                        ] as [number, number, number];
+                    });
                     return DelaunayGraph.dotProduct(DelaunayGraph.crossProduct(
-                        DelaunayGraph.subtract(tile.vertices[1].rotateVector([0, 0, 1]), tile.vertices[0].rotateVector([0, 0, 1])),
-                        DelaunayGraph.subtract(tile.vertices[2].rotateVector([0, 0, 1]), tile.vertices[0].rotateVector([0, 0, 1])),
-                    ), cameraPosition.rotateVector([0, 0, 1])) > 0;
+                        DelaunayGraph.subtract(vertices[1], vertices[0]),
+                        DelaunayGraph.subtract(vertices[2], vertices[0]),
+                    ), cameraPosition.rotateVector([0, 0, 1])) < 0;
                 });
                 for (const {id, tile} of voronoiDataStuff) {
                     const voronoiMesh = this.voronoiMeshes.find(p => p.id === id);
@@ -2463,46 +2491,68 @@ export class App extends React.Component<IAppProps, IAppState> {
      * times a second will lag the game, just to draw colored shapes on screen.
      */
     refreshVoronoiData() {
-        const position = this.getPlayerShip().position.rotateVector([0, 0, 1]);
+        let position = this.getPlayerShip().position.rotateVector([0, 0, 1]);
+        position[1] = -position[1];
 
         switch (this.state.voronoiMode) {
             default:
             case EVoronoiMode.KINGDOM: {
-                this.voronoiData = this.game.voronoiTerrain.kingdoms.reduce((acc, k) => {
+                this.voronoiData = this.game.voronoiTerrain.kingdoms.reduce((acc, k, index) => {
                     if (k.isNearBy(position)) {
                         return [
-                            ...acc, k.voronoiCell
+                            ...acc, {
+                                id: `kingdom-${index}`,
+                                voronoi: k.voronoiCell
+                            }
                         ];
                     } else {
                         return acc;
                     }
-                }, [] as VoronoiCell[]);
+                }, [] as Array<{
+                    id: string,
+                    voronoi: VoronoiCell
+                }>);
                 break;
             }
             case EVoronoiMode.DUCHY: {
-                this.voronoiData = this.game.voronoiTerrain.kingdoms.reduce((acc, k) => {
+                this.voronoiData = this.game.voronoiTerrain.kingdoms.reduce((acc, k, index) => {
                     if (k.isNearBy(position)) {
                         return [
-                            ...acc, ...k.duchies.map(d => d.voronoiCell)
+                            ...acc, ...k.duchies.map((d, index2) => ({
+                                id: `kingdom-${index}-dutchy-${index2}`,
+                                voronoi: d.voronoiCell
+                            }))
                         ];
                     } else {
                         return acc;
                     }
-                }, [] as VoronoiCell[]);
+                }, [] as Array<{
+                    id: string,
+                    voronoi: VoronoiCell
+                }>);
                 break;
             }
             case EVoronoiMode.COUNTY: {
-                this.voronoiData = this.game.voronoiTerrain.kingdoms.reduce((acc, k) => {
+                this.voronoiData = this.game.voronoiTerrain.kingdoms.reduce((acc, k, index) => {
                     if (k.isNearBy(position)) {
                         return [
-                            ...acc, ...k.duchies.reduce((acc2, d) => [
-                                ...acc2, ...d.counties.map(c => c.voronoiCell)
-                            ], [] as VoronoiCell[])
+                            ...acc, ...k.duchies.reduce((acc2, d, index2) => [
+                                ...acc2, ...d.counties.map((c, index3) => ({
+                                    id: `kingdom-${index}-dutchy-${index2}-county-${index3}`,
+                                    voronoi: c.voronoiCell
+                                }))
+                            ], [] as Array<{
+                                id: string,
+                                voronoi: VoronoiCell
+                            }>)
                         ];
                     } else {
                         return acc;
                     }
-                }, [] as VoronoiCell[]);
+                }, [] as Array<{
+                    id: string,
+                    voronoi: VoronoiCell
+                }>);
                 break;
             }
         }
