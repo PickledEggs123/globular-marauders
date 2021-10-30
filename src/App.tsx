@@ -23,9 +23,9 @@ import {
     SHIP_DATA
 } from "@pickledeggs123/globular-marauders-game/lib/src/Ship";
 import {
-    DelaunayGraph,
+    DelaunayGraph, ITessellatedTriangle,
     VoronoiCell,
-    VoronoiGraph
+    VoronoiGraph, VoronoiTile
 } from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
 import {
     EBuildingType,
@@ -605,7 +605,8 @@ export class App extends React.Component<IAppProps, IAppState> {
             uniform float uScale;
             
             void main() {
-                gl_Position = uCameraOrientation * uCameraPosition * uPosition * vec4(aPosition * uScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
+                vec4 pos = uCameraOrientation * uCameraPosition * uPosition * vec4(aPosition * uScale * uCameraScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
+                gl_Position = pos * vec4(1, -1, 0.0625, 1);
             }
         `;
         const starFragmentShader = `
@@ -675,7 +676,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                 
                 void main() {
                     vColor = aColor;
-                    gl_Position = uCameraOrientation * uCameraPosition * uPosition * vec4((uOrientation * vec4(aPosition, 1.0)).xyz * uScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
+                    vec4 pos = uCameraOrientation * uCameraPosition * uPosition * vec4((uOrientation * vec4(aPosition, 1.0)).xyz * uScale * uCameraScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
+                    gl_Position = pos * vec4(1, -1, 0.0625, 1);
                 }
             `;
         const planetFragmentShader = `
@@ -855,7 +857,8 @@ export class App extends React.Component<IAppProps, IAppState> {
             uniform float uScale;
             
             void main() {
-                gl_Position = uCameraOrientation * uCameraPosition * uPosition * vec4(aPosition * uScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
+                vec4 pos = uCameraOrientation * uCameraPosition * uPosition * vec4(aPosition * uScale * uCameraScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
+                gl_Position = pos * vec4(1, -1, 0.0625, 1);
             }
         `;
         const cannonBallFragmentShader = `
@@ -989,7 +992,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                 
                 void main() {
                     vUv = aUv;
-                    gl_Position = uCameraOrientation * uCameraPosition * uPosition * vec4((uOrientation * vec4(aPosition, 1.0)).xyz * uScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
+                    vec4 pos = uCameraOrientation * uCameraPosition * uPosition * vec4((uOrientation * vec4(aPosition, 1.0)).xyz * uScale * uCameraScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
+                    gl_Position = pos * vec4(1, -1, 0.0625, 1);
                 }
             `;
         const crateImageFragmentShader = `
@@ -1015,16 +1019,17 @@ export class App extends React.Component<IAppProps, IAppState> {
 
     pixiVoronoiResources = (() => {
         // create geometry
-        const getVoronoiGeometry = (voronoi: VoronoiCell): PIXI.Geometry => {
+        const getVoronoiGeometry = (tile: ITessellatedTriangle): PIXI.Geometry => {
             const voronoiGeometry = new PIXI.Geometry();
-            voronoiGeometry.addAttribute("aPosition", (voronoi.vertices.reduce((acc, v) => {
-                acc.push(...v);
+            voronoiGeometry.addAttribute("aPosition", (tile.vertices.reduce((acc, v) => {
+                acc.push(...v.rotateVector([0, 0, -1]));
                 return acc;
-            }, [...voronoi.centroid] as number[])), 3);
-            voronoiGeometry.addIndex(voronoi.vertices.reduce((acc, v, i) => {
-                acc.push(0, ((i + 1) % voronoi.vertices.length) + 1, (i % voronoi.vertices.length) + 1);
-                return acc;
-            }, [] as number[]));
+            }, [] as number[])), 3);
+            const indices: number[] = [];
+            for (let i = 0; i < tile.vertices.length - 2; i++) {
+                indices.push(0, i + 1, i + 2);
+            }
+            voronoiGeometry.addIndex(indices);
             return voronoiGeometry;
         };
 
@@ -1039,7 +1044,8 @@ export class App extends React.Component<IAppProps, IAppState> {
             uniform float uCameraScale;
             
             void main() {
-                gl_Position = uCameraOrientation * uCameraPosition * vec4(aPosition + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
+                vec4 pos = uCameraOrientation * uCameraPosition * vec4(aPosition * uCameraScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
+                gl_Position = pos * vec4(1, -1, 0.0625, 1);
             }
         `;
         const voronoiFragmentShader = `
@@ -1113,13 +1119,14 @@ export class App extends React.Component<IAppProps, IAppState> {
         const uniforms = {
             uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
             uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
-            uCameraScale: this.game.worldScale * this.state.zoom,
+            uCameraScale: this.state.zoom,
             uPosition: star.position.toMatrix4(),
             uColor: this.hexToRgb(star.color),
-            uScale: star.size * PHYSICS_SCALE / this.game.worldScale
+            uScale: 2 * star.size * PHYSICS_SCALE / this.game.worldScale
         };
         const shader = new PIXI.Shader(this.pixiStarResources.starProgram, uniforms);
         const mesh = new PIXI.Mesh(this.pixiStarResources.starGeometry, shader);
+        mesh.zIndex = -10;
 
         this.application.stage.addChild(mesh);
         this.starMeshes.push({
@@ -1133,22 +1140,23 @@ export class App extends React.Component<IAppProps, IAppState> {
         planet: Planet, cameraPosition: Quaternion, cameraOrientation: Quaternion, tick: number
     }) => {
         // create planet properties
-        const orientation: Quaternion = Quaternion.ONE;
-        const rotation: Quaternion = Quaternion.fromAxisAngle(DelaunayGraph.randomPoint(), Math.PI * 2 / 60 / 10);
+        const orientation: Quaternion = planet.orientation;
+        const rotation: Quaternion = Quaternion.fromAxisAngle(DelaunayGraph.randomPoint(), Math.PI * 2 / 60 / 10 / 10);
 
         // create mesh
         const uniforms = {
             uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
             uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
-            uCameraScale: this.game.worldScale * this.state.zoom,
+            uCameraScale: this.state.zoom,
             uPosition: planet.position.toMatrix4(),
             uOrientation: orientation.toMatrix4(),
-            uScale: 100 * planet.size * PHYSICS_SCALE / this.game.worldScale
+            uScale: 10 * planet.size * PHYSICS_SCALE / this.game.worldScale
         };
         const shader = new PIXI.Shader(this.pixiPlanetResources.planetProgram, uniforms);
         const state = PIXI.State.for2d();
         state.depthTest = true;
         const mesh = new PIXI.Mesh(this.pixiPlanetResources.planetGeometry, shader, state);
+        mesh.zIndex = -5;
 
         this.application.stage.addChild(mesh);
         this.planetMeshes.push({
@@ -1170,13 +1178,14 @@ export class App extends React.Component<IAppProps, IAppState> {
         const uniforms = {
             uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
             uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
-            uCameraScale: this.game.worldScale * this.state.zoom,
+            uCameraScale: this.state.zoom,
             uPosition: position.toMatrix4(),
             uOrientation: orientation.toMatrix4(),
-            uScale: 10 * PHYSICS_SCALE / this.game.worldScale
+            uScale: PHYSICS_SCALE / this.game.worldScale
         };
         const shader = new PIXI.Shader(this.pixiShipResources().shipProgram, uniforms);
         const mesh = new PIXI.Mesh(this.pixiShipResources().shipGeometryMap.get(ship.faction?.id ?? EFaction.DUTCH)?.get(ship.shipType) as any, shader);
+        mesh.zIndex = -3;
 
         const text = new PIXI.Text(ship.shipType);
         text.style.fill = "white";
@@ -1204,13 +1213,14 @@ export class App extends React.Component<IAppProps, IAppState> {
         const uniforms = {
             uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
             uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
-            uCameraScale: this.game.worldScale * this.state.zoom,
+            uCameraScale: this.state.zoom,
             uPosition: position.toMatrix4(),
             uColor: [0.75, 0.75, 0.75, 1],
-            uScale: 10 * PHYSICS_SCALE / this.game.worldScale
+            uScale: 5 * PHYSICS_SCALE / this.game.worldScale
         };
         const shader = new PIXI.Shader(this.pixiCannonBallResources.cannonBallProgram, uniforms);
         const mesh = new PIXI.Mesh(this.pixiCannonBallResources.cannonBallGeometry, shader);
+        mesh.zIndex = -1;
 
         this.application.stage.addChild(mesh);
         this.cannonBallMeshes.push({
@@ -1242,26 +1252,28 @@ export class App extends React.Component<IAppProps, IAppState> {
         const meshUniforms = {
             uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
             uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
-            uCameraScale: this.game.worldScale * this.state.zoom,
+            uCameraScale: this.state.zoom,
             uPosition: position.toMatrix4(),
             uOrientation: orientation.toMatrix4(),
-            uScale: 300 * PHYSICS_SCALE / this.game.worldScale
+            uScale: 5 * PHYSICS_SCALE / this.game.worldScale
         };
         const meshShader = new PIXI.Shader(this.pixiCrateResources.crateProgram, meshUniforms);
         const mesh = new PIXI.Mesh(this.pixiCrateResources.crateGeometry, meshShader);
+        mesh.zIndex = -4;
 
         // crate texture sprite
         const imageUniforms = {
             uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
             uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
-            uCameraScale: this.game.worldScale * this.state.zoom,
+            uCameraScale: this.state.zoom,
             uPosition: position.toMatrix4(),
             uOrientation: orientation.toMatrix4(),
-            uScale: 100 * PHYSICS_SCALE / this.game.worldScale,
+            uScale: 15 * PHYSICS_SCALE / this.game.worldScale,
             uSampler: this.sprites[resourceType]
         };
         const imageShader = new PIXI.Shader(this.pixiCrateResources.crateImageProgram, imageUniforms);
         const image = new PIXI.Mesh(this.pixiCrateResources.crateImageGeometry, imageShader);
+        mesh.zIndex = -4;
 
         const text = new PIXI.Text(resourceType);
         text.style.fill = "white";
@@ -1283,8 +1295,8 @@ export class App extends React.Component<IAppProps, IAppState> {
         });
     };
 
-    addVoronoi = ({id, voronoi, cameraPosition, cameraOrientation, tick}: {
-        id: string, voronoi: VoronoiCell, cameraPosition: Quaternion, cameraOrientation: Quaternion, tick: number
+    addVoronoi = ({id, tile, cameraPosition, cameraOrientation, tick}: {
+        id: string, tile: ITessellatedTriangle, cameraPosition: Quaternion, cameraOrientation: Quaternion, tick: number
     }) => {
         const initialIndex = parseInt(id);
         const index = isNaN(initialIndex) ? 0 : initialIndex;
@@ -1306,7 +1318,8 @@ export class App extends React.Component<IAppProps, IAppState> {
             uColor
         };
         const shader = new PIXI.Shader(this.pixiVoronoiResources.voronoiProgram, uniforms);
-        const mesh = new PIXI.Mesh(this.pixiVoronoiResources.getVoronoiGeometry(voronoi), shader);
+        const mesh = new PIXI.Mesh(this.pixiVoronoiResources.getVoronoiGeometry(tile), shader);
+        mesh.zIndex = -20;
 
         this.application.stage.addChild(mesh);
         this.voronoiMeshes.push({
@@ -1320,7 +1333,11 @@ export class App extends React.Component<IAppProps, IAppState> {
         super(props);
 
         // setup rendering
-        this.application = new PIXI.Application();
+        this.application = new PIXI.Application({
+            width: this.state.width,
+            height: this.state.height
+        });
+        this.application.stage.sortableChildren = true;
         // this.application.stage.mask = new Graphics()
         //     .beginFill(0xffffff)
         //     .drawCircle(this.application.stage.width / 2, this.application.stage.height / 2,
@@ -1360,9 +1377,12 @@ export class App extends React.Component<IAppProps, IAppState> {
         });
 
         const handleDrawingOfText = (text: PIXI.Text, position: Quaternion) => {
-            const textPosition = cameraPosition.clone().inverse().mul(position.clone()).rotateVector([0, 0, 1]);
-            text.x = ((-textPosition[0] * this.game.worldScale) / 2 + 0.5) * this.application.renderer.width;
-            text.y = ((textPosition[1] * this.game.worldScale) / 2 + 0.5) * this.application.renderer.height;
+            const textPosition = cameraOrientation.clone()
+                .mul(cameraPosition.clone().inverse())
+                .mul(position.clone())
+                .rotateVector([0, 0, 1]);
+            text.x = ((textPosition[0] * this.game.worldScale * this.state.zoom) / 2 * this.application.renderer.width) + this.application.renderer.width * 0.5;
+            text.y = ((textPosition[1] * this.game.worldScale * this.state.zoom) / 2 * this.application.renderer.height) + this.application.renderer.height * 0.5;
             const center: [number, number] = [
                 this.application.renderer.width / 2,
                 this.application.renderer.height / 2
@@ -1378,7 +1398,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             ];
             text.x += normalizedDirectionTowardsCenter[0] * 25;
             text.y += normalizedDirectionTowardsCenter[1] * 25;
-            text.visible = textPosition[2] > 0;
+            text.visible = textPosition[2] < 0;
         }
 
         // draw rotating app
@@ -1387,6 +1407,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             const playerShip = this.getPlayerShip();
             cameraPosition = playerShip.position;
             cameraOrientation = playerShip.orientation;
+            this.application.stage.scale.set(1 / this.state.zoom, 1 / this.state.zoom);
             pixiTick += 1;
 
             // sync game to Pixi renderer
@@ -1416,7 +1437,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             for (const planet of Array.from(this.game.voronoiTerrain.getPlanets(cameraPosition.rotateVector([0, 0, 1])))) {
                 const planetMesh = this.planetMeshes.find(p => p.id === planet.id);
                 if (planetMesh) {
-                    planetMesh.orientation = planetMesh.rotation.clone().mul(planet.orientation.clone());
+                    planetMesh.orientation = planetMesh.rotation.clone().mul(planetMesh.orientation.clone());
                     planetMesh.tick = pixiTick;
                 } else {
                     this.addPlanet({
@@ -1494,20 +1515,33 @@ export class App extends React.Component<IAppProps, IAppState> {
             this.crateMeshes = this.crateMeshes.filter(m => m.tick === pixiTick);
             // voronoi tiles
             if (this.state.showVoronoi) {
-                for (const {id, voronoi} of this.voronoiData.map((voronoi, id) => ({id: `${id}`, voronoi})).filter(({voronoi}) => {
-                    return true || VoronoiGraph.angularDistance(
-                        this.getPlayerShip().position.rotateVector([0, 0, 1]),
-                        voronoi.centroid,
-                        this.game.worldScale
-                    ) < (Math.PI / (this.game.worldScale * this.state.zoom)) + voronoi.radius;
-                })) {
+                const voronoiDataStuff = this.voronoiData.map((voronoi, id) => ({
+                    id: `${id}`,
+                    voronoi
+                })).reduce((acc, {id, voronoi}) => {
+                    const tiles = this.game.getDelaunayTileTessellation(
+                        Quaternion.fromBetweenVectors([0, 0, 1], voronoi.centroid),
+                        voronoi.vertices.map(v => Quaternion.fromBetweenVectors([0, 0, 1], v))
+                    );
+                    acc.push(...Array.from(tiles).map((tile, index) => ({
+                        id: `${id}-${index}`,
+                        tile
+                    })));
+                    return acc;
+                }, [] as Array<{id: string, tile: ITessellatedTriangle}>).filter(({tile}) => {
+                    return DelaunayGraph.dotProduct(DelaunayGraph.crossProduct(
+                        DelaunayGraph.subtract(tile.vertices[1].rotateVector([0, 0, 1]), tile.vertices[0].rotateVector([0, 0, 1])),
+                        DelaunayGraph.subtract(tile.vertices[2].rotateVector([0, 0, 1]), tile.vertices[0].rotateVector([0, 0, 1])),
+                    ), cameraPosition.rotateVector([0, 0, 1])) > 0;
+                });
+                for (const {id, tile} of voronoiDataStuff) {
                     const voronoiMesh = this.voronoiMeshes.find(p => p.id === id);
                     if (voronoiMesh) {
                         voronoiMesh.tick = pixiTick;
                     } else {
                         this.addVoronoi({
                             id,
-                            voronoi,
+                            tile,
                             cameraPosition,
                             cameraOrientation,
                             tick: pixiTick
@@ -1525,28 +1559,26 @@ export class App extends React.Component<IAppProps, IAppState> {
                 const shader = item.mesh.shader;
                 shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
-                shader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
+                shader.uniforms.uCameraScale = this.state.zoom;
             }
 
             // update each planet
             for (const item of this.planetMeshes) {
-                item.orientation = item.orientation.clone().mul(item.rotation.clone());
+                item.orientation = item.rotation.clone().mul(item.orientation.clone());
 
                 const shader = item.mesh.shader;
                 shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
-                shader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
+                shader.uniforms.uCameraScale = this.state.zoom;
                 shader.uniforms.uOrientation = item.orientation.toMatrix4();
             }
 
             // update each ship
             for (const item of this.shipMeshes) {
-                // item.orientation = item.orientation.clone().mul(item.rotation.clone());
-
                 const shader = item.mesh.shader;
                 shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
-                shader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
+                shader.uniforms.uCameraScale = this.state.zoom;
                 shader.uniforms.uPosition = item.position.toMatrix4();
                 shader.uniforms.uOrientation = item.orientation.toMatrix4();
 
@@ -1560,7 +1592,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 const shader = item.mesh.shader;
                 shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
-                shader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
+                shader.uniforms.uCameraScale = this.state.zoom;
                 shader.uniforms.uPosition = item.position.toMatrix4();
             }
 
@@ -1571,14 +1603,14 @@ export class App extends React.Component<IAppProps, IAppState> {
                 const meshShader = item.mesh.shader;
                 meshShader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
                 meshShader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
-                meshShader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
+                meshShader.uniforms.uCameraScale = this.state.zoom;
                 meshShader.uniforms.uPosition = item.position.toMatrix4();
                 meshShader.uniforms.uOrientation = item.orientation.toMatrix4();
 
                 const imageShader = item.image.shader;
                 imageShader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
                 imageShader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
-                imageShader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
+                imageShader.uniforms.uCameraScale = this.state.zoom;
                 imageShader.uniforms.uPosition = item.position.toMatrix4();
                 imageShader.uniforms.uOrientation = item.orientation.toMatrix4();
 
@@ -1591,7 +1623,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                     const shader = item.mesh.shader;
                     shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
                     shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
-                    shader.uniforms.uCameraScale = this.game.worldScale * this.state.zoom;
+                    shader.uniforms.uCameraScale = this.state.zoom;
                 }
             }
         });
@@ -2544,9 +2576,9 @@ export class App extends React.Component<IAppProps, IAppState> {
     private renderGameControls() {
         return (
             <g key="game-controls">
-                <text x="0" y="30" fill="black">Zoom</text>
+                <text x="0" y="30" fill="white">Zoom</text>
                 <rect x="0" y="45" width="20" height="20" fill="grey" onClick={this.decrementZoom.bind(this)}/>
-                <text x="25" y="60" textAnchor="center">{(this.state.zoom * this.game.worldScale)}</text>
+                <text x="25" y="60" textAnchor="center" fill="white">{(this.state.zoom * this.game.worldScale)}</text>
                 <rect x="40" y="45" width="20" height="20" fill="grey" onClick={this.incrementZoom.bind(this)}/>
                 <text x="5" y="60" onClick={this.decrementZoom.bind(this)}>-</text>
                 <text x="40" y="60" onClick={this.incrementZoom.bind(this)}>+</text>
@@ -2821,7 +2853,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                                 <rect
                                     key={`${spawnPlanet.planetId}-spawn-planet-rect`}
                                     stroke="white"
-                                    fill="black"
+                                    fill="white"
                                     x={x * (index + 0.5) - width / 2}
                                     y={y - 20 - 50}
                                     width={width}
@@ -2940,7 +2972,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                                 <rect
                                     key={`${spawnLocation.id}-spawn-location-rect`}
                                     stroke="white"
-                                    fill="black"
+                                    fill="white"
                                     x={x * (index + 0.5) - width / 2}
                                     y={y - 20 - 50}
                                     width={width}
@@ -3182,49 +3214,54 @@ export class App extends React.Component<IAppProps, IAppState> {
                         </ul>
                     )
                 }
-                {
-                    this.state.showLoginMenu ? this.renderLoginMenu.call(this) : (
-                        <svg ref={this.svgRef} width={this.state.width} height={this.state.height}>
-                            <defs>
-                                <mask id="worldMask">
-                                    <circle
-                                        cx={this.state.width * 0.5}
-                                        cy={this.state.height * 0.5}
-                                        r={Math.min(this.state.width, this.state.height) * 0.5}
-                                        fill="white"
-                                    />
-                                </mask>
-                            </defs>
-                            <g mask="url(#worldMask)" onClick={this.handleSvgClick.bind(this)}>
-                                {
-                                    this.state.showMainMenu ? this.renderMainMenu.call(this) : null
-                                }
-                                {
-                                    this.state.showPlanetMenu ? this.renderPlanetMenu.call(this) : null
-                                }
-                                {
-                                    this.state.showSpawnMenu ? this.renderSpawnMenu.call(this) : null
-                                }
-                            </g>
-                            {
-                                this.renderGameControls()
-                            }
-                            {
-                                this.renderGameStatus()
-                            }
-                            {
-                                this.renderCargoStatus()
-                            }
-                            {
-                                this.renderFactionStatus()
-                            }
-                            {
-                                this.renderPlayerStatus()
-                            }
-                        </svg>
-                    )
-                }
-                <div ref={this.showAppBodyRef}/>
+                {this.state.showLoginMenu ? this.renderLoginMenu.call(this) : null}
+                <div style={{width: "100%", height: this.state.height}}>
+                    <div style={{position: "absolute", padding: "0px auto", width: "100%"}} ref={this.showAppBodyRef}/>
+                    {
+                        this.state.showLoginMenu ? null : (
+                            <div style={{position: "absolute", padding: "0px auto", width: "100%"}}>
+                                <svg ref={this.svgRef} width={this.state.width} height={this.state.height}>
+                                    <defs>
+                                        <mask id="worldMask">
+                                            <circle
+                                                cx={this.state.width * 0.5}
+                                                cy={this.state.height * 0.5}
+                                                r={Math.min(this.state.width, this.state.height) * 0.5}
+                                                fill="white"
+                                            />
+                                        </mask>
+                                    </defs>
+                                    <g mask="url(#worldMask)" onClick={this.handleSvgClick.bind(this)}>
+                                        {
+                                            this.state.showMainMenu ? this.renderMainMenu.call(this) : null
+                                        }
+                                        {
+                                            this.state.showPlanetMenu ? this.renderPlanetMenu.call(this) : null
+                                        }
+                                        {
+                                            this.state.showSpawnMenu ? this.renderSpawnMenu.call(this) : null
+                                        }
+                                    </g>
+                                    {
+                                        this.renderGameControls()
+                                    }
+                                    {
+                                        this.renderGameStatus()
+                                    }
+                                    {
+                                        this.renderCargoStatus()
+                                    }
+                                    {
+                                        this.renderFactionStatus()
+                                    }
+                                    {
+                                        this.renderPlayerStatus()
+                                    }
+                                </svg>
+                            </div>
+                        )
+                    }
+                </div>
             </div>
         );
     }
