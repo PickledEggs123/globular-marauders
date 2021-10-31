@@ -1083,6 +1083,8 @@ export class App extends React.Component<IAppProps, IAppState> {
         id: string,
         mesh: PIXI.Mesh<PIXI.Shader>,
         text: PIXI.Text,
+        line: PIXI.Graphics,
+        isPlayer: boolean,
         position: Quaternion,
         orientation: Quaternion,
         tick: number
@@ -1176,6 +1178,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     }) => {
         const position: Quaternion = ship.position;
         const orientation: Quaternion = ship.orientation;
+        console.log(orientation.rotateVector([1, 0, 0]));
 
         // create mesh
         const uniforms = {
@@ -1194,12 +1197,20 @@ export class App extends React.Component<IAppProps, IAppState> {
         text.style.fill = "white";
         text.style.fontSize = 15;
 
+        const line = new PIXI.Graphics();
+        line.zIndex = -4;
+
+        const isPlayer = this.getPlayerShip().id === ship.id;
+
         this.application.stage.addChild(mesh);
         this.application.stage.addChild(text);
+        this.application.stage.addChild(line);
         this.shipMeshes.push({
             id: ship.id,
             mesh,
             text,
+            line,
+            isPlayer,
             position,
             orientation,
             tick,
@@ -1319,8 +1330,15 @@ export class App extends React.Component<IAppProps, IAppState> {
         }
 
         const initialIndex = this.hashCode(id);
-        const primaryIndex = digits[0] ?? 0;
-        const secondaryIndex = digits[digits.length - 1] ?? 0;
+        let primaryIndex = digits[0] ?? 0;
+        let secondaryIndex = digits[digits.length - 1] ?? 0;
+
+        const lastIndexOf = id.lastIndexOf('-');
+        if (lastIndexOf) {
+            primaryIndex = this.hashCode(id.slice(0, lastIndexOf));
+            secondaryIndex = this.hashCode(id.slice(0, lastIndexOf));
+        }
+
         const colors: Array<[number, number, number, number]> = [
             [0.75, 0.00, 0.00, 0.25],
             [0.75, 0.75, 0.00, 0.25],
@@ -1330,7 +1348,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             [0.75, 0.00, 0.75, 0.25]
         ];
         const color = colors[primaryIndex % colors.length];
-        const shades = [0.75, 0.65, 0.55, 0.45];
+        const shades = [0.75, 0.65, 0.55, 0.45, 0.35, 0.25];
         const shade = shades[Math.floor(secondaryIndex / colors.length) % shades.length];
         const uColor = color.map(i => i === 0.75 ? shade : i);
 
@@ -1401,7 +1419,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         });
 
         const handleDrawingOfText = (text: PIXI.Text, position: Quaternion) => {
-            const textPosition = cameraOrientation.clone()
+            const textPosition = cameraOrientation.clone().inverse()
                 .mul(cameraPosition.clone().inverse())
                 .mul(position.clone())
                 .rotateVector([0, 0, 1]);
@@ -1479,6 +1497,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             for (const ship of this.game.ships) {
                 const shipMesh = this.shipMeshes.find(s => s.id === ship.id);
                 if (shipMesh) {
+                    shipMesh.isPlayer = this.getPlayerShip().id === ship.id;
                     shipMesh.position = ship.position.clone();
                     shipMesh.orientation = ship.orientation.clone();
                     shipMesh.tick = pixiTick;
@@ -1493,6 +1512,8 @@ export class App extends React.Component<IAppProps, IAppState> {
             }
             for (const item of this.shipMeshes.filter(m => m.tick !== pixiTick)) {
                 this.application.stage.removeChild(item.mesh);
+                this.application.stage.removeChild(item.text);
+                this.application.stage.removeChild(item.line);
             }
             this.shipMeshes = this.shipMeshes.filter(m => m.tick === pixiTick);
             // cannonBalls
@@ -1541,7 +1562,9 @@ export class App extends React.Component<IAppProps, IAppState> {
                 const voronoiDataStuff = this.voronoiData.reduce((acc, {id, voronoi}) => {
                     const tiles = this.game.getDelaunayTileTessellation(
                         Quaternion.fromBetweenVectors([0, 0, 1], voronoi.centroid),
-                        voronoi.vertices.map(v => Quaternion.fromBetweenVectors([0, 0, 1], v))
+                        voronoi.vertices.map(v => Quaternion.fromBetweenVectors([0, 0, 1], v)),
+                        this.state.voronoiMode === EVoronoiMode.KINGDOM ? 3 :
+                            this.state.voronoiMode === EVoronoiMode.DUCHY ? 2 : 1
                     );
                     acc.push(...Array.from(tiles).map((tile, index) => ({
                         id: `${id}-${index}`,
@@ -1611,6 +1634,55 @@ export class App extends React.Component<IAppProps, IAppState> {
                 shader.uniforms.uOrientation = item.orientation.toMatrix4();
 
                 handleDrawingOfText(item.text, item.position);
+
+                if (item.isPlayer) {
+                    const startPoint = cameraOrientation.clone().inverse()
+                        .mul(cameraPosition.clone().inverse())
+                        .mul(item.position.clone())
+                        .rotateVector([0, 0, 1]);
+                    const lineXS = ((startPoint[0] * this.game.worldScale * this.state.zoom) / 2 * this.application.renderer.width) + this.application.renderer.width * 0.5;
+                    const lineYS = ((startPoint[1] * this.game.worldScale * this.state.zoom) / 2 * this.application.renderer.height) + this.application.renderer.height * 0.5;
+
+                    const endPoint = cameraOrientation.clone().inverse()
+                        .mul(cameraPosition.clone().inverse())
+                        .mul(item.position.clone())
+                        .mul(item.orientation.clone())
+                        .mul(Quaternion.fromAxisAngle([1, 0, 0], Math.PI / this.game.worldScale / this.state.zoom))
+                        .rotateVector([0, 0, 1]);
+                    const lineXE = ((endPoint[0] * this.game.worldScale * this.state.zoom) / 2 * this.application.renderer.width) + this.application.renderer.width * 0.5;
+                    const lineYE = ((endPoint[1] * this.game.worldScale * this.state.zoom) / 2 * this.application.renderer.height) + this.application.renderer.height * 0.5;
+
+                    const dashLength = 5;
+                    const lineDirection = DelaunayGraph.normalize(
+                        DelaunayGraph.subtract(
+                            [lineXE, lineYE, 0],
+                            [lineXS, lineYS, 0]
+                        )
+                    );
+                    const lineLength = DelaunayGraph.distanceFormula(
+                        [lineXE, lineYE, 0],
+                        [lineXS, lineYS, 0]
+                    );
+
+                    // draw line
+                    item.line.clear();
+                    item.line.beginFill(0x0000ff);
+                    item.line.lineStyle(1, 0x0000ff);
+                    for (let i = 0; i < lineLength; i += dashLength * 2) {
+                        item.line.moveTo(
+                            lineXS + lineDirection[0] * i,
+                            lineYS + lineDirection[1] * i
+                        );
+                        item.line.lineTo(
+                            lineXS + lineDirection[0] * (i + dashLength),
+                            lineYS + lineDirection[1] * (i + dashLength)
+                        );
+                    }
+                    item.line.endFill();
+                    item.line.visible = true;
+                } else {
+                    item.line.visible = false;
+                }
             }
 
             // update each cannon ball
