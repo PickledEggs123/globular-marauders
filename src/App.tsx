@@ -25,7 +25,7 @@ import {
 import {
     DelaunayGraph, ITessellatedTriangle,
     VoronoiCell,
-    VoronoiGraph, VoronoiTile
+    VoronoiGraph
 } from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
 import {
     EBuildingType,
@@ -635,7 +635,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         const planetGeometry = new PIXI.Geometry();
         const planetGeometryData = planetVoronoiCells.reduce((acc, v) => {
             // color of voronoi tile
-            const color: [number, number, number] = Math.random() > 0.33 ? [0, 0, 1] : [0, 1, 0];
+            const color: [number, number, number] = Math.random() > 0.33 ? [0.33, 0.33, 1] : [0.33, 1, 0.33];
 
             // initial center index
             const startingIndex = acc.index.reduce((acc, a) => Math.max(acc, a + 1), 0);
@@ -1145,7 +1145,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         planet: Planet, cameraPosition: Quaternion, cameraOrientation: Quaternion, tick: number
     }) => {
         // create planet properties
-        const orientation: Quaternion = planet.orientation;
+        const orientation: Quaternion = planet.orientation.clone();
         const rotation: Quaternion = Quaternion.fromAxisAngle(DelaunayGraph.randomPoint(), Math.PI * 2 / 60 / 10 / 10);
 
         // create mesh
@@ -1176,8 +1176,8 @@ export class App extends React.Component<IAppProps, IAppState> {
     addShip = ({ship, cameraPosition, cameraOrientation, tick}: {
         ship: Ship, cameraPosition: Quaternion, cameraOrientation: Quaternion, tick: number
     }) => {
-        const position: Quaternion = ship.position;
-        const orientation: Quaternion = ship.orientation;
+        const position: Quaternion = ship.position.clone();
+        const orientation: Quaternion = ship.orientation.clone();
         console.log(orientation.rotateVector([1, 0, 0]));
 
         // create mesh
@@ -1220,8 +1220,8 @@ export class App extends React.Component<IAppProps, IAppState> {
     addCannonBall = ({cannonBall, cameraPosition, cameraOrientation, tick}: {
         cannonBall: CannonBall, cameraPosition: Quaternion, cameraOrientation: Quaternion, tick: number
     }) => {
-        const position: Quaternion = cannonBall.position;
-        const positionVelocity: Quaternion = cannonBall.positionVelocity;
+        const position: Quaternion = cannonBall.position.clone();
+        const positionVelocity: Quaternion = cannonBall.positionVelocity.clone();
 
         // create mesh
         const uniforms = {
@@ -1257,9 +1257,9 @@ export class App extends React.Component<IAppProps, IAppState> {
         cameraOrientation: Quaternion,
         tick: number
     }) => {
-        const position: Quaternion = crate.position;
-        const orientation: Quaternion = crate.orientation;
-        const rotation: Quaternion = crate.orientationVelocity;
+        const position: Quaternion = crate.position.clone();
+        const orientation: Quaternion = crate.orientation.clone();
+        const rotation: Quaternion = crate.orientationVelocity.clone();
         const resourceType: EResourceType = crate.resourceType;
 
         // create mesh
@@ -1321,6 +1321,8 @@ export class App extends React.Component<IAppProps, IAppState> {
     addVoronoi = ({id, tile, cameraPosition, cameraOrientation, tick}: {
         id: string, tile: ITessellatedTriangle, cameraPosition: Quaternion, cameraOrientation: Quaternion, tick: number
     }) => {
+        // parse digits from the id
+        // last digit is tesselation index, ignore
         const digits: number[] = [];
         for (const match of id.split("-")) {
             const int = parseInt(match);
@@ -1329,27 +1331,30 @@ export class App extends React.Component<IAppProps, IAppState> {
             }
         }
 
-        const initialIndex = this.hashCode(id);
+        // initial coloring
         let primaryIndex = digits[0] ?? 0;
         let secondaryIndex = digits[digits.length - 1] ?? 0;
 
+        // second style coloring
         const lastIndexOf = id.lastIndexOf('-');
         if (lastIndexOf) {
+            // hash id into a primary color
             primaryIndex = this.hashCode(id.slice(0, lastIndexOf));
-            secondaryIndex = this.hashCode(id.slice(0, lastIndexOf));
+            secondaryIndex = this.hashCode(digits.slice(0, digits.length - 1).join(","));
         }
 
         const colors: Array<[number, number, number, number]> = [
-            [0.75, 0.00, 0.00, 0.25],
-            [0.75, 0.75, 0.00, 0.25],
-            [0.00, 0.75, 0.00, 0.25],
-            [0.00, 0.75, 0.75, 0.25],
-            [0.00, 0.00, 0.75, 0.25],
-            [0.75, 0.00, 0.75, 0.25]
+            [0.75, 0.00, 0.00, 0.25],   // red
+            [0.75, 0.75, 0.00, 0.25],   // orange
+            [0.00, 0.75, 0.00, 0.25],   // green
+            [0.00, 0.75, 0.75, 0.25],   // yellow
+            [0.00, 0.00, 0.75, 0.25],   // blue
+            [0.75, 0.00, 0.75, 0.25]    // purple
         ];
         const color = colors[primaryIndex % colors.length];
-        const shades = [0.75, 0.65, 0.55, 0.45, 0.35, 0.25];
+        const shades = [0.75, 0.65, 0.55, 0.45, 0.35, 0.25]; // 6 shades
         const shade = shades[Math.floor(secondaryIndex / colors.length) % shades.length];
+        // 6 * 6 = 36 unique colors, should prevent two regions of the same color from being next to each other
         const uColor = color.map(i => i === 0.75 ? shade : i);
 
         // create mesh
@@ -1880,32 +1885,6 @@ export class App extends React.Component<IAppProps, IAppState> {
      */
 
     /**
-     * Move an object over time, useful for graphics only objects which do not collide, like smoke clouds and sparks.
-     * @param graphicsOnlyObject The object to move.
-     * @private
-     */
-    private static applyKinematics<T extends ICameraState & IExpirable>(graphicsOnlyObject: T): T {
-        const {
-            position: objectPosition,
-            positionVelocity: objectPositionVelocity,
-            orientation: objectOrientation,
-            orientationVelocity: objectOrientationVelocity,
-            created
-        } = graphicsOnlyObject;
-
-        // apply basic kinematics
-        const t = (+new Date() - +created) / 100;
-        const position = objectPositionVelocity.clone().pow(t).mul(objectPosition);
-        const orientation = objectOrientationVelocity.clone().pow(t).mul(objectOrientation);
-
-        return {
-            ...graphicsOnlyObject,
-            position,
-            orientation
-        }
-    }
-
-    /**
      * Rotate an object based on the current ship's position and orientation.
      * @param planet The object to rotate.
      * @private
@@ -2121,100 +2100,6 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     /**
-     * Get the target lines for a ship.
-     * @param planetDrawing The ship to get target lines for.
-     * @private
-     */
-    private static getShipTargetLines(planetDrawing: IDrawable<Ship>): ITargetLineData {
-        const targetLines: Array<[[number, number], [number, number]]> = [];
-        const targetNodes: Array<[[number, number], number]> = [];
-
-        if (planetDrawing.original.pathFinding.points.length > 0) {
-            for (let i = -1; i < planetDrawing.original.pathFinding.points.length - 1; i++) {
-                // get pair of points to draw line in between two nodes
-                const a = i >= 0 ? planetDrawing.original.pathFinding.points[i] : planetDrawing.original.position.rotateVector([0, 0, 1]);
-                const b = planetDrawing.original.pathFinding.points[i + 1];
-
-                // get points projected onto plane
-                const aPoint = planetDrawing.original.orientation.clone().inverse()
-                    .mul(planetDrawing.original.position.clone().inverse())
-                    .rotateVector(a);
-                const bPoint = planetDrawing.original.orientation.clone().inverse()
-                    .mul(planetDrawing.original.position.clone().inverse())
-                    .rotateVector(b);
-
-                if (aPoint[2] >= 0 && bPoint[2] >= 0) {
-                    // both points on front of sphere
-                    const aLinePoint: [number, number] = [
-                        aPoint[0] * 0.5,
-                        aPoint[1] * 0.5,
-                    ];
-                    const bLinePoint: [number, number] = [
-                        bPoint[0] * 0.5,
-                        bPoint[1] * 0.5
-                    ];
-                    targetLines.push([aLinePoint, bLinePoint]);
-                } else if (aPoint[2] >= 0 && bPoint[2] < 0) {
-                    // first point on front of sphere while second point is behind sphere
-                    const aLinePoint: [number, number] = [
-                        aPoint[0] * 0.5,
-                        aPoint[1] * 0.5,
-                    ];
-                    const midPoint = DelaunayGraph.normalize(Game.getAveragePoint([aPoint, bPoint]));
-                    const abNormal = DelaunayGraph.normalize(DelaunayGraph.crossProduct(
-                        DelaunayGraph.normalize(aPoint),
-                        DelaunayGraph.normalize(bPoint)
-                    ));
-                    const equatorNormal = DelaunayGraph.crossProduct([1, 0, 0], [0, 1, 0]);
-                    const line = DelaunayGraph.normalize(DelaunayGraph.crossProduct(abNormal, equatorNormal));
-                    const bLinePoint: [number, number] = DelaunayGraph.dotProduct(line, midPoint) >= 0 ? [
-                        line[0] * 0.5,
-                        line[1] * 0.5
-                    ] : [
-                        -line[0] * 0.5,
-                        -line[1] * 0.5
-                    ];
-                    targetLines.push([aLinePoint, bLinePoint]);
-                } else if (aPoint[2] < 0 && bPoint[2] >= 0) {
-                    // first point is behind sphere while second point is on front of sphere
-                    const bLinePoint: [number, number] = [
-                        bPoint[0] * 0.5,
-                        bPoint[1] * 0.5
-                    ];
-                    const midPoint = DelaunayGraph.normalize(Game.getAveragePoint([aPoint, bPoint]));
-                    const abNormal = DelaunayGraph.normalize(DelaunayGraph.crossProduct(
-                        DelaunayGraph.normalize(aPoint),
-                        DelaunayGraph.normalize(bPoint)
-                    ));
-                    const equatorNormal = DelaunayGraph.crossProduct([1, 0, 0], [0, 1, 0]);
-                    const line = DelaunayGraph.normalize(DelaunayGraph.crossProduct(abNormal, equatorNormal));
-                    const aLinePoint: [number, number] = DelaunayGraph.dotProduct(line, midPoint) >= 0 ? [
-                        line[0] * 0.5,
-                        line[1] * 0.5
-                    ] : [
-                        -line[0] * 0.5,
-                        -line[1] * 0.5
-                    ];
-                    targetLines.push([aLinePoint, bLinePoint]);
-                }
-
-                if (bPoint[2] >= 0) {
-                    const bLinePoint: [number, number] = [
-                        bPoint[0] * 0.5,
-                        bPoint[1] * 0.5
-                    ];
-                    targetNodes.push([bLinePoint, planetDrawing.original.pathFinding.points.length - i - 1]);
-                }
-            }
-        }
-
-        return {
-            targetLines,
-            targetNodes
-        };
-    }
-
-    /**
      * Render a ship into a rectangle, Useful for UI button or game world.
      * @param planetDrawing
      * @param size
@@ -2271,47 +2156,6 @@ export class App extends React.Component<IAppProps, IAppState> {
                 }
             </>
         )
-    }
-
-    /**
-     * Draw a crate containing cargo, Crates are created when ships are destroyed and if that dead ship had cargo.
-     * @param uiPass
-     * @param planetDrawing
-     * @private
-     */
-    private drawCrate(uiPass: boolean, planetDrawing: IDrawable<Crate>) {
-        const isReverseSide = planetDrawing.rotatedPosition[2] > 0;
-        const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
-        const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
-        const distance = planetDrawing.distance;
-        const size = 0.1 * Math.max(0, 2 * Math.atan(planetDrawing.original.size / (2 * distance)));
-        return (
-            <g
-                key={`${planetDrawing.id}${uiPass ? "-ui" : ""}`}
-                transform={`translate(${x * this.state.width},${(1 - y) * this.state.height})`}
-            >
-                {
-                    !uiPass && (
-                        <g transform={`scale(0.2)`}>
-                            {
-                                this.renderItem(planetDrawing.original.resourceType)
-                            }
-                        </g>
-                    )
-                }
-                {
-                    uiPass && (
-                        <text
-                            stroke="white"
-                            x={size * (this.state.zoom * this.game.worldScale) + 10}
-                            y={0}
-                        >
-                            {planetDrawing.original.resourceType}
-                        </text>
-                    )
-                }
-            </g>
-        );
     }
 
     /**
@@ -2591,7 +2435,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                     if (k.isNearBy(position)) {
                         return [
                             ...acc, ...k.duchies.map((d, index2) => ({
-                                id: `kingdom-${index}-dutchy-${index2}`,
+                                id: `kingdom-${index}-duchy-${index2}`,
                                 voronoi: d.voronoiCell
                             }))
                         ];
@@ -2610,7 +2454,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                         return [
                             ...acc, ...k.duchies.reduce((acc2, d, index2) => [
                                 ...acc2, ...d.counties.map((c, index3) => ({
-                                    id: `kingdom-${index}-dutchy-${index2}-county-${index3}`,
+                                    id: `kingdom-${index}-duchy-${index2}-county-${index3}`,
                                     voronoi: c.voronoiCell
                                 }))
                             ], [] as Array<{
