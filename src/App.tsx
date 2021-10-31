@@ -10,7 +10,6 @@ import {
     ICameraState,
     ICameraStateWithOriginal,
     IDrawable,
-    IExpirable,
     MIN_DISTANCE,
     MoneyAccount
 } from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
@@ -333,14 +332,6 @@ export class MusicPlayer {
         }
         Tone.Transport.start();
     }
-}
-
-/**
- * A class used to draw a line in the world, useful for drawing pathing directions with bends and turns.
- */
-interface ITargetLineData {
-    targetLines: Array<[[number, number], [number, number]]>,
-    targetNodes: Array<[[number, number], number]>
 }
 
 /**
@@ -1047,7 +1038,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             uniform float uCameraScale;
             
             void main() {
-                vec4 pos = uCameraOrientation * uCameraPosition * vec4(aPosition * uCameraScale, 1.0);
+                vec4 pos = uCameraOrientation * uCameraPosition * vec4(-aPosition * uCameraScale, 1.0);
                 gl_Position = pos * vec4(1, -1, 0.0625, 1);
             }
         `;
@@ -1581,14 +1572,14 @@ export class App extends React.Component<IAppProps, IAppState> {
                         const item = v.rotateVector([0, 0, 1]);
                         return [
                             item[0],
-                            -item[1],
+                            item[1],
                             item[2]
                         ] as [number, number, number];
                     });
                     return DelaunayGraph.dotProduct(DelaunayGraph.crossProduct(
                         DelaunayGraph.subtract(vertices[1], vertices[0]),
                         DelaunayGraph.subtract(vertices[2], vertices[0]),
-                    ), cameraPosition.rotateVector([0, 0, 1])) < 0;
+                    ), cameraPosition.rotateVector([0, 0, 1])) > 0;
                 });
                 for (const {id, tile} of voronoiDataStuff) {
                     const voronoiMesh = this.voronoiMeshes.find(p => p.id === id);
@@ -1726,7 +1717,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             if (this.state.showVoronoi) {
                 for (const item of this.voronoiMeshes) {
                     const shader = item.mesh.shader;
-                    shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
+                    shader.uniforms.uCameraPosition = cameraPosition.clone().toMatrix4();
                     shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
                     shader.uniforms.uCameraScale = this.state.zoom;
                 }
@@ -1874,7 +1865,9 @@ export class App extends React.Component<IAppProps, IAppState> {
         const circleSlice = numSecondsToCircle * millisecondsPerSecond;
         const circleFraction = (+new Date() % circleSlice) / circleSlice;
         const angle = circleFraction * (Math.PI * 2);
-        tempShip.position = Quaternion.fromAxisAngle([1, 0, 0], -angle);
+        tempShip.position = Quaternion.fromBetweenVectors([0, 0, 1], [0, 0, 1]).mul(
+            Quaternion.fromAxisAngle([1, 0, 0], -angle)
+        );
         return Game.GetCameraState(tempShip);
     }
 
@@ -2407,8 +2400,7 @@ export class App extends React.Component<IAppProps, IAppState> {
      * times a second will lag the game, just to draw colored shapes on screen.
      */
     refreshVoronoiData() {
-        let position = this.getPlayerShip().position.rotateVector([0, 0, 1]);
-        position[1] = -position[1];
+        const position = this.getPlayerShip().position.rotateVector([0, 0, 1]);
 
         switch (this.state.voronoiMode) {
             default:
