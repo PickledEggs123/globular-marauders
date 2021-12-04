@@ -573,6 +573,9 @@ export class App extends React.Component<IAppProps, IAppState> {
             1
         ];
     };
+    convertOrientationToDisplay = (old: Quaternion): Quaternion => {
+        return old.clone();
+    };
 
     pixiStarResources = (() => {
         // create geometry
@@ -670,7 +673,18 @@ export class App extends React.Component<IAppProps, IAppState> {
                 
                 void main() {
                     vColor = aColor;
-                    vec4 pos = uCameraOrientation * uCameraPosition * uPosition * vec4((uOrientation * vec4(aPosition, 1.0)).xyz * uScale * uCameraScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
+                    mat4 translation = uCameraOrientation * uCameraPosition * uPosition;
+                    
+                    vec4 orientationPoint = uCameraOrientation * uOrientation * vec4(1.0, 0.0, 0.0, 0.0);
+                    float r = -atan(-orientationPoint.y, orientationPoint.x);
+                    mat4 rotation = mat4(
+                        cos(r), -sin(r), 0.0, 0.0,
+                        sin(r),  cos(r), 0.0, 0.0,
+                        0.0,     0.0,    1.0, 0.0,
+                        0.0,     0.0,    0.0, 1.0
+                    );
+                    
+                    vec4 pos = translation * vec4((rotation * vec4(aPosition, 1.0)).xyz * uScale * uCameraScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
                     gl_Position = pos * vec4(1, -1, 0.0625, 1);
                 }
             `;
@@ -986,7 +1000,18 @@ export class App extends React.Component<IAppProps, IAppState> {
                 
                 void main() {
                     vUv = aUv;
-                    vec4 pos = uCameraOrientation * uCameraPosition * uPosition * vec4((uOrientation * vec4(aPosition, 1.0)).xyz * uScale * uCameraScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
+                    mat4 translation = uCameraOrientation * uCameraPosition * uPosition;
+                    
+                    vec4 orientationPoint = uCameraOrientation * uOrientation * vec4(1.0, 0.0, 0.0, 0.0);
+                    float r = -atan(-orientationPoint.y, orientationPoint.x);
+                    mat4 rotation = mat4(
+                        cos(r), -sin(r), 0.0, 0.0,
+                        sin(r),  cos(r), 0.0, 0.0,
+                        0.0,     0.0,    1.0, 0.0,
+                        0.0,     0.0,    0.0, 1.0
+                    );
+                    
+                    vec4 pos = translation * vec4((rotation * vec4(aPosition, 1.0)).xyz * uScale * uCameraScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
                     gl_Position = pos * vec4(1, -1, 0.0625, 1);
                 }
             `;
@@ -1066,6 +1091,10 @@ export class App extends React.Component<IAppProps, IAppState> {
     planetMeshes: Array<{
         id: string,
         mesh: PIXI.Mesh<PIXI.Shader>,
+        faction: PIXI.Graphics,
+        factionRadius: number,
+        factionColor: number | null,
+        position: Quaternion,
         orientation: Quaternion,
         rotation: Quaternion,
         tick: number
@@ -1075,6 +1104,8 @@ export class App extends React.Component<IAppProps, IAppState> {
         mesh: PIXI.Mesh<PIXI.Shader>,
         text: PIXI.Text,
         line: PIXI.Graphics,
+        health: PIXI.Graphics,
+        healthValue: number,
         isPlayer: boolean,
         position: Quaternion,
         orientation: Quaternion,
@@ -1136,6 +1167,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         planet: Planet, cameraPosition: Quaternion, cameraOrientation: Quaternion, tick: number
     }) => {
         // create planet properties
+        const position: Quaternion = planet.position.clone();
         const orientation: Quaternion = planet.orientation.clone();
         const rotation: Quaternion = Quaternion.fromAxisAngle(DelaunayGraph.randomPoint(), Math.PI * 2 / 60 / 10 / 10);
 
@@ -1154,10 +1186,37 @@ export class App extends React.Component<IAppProps, IAppState> {
         const mesh = new PIXI.Mesh(this.pixiPlanetResources.planetGeometry, shader, state);
         mesh.zIndex = -5;
 
+        const faction = new PIXI.Graphics();
+        faction.zIndex = -6;
+
+        const factionRadius = 10 * planet.size * PHYSICS_SCALE / this.game.worldScale + 10 * PHYSICS_SCALE;
+        let factionColorName: string | null = null;
+        const ownerFaction = Object.values(this.game.factions).find(faction => faction.planetIds.includes(planet.id));
+        if (ownerFaction) {
+            factionColorName = ownerFaction.factionColor;
+        }
+        let factionColor: number | null = null;
+        switch (factionColorName) {
+            case "red": factionColor = 0xff0000;
+                break;
+            case "orange": factionColor = 0xff8000;
+                break;
+            case "yellow": factionColor = 0xffff00;
+                break;
+            case "green": factionColor = 0x00ff00;
+                break;
+            case "blue": factionColor = 0x0000ff;
+                break;
+        }
+
         this.application.stage.addChild(mesh);
         this.planetMeshes.push({
             id: planet.id,
             mesh,
+            faction,
+            factionRadius,
+            factionColor,
+            position,
             orientation,
             rotation,
             tick,
@@ -1191,16 +1250,22 @@ export class App extends React.Component<IAppProps, IAppState> {
         const line = new PIXI.Graphics();
         line.zIndex = -4;
 
+        const health = new PIXI.Graphics();
+        line.zIndex = -4;
+
         const isPlayer = this.getPlayerShip().id === ship.id;
 
         this.application.stage.addChild(mesh);
         this.application.stage.addChild(text);
         this.application.stage.addChild(line);
+        this.application.stage.addChild(health);
         this.shipMeshes.push({
             id: ship.id,
             mesh,
             text,
             line,
+            health,
+            healthValue: Math.ceil(ship.health / ship.maxHealth * 100),
             isPlayer,
             position,
             orientation,
@@ -1494,6 +1559,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 const shipMesh = this.shipMeshes.find(s => s.id === ship.id);
                 if (shipMesh) {
                     shipMesh.isPlayer = this.getPlayerShip().id === ship.id;
+                    shipMesh.healthValue = Math.ceil(ship.health / ship.maxHealth * 100);
                     shipMesh.position = ship.position.clone();
                     shipMesh.orientation = ship.orientation.clone();
                     shipMesh.tick = pixiTick;
@@ -1617,7 +1683,28 @@ export class App extends React.Component<IAppProps, IAppState> {
                 shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraScale = this.state.zoom;
-                shader.uniforms.uOrientation = item.orientation.toMatrix4();
+                shader.uniforms.uOrientation = this.convertOrientationToDisplay(item.orientation).toMatrix4();
+
+                // if (item.factionColor) {
+                //     const startPoint = cameraOrientation.clone().inverse()
+                //         .mul(cameraPosition.clone().inverse())
+                //         .mul(item.position.clone())
+                //         .rotateVector([0, 0, 1]);
+                //     const centerX = ((startPoint[0] * this.game.worldScale * this.state.zoom) / 2 * this.application.renderer.width) + this.application.renderer.width * 0.5;
+                //     const centerY = ((startPoint[1] * this.game.worldScale * this.state.zoom) / 2 * this.application.renderer.height) + this.application.renderer.height * 0.5;
+                //
+                //     item.faction.clear();
+                //     item.faction.beginFill(item.factionColor);
+                //     item.faction.drawCircle(
+                //         centerX,
+                //         centerY,
+                //         item.factionRadius * this.state.zoom
+                //     );
+                //     item.faction.endFill();
+                //     item.faction.visible = true;
+                // } else {
+                //     item.faction.visible = false;
+                // }
             }
 
             // update each ship
@@ -1627,10 +1714,11 @@ export class App extends React.Component<IAppProps, IAppState> {
                 shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraScale = this.state.zoom;
                 shader.uniforms.uPosition = item.position.toMatrix4();
-                shader.uniforms.uOrientation = item.orientation.toMatrix4();
+                shader.uniforms.uOrientation = this.convertOrientationToDisplay(item.orientation).toMatrix4();
 
                 handleDrawingOfText(item.text, item.position);
 
+                // draw player dotted line
                 if (item.isPlayer) {
                     const startPoint = cameraOrientation.clone().inverse()
                         .mul(cameraPosition.clone().inverse())
@@ -1679,6 +1767,34 @@ export class App extends React.Component<IAppProps, IAppState> {
                 } else {
                     item.line.visible = false;
                 }
+
+                // // draw health bar
+                // {
+                //     const startPoint = cameraOrientation.clone().inverse()
+                //         .mul(cameraPosition.clone().inverse())
+                //         .mul(item.position.clone())
+                //         .rotateVector([0, 0, 1]);
+                //     const centerX = ((startPoint[0] * this.game.worldScale * this.state.zoom) / 2 * this.application.renderer.width) + this.application.renderer.width * 0.5;
+                //     const centerY = ((startPoint[1] * this.game.worldScale * this.state.zoom) / 2 * this.application.renderer.height) + this.application.renderer.height * 0.5;
+                //
+                //     const radius = 20;
+                //     item.health.clear();
+                //     const sliceSize = Math.PI * 2 / 100;
+                //     item.health.beginFill(0x00ff00);
+                //     item.health.lineStyle(5, 0x00ff00);
+                //     item.health.moveTo(
+                //         centerX + radius,
+                //         centerY
+                //     );
+                //     console.log(item.healthValue);
+                //     for (let i = 1; i < item.healthValue; i++) {
+                //         item.health.lineTo(
+                //             centerX + Math.cos(i * sliceSize) * radius,
+                //             centerY + Math.sin(i * sliceSize) * radius
+                //         );
+                //     }
+                //     item.health.endFill();
+                // }
             }
 
             // update each cannon ball
@@ -1701,14 +1817,14 @@ export class App extends React.Component<IAppProps, IAppState> {
                 meshShader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
                 meshShader.uniforms.uCameraScale = this.state.zoom;
                 meshShader.uniforms.uPosition = item.position.toMatrix4();
-                meshShader.uniforms.uOrientation = item.orientation.toMatrix4();
+                meshShader.uniforms.uOrientation = this.convertOrientationToDisplay(item.orientation).toMatrix4();
 
                 const imageShader = item.image.shader;
                 imageShader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
                 imageShader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
                 imageShader.uniforms.uCameraScale = this.state.zoom;
                 imageShader.uniforms.uPosition = item.position.toMatrix4();
-                imageShader.uniforms.uOrientation = item.orientation.toMatrix4();
+                imageShader.uniforms.uOrientation = this.convertOrientationToDisplay(item.orientation).toMatrix4();
 
                 handleDrawingOfText(item.text, item.position);
             }
