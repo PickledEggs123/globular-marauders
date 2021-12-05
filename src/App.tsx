@@ -2534,8 +2534,10 @@ export class App extends React.Component<IAppProps, IAppState> {
         switch (event.key) {
             case "ArrowUp": return "w";
             case "ArrowDown": return "s";
-            case "ArrowLeft": return "a";
-            case "ArrowRight": return "d";
+            case "ArrowLeft": return "d";
+            case "ArrowRight": return "a";
+            case "a": return "d";
+            case "d": return "a";
             default: return event.key;
         }
     }
