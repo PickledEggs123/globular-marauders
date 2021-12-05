@@ -443,6 +443,7 @@ interface IAppState {
     voronoiMode: EVoronoiMode;
     autoPilotEnabled: boolean;
     audioEnabled: boolean;
+    init: boolean;
     showLoginMenu: boolean;
     showMainMenu: boolean;
     showPlanetMenu: boolean;
@@ -466,6 +467,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         audioEnabled: true as boolean,
         faction: null as EFaction | null,
         planetId: null as string | null,
+        init: false as boolean,
         showLoginMenu: true as boolean,
         showMainMenu: false as boolean,
         showPlanetMenu: false as boolean,
@@ -499,7 +501,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     public initialized: boolean = false;
     public frameCounter: number = 0;
     public game: Game = new Game();
-    public socket: WebSocket;
+    public socket: WebSocket | undefined;
     public socketEvents: Record<string, (data: any) => void> = {};
     public spawnPlanets: ISpawnPlanet[] = [];
     public spawnLocations: ISpawnLocation[] = [];
@@ -546,10 +548,12 @@ export class App extends React.Component<IAppProps, IAppState> {
 
     // networking messages, outgoing
     public sendMessage(event: string, message: any = undefined) {
-        this.socket.send(JSON.stringify({
-            event,
-            message
-        }));
+        if (this.socket) {
+            this.socket.send(JSON.stringify({
+                event,
+                message
+            }));
+        }
     }
 
     // pixi.js renderer
@@ -602,7 +606,16 @@ export class App extends React.Component<IAppProps, IAppState> {
             uniform float uScale;
             
             void main() {
-                vec4 pos = uCameraOrientation * uCameraPosition * uPosition * vec4(aPosition * uScale * uCameraScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
+                vec4 cameraOrientationPoint = uCameraOrientation * vec4(1.0, 0.0, 0.0, 0.0);
+                float cr = atan(cameraOrientationPoint.y, cameraOrientationPoint.x);
+                mat4 cameraRotation = mat4(
+                    cos(cr), -sin(cr), 0.0, 0.0,
+                    sin(cr),  cos(cr), 0.0, 0.0,
+                    0.0,      0.0,     1.0, 0.0,
+                    0.0,      0.0,     0.0, 1.0
+                );
+                    
+                vec4 pos = cameraRotation * uCameraPosition * uPosition * vec4(aPosition * uScale * uCameraScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
                 gl_Position = pos * vec4(1, -1, 0.0625, 1);
             }
         `;
@@ -673,16 +686,27 @@ export class App extends React.Component<IAppProps, IAppState> {
                 
                 void main() {
                     vColor = aColor;
-                    mat4 translation = uCameraOrientation * uCameraPosition * uPosition;
                     
-                    vec4 orientationPoint = uCameraOrientation * uOrientation * vec4(1.0, 0.0, 0.0, 0.0);
-                    float r = -atan(-orientationPoint.y, orientationPoint.x);
-                    mat4 rotation = mat4(
+                    vec4 cameraOrientationPoint = uCameraOrientation * vec4(1.0, 0.0, 0.0, 0.0);
+                    float cr = atan(cameraOrientationPoint.y, cameraOrientationPoint.x);
+                    mat4 cameraRotation = mat4(
+                        cos(cr), -sin(cr), 0.0, 0.0,
+                        sin(cr),  cos(cr), 0.0, 0.0,
+                        0.0,      0.0,     1.0, 0.0,
+                        0.0,      0.0,     0.0, 1.0
+                    );
+                    
+                    vec4 orientationPoint = uOrientation * vec4(1.0, 0.0, 0.0, 0.0);
+                    float r = atan(orientationPoint.y, orientationPoint.x);
+                    mat4 objectRotation = mat4(
                         cos(r), -sin(r), 0.0, 0.0,
                         sin(r),  cos(r), 0.0, 0.0,
                         0.0,     0.0,    1.0, 0.0,
                         0.0,     0.0,    0.0, 1.0
                     );
+                    
+                    mat4 translation = cameraRotation * uCameraPosition * uPosition;
+                    mat4 rotation = objectRotation;
                     
                     vec4 pos = translation * vec4((rotation * vec4(aPosition, 1.0)).xyz * uScale * uCameraScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
                     gl_Position = pos * vec4(1, -1, 0.0625, 1);
@@ -865,7 +889,16 @@ export class App extends React.Component<IAppProps, IAppState> {
             uniform float uScale;
             
             void main() {
-                vec4 pos = uCameraOrientation * uCameraPosition * uPosition * vec4(aPosition * uScale * uCameraScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
+                vec4 cameraOrientationPoint = uCameraOrientation * vec4(1.0, 0.0, 0.0, 0.0);
+                float cr = atan(cameraOrientationPoint.y, cameraOrientationPoint.x);
+                mat4 cameraRotation = mat4(
+                    cos(cr), -sin(cr), 0.0, 0.0,
+                    sin(cr),  cos(cr), 0.0, 0.0,
+                    0.0,      0.0,     1.0, 0.0,
+                    0.0,      0.0,     0.0, 1.0
+                );
+                
+                vec4 pos = cameraRotation * uCameraPosition * uPosition * vec4(aPosition * uScale * uCameraScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
                 gl_Position = pos * vec4(1, -1, 0.0625, 1);
             }
         `;
@@ -1000,16 +1033,27 @@ export class App extends React.Component<IAppProps, IAppState> {
                 
                 void main() {
                     vUv = aUv;
-                    mat4 translation = uCameraOrientation * uCameraPosition * uPosition;
                     
-                    vec4 orientationPoint = uCameraOrientation * uOrientation * vec4(1.0, 0.0, 0.0, 0.0);
-                    float r = -atan(-orientationPoint.y, orientationPoint.x);
-                    mat4 rotation = mat4(
+                    vec4 cameraOrientationPoint = uCameraOrientation * vec4(1.0, 0.0, 0.0, 0.0);
+                    float cr = atan(cameraOrientationPoint.y, cameraOrientationPoint.x);
+                    mat4 cameraRotation = mat4(
+                        cos(cr), -sin(cr), 0.0, 0.0,
+                        sin(cr),  cos(cr), 0.0, 0.0,
+                        0.0,      0.0,     1.0, 0.0,
+                        0.0,      0.0,     0.0, 1.0
+                    );
+                    
+                    vec4 orientationPoint = uOrientation * vec4(1.0, 0.0, 0.0, 0.0);
+                    float r = atan(orientationPoint.y, orientationPoint.x);
+                    mat4 objectRotation = mat4(
                         cos(r), -sin(r), 0.0, 0.0,
                         sin(r),  cos(r), 0.0, 0.0,
                         0.0,     0.0,    1.0, 0.0,
                         0.0,     0.0,    0.0, 1.0
                     );
+                    
+                    mat4 translation = cameraRotation * uCameraPosition * uPosition;
+                    mat4 rotation = objectRotation;
                     
                     vec4 pos = translation * vec4((rotation * vec4(aPosition, 1.0)).xyz * uScale * uCameraScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
                     gl_Position = pos * vec4(1, -1, 0.0625, 1);
@@ -1063,7 +1107,15 @@ export class App extends React.Component<IAppProps, IAppState> {
             uniform float uCameraScale;
             
             void main() {
-                vec4 pos = uCameraOrientation * uCameraPosition * vec4(-aPosition * uCameraScale, 1.0);
+                vec4 cameraOrientationPoint = uCameraOrientation * vec4(1.0, 0.0, 0.0, 0.0);
+                float cr = atan(cameraOrientationPoint.y, cameraOrientationPoint.x);
+                mat4 cameraRotation = mat4(
+                    cos(cr), -sin(cr), 0.0, 0.0,
+                    sin(cr),  cos(cr), 0.0, 0.0,
+                    0.0,      0.0,     1.0, 0.0,
+                    0.0,      0.0,     0.0, 1.0
+                );
+                vec4 pos = cameraRotation * uCameraPosition * vec4(-aPosition * uCameraScale, 1.0);
                 gl_Position = pos * vec4(1, -1, 0.0625, 1);
             }
         `;
@@ -1484,8 +1536,10 @@ export class App extends React.Component<IAppProps, IAppState> {
                 .mul(cameraPosition.clone().inverse())
                 .mul(position.clone())
                 .rotateVector([0, 0, 1]);
-            text.x = ((textPosition[0] * this.game.worldScale * this.state.zoom) / 2 * this.application.renderer.width) + this.application.renderer.width * 0.5;
-            text.y = ((textPosition[1] * this.game.worldScale * this.state.zoom) / 2 * this.application.renderer.height) + this.application.renderer.height * 0.5;
+            textPosition[0] = (textPosition[0] + 1) / 2;
+            textPosition[1] = (textPosition[1] + 1) / 2;
+            text.x = textPosition[0] * this.game.worldScale * this.state.zoom * this.application.renderer.width;
+            text.y = textPosition[1] * this.game.worldScale * this.state.zoom  * this.application.renderer.height;
             const center: [number, number] = [
                 this.application.renderer.width / 2,
                 this.application.renderer.height / 2
@@ -1504,11 +1558,15 @@ export class App extends React.Component<IAppProps, IAppState> {
             text.visible = textPosition[2] < 0;
         }
 
+        const removeExtraRotation = (q: Quaternion): Quaternion => {
+            return Quaternion.fromBetweenVectors([0, 0, 1], q.rotateVector([0, 0, 1]));
+        };
+
         // draw rotating app
         let pixiTick: number = 0;
         this.application.ticker.add(() => {
             const playerShip = this.getPlayerShip();
-            cameraPosition = playerShip.position.clone();
+            cameraPosition = removeExtraRotation(playerShip.position);
             cameraOrientation = playerShip.orientation.clone();
             pixiTick += 1;
 
@@ -1560,7 +1618,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 if (shipMesh) {
                     shipMesh.isPlayer = this.getPlayerShip().id === ship.id;
                     shipMesh.healthValue = Math.ceil(ship.health / ship.maxHealth * 100);
-                    shipMesh.position = ship.position.clone();
+                    shipMesh.position = removeExtraRotation(ship.position);
                     shipMesh.orientation = ship.orientation.clone();
                     shipMesh.tick = pixiTick;
                 } else {
@@ -1582,8 +1640,8 @@ export class App extends React.Component<IAppProps, IAppState> {
             for (const cannonBall of this.game.cannonBalls) {
                 const cannonBallMesh = this.cannonBallMeshes.find(c => c.id === cannonBall.id);
                 if (cannonBallMesh) {
-                    cannonBallMesh.position = cannonBall.position;
-                    cannonBallMesh.positionVelocity = cannonBall.positionVelocity;
+                    cannonBallMesh.position = removeExtraRotation(cannonBall.position);
+                    cannonBallMesh.positionVelocity = removeExtraRotation(cannonBall.positionVelocity);
                     cannonBallMesh.tick = pixiTick;
                 } else {
                     this.addCannonBall({
@@ -1600,11 +1658,11 @@ export class App extends React.Component<IAppProps, IAppState> {
             this.cannonBallMeshes = this.cannonBallMeshes.filter(m => m.tick === pixiTick);
             // crates
             for (const crate of this.game.crates) {
-                const crateMeshes = this.crateMeshes.find(c => c.id === crate.id);
-                if (crateMeshes) {
-                    crateMeshes.position = crate.position;
-                    crateMeshes.orientation = crate.orientation;
-                    crateMeshes.tick = pixiTick;
+                const createMesh = this.crateMeshes.find(c => c.id === crate.id);
+                if (createMesh) {
+                    createMesh.position = removeExtraRotation(crate.position);
+                    createMesh.orientation = crate.orientation;
+                    createMesh.tick = pixiTick;
                 } else {
                     this.addCrate({
                         crate,
@@ -1713,7 +1771,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraScale = this.state.zoom;
-                shader.uniforms.uPosition = item.position.toMatrix4();
+                shader.uniforms.uPosition = removeExtraRotation(item.position).toMatrix4();
                 shader.uniforms.uOrientation = this.convertOrientationToDisplay(item.orientation).toMatrix4();
 
                 handleDrawingOfText(item.text, item.position);
@@ -1724,8 +1782,10 @@ export class App extends React.Component<IAppProps, IAppState> {
                         .mul(cameraPosition.clone().inverse())
                         .mul(item.position.clone())
                         .rotateVector([0, 0, 1]);
-                    const lineXS = ((startPoint[0] * this.game.worldScale * this.state.zoom) / 2 * this.application.renderer.width) + this.application.renderer.width * 0.5;
-                    const lineYS = ((startPoint[1] * this.game.worldScale * this.state.zoom) / 2 * this.application.renderer.height) + this.application.renderer.height * 0.5;
+                    startPoint[0] = (startPoint[0] + 1) / 2;
+                    startPoint[1] = (startPoint[1] + 1) / 2;
+                    const lineXS = (startPoint[0] * this.game.worldScale * this.state.zoom) * this.application.renderer.width;
+                    const lineYS = (startPoint[1] * this.game.worldScale * this.state.zoom) * this.application.renderer.height;
 
                     const endPoint = cameraOrientation.clone().inverse()
                         .mul(cameraPosition.clone().inverse())
@@ -1733,8 +1793,10 @@ export class App extends React.Component<IAppProps, IAppState> {
                         .mul(item.orientation.clone())
                         .mul(Quaternion.fromAxisAngle([1, 0, 0], Math.PI / this.game.worldScale / this.state.zoom))
                         .rotateVector([0, 0, 1]);
-                    const lineXE = ((endPoint[0] * this.game.worldScale * this.state.zoom) / 2 * this.application.renderer.width) + this.application.renderer.width * 0.5;
-                    const lineYE = ((endPoint[1] * this.game.worldScale * this.state.zoom) / 2 * this.application.renderer.height) + this.application.renderer.height * 0.5;
+                    startPoint[0] = (endPoint[0] + 1) / 2;
+                    startPoint[1] = (endPoint[1] + 1) / 2;
+                    const lineXE = (endPoint[0] * this.game.worldScale * this.state.zoom) * this.application.renderer.width;
+                    const lineYE = (endPoint[1] * this.game.worldScale * this.state.zoom) * this.application.renderer.height;
 
                     const dashLength = 5;
                     const lineDirection = DelaunayGraph.normalize(
@@ -1805,7 +1867,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraScale = this.state.zoom;
-                shader.uniforms.uPosition = item.position.toMatrix4();
+                shader.uniforms.uPosition = removeExtraRotation(item.position).toMatrix4();
             }
 
             // update each crate
@@ -1816,14 +1878,14 @@ export class App extends React.Component<IAppProps, IAppState> {
                 meshShader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
                 meshShader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
                 meshShader.uniforms.uCameraScale = this.state.zoom;
-                meshShader.uniforms.uPosition = item.position.toMatrix4();
+                meshShader.uniforms.uPosition = removeExtraRotation(item.position).toMatrix4();
                 meshShader.uniforms.uOrientation = this.convertOrientationToDisplay(item.orientation).toMatrix4();
 
                 const imageShader = item.image.shader;
                 imageShader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
                 imageShader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
                 imageShader.uniforms.uCameraScale = this.state.zoom;
-                imageShader.uniforms.uPosition = item.position.toMatrix4();
+                imageShader.uniforms.uPosition = removeExtraRotation(item.position).toMatrix4();
                 imageShader.uniforms.uOrientation = this.convertOrientationToDisplay(item.orientation).toMatrix4();
 
                 handleDrawingOfText(item.text, item.position);
@@ -1841,6 +1903,10 @@ export class App extends React.Component<IAppProps, IAppState> {
         });
 
         // setup networking
+        this.setupNetworking.call(this);
+    }
+
+    setupNetworking() {
         this.socket = new SockJS("/game");
         this.socket.onerror = (err) => {
             console.log("Failed to connect", err);
@@ -1865,6 +1931,16 @@ export class App extends React.Component<IAppProps, IAppState> {
                 }
             }
         };
+        this.socket.onclose = () => {
+            setTimeout(() => {
+                this.setupNetworking.call(this);
+            }, 2000);
+        };
+        this.socket.onopen = () => {
+            this.setState({
+                init: true
+            });
+        };
         this.socketEvents["send-world"] = (data: IGameInitializationFrame) => {
             this.setState({
                 showSpawnMenu: false,
@@ -1877,6 +1953,8 @@ export class App extends React.Component<IAppProps, IAppState> {
             setTimeout(() => {
                 this.sendMessage("init-loop");
             }, 500);
+        };
+        this.socketEvents["ack-init-loop"] = (data: undefined) => {
         };
         this.socketEvents["send-frame"] = (data: IGameSyncFrame) => {
             const playerData = this.game.playerData.find(p => p.id === this.playerId);
@@ -1983,7 +2061,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         const angle = circleFraction * (Math.PI * 2);
         tempShip.position = Quaternion.fromBetweenVectors([0, 0, 1], [0, 0, 1]).mul(
             Quaternion.fromAxisAngle([1, 0, 0], -angle)
-        );
+        )
         return Game.GetCameraState(tempShip);
     }
 
@@ -2271,19 +2349,19 @@ export class App extends React.Component<IAppProps, IAppState> {
      * Run the game loop. This function is called 10 times a second to simulate a video game.
      */
     public gameLoop() {
+        // refresh voronoi data, refresh occasionally since this is expensive.
+        if (this.refreshVoronoiDataTick <= 60) {
+            this.refreshVoronoiDataTick += 1;
+        } else {
+            this.refreshVoronoiDataTick = 0;
+            this.refreshVoronoiData();
+        }
+
         if (!this.initialized) {
             return;
         }
 
         if (this.frameCounter++ % 3 === 0) {
-            // refresh voronoi data, refresh occasionally since this is expensive.
-            if (this.refreshVoronoiDataTick <= 20) {
-                this.refreshVoronoiDataTick += 1;
-            } else {
-                this.refreshVoronoiDataTick = 0;
-                this.refreshVoronoiData();
-            }
-
             // handle server replies
             while (true) {
                 const message = this.messages.shift();
@@ -3288,53 +3366,55 @@ export class App extends React.Component<IAppProps, IAppState> {
                         </ul>
                     )
                 }
-                {this.state.showLoginMenu ? this.renderLoginMenu.call(this) : null}
+                {this.state.showLoginMenu && this.state.init ? this.renderLoginMenu.call(this) : null}
                 <div style={{width: "100%", height: this.state.height}}>
                     <div style={{position: "absolute", padding: "0px auto", width: "100%"}} ref={this.showAppBodyRef}/>
-                    {
-                        this.state.showLoginMenu ? null : (
-                            <div style={{position: "absolute", padding: "0px auto", width: "100%"}}>
-                                <svg ref={this.svgRef} width={this.state.width} height={this.state.height}>
-                                    <defs>
-                                        <mask id="worldMask">
-                                            <circle
-                                                cx={this.state.width * 0.5}
-                                                cy={this.state.height * 0.5}
-                                                r={Math.min(this.state.width, this.state.height) * 0.5}
-                                                fill="white"
-                                            />
-                                        </mask>
-                                    </defs>
-                                    <g mask="url(#worldMask)" onClick={this.handleSvgClick.bind(this)}>
+                    <div style={{position: "absolute", padding: "0px auto", width: "100%"}}>
+                        <svg ref={this.svgRef} width={this.state.width} height={this.state.height}>
+                            <defs>
+                                <mask id="worldMask">
+                                    <circle
+                                        cx={this.state.width * 0.5}
+                                        cy={this.state.height * 0.5}
+                                        r={Math.min(this.state.width, this.state.height) * 0.5}
+                                        fill="white"
+                                    />
+                                </mask>
+                            </defs>
+                            <g mask="url(#worldMask)" onClick={this.handleSvgClick.bind(this)}>
+                                {
+                                    this.state.showMainMenu ? this.renderMainMenu.call(this) : null
+                                }
+                                {
+                                    this.state.showPlanetMenu ? this.renderPlanetMenu.call(this) : null
+                                }
+                                {
+                                    this.state.showSpawnMenu ? this.renderSpawnMenu.call(this) : null
+                                }
+                            </g>
+                            {
+                                this.renderGameControls()
+                            }
+                            {
+                                this.state.showLoginMenu ? null : (
+                                    <React.Fragment>
                                         {
-                                            this.state.showMainMenu ? this.renderMainMenu.call(this) : null
+                                            this.renderGameStatus()
                                         }
                                         {
-                                            this.state.showPlanetMenu ? this.renderPlanetMenu.call(this) : null
+                                            this.renderCargoStatus()
                                         }
                                         {
-                                            this.state.showSpawnMenu ? this.renderSpawnMenu.call(this) : null
+                                            this.renderFactionStatus()
                                         }
-                                    </g>
-                                    {
-                                        this.renderGameControls()
-                                    }
-                                    {
-                                        this.renderGameStatus()
-                                    }
-                                    {
-                                        this.renderCargoStatus()
-                                    }
-                                    {
-                                        this.renderFactionStatus()
-                                    }
-                                    {
-                                        this.renderPlayerStatus()
-                                    }
-                                </svg>
-                            </div>
-                        )
-                    }
+                                        {
+                                            this.renderPlayerStatus()
+                                        }
+                                    </React.Fragment>
+                                )
+                            }
+                        </svg>
+                    </div>
                 </div>
             </div>
         );
