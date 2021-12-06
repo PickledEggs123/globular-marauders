@@ -1536,10 +1536,10 @@ export class App extends React.Component<IAppProps, IAppState> {
                 .mul(cameraPosition.clone().inverse())
                 .mul(position.clone())
                 .rotateVector([0, 0, 1]);
-            textPosition[0] = (textPosition[0] + 1) / 2;
-            textPosition[1] = (textPosition[1] + 1) / 2;
-            text.x = textPosition[0] * this.game.worldScale * this.state.zoom * this.application.renderer.width;
-            text.y = textPosition[1] * this.game.worldScale * this.state.zoom  * this.application.renderer.height;
+            textPosition[0] = (textPosition[0] * this.game.worldScale * this.state.zoom + 1) / 2;
+            textPosition[1] = (textPosition[1] * this.game.worldScale * this.state.zoom + 1) / 2;
+            text.x = textPosition[0] * this.application.renderer.width;
+            text.y = textPosition[1]  * this.application.renderer.height;
             const center: [number, number] = [
                 this.application.renderer.width / 2,
                 this.application.renderer.height / 2
