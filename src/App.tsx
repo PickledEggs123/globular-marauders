@@ -1280,7 +1280,6 @@ export class App extends React.Component<IAppProps, IAppState> {
     }) => {
         const position: Quaternion = ship.position.clone();
         const orientation: Quaternion = ship.orientation.clone();
-        console.log(orientation.rotateVector([1, 0, 0]));
 
         // create mesh
         const uniforms = {
@@ -1532,14 +1531,18 @@ export class App extends React.Component<IAppProps, IAppState> {
         });
 
         const handleDrawingOfText = (text: PIXI.Text, position: Quaternion) => {
-            const textPosition = cameraOrientation.clone().inverse()
+            const textPosition = DelaunayGraph.distanceFormula(
+                cameraPosition.rotateVector([0, 0, 1]),
+                position.rotateVector([0, 0, 1])
+            ) < 0.001 ? [0, 0, 1] : cameraOrientation.clone().inverse()
                 .mul(cameraPosition.clone().inverse())
                 .mul(position.clone())
                 .rotateVector([0, 0, 1]);
-            textPosition[0] = (textPosition[0] * this.game.worldScale * this.state.zoom + 1) / 2;
-            textPosition[1] = (textPosition[1] * this.game.worldScale * this.state.zoom + 1) / 2;
+            textPosition[0] = ((-textPosition[0] * this.state.zoom) + 1) / 2;
+            textPosition[1] = ((-textPosition[1] * this.state.zoom) + 1) / 2;
             text.x = textPosition[0] * this.application.renderer.width;
-            text.y = textPosition[1]  * this.application.renderer.height;
+            text.y = textPosition[1] * this.application.renderer.height;
+            text.y -= 20;
             const center: [number, number] = [
                 this.application.renderer.width / 2,
                 this.application.renderer.height / 2
@@ -1549,13 +1552,14 @@ export class App extends React.Component<IAppProps, IAppState> {
                 center[1] - text.y
             ];
             const directionTowardsCenterLength = Math.sqrt(Math.pow(directionTowardsCenter[0], 2) + Math.pow(directionTowardsCenter[1], 2));
-            const normalizedDirectionTowardsCenter: [number, number] = [
+            const normalizedDirectionTowardsCenter: [number, number] = directionTowardsCenterLength !== 0 ? [
                 directionTowardsCenter[0] / directionTowardsCenterLength,
                 directionTowardsCenter[1] / directionTowardsCenterLength
-            ];
+            ] : [0, 0];
             text.x += normalizedDirectionTowardsCenter[0] * 25;
             text.y += normalizedDirectionTowardsCenter[1] * 25;
-            text.visible = textPosition[2] < 0;
+            text.anchor.set(0.5);
+            text.visible = textPosition[2] > 0;
         }
 
         const removeExtraRotation = (q: Quaternion): Quaternion => {
@@ -1743,26 +1747,34 @@ export class App extends React.Component<IAppProps, IAppState> {
                 shader.uniforms.uCameraScale = this.state.zoom;
                 shader.uniforms.uOrientation = this.convertOrientationToDisplay(item.orientation).toMatrix4();
 
-                // if (item.factionColor) {
-                //     const startPoint = cameraOrientation.clone().inverse()
-                //         .mul(cameraPosition.clone().inverse())
-                //         .mul(item.position.clone())
-                //         .rotateVector([0, 0, 1]);
-                //     const centerX = ((startPoint[0] * this.game.worldScale * this.state.zoom) / 2 * this.application.renderer.width) + this.application.renderer.width * 0.5;
-                //     const centerY = ((startPoint[1] * this.game.worldScale * this.state.zoom) / 2 * this.application.renderer.height) + this.application.renderer.height * 0.5;
-                //
-                //     item.faction.clear();
-                //     item.faction.beginFill(item.factionColor);
-                //     item.faction.drawCircle(
-                //         centerX,
-                //         centerY,
-                //         item.factionRadius * this.state.zoom
-                //     );
-                //     item.faction.endFill();
-                //     item.faction.visible = true;
-                // } else {
-                //     item.faction.visible = false;
-                // }
+                if (item.factionColor) {
+                    const startPoint = DelaunayGraph.distanceFormula(
+                        cameraPosition.rotateVector([0, 0, 1]),
+                        item.position.rotateVector([0, 0, 1])
+                    ) < 0.0001 ? [0, 0, 1] : cameraOrientation.clone().inverse()
+                        .mul(cameraPosition.clone().inverse())
+                        .mul(item.position.clone())
+                        .rotateVector([0, 0, 1]);
+                    const centerX = ((-startPoint[0] * this.state.zoom) + 1) / 2 * this.application.renderer.width;
+                    const centerY = ((-startPoint[1] * this.state.zoom) + 1) / 2 * this.application.renderer.height;
+
+                    item.faction.clear();
+                    item.faction.position.set(centerX, centerY);
+                    item.faction.beginFill(item.factionColor);
+                    item.faction.drawCircle(
+                        0,
+                        0,
+                        item.factionRadius * this.game.worldScale * this.state.zoom
+                    );
+                    item.faction.endFill();
+                    item.faction.visible = startPoint[0] > 0 &&
+                        centerX >= 0 &&
+                        centerX <= this.application.renderer.width &&
+                        centerY >= 0 &&
+                        centerY <= this.application.renderer.height;
+                } else {
+                    item.faction.visible = false;
+                }
             }
 
             // update each ship
@@ -1830,33 +1842,39 @@ export class App extends React.Component<IAppProps, IAppState> {
                     item.line.visible = false;
                 }
 
-                // // draw health bar
-                // {
-                //     const startPoint = cameraOrientation.clone().inverse()
-                //         .mul(cameraPosition.clone().inverse())
-                //         .mul(item.position.clone())
-                //         .rotateVector([0, 0, 1]);
-                //     const centerX = ((startPoint[0] * this.game.worldScale * this.state.zoom) / 2 * this.application.renderer.width) + this.application.renderer.width * 0.5;
-                //     const centerY = ((startPoint[1] * this.game.worldScale * this.state.zoom) / 2 * this.application.renderer.height) + this.application.renderer.height * 0.5;
-                //
-                //     const radius = 20;
-                //     item.health.clear();
-                //     const sliceSize = Math.PI * 2 / 100;
-                //     item.health.beginFill(0x00ff00);
-                //     item.health.lineStyle(5, 0x00ff00);
-                //     item.health.moveTo(
-                //         centerX + radius,
-                //         centerY
-                //     );
-                //     console.log(item.healthValue);
-                //     for (let i = 1; i < item.healthValue; i++) {
-                //         item.health.lineTo(
-                //             centerX + Math.cos(i * sliceSize) * radius,
-                //             centerY + Math.sin(i * sliceSize) * radius
-                //         );
-                //     }
-                //     item.health.endFill();
-                // }
+                // draw health bar
+                {
+                    const startPoint = DelaunayGraph.distanceFormula(
+                        cameraPosition.rotateVector([0, 0, 1]),
+                        item.position.rotateVector([0, 0, 1])
+                    ) < 0.001 ? [0, 0, 1] : cameraOrientation.clone().inverse()
+                        .mul(cameraPosition.clone().inverse())
+                        .mul(item.position.clone())
+                        .rotateVector([0, 0, 1]);
+                    const centerX = ((-startPoint[0] * this.state.zoom) + 1) / 2 * this.application.renderer.width;
+                    const centerY = ((-startPoint[1] * this.state.zoom) + 1) / 2 * this.application.renderer.height;
+
+                    const radius = 20;
+                    item.health.clear();
+                    const sliceSize = Math.PI * 2 / 100;
+                    item.health.position.set(centerX, centerY);
+                    item.health.lineStyle(5, 0x00ff00);
+                    item.health.moveTo(
+                        radius,
+                        0
+                    );
+                    for (let i = 1; i <= item.healthValue; i++) {
+                        item.health.lineTo(
+                            Math.cos(i * sliceSize) * radius,
+                            Math.sin(i * sliceSize) * radius
+                        );
+                    }
+                    item.health.visible = startPoint[0] > 0 &&
+                        centerX >= 0 &&
+                        centerX <= this.application.renderer.width &&
+                        centerY >= 0 &&
+                        centerY <= this.application.renderer.height;
+                }
             }
 
             // update each cannon ball
