@@ -1159,6 +1159,8 @@ export class App extends React.Component<IAppProps, IAppState> {
         mesh: PIXI.Mesh<PIXI.Shader>,
         text: PIXI.Text,
         line: PIXI.Graphics,
+        autoPilotLines: PIXI.Graphics[],
+        autoPilotLinePoints: [number, number, number][],
         health: PIXI.Graphics,
         healthValue: number,
         isPlayer: boolean,
@@ -1248,7 +1250,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         const faction2 = new PIXI.Graphics();
         faction2.zIndex = -6;
 
-        const factionRadius = (10 * planet.size + 10) * PHYSICS_SCALE;
+        const factionRadius = (planet.size * 10 / this.game.worldScale + 5) * PHYSICS_SCALE;
         let factionColorName: string | null = null;
         const ownerFaction = Object.values(this.game.factions).find(faction => faction.planetIds.includes(planet.id));
         if (ownerFaction) {
@@ -1269,6 +1271,8 @@ export class App extends React.Component<IAppProps, IAppState> {
         }
 
         this.application.stage.addChild(mesh);
+        this.application.stage.addChild(faction);
+        this.application.stage.addChild(faction2);
         this.planetMeshes.push({
             id: planet.id,
             mesh,
@@ -1325,6 +1329,8 @@ export class App extends React.Component<IAppProps, IAppState> {
             mesh,
             text,
             line,
+            autoPilotLines: [],
+            autoPilotLinePoints: [],
             health,
             healthValue: Math.ceil(ship.health / ship.maxHealth * 100),
             isPlayer,
@@ -1638,6 +1644,20 @@ export class App extends React.Component<IAppProps, IAppState> {
                     shipMesh.healthValue = Math.ceil(ship.health / ship.maxHealth * 100);
                     shipMesh.position = removeExtraRotation(ship.position);
                     shipMesh.orientation = ship.orientation.clone();
+                    const playerData = this.game.playerData.find(p => p.id === this.playerId);
+                    if (shipMesh.isPlayer && playerData && playerData.autoPilotEnabled && ship.pathFinding.points.length > 0 && shipMesh.autoPilotLines.length === 0) {
+                        const autoPilotLine = new PIXI.Graphics();
+                        autoPilotLine.zIndex = -5;
+                        this.application.stage.addChild(autoPilotLine);
+                        shipMesh.autoPilotLines.push(autoPilotLine);
+                        shipMesh.autoPilotLinePoints = [...ship.pathFinding.points];
+                    } else if (shipMesh.autoPilotLines.length > 0) {
+                        for (const autoPilotLine of shipMesh.autoPilotLines) {
+                            this.application.stage.removeChild(autoPilotLine);
+                        }
+                        shipMesh.autoPilotLines.splice(0, shipMesh.autoPilotLines.length);
+                        shipMesh.autoPilotLinePoints = [];
+                    }
                     shipMesh.tick = pixiTick;
                 } else {
                     this.addShip({
@@ -1653,6 +1673,10 @@ export class App extends React.Component<IAppProps, IAppState> {
                 this.application.stage.removeChild(item.text);
                 this.application.stage.removeChild(item.line);
                 this.application.stage.removeChild(item.health);
+                for (const autoPilotLine of item.autoPilotLines) {
+                    this.application.stage.removeChild(autoPilotLine);
+                }
+                item.autoPilotLines.splice(0, item.autoPilotLines.length);
             }
             this.shipMeshes = this.shipMeshes.filter(m => m.tick === pixiTick);
             // cannonBalls
@@ -1775,7 +1799,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                     const settlementProgressSlice = Math.max(0, Math.min(item.settlementProgress, 1)) * Math.PI * 2;
                     const settlementProgressSlice2 = Math.max(0, Math.min(item.settlementProgress - 1, 1) / 4) * Math.PI * 2;
                     const radius = item.factionRadius * this.state.zoom * this.application.renderer.width;
-                    const radius2 = (item.factionRadius + 10 * PHYSICS_SCALE) * this.state.zoom * this.application.renderer.width;
+                    const radius2 = (item.factionRadius + 5 * PHYSICS_SCALE) * this.state.zoom * this.application.renderer.width;
 
                     item.faction.clear();
                     item.faction.position.set(centerX, centerY);
@@ -1817,7 +1841,10 @@ export class App extends React.Component<IAppProps, IAppState> {
 
                 // draw player dotted line
                 if (item.isPlayer) {
-                    const startPoint = cameraOrientation.clone().inverse()
+                    const startPoint = DelaunayGraph.distanceFormula(
+                        cameraPosition.rotateVector([0, 0, 1]),
+                        item.position.rotateVector([0, 0, 1])
+                    ) < 0.001 ? [0, 0, 1] : cameraOrientation.clone().inverse()
                         .mul(cameraPosition.clone().inverse())
                         .mul(item.position.clone())
                         .rotateVector([0, 0, 1]);
@@ -1832,8 +1859,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                         .mul(item.orientation.clone())
                         .mul(Quaternion.fromAxisAngle([1, 0, 0], Math.PI / this.game.worldScale / this.state.zoom))
                         .rotateVector([0, 0, 1]);
-                    startPoint[0] = (endPoint[0] + 1) / 2;
-                    startPoint[1] = (endPoint[1] + 1) / 2;
+                    endPoint[0] = (endPoint[0] + 1) / 2;
+                    endPoint[1] = (endPoint[1] + 1) / 2;
                     const lineXE = (endPoint[0] * this.game.worldScale * this.state.zoom) * this.application.renderer.width;
                     const lineYE = (endPoint[1] * this.game.worldScale * this.state.zoom) * this.application.renderer.height;
 
@@ -1867,6 +1894,64 @@ export class App extends React.Component<IAppProps, IAppState> {
                     item.line.visible = true;
                 } else {
                     item.line.visible = false;
+                }
+
+                // draw AutoPilot dotted lines
+                for (let i = 0; i < item.autoPilotLines.length && i < 1; i++) {
+                    const lineStart = i === 0 ? cameraPosition.clone() : Quaternion.fromBetweenVectors([0, 0, 1], item.autoPilotLinePoints[i - 1]);
+                    const lineEnd = Quaternion.fromBetweenVectors([0, 0, 1], item.autoPilotLinePoints[i]);
+                    const startPoint = DelaunayGraph.distanceFormula(
+                        cameraPosition.rotateVector([0, 0, 1]),
+                        lineStart.rotateVector([0, 0, 1])
+                    ) < 0.001 ? [0, 0, 1] : cameraOrientation.clone().inverse()
+                        .mul(cameraPosition.clone().inverse())
+                        .mul(lineStart)
+                        .rotateVector([0, 0, 1]);
+                    startPoint[0] = (startPoint[0] + 1) / 2;
+                    startPoint[1] = (startPoint[1] + 1) / 2;
+                    const lineXS = (startPoint[0] * this.game.worldScale * this.state.zoom) * this.application.renderer.width;
+                    const lineYS = (startPoint[1] * this.game.worldScale * this.state.zoom) * this.application.renderer.height;
+
+                    const endPoint = DelaunayGraph.distanceFormula(
+                        cameraPosition.rotateVector([0, 0, 1]),
+                        lineEnd.rotateVector([0, 0, 1])
+                    ) < 0.001 ? [0, 0, 1] : cameraOrientation.clone().inverse()
+                        .mul(cameraPosition.clone().inverse())
+                        .mul(lineEnd)
+                        .rotateVector([0, 0, 1]);
+                    endPoint[0] = (endPoint[0] + 1) / 2;
+                    endPoint[1] = (endPoint[1] + 1) / 2;
+                    const lineXE = (endPoint[0] * this.game.worldScale * this.state.zoom) * this.application.renderer.width;
+                    const lineYE = (endPoint[1] * this.game.worldScale * this.state.zoom) * this.application.renderer.height;
+
+                    const dashLength = 5;
+                    const lineDirection = DelaunayGraph.normalize(
+                        DelaunayGraph.subtract(
+                            [lineXE, lineYE, 0],
+                            [lineXS, lineYS, 0]
+                        )
+                    );
+                    const lineLength = DelaunayGraph.distanceFormula(
+                        [lineXE, lineYE, 0],
+                        [lineXS, lineYS, 0]
+                    );
+
+                    // draw line
+                    item.line.clear();
+                    item.line.beginFill(0xff0000);
+                    item.line.lineStyle(1, 0xff0000);
+                    for (let i = 0; i < lineLength; i += dashLength * 3) {
+                        item.line.moveTo(
+                            lineXS + lineDirection[0] * i,
+                            lineYS + lineDirection[1] * i
+                        );
+                        item.line.lineTo(
+                            lineXS + lineDirection[0] * (i + dashLength),
+                            lineYS + lineDirection[1] * (i + dashLength)
+                        );
+                    }
+                    item.line.endFill();
+                    item.line.visible = true;
                 }
 
                 // draw health bar
