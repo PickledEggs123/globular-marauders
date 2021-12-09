@@ -1144,8 +1144,11 @@ export class App extends React.Component<IAppProps, IAppState> {
         id: string,
         mesh: PIXI.Mesh<PIXI.Shader>,
         faction: PIXI.Graphics,
+        faction2: PIXI.Graphics,
         factionRadius: number,
         factionColor: number | null,
+        settlementLevel: number,
+        settlementProgress: number,
         position: Quaternion,
         orientation: Quaternion,
         rotation: Quaternion,
@@ -1222,6 +1225,8 @@ export class App extends React.Component<IAppProps, IAppState> {
         const position: Quaternion = planet.position.clone();
         const orientation: Quaternion = planet.orientation.clone();
         const rotation: Quaternion = Quaternion.fromAxisAngle(DelaunayGraph.randomPoint(), Math.PI * 2 / 60 / 10 / 10);
+        const settlementLevel = planet.settlementLevel;
+        const settlementProgress = planet.settlementProgress;
 
         // create mesh
         const uniforms = {
@@ -1240,8 +1245,10 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         const faction = new PIXI.Graphics();
         faction.zIndex = -6;
+        const faction2 = new PIXI.Graphics();
+        faction2.zIndex = -6;
 
-        const factionRadius = 10 * planet.size * PHYSICS_SCALE / this.game.worldScale + 10 * PHYSICS_SCALE;
+        const factionRadius = (10 * planet.size + 10) * PHYSICS_SCALE;
         let factionColorName: string | null = null;
         const ownerFaction = Object.values(this.game.factions).find(faction => faction.planetIds.includes(planet.id));
         if (ownerFaction) {
@@ -1266,8 +1273,11 @@ export class App extends React.Component<IAppProps, IAppState> {
             id: planet.id,
             mesh,
             faction,
+            faction2,
             factionRadius,
             factionColor,
+            settlementLevel,
+            settlementProgress,
             position,
             orientation,
             rotation,
@@ -1602,6 +1612,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                 const planetMesh = this.planetMeshes.find(p => p.id === planet.id);
                 if (planetMesh) {
                     planetMesh.orientation = planetMesh.rotation.clone().mul(planetMesh.orientation.clone());
+                    planetMesh.settlementLevel = planet.settlementLevel;
+                    planetMesh.settlementProgress = planet.settlementProgress;
                     planetMesh.tick = pixiTick;
                 } else {
                     this.addPlanet({
@@ -1614,6 +1626,8 @@ export class App extends React.Component<IAppProps, IAppState> {
             }
             for (const item of this.planetMeshes.filter(m => m.tick !== pixiTick)) {
                 this.application.stage.removeChild(item.mesh);
+                this.application.stage.removeChild(item.faction);
+                this.application.stage.removeChild(item.faction2);
             }
             this.planetMeshes = this.planetMeshes.filter(m => m.tick === pixiTick);
             // ships
@@ -1638,6 +1652,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 this.application.stage.removeChild(item.mesh);
                 this.application.stage.removeChild(item.text);
                 this.application.stage.removeChild(item.line);
+                this.application.stage.removeChild(item.health);
             }
             this.shipMeshes = this.shipMeshes.filter(m => m.tick === pixiTick);
             // cannonBalls
@@ -1757,23 +1772,35 @@ export class App extends React.Component<IAppProps, IAppState> {
                         .rotateVector([0, 0, 1]);
                     const centerX = ((-startPoint[0] * this.state.zoom) + 1) / 2 * this.application.renderer.width;
                     const centerY = ((-startPoint[1] * this.state.zoom) + 1) / 2 * this.application.renderer.height;
+                    const settlementProgressSlice = Math.max(0, Math.min(item.settlementProgress, 1)) * Math.PI * 2;
+                    const settlementProgressSlice2 = Math.max(0, Math.min(item.settlementProgress - 1, 1) / 4) * Math.PI * 2;
+                    const radius = item.factionRadius * this.state.zoom * this.application.renderer.width;
+                    const radius2 = (item.factionRadius + 10 * PHYSICS_SCALE) * this.state.zoom * this.application.renderer.width;
 
                     item.faction.clear();
                     item.faction.position.set(centerX, centerY);
                     item.faction.beginFill(item.factionColor);
-                    item.faction.drawCircle(
-                        0,
-                        0,
-                        item.factionRadius * this.game.worldScale * this.state.zoom
-                    );
+                    item.faction.arc(0, 0, radius, 0, settlementProgressSlice);
                     item.faction.endFill();
                     item.faction.visible = startPoint[0] > 0 &&
                         centerX >= 0 &&
                         centerX <= this.application.renderer.width &&
                         centerY >= 0 &&
                         centerY <= this.application.renderer.height;
+
+                    item.faction2.clear();
+                    item.faction2.position.set(centerX, centerY);
+                    item.faction2.beginFill(item.factionColor);
+                    item.faction2.arc(0, 0, radius2, 0, settlementProgressSlice2);
+                    item.faction2.endFill();
+                    item.faction2.visible = startPoint[0] > 0 &&
+                        centerX >= 0 &&
+                        centerX <= this.application.renderer.width &&
+                        centerY >= 0 &&
+                        centerY <= this.application.renderer.height;
                 } else {
                     item.faction.visible = false;
+                    item.faction2.visible = false;
                 }
             }
 
@@ -1854,11 +1881,12 @@ export class App extends React.Component<IAppProps, IAppState> {
                     const centerX = ((-startPoint[0] * this.state.zoom) + 1) / 2 * this.application.renderer.width;
                     const centerY = ((-startPoint[1] * this.state.zoom) + 1) / 2 * this.application.renderer.height;
 
-                    const radius = 20;
-                    item.health.clear();
+                    const radius = 20 * PHYSICS_SCALE * this.state.zoom * this.application.renderer.width;
+                    const thickness = 5 * PHYSICS_SCALE * this.state.zoom * this.application.renderer.width;
                     const sliceSize = Math.PI * 2 / 100;
+                    item.health.clear();
                     item.health.position.set(centerX, centerY);
-                    item.health.lineStyle(5, 0x00ff00);
+                    item.health.lineStyle(thickness, 0x00ff00);
                     item.health.moveTo(
                         radius,
                         0
@@ -1979,7 +2007,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             if (playerData) {
                 const ship = this.game.ships.find(s => s.id === playerData.shipId);
                 const shipData = data.ships.find(s => s.id === playerData.shipId);
-                if (ship && shipData) {
+                if (ship && shipData && !playerData.autoPilotEnabled) {
                     // cancel server position if the position difference is small
                     if (VoronoiGraph.angularDistance(
                         ship.position.rotateVector([0, 0, 1]),
@@ -2783,9 +2811,9 @@ export class App extends React.Component<IAppProps, IAppState> {
         if (numPathingNodes) {
             return (
                 <g key="game-status" transform={`translate(${this.state.width - 80},0)`}>
-                    <text x="0" y="30" fontSize={8} color="black">Node{numPathingNodes > 1 ? "s" : ""}: {numPathingNodes}</text>
-                    <text x="0" y="45" fontSize={8} color="black">Distance: {Math.round(distanceToNode * 100000 / Math.PI) / 100}</text>
-                    <text x="0" y="60" fontSize={8} color="black">Order: {orderType}</text>
+                    <text x="0" y="30" fontSize={8} fill="white">Node{numPathingNodes > 1 ? "s" : ""}: {numPathingNodes}</text>
+                    <text x="0" y="45" fontSize={8} fill="white">Distance: {Math.round(distanceToNode * 100000 / Math.PI) / 100}</text>
+                    <text x="0" y="60" fontSize={8} fill="white">Order: {orderType}</text>
                 </g>
             );
         } else {
@@ -2841,10 +2869,10 @@ export class App extends React.Component<IAppProps, IAppState> {
         if (faction) {
             return (
                 <g key="faction-status" transform={`translate(${this.state.width - 80},${this.state.height - 80})`}>
-                    <text x="0" y="30" fontSize={8} color="black">Faction: {faction.id}</text>
-                    <text x="0" y="45" fontSize={8} color="black">Gold: {planet && planet.moneyAccount ? planet.moneyAccount.cash.getGold() : "N/A"}</text>
-                    <text x="0" y="60" fontSize={8} color="black">Planet{faction.planetIds.length > 1 ? "s" : ""}: {faction.planetIds.length}</text>
-                    <text x="0" y="75" fontSize={8} color="black">Ship{faction.shipIds.length > 1 ? "s" : ""}: {faction.shipIds.length}</text>
+                    <text x="0" y="30" fontSize={8} fill="white">Faction: {faction.id}</text>
+                    <text x="0" y="45" fontSize={8} fill="white">Gold: {planet && planet.moneyAccount ? planet.moneyAccount.cash.getGold() : "N/A"}</text>
+                    <text x="0" y="60" fontSize={8} fill="white">Planet{faction.planetIds.length > 1 ? "s" : ""}: {faction.planetIds.length}</text>
+                    <text x="0" y="75" fontSize={8} fill="white">Ship{faction.shipIds.length > 1 ? "s" : ""}: {faction.shipIds.length}</text>
                 </g>
             );
         } else {
@@ -2858,7 +2886,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             const moneyAccount = MoneyAccount.deserialize(player.moneyAccount as any);
             return (
                 <g key="player-status" transform={`translate(0,${this.state.height - 80})`}>
-                    <text x="0" y="45" fontSize={8} color="black">Gold: {moneyAccount.getGold()}</text>
+                    <text x="0" y="45" fontSize={8} fill="white">Gold: {moneyAccount.getGold()}</text>
                 </g>
             );
         } else {
