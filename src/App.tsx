@@ -1550,7 +1550,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             const textPosition = DelaunayGraph.distanceFormula(
                 cameraPosition.rotateVector([0, 0, 1]),
                 position.rotateVector([0, 0, 1])
-            ) < 0.001 ? [0, 0, 1] : cameraOrientation.clone().inverse()
+            ) < 0.001 ? [0, 0, 1] as [number, number, number] : cameraOrientation.clone().inverse()
                 .mul(cameraPosition.clone().inverse())
                 .mul(position.clone())
                 .rotateVector([0, 0, 1]);
@@ -1844,14 +1844,14 @@ export class App extends React.Component<IAppProps, IAppState> {
                     const startPoint = DelaunayGraph.distanceFormula(
                         cameraPosition.rotateVector([0, 0, 1]),
                         item.position.rotateVector([0, 0, 1])
-                    ) < 0.001 ? [0, 0, 1] : cameraOrientation.clone().inverse()
+                    ) < 0.001 ? [0, 0, 1] as [number, number, number] : cameraOrientation.clone().inverse()
                         .mul(cameraPosition.clone().inverse())
                         .mul(item.position.clone())
                         .rotateVector([0, 0, 1]);
                     startPoint[0] = (startPoint[0] + 1) / 2;
                     startPoint[1] = (startPoint[1] + 1) / 2;
-                    const lineXS = (startPoint[0] * this.game.worldScale * this.state.zoom) * this.application.renderer.width;
-                    const lineYS = (startPoint[1] * this.game.worldScale * this.state.zoom) * this.application.renderer.height;
+                    const lineXS = (startPoint[0] * this.state.zoom) * this.application.renderer.width;
+                    const lineYS = (startPoint[1] * this.state.zoom) * this.application.renderer.height;
 
                     const endPoint = cameraOrientation.clone().inverse()
                         .mul(cameraPosition.clone().inverse())
@@ -1861,8 +1861,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                         .rotateVector([0, 0, 1]);
                     endPoint[0] = (endPoint[0] + 1) / 2;
                     endPoint[1] = (endPoint[1] + 1) / 2;
-                    const lineXE = (endPoint[0] * this.game.worldScale * this.state.zoom) * this.application.renderer.width;
-                    const lineYE = (endPoint[1] * this.game.worldScale * this.state.zoom) * this.application.renderer.height;
+                    const lineXE = (endPoint[0] * this.state.zoom) * this.application.renderer.width;
+                    const lineYE = (endPoint[1] * this.state.zoom) * this.application.renderer.height;
 
                     const dashLength = 5;
                     const lineDirection = DelaunayGraph.normalize(
@@ -1903,26 +1903,26 @@ export class App extends React.Component<IAppProps, IAppState> {
                     const startPoint = DelaunayGraph.distanceFormula(
                         cameraPosition.rotateVector([0, 0, 1]),
                         lineStart.rotateVector([0, 0, 1])
-                    ) < 0.001 ? [0, 0, 1] : cameraOrientation.clone().inverse()
+                    ) < 0.001 ? [0, 0, 1] as [number, number, number] : cameraOrientation.clone().inverse()
                         .mul(cameraPosition.clone().inverse())
                         .mul(lineStart)
                         .rotateVector([0, 0, 1]);
                     startPoint[0] = (startPoint[0] + 1) / 2;
                     startPoint[1] = (startPoint[1] + 1) / 2;
-                    const lineXS = (startPoint[0] * this.game.worldScale * this.state.zoom) * this.application.renderer.width;
-                    const lineYS = (startPoint[1] * this.game.worldScale * this.state.zoom) * this.application.renderer.height;
+                    const lineXS = (startPoint[0] * this.state.zoom) * this.application.renderer.width;
+                    const lineYS = (startPoint[1] * this.state.zoom) * this.application.renderer.height;
 
                     const endPoint = DelaunayGraph.distanceFormula(
                         cameraPosition.rotateVector([0, 0, 1]),
                         lineEnd.rotateVector([0, 0, 1])
-                    ) < 0.001 ? [0, 0, 1] : cameraOrientation.clone().inverse()
+                    ) < 0.001 ? [0, 0, 1] as [number, number, number] : cameraOrientation.clone().inverse()
                         .mul(cameraPosition.clone().inverse())
                         .mul(lineEnd)
                         .rotateVector([0, 0, 1]);
                     endPoint[0] = (endPoint[0] + 1) / 2;
                     endPoint[1] = (endPoint[1] + 1) / 2;
-                    const lineXE = (endPoint[0] * this.game.worldScale * this.state.zoom) * this.application.renderer.width;
-                    const lineYE = (endPoint[1] * this.game.worldScale * this.state.zoom) * this.application.renderer.height;
+                    const lineXE = (endPoint[0] * this.state.zoom) * this.application.renderer.width;
+                    const lineYE = (endPoint[1] * this.state.zoom) * this.application.renderer.height;
 
                     const dashLength = 5;
                     const lineDirection = DelaunayGraph.normalize(
@@ -1959,7 +1959,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                     const startPoint = DelaunayGraph.distanceFormula(
                         cameraPosition.rotateVector([0, 0, 1]),
                         item.position.rotateVector([0, 0, 1])
-                    ) < 0.001 ? [0, 0, 1] : cameraOrientation.clone().inverse()
+                    ) < 0.001 ? [0, 0, 1] as [number, number, number] : cameraOrientation.clone().inverse()
                         .mul(cameraPosition.clone().inverse())
                         .mul(item.position.clone())
                         .rotateVector([0, 0, 1]);
@@ -2091,7 +2091,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             const playerData = this.game.playerData.find(p => p.id === this.playerId);
             if (playerData) {
                 const ship = this.game.ships.find(s => s.id === playerData.shipId);
-                const shipData = data.ships.find(s => s.id === playerData.shipId);
+                const shipData = data.ships.update.find(s => s.id === playerData.shipId);
                 if (ship && shipData && !playerData.autoPilotEnabled) {
                     // cancel server position if the position difference is small
                     if (VoronoiGraph.angularDistance(
