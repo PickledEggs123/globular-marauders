@@ -1252,10 +1252,12 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         const faction = new PIXI.Graphics();
         faction.zIndex = -6;
+        faction.alpha = 0.75;
         const faction2 = new PIXI.Graphics();
         faction2.zIndex = -6;
+        faction2.alpha = 0.5;
 
-        const factionRadius = (planet.size * 10 / this.game.worldScale + 5) * PHYSICS_SCALE;
+        const factionRadius = (planet.size * 10 / this.game.worldScale + 3) * PHYSICS_SCALE;
         let factionColorName: string | null = null;
         const ownerFaction = Object.values(this.game.factions).find(faction => faction.planetIds.includes(planet.id));
         if (ownerFaction) {
@@ -1321,7 +1323,8 @@ export class App extends React.Component<IAppProps, IAppState> {
         line.zIndex = -4;
 
         const health = new PIXI.Graphics();
-        line.zIndex = -4;
+        health.zIndex = -4;
+        health.alpha = 0.5;
 
         const isPlayer = this.getPlayerShip().id === ship.id;
         const isEnemy = this.findPlayerShip()?.faction?.id !== ship.faction?.id;
@@ -1653,21 +1656,24 @@ export class App extends React.Component<IAppProps, IAppState> {
                     shipMesh.position = removeExtraRotation(ship.position);
                     shipMesh.orientation = ship.orientation.clone();
                     const playerData = this.game.playerData.find(p => p.id === this.playerId);
-                    if (shipMesh.isPlayer && playerData) {
-                        if (ship.pathFinding.points.length > 0 && shipMesh.autoPilotLines.length === 0) {
-                            const autoPilotLine = new PIXI.Graphics();
-                            autoPilotLine.zIndex = -5;
-                            this.application.stage.addChild(autoPilotLine);
-                            shipMesh.autoPilotLines.push(autoPilotLine);
-                            shipMesh.autoPilotLinePoints = [...ship.pathFinding.points];
-                        }
-                    } else if (shipMesh.autoPilotLines.length > 0) {
-                        for (const autoPilotLine of shipMesh.autoPilotLines) {
-                            this.application.stage.removeChild(autoPilotLine);
-                        }
+                    if (ship.pathFinding.points.length > 0 && !(
+                        shipMesh.autoPilotLines.length === ship.pathFinding.points.length &&
+                        ship.pathFinding.points.every(p => shipMesh.autoPilotLinePoints.includes(p)))
+                    ) {
+                        shipMesh.autoPilotLines.forEach((i) => {
+                            this.application.stage.removeChild(i);
+                        });
                         shipMesh.autoPilotLines.splice(0, shipMesh.autoPilotLines.length);
-                        shipMesh.autoPilotLinePoints = [];
+                        if (shipMesh.isPlayer && playerData) {
+                            ship.pathFinding.points.forEach(() => {
+                                const autoPilotLine = new PIXI.Graphics();
+                                autoPilotLine.zIndex = -5;
+                                this.application.stage.addChild(autoPilotLine);
+                                shipMesh.autoPilotLines.push(autoPilotLine);
+                            });
+                        }
                     }
+                    shipMesh.autoPilotLinePoints.splice(0, shipMesh.autoPilotLinePoints.length, ...ship.pathFinding.points);
                     shipMesh.tick = pixiTick;
                 } else {
                     this.addShip({
@@ -1809,12 +1815,15 @@ export class App extends React.Component<IAppProps, IAppState> {
                     const settlementProgressSlice = Math.max(0, Math.min(item.settlementProgress, 1)) * Math.PI * 2;
                     const settlementProgressSlice2 = Math.max(0, Math.min(item.settlementProgress - 1, 1) / 4) * Math.PI * 2;
                     const radius = item.factionRadius * this.state.zoom * this.application.renderer.width;
-                    const radius2 = (item.factionRadius + 5 * PHYSICS_SCALE) * this.state.zoom * this.application.renderer.width;
+                    const radius2 = (item.factionRadius + 3 * PHYSICS_SCALE) * this.state.zoom * this.application.renderer.width;
 
                     item.faction.clear();
                     item.faction.position.set(centerX, centerY);
                     item.faction.beginFill(item.factionColor);
+                    item.faction2.moveTo(0, 0);
+                    item.faction2.lineTo(radius, 0);
                     item.faction.arc(0, 0, radius, 0, settlementProgressSlice);
+                    item.faction2.lineTo(0, 0);
                     item.faction.endFill();
                     item.faction.visible = startPoint[2] > 0 &&
                         centerX >= 0 &&
@@ -1825,7 +1834,10 @@ export class App extends React.Component<IAppProps, IAppState> {
                     item.faction2.clear();
                     item.faction2.position.set(centerX, centerY);
                     item.faction2.beginFill(item.factionColor);
+                    item.faction2.moveTo(0, 0);
+                    item.faction2.lineTo(radius2, 0);
                     item.faction2.arc(0, 0, radius2, 0, settlementProgressSlice2);
+                    item.faction2.lineTo(0, 0);
                     item.faction2.endFill();
                     item.faction2.visible = startPoint[2] > 0 &&
                         centerX >= 0 &&
@@ -1858,8 +1870,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                         .mul(cameraPosition.clone().inverse())
                         .mul(item.position.clone())
                         .rotateVector([0, 0, 1]);
-                    const lineXS = ((startPoint[0] * this.state.zoom) + 1) / 2 * this.application.renderer.width;
-                    const lineYS = ((startPoint[1] * this.state.zoom) + 1) / 2 * this.application.renderer.height;
+                    const lineXS = ((-startPoint[0] * this.state.zoom) + 1) / 2 * this.application.renderer.width;
+                    const lineYS = ((-startPoint[1] * this.state.zoom) + 1) / 2 * this.application.renderer.height;
 
                     const endPoint = cameraOrientation.clone().inverse()
                         .mul(cameraPosition.clone().inverse())
@@ -1867,8 +1879,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                         .mul(item.orientation.clone())
                         .mul(Quaternion.fromAxisAngle([1, 0, 0], Math.PI / this.game.worldScale / this.state.zoom))
                         .rotateVector([0, 0, 1]);
-                    const lineXE = ((endPoint[0] * this.state.zoom) + 1) / 2 * this.application.renderer.width;
-                    const lineYE = ((endPoint[1] * this.state.zoom) + 1) / 2 * this.application.renderer.height;
+                    const lineXE = ((-endPoint[0] * this.state.zoom) + 1) / 2 * this.application.renderer.width;
+                    const lineYE = ((-endPoint[1] * this.state.zoom) + 1) / 2 * this.application.renderer.height;
 
                     const dashLength = 5;
                     const lineDirection = DelaunayGraph.normalize(
@@ -1903,7 +1915,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 }
 
                 // draw AutoPilot dotted lines
-                for (let i = 0; i < item.autoPilotLines.length && i < 1; i++) {
+                for (let i = 0; i < item.autoPilotLines.length && i < item.autoPilotLinePoints.length; i++) {
                     const lineStart = i === 0 ? cameraPosition.clone() : Quaternion.fromBetweenVectors([0, 0, 1], item.autoPilotLinePoints[i - 1]);
                     const lineEnd = Quaternion.fromBetweenVectors([0, 0, 1], item.autoPilotLinePoints[i]);
                     const startPoint = DelaunayGraph.distanceFormula(
@@ -1913,8 +1925,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                         .mul(cameraPosition.clone().inverse())
                         .mul(lineStart)
                         .rotateVector([0, 0, 1]);
-                    const lineXS = ((startPoint[0] * this.state.zoom) + 1) / 2 * this.application.renderer.width;
-                    const lineYS = ((startPoint[1] * this.state.zoom) + 1) / 2 * this.application.renderer.height;
+                    const lineXS = ((-startPoint[0] * this.state.zoom) + 1) / 2 * this.application.renderer.width;
+                    const lineYS = ((-startPoint[1] * this.state.zoom) + 1) / 2 * this.application.renderer.height;
 
                     const endPoint = DelaunayGraph.distanceFormula(
                         cameraPosition.rotateVector([0, 0, 1]),
@@ -1923,8 +1935,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                         .mul(cameraPosition.clone().inverse())
                         .mul(lineEnd)
                         .rotateVector([0, 0, 1]);
-                    const lineXE = ((endPoint[0] * this.state.zoom) + 1) / 2 * this.application.renderer.width;
-                    const lineYE = ((endPoint[1] * this.state.zoom) + 1) / 2 * this.application.renderer.height;
+                    const lineXE = ((-endPoint[0] * this.state.zoom) + 1) / 2 * this.application.renderer.width;
+                    const lineYE = ((-endPoint[1] * this.state.zoom) + 1) / 2 * this.application.renderer.height;
 
                     const dashLength = 5;
                     const lineDirection = DelaunayGraph.normalize(
@@ -1968,8 +1980,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                     const centerX = ((-startPoint[0] * this.state.zoom) + 1) / 2 * this.application.renderer.width;
                     const centerY = ((-startPoint[1] * this.state.zoom) + 1) / 2 * this.application.renderer.height;
 
-                    const radius = 20 * PHYSICS_SCALE * this.state.zoom * this.application.renderer.width;
-                    const thickness = 5 * PHYSICS_SCALE * this.state.zoom * this.application.renderer.width;
+                    const radius = 10 * PHYSICS_SCALE * this.state.zoom * this.application.renderer.width;
+                    const thickness = 3 * PHYSICS_SCALE * this.state.zoom * this.application.renderer.width;
                     const sliceSize = Math.PI * 2 / 100;
                     item.health.clear();
                     item.health.position.set(centerX, centerY);
