@@ -451,6 +451,7 @@ interface IAppState {
     faction: EFaction | null;
     planetId: string | null;
     userName: string;
+    numNetworkFrames: number;
 }
 
 export class App extends React.Component<IAppProps, IAppState> {
@@ -473,6 +474,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         showPlanetMenu: false as boolean,
         showSpawnMenu: false as boolean,
         userName: "" as string,
+        numNetworkFrames: 0 as number,
     };
 
     // ui ref
@@ -512,6 +514,8 @@ export class App extends React.Component<IAppProps, IAppState> {
     public clientLoopStart: number = performance.now();
     public clientLoopDelta: number = 1000 / 10;
     public clientLoopDeltaStart: number = performance.now();
+
+    public numNetworkFrames: number = 0;
 
     public resetClientLoop() {
         const now = performance.now();
@@ -1164,6 +1168,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         health: PIXI.Graphics,
         healthValue: number,
         isPlayer: boolean,
+        isEnemy: boolean,
         position: Quaternion,
         orientation: Quaternion,
         tick: number
@@ -1319,6 +1324,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         line.zIndex = -4;
 
         const isPlayer = this.getPlayerShip().id === ship.id;
+        const isEnemy = this.findPlayerShip()?.faction?.id !== ship.faction?.id;
 
         this.application.stage.addChild(mesh);
         this.application.stage.addChild(text);
@@ -1334,6 +1340,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             health,
             healthValue: Math.ceil(ship.health / ship.maxHealth * 100),
             isPlayer,
+            isEnemy,
             position,
             orientation,
             tick,
@@ -1641,16 +1648,19 @@ export class App extends React.Component<IAppProps, IAppState> {
                 const shipMesh = this.shipMeshes.find(s => s.id === ship.id);
                 if (shipMesh) {
                     shipMesh.isPlayer = this.getPlayerShip().id === ship.id;
+                    shipMesh.isEnemy = this.findPlayerShip()?.faction?.id !== ship.faction?.id;
                     shipMesh.healthValue = Math.ceil(ship.health / ship.maxHealth * 100);
                     shipMesh.position = removeExtraRotation(ship.position);
                     shipMesh.orientation = ship.orientation.clone();
                     const playerData = this.game.playerData.find(p => p.id === this.playerId);
-                    if (shipMesh.isPlayer && playerData && playerData.autoPilotEnabled && ship.pathFinding.points.length > 0 && shipMesh.autoPilotLines.length === 0) {
-                        const autoPilotLine = new PIXI.Graphics();
-                        autoPilotLine.zIndex = -5;
-                        this.application.stage.addChild(autoPilotLine);
-                        shipMesh.autoPilotLines.push(autoPilotLine);
-                        shipMesh.autoPilotLinePoints = [...ship.pathFinding.points];
+                    if (shipMesh.isPlayer && playerData) {
+                        if (ship.pathFinding.points.length > 0 && shipMesh.autoPilotLines.length === 0) {
+                            const autoPilotLine = new PIXI.Graphics();
+                            autoPilotLine.zIndex = -5;
+                            this.application.stage.addChild(autoPilotLine);
+                            shipMesh.autoPilotLines.push(autoPilotLine);
+                            shipMesh.autoPilotLinePoints = [...ship.pathFinding.points];
+                        }
                     } else if (shipMesh.autoPilotLines.length > 0) {
                         for (const autoPilotLine of shipMesh.autoPilotLines) {
                             this.application.stage.removeChild(autoPilotLine);
@@ -1806,7 +1816,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                     item.faction.beginFill(item.factionColor);
                     item.faction.arc(0, 0, radius, 0, settlementProgressSlice);
                     item.faction.endFill();
-                    item.faction.visible = startPoint[0] > 0 &&
+                    item.faction.visible = startPoint[2] > 0 &&
                         centerX >= 0 &&
                         centerX <= this.application.renderer.width &&
                         centerY >= 0 &&
@@ -1817,7 +1827,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                     item.faction2.beginFill(item.factionColor);
                     item.faction2.arc(0, 0, radius2, 0, settlementProgressSlice2);
                     item.faction2.endFill();
-                    item.faction2.visible = startPoint[0] > 0 &&
+                    item.faction2.visible = startPoint[2] > 0 &&
                         centerX >= 0 &&
                         centerX <= this.application.renderer.width &&
                         centerY >= 0 &&
@@ -1848,10 +1858,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                         .mul(cameraPosition.clone().inverse())
                         .mul(item.position.clone())
                         .rotateVector([0, 0, 1]);
-                    startPoint[0] = (startPoint[0] + 1) / 2;
-                    startPoint[1] = (startPoint[1] + 1) / 2;
-                    const lineXS = (startPoint[0] * this.state.zoom) * this.application.renderer.width;
-                    const lineYS = (startPoint[1] * this.state.zoom) * this.application.renderer.height;
+                    const lineXS = ((startPoint[0] * this.state.zoom) + 1) / 2 * this.application.renderer.width;
+                    const lineYS = ((startPoint[1] * this.state.zoom) + 1) / 2 * this.application.renderer.height;
 
                     const endPoint = cameraOrientation.clone().inverse()
                         .mul(cameraPosition.clone().inverse())
@@ -1859,10 +1867,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                         .mul(item.orientation.clone())
                         .mul(Quaternion.fromAxisAngle([1, 0, 0], Math.PI / this.game.worldScale / this.state.zoom))
                         .rotateVector([0, 0, 1]);
-                    endPoint[0] = (endPoint[0] + 1) / 2;
-                    endPoint[1] = (endPoint[1] + 1) / 2;
-                    const lineXE = (endPoint[0] * this.state.zoom) * this.application.renderer.width;
-                    const lineYE = (endPoint[1] * this.state.zoom) * this.application.renderer.height;
+                    const lineXE = ((endPoint[0] * this.state.zoom) + 1) / 2 * this.application.renderer.width;
+                    const lineYE = ((endPoint[1] * this.state.zoom) + 1) / 2 * this.application.renderer.height;
 
                     const dashLength = 5;
                     const lineDirection = DelaunayGraph.normalize(
@@ -1907,10 +1913,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                         .mul(cameraPosition.clone().inverse())
                         .mul(lineStart)
                         .rotateVector([0, 0, 1]);
-                    startPoint[0] = (startPoint[0] + 1) / 2;
-                    startPoint[1] = (startPoint[1] + 1) / 2;
-                    const lineXS = (startPoint[0] * this.state.zoom) * this.application.renderer.width;
-                    const lineYS = (startPoint[1] * this.state.zoom) * this.application.renderer.height;
+                    const lineXS = ((startPoint[0] * this.state.zoom) + 1) / 2 * this.application.renderer.width;
+                    const lineYS = ((startPoint[1] * this.state.zoom) + 1) / 2 * this.application.renderer.height;
 
                     const endPoint = DelaunayGraph.distanceFormula(
                         cameraPosition.rotateVector([0, 0, 1]),
@@ -1919,10 +1923,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                         .mul(cameraPosition.clone().inverse())
                         .mul(lineEnd)
                         .rotateVector([0, 0, 1]);
-                    endPoint[0] = (endPoint[0] + 1) / 2;
-                    endPoint[1] = (endPoint[1] + 1) / 2;
-                    const lineXE = (endPoint[0] * this.state.zoom) * this.application.renderer.width;
-                    const lineYE = (endPoint[1] * this.state.zoom) * this.application.renderer.height;
+                    const lineXE = ((endPoint[0] * this.state.zoom) + 1) / 2 * this.application.renderer.width;
+                    const lineYE = ((endPoint[1] * this.state.zoom) + 1) / 2 * this.application.renderer.height;
 
                     const dashLength = 5;
                     const lineDirection = DelaunayGraph.normalize(
@@ -1938,8 +1940,8 @@ export class App extends React.Component<IAppProps, IAppState> {
 
                     // draw line
                     item.line.clear();
-                    item.line.beginFill(0xff0000);
-                    item.line.lineStyle(1, 0xff0000);
+                    item.line.beginFill(0xffffff);
+                    item.line.lineStyle(1, 0xffffff);
                     for (let i = 0; i < lineLength; i += dashLength * 3) {
                         item.line.moveTo(
                             lineXS + lineDirection[0] * i,
@@ -1971,7 +1973,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                     const sliceSize = Math.PI * 2 / 100;
                     item.health.clear();
                     item.health.position.set(centerX, centerY);
-                    item.health.lineStyle(thickness, 0x00ff00);
+                    item.health.lineStyle(thickness, item.isEnemy ? 0xff0000 : 0x00ff00);
                     item.health.moveTo(
                         radius,
                         0
@@ -1982,7 +1984,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                             Math.sin(i * sliceSize) * radius
                         );
                     }
-                    item.health.visible = startPoint[0] > 0 &&
+                    item.health.visible = startPoint[2] > 0 &&
                         centerX >= 0 &&
                         centerX <= this.application.renderer.width &&
                         centerY >= 0 &&
@@ -2088,6 +2090,11 @@ export class App extends React.Component<IAppProps, IAppState> {
         this.socketEvents["ack-init-loop"] = (data: undefined) => {
         };
         this.socketEvents["send-frame"] = (data: IGameSyncFrame) => {
+            this.numNetworkFrames += 1;
+            setTimeout(() => {
+                this.numNetworkFrames -= 1;
+            }, 1000);
+
             const playerData = this.game.playerData.find(p => p.id === this.playerId);
             if (playerData) {
                 const ship = this.game.ships.find(s => s.id === playerData.shipId);
@@ -2098,7 +2105,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                         ship.position.rotateVector([0, 0, 1]),
                         DeserializeQuaternion(shipData.position).rotateVector([0, 0, 1]),
                         this.game.worldScale
-                    ) < Game.VELOCITY_STEP * 10 * 3 * 10 * Math.PI * 2) {
+                    ) < PHYSICS_SCALE * 100) {
                         shipData.position = SerializeQuaternion(ship.position);
                         shipData.positionVelocity = SerializeQuaternion(ship.positionVelocity);
                         shipData.orientation = SerializeQuaternion(ship.orientation);
@@ -2486,6 +2493,9 @@ export class App extends React.Component<IAppProps, IAppState> {
         } else {
             this.refreshVoronoiDataTick = 0;
             this.refreshVoronoiData();
+            this.setState({
+                numNetworkFrames: this.numNetworkFrames
+            });
         }
 
         if (!this.initialized) {
@@ -3500,6 +3510,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                     )
                 }
                 {this.state.showLoginMenu && this.state.init ? this.renderLoginMenu.call(this) : null}
+                <span>Num Network Frames: {this.numNetworkFrames}</span>
                 <div style={{width: "100%", height: this.state.height}}>
                     <div style={{position: "absolute", padding: "0px auto", width: "100%"}} ref={this.showAppBodyRef}/>
                     <div style={{position: "absolute", padding: "0px auto", width: "100%"}}>
