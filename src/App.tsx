@@ -642,35 +642,42 @@ export class App extends React.Component<IAppProps, IAppState> {
 
     pixiPlanetResources = (() => {
         // generate planets
-        const planetVoronoiCells = this.game.generateGoodPoints(100, 10);
-        const planetGeometry = new PIXI.Geometry();
-        const planetGeometryData = planetVoronoiCells.reduce((acc, v) => {
-            // color of voronoi tile
-            const color: [number, number, number] = Math.random() > 0.33 ? [0.33, 0.33, 1] : [0.33, 1, 0.33];
+        const planetGeometries: PIXI.Geometry[] = [];
+        for (let i = 0; i < 10; i++) {
+            const planetVoronoiCells = this.game.generateGoodPoints(100, 10);
+            const planetGeometry = new PIXI.Geometry();
+            const planetGeometryData = planetVoronoiCells.reduce((acc, v) => {
+                // color of voronoi tile
+                const color: [number, number, number] = Math.random() > 0.33 ? [0.33, 0.33, 1] : [0.33, 1, 0.33];
 
-            // initial center index
-            const startingIndex = acc.index.reduce((acc, a) => Math.max(acc, a + 1), 0);
-            acc.position.push.apply(acc.position, v.centroid);
-            acc.color.push.apply(acc.color, color);
-
-            for (let i = 0; i < v.vertices.length; i++) {
-                // vertex data
-                const a = v.vertices[i % v.vertices.length];
-                acc.position.push.apply(acc.position, a);
+                // initial center index
+                const startingIndex = acc.index.reduce((acc, a) => Math.max(acc, a + 1), 0);
+                acc.position.push.apply(acc.position, v.centroid);
                 acc.color.push.apply(acc.color, color);
 
-                // triangle data
-                acc.index.push(
-                    startingIndex,
-                    startingIndex + (i % v.vertices.length) + 1,
-                    startingIndex + ((i + 1) % v.vertices.length) + 1
-                );
-            }
-            return acc;
-        }, {position: [], color: [], index: []} as {position: number[], color: number[], index: number[]});
-        planetGeometry.addAttribute("aPosition", planetGeometryData.position, 3);
-        planetGeometry.addAttribute("aColor", planetGeometryData.color, 3);
-        planetGeometry.addIndex(planetGeometryData.index);
+                for (let i = 0; i < v.vertices.length; i++) {
+                    // vertex data
+                    const a = v.vertices[i % v.vertices.length];
+                    acc.position.push.apply(acc.position, a);
+                    acc.color.push.apply(acc.color, color);
+
+                    // triangle data
+                    acc.index.push(
+                        startingIndex,
+                        startingIndex + (i % v.vertices.length) + 1,
+                        startingIndex + ((i + 1) % v.vertices.length) + 1
+                    );
+                }
+                return acc;
+            }, {position: [], color: [], index: []} as {position: number[], color: number[], index: number[]});
+            planetGeometry.addAttribute("aPosition", planetGeometryData.position, 3);
+            planetGeometry.addAttribute("aColor", planetGeometryData.color, 3);
+            planetGeometry.addIndex(planetGeometryData.index);
+            planetGeometries.push(planetGeometry);
+        }
+        const getPlanetGeometry = () => {
+            return planetGeometries[Math.floor(Math.random() * planetGeometries.length)];
+        };
 
         // create material
         const planetVertexShader = `
@@ -728,7 +735,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         const planetProgram = new PIXI.Program(planetVertexShader, planetFragmentShader);
 
         return {
-            planetGeometry,
+            getPlanetGeometry,
             planetProgram
         };
     })();
@@ -1247,7 +1254,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         const shader = new PIXI.Shader(this.pixiPlanetResources.planetProgram, uniforms);
         const state = PIXI.State.for2d();
         state.depthTest = true;
-        const mesh = new PIXI.Mesh(this.pixiPlanetResources.planetGeometry, shader, state);
+        const mesh = new PIXI.Mesh(this.pixiPlanetResources.getPlanetGeometry(), shader, state);
         mesh.zIndex = -5;
 
         const faction = new PIXI.Graphics();
@@ -1859,6 +1866,16 @@ export class App extends React.Component<IAppProps, IAppState> {
                 shader.uniforms.uPosition = removeExtraRotation(item.position).toMatrix4();
                 shader.uniforms.uOrientation = this.convertOrientationToDisplay(item.orientation).toMatrix4();
 
+                // hide ships on the other side of the world
+                const shipPoint = DelaunayGraph.distanceFormula(
+                    cameraPosition.rotateVector([0, 0, 1]),
+                    item.position.rotateVector([0, 0, 1])
+                ) < 0.001 ? [0, 0, 1] as [number, number, number] : cameraOrientation.clone().inverse()
+                    .mul(cameraPosition.clone().inverse())
+                    .mul(item.position.clone())
+                    .rotateVector([0, 0, 1]);
+                item.mesh.visible = shipPoint[2] > 0;
+
                 handleDrawingOfText(item.text, item.position);
 
                 // draw player dotted line
@@ -2048,10 +2065,10 @@ export class App extends React.Component<IAppProps, IAppState> {
         });
 
         // setup networking
-        this.setupNetworking.call(this);
+        this.setupNetworking.call(this, false);
     }
 
-    setupNetworking() {
+    setupNetworking(autoLogin: boolean) {
         this.socket = new SockJS("/game");
         this.socket.onerror = (err) => {
             console.log("Failed to connect", err);
@@ -2077,14 +2094,28 @@ export class App extends React.Component<IAppProps, IAppState> {
             }
         };
         this.socket.onclose = () => {
+            this.initialized = false;
+            this.music.stop();
+            this.game = new Game();
+            this.game.initializeGame();
+            this.setState({
+                showSpawnMenu: false,
+                showPlanetMenu: false,
+                showMainMenu: false,
+                showLoginMenu: true,
+                init: false,
+            });
             setTimeout(() => {
-                this.setupNetworking.call(this);
+                this.setupNetworking.call(this, true);
             }, 2000);
         };
         this.socket.onopen = () => {
             this.setState({
                 init: true
             });
+            if (autoLogin) {
+                this.handleLogin.call(this);
+            }
         };
         this.socketEvents["send-world"] = (data: IGameInitializationFrame) => {
             this.setState({
