@@ -3449,7 +3449,6 @@ export class App extends React.Component<IAppProps, IAppState> {
                             <li>Project 3d world onto a small area for viewing, yet still able to navigate in a circle like a 3d sphere. -- DONE 3/28/2021</li>
                             <li>Create camera system centered around a small ship. Rotating will rotate camera/world. -- DONE 3/30/2021</li>
                             <li>Add projectiles or cannon balls and small frictionless motion in space. -- DONE 4/17/2021</li>
-                            <li>Add gravity around planets.</li>
                             <li>Improve random distribution of planets using Voronoi and Lloyd Relaxation. -- DONE 4/17/2021</li>
                             <li>Create factions which start from a home world and launch ships. - DONE 4/21/2021</li>
                             <li>Spawn settler ships to colonize other worlds. Each world has upto 3 resources. DONE 4/21/2021</li>
@@ -3477,9 +3476,9 @@ export class App extends React.Component<IAppProps, IAppState> {
                             <li>Compute new nobility after each battle.</li>
                             <li>Add multiplayer... (1 month)
                                 <ol>
-                                    <li>Break game into client and server.</li>
-                                    <li>Create bot clients based on bot code, copied into client.</li>
-                                    <li>Test number of bots on single process server before lagging.</li>
+                                    <li>Break game into client and server. -- DONE 12/12/2021</li>
+                                    <li>Create bot clients based on bot code, copied into client. -- DONE 12/12/2021</li>
+                                    <li>Test number of bots on single process server before lagging. -- DONE 12/12/2021</li>
                                     <li>Create multi process servers which divide each kingdom (1 out of 20 voronoi cells) into a process.</li>
                                     <li>Test number of bots on multi process server.</li>
                                     <li>Create code which can spawn multiple servers and release multiple servers.</li>
