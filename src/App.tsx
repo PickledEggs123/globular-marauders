@@ -6,7 +6,6 @@ import SockJS from "sockjs-client";
 import * as PIXI from "pixi.js";
 import {EResourceType, ITEM_DATA} from "@pickledeggs123/globular-marauders-game/lib/src/Resource";
 import {
-    ESettlementLevel,
     ICameraState,
     ICameraStateWithOriginal,
     IDrawable,
@@ -22,16 +21,12 @@ import {
     SHIP_DATA
 } from "@pickledeggs123/globular-marauders-game/lib/src/Ship";
 import {
-    DelaunayGraph, ITessellatedTriangle,
+    DelaunayGraph,
+    ITessellatedTriangle,
     VoronoiCell,
     VoronoiGraph
 } from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
-import {
-    EBuildingType,
-    Manufactory,
-    Planet,
-    Plantation, Star
-} from "@pickledeggs123/globular-marauders-game/lib/src/Planet";
+import {Planet, Star} from "@pickledeggs123/globular-marauders-game/lib/src/Planet";
 import {
     CannonBall,
     Crate,
@@ -508,6 +503,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     public spawnPlanets: ISpawnPlanet[] = [];
     public spawnLocations: ISpawnLocation[] = [];
     public playerId: string | null = null;
+    public shardPortNumber: number | null = null;
     public messages: IMessage[] = [];
 
     // client loop stuff
@@ -2069,7 +2065,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     setupNetworking(autoLogin: boolean) {
-        this.socket = new SockJS("/game");
+        this.socket = new SockJS(window.location.protocol + "//" + window.location.hostname + ":" + (this.shardPortNumber ?? window.location.port) + "/game");
         this.socket.onerror = (err) => {
             console.log("Failed to connect", err);
         };
@@ -2115,6 +2111,12 @@ export class App extends React.Component<IAppProps, IAppState> {
             });
             if (autoLogin) {
                 this.handleLogin.call(this);
+            }
+        };
+        this.socketEvents["shard-port-number"] = (data: number) => {
+            this.shardPortNumber = data;
+            if (this.socket) {
+                this.socket.close();
             }
         };
         this.socketEvents["send-world"] = (data: IGameInitializationFrame) => {
@@ -2324,148 +2326,10 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     /**
-     * Get the points of angular progress for a polygon pi chart. Used for health bars and progress bars.
-     * @param percent the percentage done from 0 to 1.
-     * @param radius the size of the pi chart
-     */
-    private getPointsOfAngularProgress(percent: number, radius: number) {
-        const numSlices = Math.ceil(percent * 32);
-        return new Array(numSlices + 1).fill(0).map((v, i) => {
-            return `${radius * Math.cos((i / numSlices) * percent * Math.PI * 2)},${radius * Math.sin((i / numSlices) * percent * Math.PI * 2)}`;
-        }).join(" ");
-    }
-
-    /**
      * ----------------------------------------------------------------------------------------------
      * Render functions used to draw stuff onto the screen. Each stuff has their own render function.
      * ----------------------------------------------------------------------------------------------
      */
-    /**
-     * Draw the planet onto the screen.
-     * @param uiPass
-     * @param planetDrawing
-     * @private
-     */
-    private drawPlanet(uiPass: boolean, planetDrawing: IDrawable<Planet>) {
-        const isReverseSide = planetDrawing.rotatedPosition[2] < 0;
-        const x = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).x + 1) * 0.5;
-        const y = ((isReverseSide ? planetDrawing.reverseProjection : planetDrawing.projection).y + 1) * 0.5;
-        const distance = planetDrawing.distance * 5;
-        const size = 2 * Math.max(0, 2 * Math.atan(planetDrawing.original.size / (2 * distance)));
-
-        // extract faction information
-        let factionColor: string | null = null;
-        const ownerFaction = Object.values(this.game.factions).find(faction => faction.planetIds.includes(planetDrawing.original.id));
-        if (ownerFaction) {
-            factionColor = ownerFaction.factionColor;
-        }
-
-        // extract planet information
-        let planetX: number = 0;
-        let planetY: number = 0;
-        let planetVisible: boolean = false;
-        let planetTitle: string = "";
-        if (planetDrawing.original.settlementProgress > 0) {
-            if (ownerFaction) {
-                // get the settlement text
-                let settlementText: string = "";
-                const settlementEntry = Object.entries(ESettlementLevel).find(e => e[1] === planetDrawing.original.settlementLevel);
-                if (settlementEntry) {
-                    settlementText = ` ${settlementEntry[0]}`;
-                }
-
-                // get the title text
-                let titleText: string = "";
-                if (planetDrawing.original.county.faction) {
-                    titleText = "County of ";
-                    if (planetDrawing.original.county.duchy.capital === planetDrawing.original.county) {
-                        titleText = "Duchy of ";
-                        if (planetDrawing.original.county.duchy.kingdom.capital === planetDrawing.original.county.duchy) {
-                            titleText = "Kingdom of ";
-                            if (planetDrawing.original.id === ownerFaction.homeWorldPlanetId) {
-                                titleText = "Empire of ";
-                            }
-                        }
-                    }
-                }
-                planetTitle = `${titleText}${ownerFaction.id}${settlementText}`;
-            }
-
-            planetX = x * this.state.width;
-            planetY = (1 - y) * this.state.height;
-            planetVisible = !isReverseSide;
-        }
-
-        return (
-            <>
-                {
-                    !uiPass && planetDrawing.original.settlementProgress > 0 && factionColor && (
-                        <polygon
-                            key={`${planetDrawing.id}-settlement-progress-1`}
-                            transform={`translate(${x * this.state.width},${(1 - y) * this.state.height})`}
-                            fill={factionColor}
-                            style={{opacity: 0.8}}
-                            points={`0,0 ${this.getPointsOfAngularProgress.call(this, Math.max(0, Math.min(planetDrawing.original.settlementProgress, 1)), size * (this.state.zoom * this.game.worldScale) * 1.35)}`}
-                        />
-                    )
-                }
-                {
-                    !uiPass && planetDrawing.original.settlementProgress > 1 && factionColor && (
-                        <polygon
-                            key={`${planetDrawing.id}-settlement-progress-2`}
-                            transform={`translate(${x * this.state.width},${(1 - y) * this.state.height})`}
-                            fill={factionColor}
-                            style={{opacity: 0.8}}
-                            points={`0,0 ${this.getPointsOfAngularProgress.call(this, Math.max(0, Math.min((planetDrawing.original.settlementProgress - 1) / 4, 1)), size * (this.state.zoom * this.game.worldScale) * 1.70)}`}
-                        />
-                    )
-                }
-                {
-                    !uiPass && (
-                        <circle
-                            key={`${planetDrawing.id}-planet`}
-                            cx={x * this.state.width}
-                            cy={(1 - y) * this.state.height}
-                            r={size * (this.state.zoom * this.game.worldScale)}
-                            fill={planetDrawing.color}
-                            stroke="grey"
-                            strokeWidth={0.2 * size * (this.state.zoom * this.game.worldScale)}
-                            style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
-                        />
-                    )
-                }
-                {
-                    uiPass && planetVisible && (
-                        <>
-                            <text
-                                key={`${planetDrawing.id}-planet-title`}
-                                x={planetX + size * (this.state.zoom * this.game.worldScale) + 10}
-                                y={planetY - 6}
-                                fill="white"
-                                fontSize="12"
-                            >{planetTitle}</text>
-                            {
-                                planetDrawing.original.buildings.filter(b => {
-                                    return b.buildingType === EBuildingType.PLANTATION || b.buildingType === EBuildingType.MANUFACTORY;
-                                }).map((building, index) => {
-                                    const resourceType: EResourceType = building.buildingType === EBuildingType.PLANTATION ? (building as Plantation).resourceType : (building as Manufactory).recipe.products[0].resourceType;
-                                    return (
-                                        <text
-                                            key={`${planetDrawing.id}-planet-resource-${index}`}
-                                            x={planetX + size * (this.state.zoom * this.game.worldScale) + 10}
-                                            y={planetY + (index + 1) * 10}
-                                            fill="white"
-                                            fontSize="8"
-                                        >{resourceType} ({building.buildingLevel})</text>
-                                    );
-                                })
-                            }
-                        </>
-                    )
-                }
-            </>
-        );
-    }
 
     /**
      * Render a ship into a rectangle, Useful for UI button or game world.
@@ -2570,9 +2434,6 @@ export class App extends React.Component<IAppProps, IAppState> {
                     this.game.handleShipLoop(shipIndex, () => this.activeKeys, false);
                 }
             }
-
-            // remove smoke clouds for performance
-            this.game.smokeClouds.splice(0, this.game.smokeClouds.length);
 
             // move client side data to server
             while (true) {
