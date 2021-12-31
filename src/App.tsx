@@ -26,7 +26,7 @@ import {
     VoronoiCell,
     VoronoiGraph
 } from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
-import {Planet, Star} from "@pickledeggs123/globular-marauders-game/lib/src/Planet";
+import {Planet} from "@pickledeggs123/globular-marauders-game/lib/src/Planet";
 import {
     CannonBall,
     Crate,
@@ -47,6 +47,7 @@ import {
     ISpawnMessage,
     ISpawnPlanet
 } from "@pickledeggs123/globular-marauders-game/lib/src/Game";
+import {Star} from "@pickledeggs123/globular-marauders-game/lib/src";
 
 /**
  * A class for playing music through a series of notes. The data is a list of musical notes to play in sequence.
@@ -2065,7 +2066,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     setupNetworking(autoLogin: boolean) {
-        this.socket = new SockJS(window.location.protocol + "//" + window.location.hostname + ":" + (this.shardPortNumber ?? window.location.port) + "/game");
+        this.socket = new SockJS(window.location.protocol + "//" + window.location.hostname + ":" + (this.shardPortNumber ?? 4000) + "/game");
         this.socket.onerror = (err) => {
             console.log("Failed to connect", err);
         };
