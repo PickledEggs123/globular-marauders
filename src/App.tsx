@@ -2080,7 +2080,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                     // send a message back to stop effects of nagle algorithm
                     // do not want messages to clump or buffer
                     // old message delays 100 100 100 300 0 0 100
-                    // this line fixes the bug so it is 100 100 100 100 100 100 100
+                    // this line fixes the bug, so it is 100 100 100 100 100 100 100
                     // clumpy messages will cause interpolation bugs
                     this.sendMessage("ack", "ACK");
                 }
@@ -2219,7 +2219,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         if (ship) {
             return Game.GetCameraState(ship);
         }
-        // show latest faction ship
+        // show the latest faction ship
         if (this.state.faction) {
             // faction selected, orbit the faction's home world
             const faction = Object.values(this.game.factions).find(f => f.id === this.state.faction);
@@ -2228,7 +2228,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 return Game.GetCameraState(ship);
             }
         }
-        // show latest attacking ship
+        // show the latest attacking ship
         const attackingAIShip = this.game.ships.find(s => s.id === this.game.demoAttackingShipId);
         if (attackingAIShip) {
             return Game.GetCameraState(attackingAIShip);
@@ -2415,7 +2415,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             while (true) {
                 const message = this.messages.shift();
                 if (message) {
-                    // has message, process message
+                    // has a message, process the message
                     if (message.messageType === EMessageType.DEATH) {
                         this.setState({
                             showSpawnMenu: true
@@ -2532,7 +2532,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     /**
-     * Change if auto pilot is enabled in game.
+     * Change if autopilot is enabled in game.
      * @private
      */
     private handleAutoPilotEnabled() {
