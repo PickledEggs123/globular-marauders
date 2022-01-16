@@ -1263,7 +1263,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         const factionRadius = (planet.size * 10 / this.game.worldScale + 3) * PHYSICS_SCALE;
         let factionColorName: string | null = null;
-        const ownerFaction = Object.values(this.game.factions).find(faction => faction.planetIds.includes(planet.id));
+        const ownerFaction = Array.from(this.game.factions.values()).find(faction => faction.planetIds.includes(planet.id));
         if (ownerFaction) {
             factionColorName = ownerFaction.factionColor;
         }
@@ -2225,7 +2225,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         // show the latest faction ship
         if (this.state.faction) {
             // faction selected, orbit the faction's home world
-            const faction = Object.values(this.game.factions).find(f => f.id === this.state.faction);
+            const faction = Array.from(this.game.factions.values()).find(f => f.id === this.state.faction);
             const ship = Array.from(this.game.ships.values()).find(s => faction && faction.shipIds.length > 0 && s.id === faction.shipIds[faction.shipIds.length - 1]);
             if (ship) {
                 return Game.GetCameraState(ship);
@@ -3233,7 +3233,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         const original: Ship = new Ship(this.game, shipType);
         original.id = id;
         if (factionType) {
-            const faction = Object.values(this.game.factions).find(f => f.id === factionType);
+            const faction = Array.from(this.game.factions.values()).find(f => f.id === factionType);
             if (faction) {
                 original.color = faction.factionColor;
             }
