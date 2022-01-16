@@ -532,11 +532,11 @@ export class App extends React.Component<IAppProps, IAppState> {
         const movableArrays: Array<{
             array: ICameraState[]
         }> = [{
-            array: this.game.ships,
+            array: Array.from(this.game.ships.values()),
         }, {
-            array: this.game.cannonBalls,
+            array: Array.from(this.game.cannonBalls.values()),
         }, {
-            array: this.game.crates,
+            array: Array.from(this.game.crates.values()),
         }];
 
         for (const {array: movableArray} of movableArrays) {
@@ -759,7 +759,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                     index: []
                 };
                 let shipColor = [1, 1, 1];
-                const factionData = this.game.factions[factionType];
+                const factionData = this.game.factions.get(factionType);
                 if (factionData) {
                     switch (factionData.factionColor) {
                         case "orange":
@@ -1651,7 +1651,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             }
             this.planetMeshes = this.planetMeshes.filter(m => m.tick === pixiTick);
             // ships
-            for (const ship of this.game.ships) {
+            for (const [, ship] of Array.from(this.game.ships)) {
                 const shipMesh = this.shipMeshes.find(s => s.id === ship.id);
                 if (shipMesh) {
                     shipMesh.isPlayer = this.getPlayerShip().id === ship.id;
@@ -1659,7 +1659,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                     shipMesh.healthValue = Math.ceil(ship.health / ship.maxHealth * 100);
                     shipMesh.position = removeExtraRotation(ship.position);
                     shipMesh.orientation = ship.orientation.clone();
-                    const playerData = this.game.playerData.find(p => p.id === this.playerId);
+                    const playerData = (this.playerId && this.game.playerData.get(this.playerId)) ?? null;
                     if (ship.pathFinding.points.length > 0 && !(
                         shipMesh.autoPilotLines.length === ship.pathFinding.points.length &&
                         ship.pathFinding.points.every(p => shipMesh.autoPilotLinePoints.includes(p)))
@@ -1700,7 +1700,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             }
             this.shipMeshes = this.shipMeshes.filter(m => m.tick === pixiTick);
             // cannonBalls
-            for (const cannonBall of this.game.cannonBalls) {
+            for (const [, cannonBall] of Array.from(this.game.cannonBalls)) {
                 const cannonBallMesh = this.cannonBallMeshes.find(c => c.id === cannonBall.id);
                 if (cannonBallMesh) {
                     cannonBallMesh.position = removeExtraRotation(cannonBall.position);
@@ -1720,7 +1720,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             }
             this.cannonBallMeshes = this.cannonBallMeshes.filter(m => m.tick === pixiTick);
             // crates
-            for (const crate of this.game.crates) {
+            for (const [, crate] of Array.from(this.game.crates)) {
                 const createMesh = this.crateMeshes.find(c => c.id === crate.id);
                 if (createMesh) {
                     createMesh.position = removeExtraRotation(crate.position);
@@ -2141,9 +2141,9 @@ export class App extends React.Component<IAppProps, IAppState> {
                 this.numNetworkFrames -= 1;
             }, 1000);
 
-            const playerData = this.game.playerData.find(p => p.id === this.playerId);
+            const playerData = (this.playerId && this.game.playerData.get(this.playerId)) ?? null;
             if (playerData) {
-                const ship = this.game.ships.find(s => s.id === playerData.shipId);
+                const ship = this.game.ships.get(playerData.shipId);
                 const shipData = data.ships.update.find(s => s.id === playerData.shipId);
                 if (ship && shipData && !playerData.autoPilotEnabled) {
                     // cancel server position if the position difference is small
@@ -2165,8 +2165,11 @@ export class App extends React.Component<IAppProps, IAppState> {
             this.game.applyGameSyncFrame(data);
             this.resetClientLoop();
         };
-        this.socketEvents["send-players"] = (data) => {
-            this.game.playerData = data.players;
+        this.socketEvents["send-players"] = (data: { players: IPlayerData[], playerId: string }) => {
+            this.game.playerData = new Map<string, IPlayerData>();
+            data.players.forEach((d) => {
+                this.game.playerData.set(d.id, d);
+            });
             this.playerId = data.playerId;
         };
         this.socketEvents["generic-message"] = (data: IMessage) => {
@@ -2187,13 +2190,13 @@ export class App extends React.Component<IAppProps, IAppState> {
      */
 
     private findPlayer(): IPlayerData | null {
-        return this.game.playerData.find(p => p.id === this.playerId) || null;
+        return (this.playerId && this.game.playerData.get(this.playerId)) || null;
     }
 
     private findPlayerShip(): Ship | null {
         const player = this.findPlayer();
         if (player) {
-            return this.game.ships.find(s => s.id === player.shipId) || null;
+            return this.game.ships.get(player.shipId) || null;
         } else {
             return null;
         }
@@ -2223,13 +2226,13 @@ export class App extends React.Component<IAppProps, IAppState> {
         if (this.state.faction) {
             // faction selected, orbit the faction's home world
             const faction = Object.values(this.game.factions).find(f => f.id === this.state.faction);
-            const ship = this.game.ships.find(s => faction && faction.shipIds.length > 0 && s.id === faction.shipIds[faction.shipIds.length - 1]);
+            const ship = Array.from(this.game.ships.values()).find(s => faction && faction.shipIds.length > 0 && s.id === faction.shipIds[faction.shipIds.length - 1]);
             if (ship) {
                 return Game.GetCameraState(ship);
             }
         }
         // show the latest attacking ship
-        const attackingAIShip = this.game.ships.find(s => s.id === this.game.demoAttackingShipId);
+        const attackingAIShip = (this.game.demoAttackingShipId && this.game.ships.get(this.game.demoAttackingShipId)) ?? null;
         if (attackingAIShip) {
             return Game.GetCameraState(attackingAIShip);
         } else {
@@ -2428,11 +2431,10 @@ export class App extends React.Component<IAppProps, IAppState> {
             }
 
             // perform client side movement
-            const playerData = this.game.playerData.find(p => p.id === this.playerId);
+            const playerData = (this.playerId && this.game.playerData.get(this.playerId)) || null;
             if (playerData && !playerData.autoPilotEnabled) {
-                const shipIndex = this.game.ships.findIndex(s => s.id === playerData.shipId);
-                if (shipIndex >= 0) {
-                    this.game.handleShipLoop(shipIndex, () => this.activeKeys, false);
+                if (this.game.ships.has(playerData.shipId)) {
+                    this.game.handleShipLoop(playerData.shipId, () => this.activeKeys, false);
                 }
             }
 
