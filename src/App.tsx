@@ -2222,6 +2222,19 @@ export class App extends React.Component<IAppProps, IAppState> {
         if (ship) {
             return Game.GetCameraState(ship);
         }
+        // show the latest planet
+        if (this.state.planetId) {
+            // faction selected, orbit the faction's home world
+            const planet = this.game.planets.get(this.state.planetId);
+            if (planet) {
+                // no faction selected, orbit the world
+                const planetShip = new Ship(this.game, EShipType.CUTTER);
+                planetShip.id = "ghost-ship";
+                planetShip.position = planet.position;
+                planetShip.orientation = planet.orientation;
+                return Game.GetCameraState(planetShip);
+            }
+        }
         // show the latest faction ship
         if (this.state.faction) {
             // faction selected, orbit the faction's home world
@@ -2899,6 +2912,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     public selectFaction(faction: EFaction) {
         this.setState({
             faction,
+            planetId: null,
             showSpawnMenu: false,
             showPlanetMenu: true,
             showMainMenu: false,
@@ -3003,6 +3017,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 showPlanetMenu: false,
                 showMainMenu: false,
                 showLoginMenu: false,
+                planetId
             });
             const message: IChoosePlanetMessage = {
                 messageType: EMessageType.CHOOSE_PLANET,
