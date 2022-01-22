@@ -1157,6 +1157,11 @@ export class App extends React.Component<IAppProps, IAppState> {
         factionColor: number | null,
         settlementLevel: number,
         settlementProgress: number,
+        textName: PIXI.Text,
+        textTitle: PIXI.Text,
+        textResource1: PIXI.Text,
+        textResource2: PIXI.Text,
+        textResource3: PIXI.Text,
         position: Quaternion,
         orientation: Quaternion,
         rotation: Quaternion,
@@ -1281,9 +1286,30 @@ export class App extends React.Component<IAppProps, IAppState> {
                 break;
         }
 
+        const textName = new PIXI.Text(planet.name ?? planet.id ?? "");
+        textName.style.fill = "white";
+        textName.style.fontSize = 15;
+        const textTitle = new PIXI.Text(planet.getRoyalRank() ?? "");
+        textTitle.style.fill = "white";
+        textTitle.style.fontSize = 15;
+        const textResource1 = new PIXI.Text(planet.naturalResources[0] ?? "");
+        textResource1.style.fill = "white";
+        textResource1.style.fontSize = 10;
+        const textResource2 = new PIXI.Text(planet.naturalResources[1] ?? "");
+        textResource2.style.fill = "white";
+        textResource2.style.fontSize = 10;
+        const textResource3 = new PIXI.Text(planet.naturalResources[2] ?? "");
+        textResource3.style.fill = "white";
+        textResource3.style.fontSize = 10;
+
         this.application.stage.addChild(mesh);
         this.application.stage.addChild(faction);
         this.application.stage.addChild(faction2);
+        this.application.stage.addChild(textName);
+        this.application.stage.addChild(textTitle);
+        this.application.stage.addChild(textResource1);
+        this.application.stage.addChild(textResource2);
+        this.application.stage.addChild(textResource3);
         this.planetMeshes.push({
             id: planet.id,
             mesh,
@@ -1293,6 +1319,11 @@ export class App extends React.Component<IAppProps, IAppState> {
             factionColor,
             settlementLevel,
             settlementProgress,
+            textName,
+            textTitle,
+            textResource1,
+            textResource2,
+            textResource3,
             position,
             orientation,
             rotation,
@@ -1560,7 +1591,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             }
         });
 
-        const handleDrawingOfText = (text: PIXI.Text, position: Quaternion) => {
+        const handleDrawingOfText = (text: PIXI.Text, position: Quaternion, offset?: {x: number, y: number}) => {
             const textPosition = DelaunayGraph.distanceFormula(
                 cameraPosition.rotateVector([0, 0, 1]),
                 position.rotateVector([0, 0, 1])
@@ -1577,17 +1608,22 @@ export class App extends React.Component<IAppProps, IAppState> {
                 this.application.renderer.width / 2,
                 this.application.renderer.height / 2
             ];
-            const directionTowardsCenter: [number, number] = [
-                center[0] - text.x,
-                center[1] - text.y
-            ];
-            const directionTowardsCenterLength = Math.sqrt(Math.pow(directionTowardsCenter[0], 2) + Math.pow(directionTowardsCenter[1], 2));
-            const normalizedDirectionTowardsCenter: [number, number] = directionTowardsCenterLength !== 0 ? [
-                directionTowardsCenter[0] / directionTowardsCenterLength,
-                directionTowardsCenter[1] / directionTowardsCenterLength
-            ] : [0, 0];
-            text.x += normalizedDirectionTowardsCenter[0] * 25;
-            text.y += normalizedDirectionTowardsCenter[1] * 25;
+            if (offset) {
+                text.x += offset.x;
+                text.y += offset.y;
+            } else {
+                const directionTowardsCenter: [number, number] = [
+                    center[0] - text.x,
+                    center[1] - text.y
+                ];
+                const directionTowardsCenterLength = Math.sqrt(Math.pow(directionTowardsCenter[0], 2) + Math.pow(directionTowardsCenter[1], 2));
+                const normalizedDirectionTowardsCenter: [number, number] = directionTowardsCenterLength !== 0 ? [
+                    directionTowardsCenter[0] / directionTowardsCenterLength,
+                    directionTowardsCenter[1] / directionTowardsCenterLength
+                ] : [0, 0];
+                text.x += normalizedDirectionTowardsCenter[0] * 25;
+                text.y += normalizedDirectionTowardsCenter[1] * 25;
+            }
             text.anchor.set(0.5);
             text.visible = textPosition[2] > 0;
         }
@@ -1648,6 +1684,11 @@ export class App extends React.Component<IAppProps, IAppState> {
                 this.application.stage.removeChild(item.mesh);
                 this.application.stage.removeChild(item.faction);
                 this.application.stage.removeChild(item.faction2);
+                this.application.stage.removeChild(item.textName);
+                this.application.stage.removeChild(item.textTitle);
+                this.application.stage.removeChild(item.textResource1);
+                this.application.stage.removeChild(item.textResource2);
+                this.application.stage.removeChild(item.textResource3);
             }
             this.planetMeshes = this.planetMeshes.filter(m => m.tick === pixiTick);
             // ships
@@ -1852,6 +1893,12 @@ export class App extends React.Component<IAppProps, IAppState> {
                     item.faction.visible = false;
                     item.faction2.visible = false;
                 }
+
+                handleDrawingOfText(item.textName, item.position, {x: 0, y: item.factionRadius / PHYSICS_SCALE * 2 + 40 - 160});
+                handleDrawingOfText(item.textTitle, item.position, {x: 0, y: item.factionRadius / PHYSICS_SCALE * 2 + 60 - 160});
+                handleDrawingOfText(item.textResource1, item.position, {x: 0, y: item.factionRadius / PHYSICS_SCALE * 2 + 80 - 160});
+                handleDrawingOfText(item.textResource2, item.position, {x: 0, y: item.factionRadius / PHYSICS_SCALE * 2 + 100 - 160});
+                handleDrawingOfText(item.textResource3, item.position, {x: 0, y: item.factionRadius / PHYSICS_SCALE * 2 + 120 - 160});
             }
 
             // update each ship
@@ -3085,7 +3132,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                                     y={y + 5}
                                     textAnchor="middle"
                                     onClick={this.beginPickPlanet.bind(this, spawnPlanet.planetId)}
-                                >{spawnPlanet.planetId} ({spawnPlanet.numShipsAvailable} ships)</text>
+                                >{this.game.planets.get(spawnPlanet.planetId)?.name ?? spawnPlanet.planetId} ({spawnPlanet.numShipsAvailable} ships)</text>
                             </>
                         );
                     })
