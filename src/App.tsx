@@ -1,7 +1,6 @@
 import React from 'react';
 import './App.css';
 import Quaternion from "quaternion";
-import * as Tone from "tone";
 import SockJS from "sockjs-client";
 import * as PIXI from "pixi.js";
 import {EResourceType, ITEM_DATA} from "@pickledeggs123/globular-marauders-game/lib/src/Resource";
@@ -48,287 +47,7 @@ import {
     ISpawnPlanet
 } from "@pickledeggs123/globular-marauders-game/lib/src/Game";
 import {Star} from "@pickledeggs123/globular-marauders-game/lib/src";
-
-/**
- * A class for playing music through a series of notes. The data is a list of musical notes to play in sequence.
- */
-export class MusicPlayer {
-    synth: Tone.PolySynth | null = null;
-    synthPart: Tone.Sequence | null = null;
-
-    public start() {
-        this.startTone().catch(err => {
-            console.log("FAILED TO START MUSIC", err);
-        });
-    }
-
-    public stop() {
-        if (this.synthPart) {
-            this.synthPart.stop();
-            this.synthPart.dispose();
-            this.synthPart = null;
-        }
-        Tone.Transport.stop();
-    }
-
-    public static firstMelody = [
-        // stanza 1
-        "C3",
-        ["C3", "C3"],
-        null,
-        ["G3", "A#3"],
-        null,
-        ["A3", "G3"],
-        null,
-        null,
-
-        // stanza 2
-        "C3",
-        ["C3", "C3"],
-        null,
-        ["G3", "A#3"],
-        null,
-        ["A3", "G3"],
-        null,
-        null,
-
-        // stanza 3
-        "A#3",
-        ["A#3", "A3"],
-        null,
-        ["F3", "G3"],
-        null,
-        ["C2", "C2"],
-        null,
-        null,
-
-        // stanza 4
-        "A#3",
-        ["A#3", "A3"],
-        null,
-        ["F3", "G3"],
-        null,
-        ["C2", "C2"],
-        null,
-        null,
-        "END"
-    ];
-    public static secondMelody = [
-        // stanza 1
-        "C3",
-        "D3",
-        "Eb3",
-        null,
-
-        // stanza 2
-        "Eb3",
-        null,
-        "D3",
-        null,
-
-        // stanza 3
-        "Eb3",
-        "D3",
-        "C3",
-        null,
-
-        // stanza 4
-        "A2",
-        null,
-        "A#2",
-        null,
-
-        // stanza 1
-        "C3",
-        "D3",
-        "Eb3",
-        null,
-
-        // stanza 2
-        "Eb3",
-        null,
-        "D3",
-        null,
-
-        // stanza 3
-        "Eb3",
-        "D3",
-        "C3",
-        null,
-
-        // stanza 4
-        "A2",
-        null,
-        "A#2",
-        null,
-        "END"
-    ];
-    public static thirdMelody = [
-        // stanza 1
-        "C3",
-        "G2",
-        "A2",
-        "A#2",
-        "A2",
-        "G2",
-
-        // stanza 2
-        "C3",
-        "G2",
-        "A2",
-        "A#2",
-        "A2",
-        "G2",
-
-        // stanza 3
-        "C3",
-        "G2",
-        "A2",
-        "A#2",
-        "A2",
-        "G2",
-
-        // stanza 4
-        "A2",
-        "G2",
-        "F2",
-        "G2",
-        "C2",
-        "C2",
-        "END"
-    ];
-    public static forthMelody = [
-        // stanza 1
-        "C3",
-        null,
-        "G3",
-        "G3",
-        null,
-        null,
-
-        // stanza 2
-        "F3",
-        null,
-        "Eb3",
-        "C3",
-        null,
-        null,
-
-        // stanza 3
-        "D3",
-        null,
-        "Eb3",
-        "D3",
-        null,
-        null,
-
-        // stanza 4
-        "C3",
-        null,
-        "B2",
-        "C3",
-        null,
-        null,
-        "END"
-    ];
-
-    public melodyMap: Array<{
-        id: string,
-        next: string,
-        notes: Array<string | null | Array<string | null>>
-    }> = [{
-        id: "main",
-        next: "main2",
-        notes: MusicPlayer.firstMelody
-    }, {
-        id: "main2",
-        next: "main3",
-        notes: MusicPlayer.secondMelody
-    }, {
-        id: "main3",
-        next: "main4",
-        notes: MusicPlayer.thirdMelody
-    }, {
-        id: "main4",
-        next: "main5",
-        notes: MusicPlayer.thirdMelody
-    }, {
-        id: "main5",
-        next: "main6",
-        notes: MusicPlayer.secondMelody
-    }, {
-        id: "main6",
-        next: "main7",
-        notes: MusicPlayer.forthMelody
-    }, {
-        id: "main7",
-        next: "main",
-        notes: MusicPlayer.forthMelody
-    }];
-    public currentMelody: string = "";
-    public getNextMelody(): Array<string | null | Array<string | null>> {
-        const melodyNode = this.melodyMap.find(m => m.id === this.currentMelody);
-        if (melodyNode) {
-            const nextMelodyNode = this.melodyMap.find(m => m.id === melodyNode.next);
-            if (nextMelodyNode) {
-                this.currentMelody = nextMelodyNode.id;
-                return nextMelodyNode.notes;
-            }
-        }
-        const firstMelodyNode = this.melodyMap[0];
-        if (firstMelodyNode) {
-            this.currentMelody = firstMelodyNode.id;
-            return firstMelodyNode.notes;
-        }
-        throw new Error("Could not find melody node to play next sound");
-    }
-
-    /**
-     * Handle the playing of music and the transition between melodies.
-     * @param time
-     * @param note
-     */
-    handleToneSequenceCallback = (time: number, note: any) => {
-        if (note === "END") {
-            this.setupMelody(this.getNextMelody());
-            if (this.synthPart) {
-                this.synthPart.start(Tone.Transport.seconds);
-            }
-            return;
-        }
-        if (this.synth && note) {
-            this.synth.triggerAttackRelease(note, "10hz", time);
-        }
-    };
-
-    setupMelody(notes: Array<string | null | Array<string | null>>) {
-        // clean up old synth parts
-        if (this.synthPart) {
-            this.synthPart.stop();
-            this.synthPart.dispose();
-            this.synthPart = null;
-        }
-        this.synthPart = new Tone.Sequence(
-            this.handleToneSequenceCallback,
-            notes,
-            "4n"
-        );
-        this.synthPart.loop = false;
-    }
-
-    async startTone() {
-        await Tone.start();
-
-        this.synth = new Tone.PolySynth(Tone.Synth).toDestination();
-
-        // first melody
-        this.setupMelody(this.getNextMelody());
-        if (this.synthPart) {
-            this.synthPart.start(Tone.Transport.seconds);
-        }
-        Tone.Transport.start();
-    }
-}
+import {MusicPlayer} from "./MusicPlayer";
 
 /**
  * Which mode the app is in.
@@ -743,6 +462,34 @@ export class App extends React.Component<IAppProps, IAppState> {
             return this.cachedPixiShipResources;
         }
 
+        const getColor = (str: string) => {
+            let shipColor;
+            switch (str) {
+                case "orange":
+                    shipColor = [1, 0.5, 0];
+                    break;
+                case "red":
+                    shipColor = [1, 0, 0];
+                    break;
+                case "blue":
+                    shipColor = [0, 0, 1];
+                    break;
+                case "green":
+                    shipColor = [0, 1, 0];
+                    break;
+                case "yellow":
+                    shipColor = [1, 1, 0];
+                    break;
+                default:
+                    if (str.startsWith("#")) {
+                        shipColor = this.hexToRgb(str);
+                    } else {
+                        shipColor = [1, 1, 1];
+                    }
+            }
+            return shipColor;
+        }
+
         // generate ships
         const shipGeometryMap: Map<EFaction, Map<string, PIXI.Geometry>> = new Map();
         for (const factionType of Object.values(EFaction)) {
@@ -761,29 +508,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 let shipColor = [1, 1, 1];
                 const factionData = this.game.factions.get(factionType);
                 if (factionData) {
-                    switch (factionData.factionColor) {
-                        case "orange":
-                            shipColor = [1, 0.5, 0];
-                            break;
-                        case "red":
-                            shipColor = [1, 0, 0];
-                            break;
-                        case "blue":
-                            shipColor = [0, 0, 1];
-                            break;
-                        case "green":
-                            shipColor = [0, 1, 0];
-                            break;
-                        case "yellow":
-                            shipColor = [1, 1, 0];
-                            break;
-                        default:
-                            if (factionData.factionColor.startsWith("#")) {
-                                shipColor = this.hexToRgb(factionData.factionColor);
-                            } else {
-                                shipColor = [1, 1, 1];
-                            }
-                    }
+                    shipColor = getColor(factionData.factionColor);
                 }
 
                 // draw hull
@@ -867,7 +592,8 @@ export class App extends React.Component<IAppProps, IAppState> {
 
         this.cachedPixiShipResources = {
             shipGeometryMap,
-            shipProgram
+            shipProgram,
+            getColor,
         };
         return this.cachedPixiShipResources;
     }
@@ -1175,6 +901,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         autoPilotLines: PIXI.Graphics[],
         autoPilotLinePoints: [number, number, number][],
         health: PIXI.Graphics,
+        healthColor: number,
         healthValue: number,
         isPlayer: boolean,
         isEnemy: boolean,
@@ -1240,7 +967,8 @@ export class App extends React.Component<IAppProps, IAppState> {
         // create planet properties
         const position: Quaternion = planet.position.clone();
         const orientation: Quaternion = planet.orientation.clone();
-        const rotation: Quaternion = Quaternion.fromAxisAngle(DelaunayGraph.randomPoint(), Math.PI * 2 / 60 / 10 / 10);
+        const randomRotationAngle = Math.random() * 2 * Math.PI;
+        const rotation: Quaternion = Quaternion.fromAxisAngle([Math.cos(randomRotationAngle), Math.sin(randomRotationAngle), 0], Math.PI * 2 / 60 / 10 / 10);
         const settlementLevel = planet.settlementLevel;
         const settlementProgress = planet.settlementProgress;
 
@@ -1361,6 +1089,8 @@ export class App extends React.Component<IAppProps, IAppState> {
         health.zIndex = -4;
         health.alpha = 0.5;
 
+        const healthColor = this.pixiShipResources().getColor(ship.faction?.factionColor ?? ship.color).slice(0, 3).reduce((acc: number, v: number, i: number) => acc | (Math.floor(v * 255) << (2 - i) * 8), 0xff000000);
+
         const isPlayer = this.getPlayerShip().id === ship.id;
         const isEnemy = this.findPlayerShip()?.faction?.id !== ship.faction?.id;
 
@@ -1376,6 +1106,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             autoPilotLines: [],
             autoPilotLinePoints: [],
             health,
+            healthColor,
             healthValue: Math.ceil(ship.health / ship.maxHealth * 100),
             isPlayer,
             isEnemy,
@@ -1550,7 +1281,8 @@ export class App extends React.Component<IAppProps, IAppState> {
         // setup rendering
         this.application = new PIXI.Application({
             width: this.state.width,
-            height: this.state.height
+            height: this.state.height,
+            backgroundColor: 0xff110022,
         });
         this.application.stage.sortableChildren = true;
         // this.application.stage.mask = new Graphics()
@@ -2046,7 +1778,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                     const sliceSize = Math.PI * 2 / 100;
                     item.health.clear();
                     item.health.position.set(centerX, centerY);
-                    item.health.lineStyle(thickness, item.isEnemy ? 0xff0000 : 0x00ff00);
+                    item.health.lineStyle(thickness, item.healthColor);
                     item.health.moveTo(
                         radius,
                         0
@@ -2161,9 +1893,9 @@ export class App extends React.Component<IAppProps, IAppState> {
                 this.handleLogin.call(this);
             }
         };
-        this.socketEvents["shard-port-number"] = (data: number) => {
-            this.shardPortNumber = data;
-            if (this.socket) {
+        this.socketEvents["shard-port-number"] = ({portNumber, isStandalone}: {portNumber: number, isStandalone: boolean}) => {
+            this.shardPortNumber = portNumber;
+            if (this.socket && !isStandalone) {
                 this.socket.close();
             }
         };
@@ -2180,7 +1912,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 this.sendMessage("init-loop");
             }, 500);
         };
-        this.socketEvents["ack-init-loop"] = (data: undefined) => {
+        this.socketEvents["ack-init-loop"] = () => {
         };
         this.socketEvents["send-frame"] = (data: IGameSyncFrame) => {
             this.numNetworkFrames += 1;
@@ -3477,7 +3209,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                         </ul>
                     )
                 }
-                {this.state.showLoginMenu && this.state.init ? this.renderLoginMenu.call(this) : null}
+                {this.state.showLoginMenu && this.state.init ? this.renderLoginMenu.call(this) : this.state.init ? null : <span>Connecting to server...</span>}
                 <span>Num Network Frames: {this.numNetworkFrames}</span>
                 <div style={{width: "100%", height: this.state.height}}>
                     <div style={{position: "absolute", padding: "0px auto", width: "100%"}} ref={this.showAppBodyRef}/>
