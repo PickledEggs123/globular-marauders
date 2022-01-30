@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {Fragment} from 'react';
 import './App.css';
 import Quaternion from "quaternion";
 import SockJS from "sockjs-client";
@@ -8,13 +8,12 @@ import {
     ICameraState,
     ICameraStateWithOriginal,
     IDrawable,
-    MIN_DISTANCE,
-    MoneyAccount
+    MIN_DISTANCE
 } from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
 import {
-    CorvetteHull,
     EFaction,
     EShipType,
+    GetShipData,
     PHYSICS_SCALE,
     Ship,
     SHIP_DATA
@@ -26,12 +25,7 @@ import {
     VoronoiGraph
 } from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
 import {Planet} from "@pickledeggs123/globular-marauders-game/lib/src/Planet";
-import {
-    CannonBall,
-    Crate,
-    DeserializeQuaternion,
-    SerializeQuaternion,
-} from "@pickledeggs123/globular-marauders-game/lib/src/Item";
+import {DeserializeQuaternion, SerializeQuaternion,} from "@pickledeggs123/globular-marauders-game/lib/src/Item";
 import {
     EMessageType,
     Game,
@@ -46,161 +40,46 @@ import {
     ISpawnMessage,
     ISpawnPlanet
 } from "@pickledeggs123/globular-marauders-game/lib/src/Game";
-import {Star} from "@pickledeggs123/globular-marauders-game/lib/src";
 import {MusicPlayer} from "./MusicPlayer";
+import {
+    AppBar,
+    Button,
+    Card,
+    CardContent,
+    CardHeader,
+    Checkbox,
+    Dialog,
+    DialogContent,
+    DialogTitle,
+    FormControlLabel,
+    Grid,
+    RadioGroup,
+    TextField,
+    Toolbar,
+    Typography, Theme, createTheme, ThemeProvider, List, ListItem, ListItemText,
+} from "@mui/material";
+import {makeStyles, createStyles} from "@mui/styles";
+import {DEFAULT_IMAGE, EVoronoiMode, RESOURCE_TYPE_TEXTURE_PAIRS} from "./Data";
+import {AppPixi, IAppProps} from "./AppPixi";
 
-/**
- * Which mode the app is in.
- */
-enum EVoronoiMode {
-    KINGDOM = "KINGDOM",
-    DUCHY = "DUCHY",
-    COUNTY = "COUNTY"
-}
+const theme = createTheme();
 
-/**
- * An object which contains a texture match for a resource type.
- */
-interface IResourceTypeTexturePair {
-    resourceType: EResourceType | null;
-    name: string;
-    url: string;
-}
-const RESOURCE_TYPE_TEXTURE_PAIRS: IResourceTypeTexturePair[] = [{
-    resourceType: EResourceType.RUM,
-    name: "rum",
-    url: "images/rum.svg"
-}, {
-    resourceType: EResourceType.RATION,
-    name: "ration",
-    url:"images/ration.svg"
-}, {
-    resourceType: EResourceType.IRON,
-    name: "iron",
-    url:"images/iron.svg"
-}, {
-    resourceType: EResourceType.GUNPOWDER,
-    name: "gunpowder",
-    url:"images/gunpowder.svg"
-}, {
-    resourceType: EResourceType.FIREARM,
-    name: "firearm",
-    url:"images/firearm.svg"
-}, {
-    resourceType: EResourceType.MAHOGANY,
-    name: "mahogany",
-    url:"images/mahogany.svg"
-}, {
-    resourceType: EResourceType.FUR,
-    name: "fur",
-    url:"images/fur.svg"
-}, {
-    resourceType: EResourceType.RUBBER,
-    name: "rubber",
-    url:"images/rubber.svg"
-}, {
-    resourceType: EResourceType.CACAO,
-    name: "cacao",
-    url:"images/cacao.svg"
-}, {
-    resourceType: EResourceType.COFFEE,
-    name: "coffee",
-    url:"images/coffee.svg"
-}, {
-    resourceType: EResourceType.RUM,
-    name: "rum",
-    url:"images/rum.svg"
-}, {
-    resourceType: EResourceType.MOLASSES,
-    name: "molasses",
-    url:"images/molasses.svg"
-}, {
-    resourceType: EResourceType.COTTON,
-    name: "cotton",
-    url:"images/cotton.svg"
-}, {
-    resourceType: EResourceType.FLAX,
-    name: "flax",
-    url:"images/flax.svg"
-}, {
-    resourceType: EResourceType.TOBACCO,
-    name: "tobacco",
-    url:"images/tobacco.svg"
-}];
+const getStyles = makeStyles((theme: Theme) => createStyles({
+    root: {
+        flexGrow: 1
+    },
+    flex: {
+        flex: 1,
+    },
+    menuButton: {
+        marginLeft: -12,
+        marginRight: 20
+    },
+    toolbarMargin: theme.mixins.toolbar
+})) as any;
 
-const DEFAULT_IMAGE: string = "images/no_image.svg";
-
-/**
- * The input parameters of the app.
- */
-interface IAppProps {
-    /**
-     * If the app is in test mode.
-     */
-    isTestMode?: boolean;
-    /**
-     * The size of the world, initially
-     */
-    worldScale?: number;
-}
-
-/**
- * The state of the app.
- */
-interface IAppState {
-    showNotes: boolean;
-    showShips: boolean;
-    showItems: boolean;
-    width: number;
-    height: number;
-    zoom: number;
-    showVoronoi: boolean;
-    voronoiMode: EVoronoiMode;
-    autoPilotEnabled: boolean;
-    audioEnabled: boolean;
-    init: boolean;
-    showLoginMenu: boolean;
-    showMainMenu: boolean;
-    showPlanetMenu: boolean;
-    showSpawnMenu: boolean;
-    faction: EFaction | null;
-    planetId: string | null;
-    userName: string;
-    numNetworkFrames: number;
-}
-
-export class App extends React.Component<IAppProps, IAppState> {
-    state = {
-        showNotes: false as boolean,
-        showShips: false as boolean,
-        showItems: false as boolean,
-        width: 1200 as number,
-        height: 1200 as number,
-        zoom: 4 as number,
-        showVoronoi: false as boolean,
-        voronoiMode: EVoronoiMode.KINGDOM as EVoronoiMode,
-        autoPilotEnabled: true as boolean,
-        audioEnabled: true as boolean,
-        faction: null as EFaction | null,
-        planetId: null as string | null,
-        init: false as boolean,
-        showLoginMenu: true as boolean,
-        showMainMenu: false as boolean,
-        showPlanetMenu: false as boolean,
-        showSpawnMenu: false as boolean,
-        userName: "" as string,
-        numNetworkFrames: 0 as number,
-    };
-
-    // ui ref
-    private showAppBodyRef: React.RefObject<HTMLDivElement> = React.createRef<HTMLDivElement>();
-    private showNotesRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
-    private showShipsRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
-    private showItemsRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
-    private showVoronoiRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
-    private autoPilotEnabledRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
-    private audioEnabledRef: React.RefObject<HTMLInputElement> = React.createRef<HTMLInputElement>();
-    private svgRef: React.RefObject<SVGSVGElement> = React.createRef<SVGSVGElement>();
+export class App extends AppPixi {
+    public application: PIXI.Application;
 
     // game loop stuff
     public rotateCameraInterval: any = null;
@@ -217,12 +96,10 @@ export class App extends React.Component<IAppProps, IAppState> {
     public music: MusicPlayer = new MusicPlayer();
     public initialized: boolean = false;
     public frameCounter: number = 0;
-    public game: Game = new Game();
     public socket: WebSocket | undefined;
     public socketEvents: Record<string, (data: any) => void> = {};
     public spawnPlanets: ISpawnPlanet[] = [];
     public spawnLocations: ISpawnLocation[] = [];
-    public playerId: string | null = null;
     public shardPortNumber: number | null = null;
     public messages: IMessage[] = [];
 
@@ -276,1003 +153,8 @@ export class App extends React.Component<IAppProps, IAppState> {
         }
     }
 
-    // pixi.js renderer
-    public application: PIXI.Application;
-
-    GetHullPoint = ([x, y]: [number, number]): [number, number, number] => {
-        const z = Math.sqrt(1 -
-            Math.pow(x * PHYSICS_SCALE / this.game.worldScale, 2) -
-            Math.pow(y * PHYSICS_SCALE / this.game.worldScale, 2)
-        );
-        return [x, y, z];
-    };
-    hexToRgb = (hex: string): [number, number, number, number] => {
-        if (hex === "red") return [1, 0, 0, 1];
-        if (hex === "yellow") return [1, 1, 0, 1];
-        if (hex === "blue") return [0, 0, 1, 1];
-        return [
-            parseInt(hex.slice(1, 3), 16) / 255,
-            parseInt(hex.slice(3, 5), 16) / 255,
-            parseInt(hex.slice(5, 7), 16) / 255,
-            1
-        ];
-    };
     convertOrientationToDisplay = (old: Quaternion): Quaternion => {
         return old.clone();
-    };
-
-    pixiStarResources = (() => {
-        // create geometry
-        const starGeometry = new PIXI.Geometry();
-        starGeometry.addAttribute("aPosition", (new Array(32).fill(0).reduce((acc, v, i) => {
-            acc.push(Math.cos(i * Math.PI * 2 / 32), Math.sin(i * Math.PI * 2 / 32), 0);
-            return acc;
-        }, [0, 0, 0] as number[])), 3);
-        starGeometry.addIndex((new Array(33).fill(0).reduce((acc, v, i) => {
-            acc.push(0, (i % 32) + 1, ((i + 1) % 32) + 1);
-            return acc;
-        }, [] as number[])));
-
-        // create material
-        const starVertexShader = `
-            precision mediump float;
-            
-            attribute vec3 aPosition;
-            
-            uniform mat4 uCameraPosition;
-            uniform mat4 uCameraOrientation;
-            uniform float uCameraScale;
-            uniform mat4 uPosition;
-            uniform float uScale;
-            
-            void main() {
-                vec4 cameraOrientationPoint = uCameraOrientation * vec4(1.0, 0.0, 0.0, 0.0);
-                float cr = atan(cameraOrientationPoint.y, cameraOrientationPoint.x);
-                mat4 cameraRotation = mat4(
-                    cos(cr), -sin(cr), 0.0, 0.0,
-                    sin(cr),  cos(cr), 0.0, 0.0,
-                    0.0,      0.0,     1.0, 0.0,
-                    0.0,      0.0,     0.0, 1.0
-                );
-                    
-                vec4 pos = cameraRotation * uCameraPosition * uPosition * vec4(aPosition * uScale * uCameraScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
-                gl_Position = pos * vec4(1, -1, 0.0625, 1);
-            }
-        `;
-        const starFragmentShader = `
-            precision mediump float;
-            
-            uniform vec4 uColor;
-            
-            void main() {
-                gl_FragColor = uColor;
-            }
-        `;
-        const starProgram = new PIXI.Program(starVertexShader, starFragmentShader);
-
-        return {
-            starGeometry,
-            starProgram
-        };
-    })();
-
-    pixiPlanetResources = (() => {
-        // generate planets
-        const planetGeometries: PIXI.Geometry[] = [];
-        for (let i = 0; i < 10; i++) {
-            const planetVoronoiCells = this.game.generateGoodPoints(100, 10);
-            const planetGeometry = new PIXI.Geometry();
-            const planetGeometryData = planetVoronoiCells.reduce((acc, v) => {
-                // color of voronoi tile
-                const color: [number, number, number] = Math.random() > 0.33 ? [0.33, 0.33, 1] : [0.33, 1, 0.33];
-
-                // initial center index
-                const startingIndex = acc.index.reduce((acc, a) => Math.max(acc, a + 1), 0);
-                acc.position.push.apply(acc.position, v.centroid);
-                acc.color.push.apply(acc.color, color);
-
-                for (let i = 0; i < v.vertices.length; i++) {
-                    // vertex data
-                    const a = v.vertices[i % v.vertices.length];
-                    acc.position.push.apply(acc.position, a);
-                    acc.color.push.apply(acc.color, color);
-
-                    // triangle data
-                    acc.index.push(
-                        startingIndex,
-                        startingIndex + (i % v.vertices.length) + 1,
-                        startingIndex + ((i + 1) % v.vertices.length) + 1
-                    );
-                }
-                return acc;
-            }, {position: [], color: [], index: []} as {position: number[], color: number[], index: number[]});
-            planetGeometry.addAttribute("aPosition", planetGeometryData.position, 3);
-            planetGeometry.addAttribute("aColor", planetGeometryData.color, 3);
-            planetGeometry.addIndex(planetGeometryData.index);
-            planetGeometries.push(planetGeometry);
-        }
-        const getPlanetGeometry = () => {
-            return planetGeometries[Math.floor(Math.random() * planetGeometries.length)];
-        };
-
-        // create material
-        const planetVertexShader = `
-                precision mediump float;
-                
-                attribute vec3 aPosition;
-                attribute vec3 aColor;
-                
-                uniform mat4 uCameraPosition;
-                uniform mat4 uCameraOrientation;
-                uniform float uCameraScale;
-                uniform mat4 uPosition;
-                uniform mat4 uOrientation;
-                uniform float uScale;
-                
-                varying vec3 vColor;
-                
-                void main() {
-                    vColor = aColor;
-                    
-                    vec4 cameraOrientationPoint = uCameraOrientation * vec4(1.0, 0.0, 0.0, 0.0);
-                    float cr = atan(cameraOrientationPoint.y, cameraOrientationPoint.x);
-                    mat4 cameraRotation = mat4(
-                        cos(cr), -sin(cr), 0.0, 0.0,
-                        sin(cr),  cos(cr), 0.0, 0.0,
-                        0.0,      0.0,     1.0, 0.0,
-                        0.0,      0.0,     0.0, 1.0
-                    );
-                    
-                    vec4 orientationPoint = uOrientation * vec4(1.0, 0.0, 0.0, 0.0);
-                    float r = atan(orientationPoint.y, orientationPoint.x);
-                    mat4 objectRotation = mat4(
-                        cos(r), -sin(r), 0.0, 0.0,
-                        sin(r),  cos(r), 0.0, 0.0,
-                        0.0,     0.0,    1.0, 0.0,
-                        0.0,     0.0,    0.0, 1.0
-                    );
-                    
-                    mat4 translation = cameraRotation * uCameraPosition * uPosition;
-                    mat4 rotation = objectRotation;
-                    
-                    vec4 pos = translation * vec4((rotation * vec4(aPosition, 1.0)).xyz * uScale * uCameraScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
-                    gl_Position = pos * vec4(1, -1, 0.0625, 1);
-                }
-            `;
-        const planetFragmentShader = `
-                precision mediump float;
-                
-                varying vec3 vColor;
-                
-                void main() {
-                    gl_FragColor = vec4(vColor, 1.0);
-                }
-            `;
-        const planetProgram = new PIXI.Program(planetVertexShader, planetFragmentShader);
-
-        return {
-            getPlanetGeometry,
-            planetProgram
-        };
-    })();
-
-    cachedPixiShipResources: any;
-    pixiShipResources = () => {
-        if (this.cachedPixiShipResources) {
-            return this.cachedPixiShipResources;
-        }
-
-        const getColor = (str: string) => {
-            let shipColor;
-            switch (str) {
-                case "orange":
-                    shipColor = [1, 0.5, 0];
-                    break;
-                case "red":
-                    shipColor = [1, 0, 0];
-                    break;
-                case "blue":
-                    shipColor = [0, 0, 1];
-                    break;
-                case "green":
-                    shipColor = [0, 1, 0];
-                    break;
-                case "yellow":
-                    shipColor = [1, 1, 0];
-                    break;
-                default:
-                    if (str.startsWith("#")) {
-                        shipColor = this.hexToRgb(str);
-                    } else {
-                        shipColor = [1, 1, 1];
-                    }
-            }
-            return shipColor;
-        }
-
-        // generate ships
-        const shipGeometryMap: Map<EFaction, Map<string, PIXI.Geometry>> = new Map();
-        for (const factionType of Object.values(EFaction)) {
-            for (const shipType of Object.values(EShipType)) {
-                const shipToDraw = SHIP_DATA.find(i => i.shipType === shipType);
-                if (!shipToDraw) {
-                    continue;
-                }
-
-                const shipGeometry = new PIXI.Geometry();
-                const shipGeometryData: {position: number[], color: number[], index: number[]} = {
-                    position: [],
-                    color: [],
-                    index: []
-                };
-                let shipColor = [1, 1, 1];
-                const factionData = this.game.factions.get(factionType);
-                if (factionData) {
-                    shipColor = getColor(factionData.factionColor);
-                }
-
-                // draw hull
-                shipGeometryData.position.push.apply(shipGeometryData.position, this.GetHullPoint([0, 0]));
-                shipGeometryData.color.push.apply(shipGeometryData.color, shipColor);
-                for (let i = 0; i < shipToDraw.hull.length; i++) {
-                    const a = shipToDraw.hull[i % shipToDraw.hull.length];
-
-                    shipGeometryData.position.push.apply(shipGeometryData.position, this.GetHullPoint(a));
-                    shipGeometryData.color.push.apply(shipGeometryData.color, shipColor);
-                    shipGeometryData.index.push(
-                        0,
-                        (i % CorvetteHull.length) + 1,
-                        ((i + 1) % CorvetteHull.length) + 1,
-                    );
-                }
-
-                // draw cannons
-                const numCannonPositions = Math.floor(shipToDraw.cannons.numCannons / 2);
-                const cannonSpacing = (shipToDraw.cannons.endY - shipToDraw.cannons.startY) / numCannonPositions;
-                for (let cannonIndex = 0; cannonIndex < shipToDraw.cannons.numCannons; cannonIndex++) {
-                    const position = Math.floor(cannonIndex / 2);
-                    const isLeftSide = Math.floor(cannonIndex % 2) === 0;
-                    const startIndex = shipGeometryData.index.reduce((acc, a) => Math.max(acc, a + 1), 0);
-
-                    if (isLeftSide) {
-                        shipGeometryData.position.push(
-                            shipToDraw.cannons.leftWall, shipToDraw.cannons.startY + (position + 0.25) * cannonSpacing, 1,
-                            shipToDraw.cannons.leftWall, shipToDraw.cannons.startY + (position + 0.75) * cannonSpacing, 1,
-                            shipToDraw.cannons.leftWall + 5, shipToDraw.cannons.startY + (position + 0.75) * cannonSpacing, 1,
-                            shipToDraw.cannons.leftWall + 5, shipToDraw.cannons.startY + (position + 0.25) * cannonSpacing, 1
-                        );
-                        shipGeometryData.color.push(
-                            0.75, 0.75, 0.75,
-                            0.75, 0.75, 0.75,
-                            0.75, 0.75, 0.75,
-                            0.75, 0.75, 0.75,
-                        );
-                    } else {
-                        shipGeometryData.position.push(
-                            shipToDraw.cannons.rightWall - 5, shipToDraw.cannons.startY + (position + 0.25) * cannonSpacing, 1,
-                            shipToDraw.cannons.rightWall - 5, shipToDraw.cannons.startY + (position + 0.75) * cannonSpacing, 1,
-                            shipToDraw.cannons.rightWall, shipToDraw.cannons.startY + (position + 0.75) * cannonSpacing, 1,
-                            shipToDraw.cannons.rightWall, shipToDraw.cannons.startY + (position + 0.25) * cannonSpacing, 1
-                        );
-                        shipGeometryData.color.push(
-                            0.75, 0.75, 0.75,
-                            0.75, 0.75, 0.75,
-                            0.75, 0.75, 0.75,
-                            0.75, 0.75, 0.75,
-                        );
-                    }
-                    shipGeometryData.index.push(
-                        startIndex,
-                        startIndex + 1,
-                        startIndex + 2,
-                        startIndex,
-                        startIndex + 2,
-                        startIndex + 3
-                    );
-                }
-
-                // flip ship along y axis
-                shipGeometryData.position = shipGeometryData.position.map((v, i) => i % 3 === 2 ? -v : v);
-
-                // construct geometry
-                shipGeometry.addAttribute("aPosition", shipGeometryData.position, 3);
-                shipGeometry.addAttribute("aColor", shipGeometryData.color, 3);
-                shipGeometry.addIndex(shipGeometryData.index);
-
-                // add to map
-                if (!shipGeometryMap.has(factionType)) {
-                    shipGeometryMap.set(factionType, new Map<string, PIXI.Geometry>());
-                }
-                shipGeometryMap.get(factionType)?.set(shipType, shipGeometry);
-            }
-        }
-
-        // create material
-        const shipProgram = this.pixiPlanetResources.planetProgram;
-
-        this.cachedPixiShipResources = {
-            shipGeometryMap,
-            shipProgram,
-            getColor,
-        };
-        return this.cachedPixiShipResources;
-    }
-
-    pixiCannonBallResources = (() => {
-        // create geometry
-        const cannonBallGeometry = new PIXI.Geometry();
-        cannonBallGeometry.addAttribute("aPosition", (new Array(32).fill(0).reduce((acc, v, i) => {
-            acc.push(Math.cos(i * Math.PI * 2 / 32), Math.sin(i * Math.PI * 2 / 32), 0);
-            return acc;
-        }, [0, 0, 0] as number[])), 3);
-        cannonBallGeometry.addIndex((new Array(33).fill(0).reduce((acc, v, i) => {
-            acc.push(0, (i % 32) + 1, ((i + 1) % 32) + 1);
-            return acc;
-        }, [] as number[])));
-
-        // create material
-        const cannonBallVertexShader = `
-            precision mediump float;
-            
-            attribute vec3 aPosition;
-            
-            uniform mat4 uCameraPosition;
-            uniform mat4 uCameraOrientation;
-            uniform float uCameraScale;
-            uniform mat4 uPosition;
-            uniform float uScale;
-            
-            void main() {
-                vec4 cameraOrientationPoint = uCameraOrientation * vec4(1.0, 0.0, 0.0, 0.0);
-                float cr = atan(cameraOrientationPoint.y, cameraOrientationPoint.x);
-                mat4 cameraRotation = mat4(
-                    cos(cr), -sin(cr), 0.0, 0.0,
-                    sin(cr),  cos(cr), 0.0, 0.0,
-                    0.0,      0.0,     1.0, 0.0,
-                    0.0,      0.0,     0.0, 1.0
-                );
-                
-                vec4 pos = cameraRotation * uCameraPosition * uPosition * vec4(aPosition * uScale * uCameraScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
-                gl_Position = pos * vec4(1, -1, 0.0625, 1);
-            }
-        `;
-        const cannonBallFragmentShader = `
-            precision mediump float;
-            
-            uniform vec4 uColor;
-            
-            void main() {
-                gl_FragColor = uColor;
-            }
-        `;
-        const cannonBallProgram = new PIXI.Program(cannonBallVertexShader, cannonBallFragmentShader);
-
-        return {
-            cannonBallGeometry,
-            cannonBallProgram
-        };
-    })();
-
-    pixiCrateResources = (() => {
-        // generate crates
-        const crateGeometry = new PIXI.Geometry();
-        const crateGeometryData: {position: number[], color: number[], index: number[]} = {
-            position: [
-                ...this.GetHullPoint([0, 0]),
-                ...this.GetHullPoint([0.1, 0.1]),
-                ...this.GetHullPoint([0, 1]),
-                ...this.GetHullPoint([0.1, 0.9]),
-                ...this.GetHullPoint([1, 0]),
-                ...this.GetHullPoint([0.9, 0.1]),
-                ...this.GetHullPoint([1, 1]),
-                ...this.GetHullPoint([0.9, 0.9]),
-                ...this.GetHullPoint([0.1, 0.8]),
-                ...this.GetHullPoint([0.2, 0.9]),
-                ...this.GetHullPoint([0.8, 0.1]),
-                ...this.GetHullPoint([0.9, 0.2]),
-
-                ...this.GetHullPoint([0.1, 0.1]),
-                ...this.GetHullPoint([0.1, 0.8]),
-                ...this.GetHullPoint([0.2, 0.9]),
-                ...this.GetHullPoint([0.9, 0.9]),
-                ...this.GetHullPoint([0.8, 0.1]),
-                ...this.GetHullPoint([0.9, 0.2])
-            ].map(i => i * 2 - 1),
-            color: [
-                0.2, 0.2, 0.0,
-                0.2, 0.2, 0.0,
-                0.2, 0.2, 0.0,
-                0.2, 0.2, 0.0,
-                0.2, 0.2, 0.0,
-                0.2, 0.2, 0.0,
-                0.2, 0.2, 0.0,
-                0.2, 0.2, 0.0,
-                0.2, 0.2, 0.0,
-                0.2, 0.2, 0.0,
-                0.2, 0.2, 0.0,
-                0.2, 0.2, 0.0,
-
-                0.5, 0.5, 0.3,
-                0.5, 0.5, 0.3,
-                0.5, 0.5, 0.3,
-                0.5, 0.5, 0.3,
-                0.5, 0.5, 0.3,
-                0.5, 0.5, 0.3,
-            ],
-            index: [
-                0, 1, 2,
-                1, 2, 3,
-                2, 3, 6,
-                3, 6, 7,
-                6, 7, 4,
-                7, 4, 5,
-                4, 5, 0,
-                5, 1, 0,
-
-                3, 9, 8,
-                9, 11, 8,
-                8, 11, 10,
-                10, 11, 5,
-
-                12, 13, 16,
-                15, 17, 14
-            ]
-        };
-        crateGeometry.addAttribute("aPosition", crateGeometryData.position, 3);
-        crateGeometry.addAttribute("aColor", crateGeometryData.color, 3);
-        crateGeometry.addIndex(crateGeometryData.index);
-
-        // create crate image geometry
-        const crateImageGeometry = new PIXI.Geometry();
-        const crateImageGeometryData: {position: number[], uv: number[], index: number[]} = {
-            position: [
-                ...this.GetHullPoint([0, 0]),
-                ...this.GetHullPoint([1, 0]),
-                ...this.GetHullPoint([0, 1]),
-                ...this.GetHullPoint([1, 1]),
-            ].map(i => i * 2 - 1),
-            uv: [
-                0, 0,
-                1, 0,
-                0, 1,
-                1, 1,
-            ],
-            index: [
-                0, 1, 2,
-                1, 3, 2,
-            ]
-        };
-        crateImageGeometry.addAttribute("aPosition", crateImageGeometryData.position, 3);
-        crateImageGeometry.addAttribute("aUv", crateImageGeometryData.uv, 2);
-        crateImageGeometry.addIndex(crateImageGeometryData.index);
-
-        // create material
-        const crateProgram = this.pixiPlanetResources.planetProgram;
-
-        // create material
-        const crateImageVertexShader = `
-                precision mediump float;
-                
-                attribute vec3 aPosition;
-                attribute vec2 aUv;
-                
-                uniform mat4 uCameraPosition;
-                uniform mat4 uCameraOrientation;
-                uniform float uCameraScale;
-                uniform mat4 uPosition;
-                uniform mat4 uOrientation;
-                uniform float uScale;
-                
-                varying highp vec2 vUv;
-                
-                void main() {
-                    vUv = aUv;
-                    
-                    vec4 cameraOrientationPoint = uCameraOrientation * vec4(1.0, 0.0, 0.0, 0.0);
-                    float cr = atan(cameraOrientationPoint.y, cameraOrientationPoint.x);
-                    mat4 cameraRotation = mat4(
-                        cos(cr), -sin(cr), 0.0, 0.0,
-                        sin(cr),  cos(cr), 0.0, 0.0,
-                        0.0,      0.0,     1.0, 0.0,
-                        0.0,      0.0,     0.0, 1.0
-                    );
-                    
-                    vec4 orientationPoint = uOrientation * vec4(1.0, 0.0, 0.0, 0.0);
-                    float r = atan(orientationPoint.y, orientationPoint.x);
-                    mat4 objectRotation = mat4(
-                        cos(r), -sin(r), 0.0, 0.0,
-                        sin(r),  cos(r), 0.0, 0.0,
-                        0.0,     0.0,    1.0, 0.0,
-                        0.0,     0.0,    0.0, 1.0
-                    );
-                    
-                    mat4 translation = cameraRotation * uCameraPosition * uPosition;
-                    mat4 rotation = objectRotation;
-                    
-                    vec4 pos = translation * vec4((rotation * vec4(aPosition, 1.0)).xyz * uScale * uCameraScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
-                    gl_Position = pos * vec4(1, -1, 0.0625, 1);
-                }
-            `;
-        const crateImageFragmentShader = `
-                precision mediump float;
-                
-                uniform sampler2D uSampler;
-                
-                varying highp vec2 vUv;
-                
-                void main() {
-                    gl_FragColor = texture2D(uSampler, vUv);
-                }
-            `;
-        const crateImageProgram = new PIXI.Program(crateImageVertexShader, crateImageFragmentShader);
-
-        return {
-            crateGeometry,
-            crateProgram,
-            crateImageGeometry,
-            crateImageProgram
-        };
-    })();
-
-    pixiVoronoiResources = (() => {
-        // create geometry
-        const getVoronoiGeometry = (tile: ITessellatedTriangle): PIXI.Geometry => {
-            const voronoiGeometry = new PIXI.Geometry();
-            voronoiGeometry.addAttribute("aPosition", (tile.vertices.reduce((acc, v) => {
-                acc.push(...v.rotateVector([0, 0, 1]));
-                return acc;
-            }, [] as number[])), 3);
-            const indices: number[] = [];
-            for (let i = 0; i < tile.vertices.length - 2; i++) {
-                indices.push(0, i + 1, i + 2);
-            }
-            voronoiGeometry.addIndex(indices);
-            return voronoiGeometry;
-        };
-
-        // create material
-        const voronoiVertexShader = `
-            precision mediump float;
-            
-            attribute vec3 aPosition;
-            
-            uniform mat4 uCameraPosition;
-            uniform mat4 uCameraOrientation;
-            uniform float uCameraScale;
-            
-            void main() {
-                vec4 cameraOrientationPoint = uCameraOrientation * vec4(1.0, 0.0, 0.0, 0.0);
-                float cr = atan(cameraOrientationPoint.y, cameraOrientationPoint.x);
-                mat4 cameraRotation = mat4(
-                    cos(cr), -sin(cr), 0.0, 0.0,
-                    sin(cr),  cos(cr), 0.0, 0.0,
-                    0.0,      0.0,     1.0, 0.0,
-                    0.0,      0.0,     0.0, 1.0
-                );
-                vec4 pos = cameraRotation * uCameraPosition * vec4(-aPosition * uCameraScale, 1.0);
-                gl_Position = pos * vec4(1, -1, 0.0625, 1);
-            }
-        `;
-        const voronoiFragmentShader = `
-            precision mediump float;
-            
-            uniform vec4 uColor;
-            
-            void main() {
-                gl_FragColor = uColor;
-            }
-        `;
-        const voronoiProgram = new PIXI.Program(voronoiVertexShader, voronoiFragmentShader);
-
-        return {
-            getVoronoiGeometry,
-            voronoiProgram
-        };
-    })();
-
-    starMeshes: Array<{
-        id: string, mesh: PIXI.Mesh<PIXI.Shader>,
-        tick: number
-    }> = [];
-    planetMeshes: Array<{
-        id: string,
-        mesh: PIXI.Mesh<PIXI.Shader>,
-        faction: PIXI.Graphics,
-        faction2: PIXI.Graphics,
-        factionRadius: number,
-        factionColor: number | null,
-        settlementLevel: number,
-        settlementProgress: number,
-        textName: PIXI.Text,
-        textTitle: PIXI.Text,
-        textResource1: PIXI.Text,
-        textResource2: PIXI.Text,
-        textResource3: PIXI.Text,
-        position: Quaternion,
-        orientation: Quaternion,
-        rotation: Quaternion,
-        tick: number
-    }> = [];
-    shipMeshes: Array<{
-        id: string,
-        mesh: PIXI.Mesh<PIXI.Shader>,
-        text: PIXI.Text,
-        line: PIXI.Graphics,
-        autoPilotLines: PIXI.Graphics[],
-        autoPilotLinePoints: [number, number, number][],
-        health: PIXI.Graphics,
-        healthColor: number,
-        healthValue: number,
-        isPlayer: boolean,
-        isEnemy: boolean,
-        position: Quaternion,
-        orientation: Quaternion,
-        tick: number
-    }> = [];
-    cannonBallMeshes: Array<{
-        id: string,
-        mesh: PIXI.Mesh<PIXI.Shader>,
-        position: Quaternion,
-        positionVelocity: Quaternion,
-        tick: number
-    }> = [];
-    crateMeshes: Array<{
-        id: string,
-        mesh: PIXI.Mesh<PIXI.Shader>,
-        image: PIXI.Mesh<PIXI.Shader>,
-        text: PIXI.Text,
-        position: Quaternion,
-        orientation: Quaternion,
-        rotation: Quaternion,
-        resourceType: EResourceType,
-        tick: number
-    }> = [];
-    sprites: Record<string, PIXI.Texture> = {};
-    voronoiMeshes: Array<{
-        id: string,
-        mesh: PIXI.Mesh<PIXI.Shader>,
-        tick: number
-    }> = [];
-
-    addStar = ({star, cameraPosition, cameraOrientation, tick}: {
-        star: Star,
-        cameraPosition: Quaternion,
-        cameraOrientation: Quaternion,
-        tick: number
-    }) => {
-        // create mesh
-        const uniforms = {
-            uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
-            uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
-            uCameraScale: this.state.zoom,
-            uPosition: star.position.toMatrix4(),
-            uColor: this.hexToRgb(star.color),
-            uScale: 2 * star.size * PHYSICS_SCALE / this.game.worldScale
-        };
-        const shader = new PIXI.Shader(this.pixiStarResources.starProgram, uniforms);
-        const mesh = new PIXI.Mesh(this.pixiStarResources.starGeometry, shader);
-        mesh.zIndex = -10;
-
-        this.application.stage.addChild(mesh);
-        this.starMeshes.push({
-            id: star.id,
-            mesh,
-            tick
-        });
-    };
-
-    addPlanet = ({planet, cameraPosition, cameraOrientation, tick}: {
-        planet: Planet, cameraPosition: Quaternion, cameraOrientation: Quaternion, tick: number
-    }) => {
-        // create planet properties
-        const position: Quaternion = planet.position.clone();
-        const orientation: Quaternion = planet.orientation.clone();
-        const randomRotationAngle = Math.random() * 2 * Math.PI;
-        const rotation: Quaternion = Quaternion.fromAxisAngle([Math.cos(randomRotationAngle), Math.sin(randomRotationAngle), 0], Math.PI * 2 / 60 / 10 / 10);
-        const settlementLevel = planet.settlementLevel;
-        const settlementProgress = planet.settlementProgress;
-
-        // create mesh
-        const uniforms = {
-            uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
-            uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
-            uCameraScale: this.state.zoom,
-            uPosition: planet.position.toMatrix4(),
-            uOrientation: orientation.toMatrix4(),
-            uScale: 10 * planet.size * PHYSICS_SCALE / this.game.worldScale
-        };
-        const shader = new PIXI.Shader(this.pixiPlanetResources.planetProgram, uniforms);
-        const state = PIXI.State.for2d();
-        state.depthTest = true;
-        const mesh = new PIXI.Mesh(this.pixiPlanetResources.getPlanetGeometry(), shader, state);
-        mesh.zIndex = -5;
-
-        const faction = new PIXI.Graphics();
-        faction.zIndex = -6;
-        faction.alpha = 0.75;
-        const faction2 = new PIXI.Graphics();
-        faction2.zIndex = -6;
-        faction2.alpha = 0.5;
-
-        const factionRadius = (planet.size * 10 / this.game.worldScale + 3) * PHYSICS_SCALE;
-        let factionColorName: string | null = null;
-        const ownerFaction = Array.from(this.game.factions.values()).find(faction => faction.planetIds.includes(planet.id));
-        if (ownerFaction) {
-            factionColorName = ownerFaction.factionColor;
-        }
-        let factionColor: number | null = null;
-        switch (factionColorName) {
-            case "red": factionColor = 0xff0000;
-                break;
-            case "orange": factionColor = 0xff8000;
-                break;
-            case "yellow": factionColor = 0xffff00;
-                break;
-            case "green": factionColor = 0x00ff00;
-                break;
-            case "blue": factionColor = 0x0000ff;
-                break;
-        }
-
-        const textName = new PIXI.Text(planet.name ?? planet.id ?? "");
-        textName.style.fill = "white";
-        textName.style.fontSize = 15;
-        const textTitle = new PIXI.Text(planet.getRoyalRank() ?? "");
-        textTitle.style.fill = "white";
-        textTitle.style.fontSize = 15;
-        const textResource1 = new PIXI.Text(planet.naturalResources[0] ?? "");
-        textResource1.style.fill = "white";
-        textResource1.style.fontSize = 10;
-        const textResource2 = new PIXI.Text(planet.naturalResources[1] ?? "");
-        textResource2.style.fill = "white";
-        textResource2.style.fontSize = 10;
-        const textResource3 = new PIXI.Text(planet.naturalResources[2] ?? "");
-        textResource3.style.fill = "white";
-        textResource3.style.fontSize = 10;
-
-        this.application.stage.addChild(mesh);
-        this.application.stage.addChild(faction);
-        this.application.stage.addChild(faction2);
-        this.application.stage.addChild(textName);
-        this.application.stage.addChild(textTitle);
-        this.application.stage.addChild(textResource1);
-        this.application.stage.addChild(textResource2);
-        this.application.stage.addChild(textResource3);
-        this.planetMeshes.push({
-            id: planet.id,
-            mesh,
-            faction,
-            faction2,
-            factionRadius,
-            factionColor,
-            settlementLevel,
-            settlementProgress,
-            textName,
-            textTitle,
-            textResource1,
-            textResource2,
-            textResource3,
-            position,
-            orientation,
-            rotation,
-            tick,
-        });
-    };
-
-    addShip = ({ship, cameraPosition, cameraOrientation, tick}: {
-        ship: Ship, cameraPosition: Quaternion, cameraOrientation: Quaternion, tick: number
-    }) => {
-        const position: Quaternion = ship.position.clone();
-        const orientation: Quaternion = ship.orientation.clone();
-
-        // create mesh
-        const uniforms = {
-            uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
-            uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
-            uCameraScale: this.state.zoom,
-            uPosition: position.toMatrix4(),
-            uOrientation: orientation.toMatrix4(),
-            uScale: PHYSICS_SCALE / this.game.worldScale
-        };
-        const shader = new PIXI.Shader(this.pixiShipResources().shipProgram, uniforms);
-        const mesh = new PIXI.Mesh(this.pixiShipResources().shipGeometryMap.get(ship.faction?.id ?? EFaction.DUTCH)?.get(ship.shipType) as any, shader);
-        mesh.zIndex = -3;
-
-        const text = new PIXI.Text(ship.shipType);
-        text.style.fill = "white";
-        text.style.fontSize = 15;
-
-        const line = new PIXI.Graphics();
-        line.zIndex = -4;
-
-        const health = new PIXI.Graphics();
-        health.zIndex = -4;
-        health.alpha = 0.5;
-
-        const healthColor = this.pixiShipResources().getColor(ship.faction?.factionColor ?? ship.color).slice(0, 3).reduce((acc: number, v: number, i: number) => acc | (Math.floor(v * 255) << (2 - i) * 8), 0xff000000);
-
-        const isPlayer = this.getPlayerShip().id === ship.id;
-        const isEnemy = this.findPlayerShip()?.faction?.id !== ship.faction?.id;
-
-        this.application.stage.addChild(mesh);
-        this.application.stage.addChild(text);
-        this.application.stage.addChild(line);
-        this.application.stage.addChild(health);
-        this.shipMeshes.push({
-            id: ship.id,
-            mesh,
-            text,
-            line,
-            autoPilotLines: [],
-            autoPilotLinePoints: [],
-            health,
-            healthColor,
-            healthValue: Math.ceil(ship.health / ship.maxHealth * 100),
-            isPlayer,
-            isEnemy,
-            position,
-            orientation,
-            tick,
-        });
-    };
-
-    addCannonBall = ({cannonBall, cameraPosition, cameraOrientation, tick}: {
-        cannonBall: CannonBall, cameraPosition: Quaternion, cameraOrientation: Quaternion, tick: number
-    }) => {
-        const position: Quaternion = cannonBall.position.clone();
-        const positionVelocity: Quaternion = cannonBall.positionVelocity.clone();
-
-        // create mesh
-        const uniforms = {
-            uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
-            uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
-            uCameraScale: this.state.zoom,
-            uPosition: position.toMatrix4(),
-            uColor: [0.75, 0.75, 0.75, 1],
-            uScale: 5 * PHYSICS_SCALE / this.game.worldScale
-        };
-        const shader = new PIXI.Shader(this.pixiCannonBallResources.cannonBallProgram, uniforms);
-        const mesh = new PIXI.Mesh(this.pixiCannonBallResources.cannonBallGeometry, shader);
-        mesh.zIndex = -1;
-
-        this.application.stage.addChild(mesh);
-        this.cannonBallMeshes.push({
-            id: cannonBall.id,
-            mesh,
-            position,
-            positionVelocity,
-            tick,
-        });
-    };
-
-    addCrate = ({
-        crate,
-        cameraPosition,
-        cameraOrientation,
-        tick
-    }: {
-        crate: Crate,
-        cameraPosition: Quaternion,
-        cameraOrientation: Quaternion,
-        tick: number
-    }) => {
-        const position: Quaternion = crate.position.clone();
-        const orientation: Quaternion = crate.orientation.clone();
-        const rotation: Quaternion = crate.orientationVelocity.clone();
-        const resourceType: EResourceType = crate.resourceType;
-
-        // create mesh
-        const meshUniforms = {
-            uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
-            uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
-            uCameraScale: this.state.zoom,
-            uPosition: position.toMatrix4(),
-            uOrientation: orientation.toMatrix4(),
-            uScale: 5 * PHYSICS_SCALE / this.game.worldScale
-        };
-        const meshShader = new PIXI.Shader(this.pixiCrateResources.crateProgram, meshUniforms);
-        const mesh = new PIXI.Mesh(this.pixiCrateResources.crateGeometry, meshShader);
-        mesh.zIndex = -4;
-
-        // crate texture sprite
-        const imageUniforms = {
-            uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
-            uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
-            uCameraScale: this.state.zoom,
-            uPosition: position.toMatrix4(),
-            uOrientation: orientation.toMatrix4(),
-            uScale: 15 * PHYSICS_SCALE / this.game.worldScale,
-            uSampler: this.sprites[resourceType]
-        };
-        const imageShader = new PIXI.Shader(this.pixiCrateResources.crateImageProgram, imageUniforms);
-        const image = new PIXI.Mesh(this.pixiCrateResources.crateImageGeometry, imageShader);
-        mesh.zIndex = -4;
-
-        const text = new PIXI.Text(resourceType);
-        text.style.fill = "white";
-        text.style.fontSize = 12;
-
-        this.application.stage.addChild(mesh);
-        this.application.stage.addChild(image);
-        this.application.stage.addChild(text);
-        this.crateMeshes.push({
-            id: crate.id,
-            mesh,
-            image,
-            text,
-            position,
-            orientation,
-            rotation,
-            resourceType,
-            tick,
-        });
-    };
-    hashCode = (str: string): number => {
-        let hash: number = 0;
-        for (let i = 0; i < str.length; i++) {
-            const character: number = str.charCodeAt(i);
-            hash = ((hash<<5)-hash)+character;
-            hash = hash & hash; // Convert to 32bit integer
-        }
-        return Math.abs(hash);
-    }
-
-    addVoronoi = ({id, tile, cameraPosition, cameraOrientation, tick}: {
-        id: string, tile: ITessellatedTriangle, cameraPosition: Quaternion, cameraOrientation: Quaternion, tick: number
-    }) => {
-        // parse digits from the id
-        // last digit is tesselation index, ignore
-        const digits: number[] = [];
-        for (const match of id.split("-")) {
-            const int = parseInt(match);
-            if (!isNaN(int)) {
-                digits.push(int);
-            }
-        }
-
-        // initial coloring
-        let primaryIndex = digits[0] ?? 0;
-        let secondaryIndex = digits[digits.length - 1] ?? 0;
-
-        // second style coloring
-        const lastIndexOf = id.lastIndexOf('-');
-        if (lastIndexOf) {
-            // hash id into a primary color
-            primaryIndex = this.hashCode(id.slice(0, lastIndexOf));
-            secondaryIndex = this.hashCode(digits.slice(0, digits.length - 1).join(","));
-        }
-
-        const colors: Array<[number, number, number, number]> = [
-            [0.75, 0.00, 0.00, 0.25],   // red
-            [0.75, 0.75, 0.00, 0.25],   // orange
-            [0.00, 0.75, 0.00, 0.25],   // green
-            [0.00, 0.75, 0.75, 0.25],   // yellow
-            [0.00, 0.00, 0.75, 0.25],   // blue
-            [0.75, 0.00, 0.75, 0.25]    // purple
-        ];
-        const color = colors[primaryIndex % colors.length];
-        const shades = [0.75, 0.65, 0.55, 0.45, 0.35, 0.25]; // 6 shades
-        const shade = shades[Math.floor(secondaryIndex / colors.length) % shades.length];
-        // 6 * 6 = 36 unique colors, should prevent two regions of the same color from being next to each other
-        const uColor = color.map(i => i === 0.75 ? shade : i);
-
-        // create mesh
-        const uniforms = {
-            uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
-            uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
-            uCameraScale: this.game.worldScale * this.state.zoom,
-            uColor
-        };
-        const shader = new PIXI.Shader(this.pixiVoronoiResources.voronoiProgram, uniforms);
-        const mesh = new PIXI.Mesh(this.pixiVoronoiResources.getVoronoiGeometry(tile), shader);
-        mesh.zIndex = -20;
-
-        this.application.stage.addChild(mesh);
-        this.voronoiMeshes.push({
-            id,
-            mesh,
-            tick,
-        });
     };
 
     constructor(props: IAppProps) {
@@ -1331,8 +213,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                 .mul(cameraPosition.clone().inverse())
                 .mul(position.clone())
                 .rotateVector([0, 0, 1]);
-            textPosition[0] = ((-textPosition[0] * this.state.zoom) + 1) / 2;
-            textPosition[1] = ((-textPosition[1] * this.state.zoom) + 1) / 2;
+            textPosition[0] = ((-textPosition[0] * this.state.zoom * this.game.worldScale) + 1) / 2;
+            textPosition[1] = ((-textPosition[1] * this.state.zoom * this.game.worldScale) + 1) / 2;
             text.x = textPosition[0] * this.application.renderer.width;
             text.y = textPosition[1] * this.application.renderer.height;
             text.y -= 20;
@@ -1357,7 +239,7 @@ export class App extends React.Component<IAppProps, IAppState> {
                 text.y += normalizedDirectionTowardsCenter[1] * 25;
             }
             text.anchor.set(0.5);
-            text.visible = textPosition[2] > 0;
+            text.visible = textPosition[2] > 0 && this.state.zoom * this.game.worldScale > 6;
         }
 
         const removeExtraRotation = (q: Quaternion): Quaternion => {
@@ -1587,12 +469,12 @@ export class App extends React.Component<IAppProps, IAppState> {
                         .mul(cameraPosition.clone().inverse())
                         .mul(item.position.clone())
                         .rotateVector([0, 0, 1]);
-                    const centerX = ((-startPoint[0] * this.state.zoom) + 1) / 2 * this.application.renderer.width;
-                    const centerY = ((-startPoint[1] * this.state.zoom) + 1) / 2 * this.application.renderer.height;
+                    const centerX = ((-startPoint[0] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.width;
+                    const centerY = ((-startPoint[1] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.height;
                     const settlementProgressSlice = Math.max(0, Math.min(item.settlementProgress, 1)) * Math.PI * 2;
                     const settlementProgressSlice2 = Math.max(0, Math.min(item.settlementProgress - 1, 1) / 4) * Math.PI * 2;
-                    const radius = item.factionRadius * this.state.zoom * this.application.renderer.width;
-                    const radius2 = (item.factionRadius + 3 * PHYSICS_SCALE) * this.state.zoom * this.application.renderer.width;
+                    const radius = item.factionRadius * this.state.zoom * this.game.worldScale * this.application.renderer.width;
+                    const radius2 = (item.factionRadius + 3 * PHYSICS_SCALE) * this.state.zoom * this.game.worldScale * this.application.renderer.width;
 
                     item.faction.clear();
                     item.faction.position.set(centerX, centerY);
@@ -1663,17 +545,17 @@ export class App extends React.Component<IAppProps, IAppState> {
                         .mul(cameraPosition.clone().inverse())
                         .mul(item.position.clone())
                         .rotateVector([0, 0, 1]);
-                    const lineXS = ((-startPoint[0] * this.state.zoom) + 1) / 2 * this.application.renderer.width;
-                    const lineYS = ((-startPoint[1] * this.state.zoom) + 1) / 2 * this.application.renderer.height;
+                    const lineXS = ((-startPoint[0] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.width;
+                    const lineYS = ((-startPoint[1] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.height;
 
                     const endPoint = cameraOrientation.clone().inverse()
                         .mul(cameraPosition.clone().inverse())
                         .mul(item.position.clone())
                         .mul(item.orientation.clone())
-                        .mul(Quaternion.fromAxisAngle([1, 0, 0], Math.PI / this.game.worldScale / this.state.zoom))
+                        .mul(Quaternion.fromAxisAngle([1, 0, 0], Math.PI / this.state.zoom * this.game.worldScale))
                         .rotateVector([0, 0, 1]);
-                    const lineXE = ((-endPoint[0] * this.state.zoom) + 1) / 2 * this.application.renderer.width;
-                    const lineYE = ((-endPoint[1] * this.state.zoom) + 1) / 2 * this.application.renderer.height;
+                    const lineXE = ((-endPoint[0] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.width;
+                    const lineYE = ((-endPoint[1] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.height;
 
                     const dashLength = 5;
                     const lineDirection = DelaunayGraph.normalize(
@@ -1718,8 +600,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                         .mul(cameraPosition.clone().inverse())
                         .mul(lineStart)
                         .rotateVector([0, 0, 1]);
-                    const lineXS = ((-startPoint[0] * this.state.zoom) + 1) / 2 * this.application.renderer.width;
-                    const lineYS = ((-startPoint[1] * this.state.zoom) + 1) / 2 * this.application.renderer.height;
+                    const lineXS = ((-startPoint[0] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.width;
+                    const lineYS = ((-startPoint[1] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.height;
 
                     const endPoint = DelaunayGraph.distanceFormula(
                         cameraPosition.rotateVector([0, 0, 1]),
@@ -1728,8 +610,8 @@ export class App extends React.Component<IAppProps, IAppState> {
                         .mul(cameraPosition.clone().inverse())
                         .mul(lineEnd)
                         .rotateVector([0, 0, 1]);
-                    const lineXE = ((-endPoint[0] * this.state.zoom) + 1) / 2 * this.application.renderer.width;
-                    const lineYE = ((-endPoint[1] * this.state.zoom) + 1) / 2 * this.application.renderer.height;
+                    const lineXE = ((-endPoint[0] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.width;
+                    const lineYE = ((-endPoint[1] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.height;
 
                     const dashLength = 5;
                     const lineDirection = DelaunayGraph.normalize(
@@ -1770,11 +652,11 @@ export class App extends React.Component<IAppProps, IAppState> {
                         .mul(cameraPosition.clone().inverse())
                         .mul(item.position.clone())
                         .rotateVector([0, 0, 1]);
-                    const centerX = ((-startPoint[0] * this.state.zoom) + 1) / 2 * this.application.renderer.width;
-                    const centerY = ((-startPoint[1] * this.state.zoom) + 1) / 2 * this.application.renderer.height;
+                    const centerX = ((-startPoint[0] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.width;
+                    const centerY = ((-startPoint[1] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.height;
 
-                    const radius = 10 * PHYSICS_SCALE * this.state.zoom * this.application.renderer.width;
-                    const thickness = 3 * PHYSICS_SCALE * this.state.zoom * this.application.renderer.width;
+                    const radius = 10 * PHYSICS_SCALE * this.state.zoom * this.game.worldScale * this.application.renderer.width;
+                    const thickness = 3 * PHYSICS_SCALE * this.state.zoom * this.game.worldScale * this.application.renderer.width;
                     const sliceSize = Math.PI * 2 / 100;
                     item.health.clear();
                     item.health.position.set(centerX, centerY);
@@ -1963,25 +845,6 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     /**
-     * ------------------------------------------------------------
-     * Get player data
-     * ------------------------------------------------------------
-     */
-
-    private findPlayer(): IPlayerData | null {
-        return (this.playerId && this.game.playerData.get(this.playerId)) || null;
-    }
-
-    private findPlayerShip(): Ship | null {
-        const player = this.findPlayer();
-        if (player) {
-            return this.game.ships.get(player.shipId) || null;
-        } else {
-            return null;
-        }
-    }
-
-    /**
      * Get the home world of the player.
      */
     getPlayerPlanet(): Planet | null {
@@ -1991,57 +854,6 @@ export class App extends React.Component<IAppProps, IAppState> {
         } else {
             return null;
         }
-    }
-
-    /**
-     * Get the ship of the player.
-     */
-    getPlayerShip(): ICameraState {
-        const ship = this.findPlayerShip();
-        if (ship) {
-            return Game.GetCameraState(ship);
-        }
-        // show the latest planet
-        if (this.state.planetId) {
-            // faction selected, orbit the faction's home world
-            const planet = this.game.planets.get(this.state.planetId);
-            if (planet) {
-                // no faction selected, orbit the world
-                const planetShip = new Ship(this.game, EShipType.CUTTER);
-                planetShip.id = "ghost-ship";
-                planetShip.position = planet.position;
-                planetShip.orientation = planet.orientation;
-                return Game.GetCameraState(planetShip);
-            }
-        }
-        // show the latest faction ship
-        if (this.state.faction) {
-            // faction selected, orbit the faction's home world
-            const faction = Array.from(this.game.factions.values()).find(f => f.id === this.state.faction);
-            const ship = Array.from(this.game.ships.values()).find(s => faction && faction.shipIds.length > 0 && s.id === faction.shipIds[faction.shipIds.length - 1]);
-            if (ship) {
-                return Game.GetCameraState(ship);
-            }
-        }
-        // show the latest attacking ship
-        const attackingAIShip = (this.game.demoAttackingShipId && this.game.ships.get(this.game.demoAttackingShipId)) ?? null;
-        if (attackingAIShip) {
-            return Game.GetCameraState(attackingAIShip);
-        } else {
-            this.game.demoAttackingShipId = null;
-        }
-        // no faction selected, orbit the world
-        const tempShip = new Ship(this.game, EShipType.CUTTER);
-        tempShip.id = "ghost-ship";
-        const numSecondsToCircle = 120 * this.game.worldScale;
-        const millisecondsPerSecond = 1000;
-        const circleSlice = numSecondsToCircle * millisecondsPerSecond;
-        const circleFraction = (+new Date() % circleSlice) / circleSlice;
-        const angle = circleFraction * (Math.PI * 2);
-        tempShip.position = Quaternion.fromBetweenVectors([0, 0, 1], [0, 0, 1]).mul(
-            Quaternion.fromAxisAngle([1, 0, 0], -angle)
-        )
-        return Game.GetCameraState(tempShip);
     }
 
     /**
@@ -2134,7 +946,7 @@ export class App extends React.Component<IAppProps, IAppState> {
      * @private
      */
     private renderShip(planetDrawing: IDrawable<Ship>, size: number) {
-        const shipData = SHIP_DATA.find(item => item.shipType === planetDrawing.original.shipType);
+        const shipData = GetShipData(planetDrawing.original.shipType, 1);
         if (!shipData) {
             throw new Error("Cannot find ship type");
         }
@@ -2256,17 +1068,15 @@ export class App extends React.Component<IAppProps, IAppState> {
      */
 
     /**
-     * Handle show notes of the UI. The notes contain the goals to program/write. The ultimate goal is a multiplayer game,
-     * but show notes contains about 20 bullet points to write over time.
+     * Show different type of ships in the screen above the game. Used for debugging the appearance of each ship
+     * without buying the ship in game.
      * @private
      */
-    private handleShowNotes() {
-        if (this.showNotesRef.current) {
-            this.setState({
-                ...this.state,
-                showNotes: this.showNotesRef.current.checked,
-            });
-        }
+    private handleShowSettings() {
+        this.setState((s) => ({
+            ...s,
+            showSettings: !s.showSettings,
+        }));
     }
 
     /**
@@ -2274,13 +1084,11 @@ export class App extends React.Component<IAppProps, IAppState> {
      * without buying the ship in game.
      * @private
      */
-    private handleShowShips() {
-        if (this.showShipsRef.current) {
-            this.setState({
-                ...this.state,
-                showShips: this.showShipsRef.current.checked,
-            });
-        }
+    private handleShowShips(e: React.ChangeEvent<HTMLInputElement>) {
+        this.setState({
+            ...this.state,
+            showShips: e.target.checked,
+        });
     }
 
     /**
@@ -2288,13 +1096,11 @@ export class App extends React.Component<IAppProps, IAppState> {
      * the item in game.
      * @private
      */
-    private handleShowItems() {
-        if (this.showItemsRef.current) {
-            this.setState({
-                ...this.state,
-                showItems: this.showItemsRef.current.checked,
-            });
-        }
+    private handleShowItems(e: React.ChangeEvent<HTMLInputElement>) {
+        this.setState({
+            ...this.state,
+            showItems: e.target.checked,
+        });
     }
 
     /**
@@ -2302,13 +1108,11 @@ export class App extends React.Component<IAppProps, IAppState> {
      * to display political information such as the boundaries of each kingdom.
      * @private
      */
-    private handleShowVoronoi() {
-        if (this.showVoronoiRef.current) {
-            this.setState({
-                ...this.state,
-                showVoronoi: this.showVoronoiRef.current.checked,
-            });
-        }
+    private handleShowVoronoi(e: React.ChangeEvent<HTMLInputElement>) {
+        this.setState({
+            ...this.state,
+            showVoronoi: e.target.checked,
+        });
     }
 
     /**
@@ -2329,40 +1133,36 @@ export class App extends React.Component<IAppProps, IAppState> {
      * Change if autopilot is enabled in game.
      * @private
      */
-    private handleAutoPilotEnabled() {
-        if (this.autoPilotEnabledRef.current) {
-            this.setState({
-                ...this.state,
-                autoPilotEnabled: this.autoPilotEnabledRef.current.checked,
-            }, () => {
-                const message: IAutoPilotMessage = {
-                    messageType: EMessageType.AUTOPILOT,
-                    enabled: this.state.autoPilotEnabled
-                };
-                if (this.socket) {
-                    this.sendMessage("generic-message", message);
-                }
-            });
-        }
+    private handleAutoPilotEnabled(e: React.ChangeEvent<HTMLInputElement>) {
+        this.setState({
+            ...this.state,
+            autoPilotEnabled: e.target.checked,
+        }, () => {
+            const message: IAutoPilotMessage = {
+                messageType: EMessageType.AUTOPILOT,
+                enabled: this.state.autoPilotEnabled
+            };
+            if (this.socket) {
+                this.sendMessage("generic-message", message);
+            }
+        });
     }
 
     /**
      * Enable or disable in game audio such as music.
      * @private
      */
-    private handleAudioEnabled() {
-        if (this.audioEnabledRef.current) {
-            this.setState({
-                ...this.state,
-                audioEnabled: this.audioEnabledRef.current.checked,
-            }, () => {
-                if (this.state.audioEnabled) {
-                    this.music.start();
-                } else {
-                    this.music.stop();
-                }
-            });
-        }
+    private handleAudioEnabled(e: React.ChangeEvent<HTMLInputElement>) {
+        this.setState({
+            ...this.state,
+            audioEnabled: e.target.checked,
+        }, () => {
+            if (this.state.audioEnabled) {
+                this.music.start();
+            } else {
+                this.music.stop();
+            }
+        });
     }
 
     /**
@@ -2511,6 +1311,9 @@ export class App extends React.Component<IAppProps, IAppState> {
             this.showAppBodyRef.current.appendChild(this.application.view);
         }
 
+        window.addEventListener("resize", this.handleResize);
+        this.handleResize();
+
         // handle keyboard input
         if (!this.props.isTestMode) {
             this.rotateCameraInterval = setInterval(this.gameLoop.bind(this), 30);
@@ -2534,158 +1337,6 @@ export class App extends React.Component<IAppProps, IAppState> {
         document.removeEventListener("keydown", this.keyDownHandlerInstance);
         document.removeEventListener("keyup", this.keyUpHandlerInstance);
         this.music.stop();
-    }
-
-    handleSvgClick(event: React.MouseEvent) {
-        // get element coordinates
-        if (!this.svgRef.current) {
-            return;
-        }
-        const node = this.svgRef.current;
-        const bounds = node.getBoundingClientRect();
-        const x = event.clientX - bounds.left;
-        const y = event.clientY - bounds.top;
-
-        // if inside bounds of the play area
-        const size = Math.min(this.state.width, this.state.height);
-        if (x >= 0 && x <= size && y >= 0 && y <= size) {
-            const clickScreenPoint: [number, number, number] = [
-                ((x / size) - 0.5) * 2 / (this.state.zoom * this.game.worldScale),
-                ((y / size) - 0.5) * 2 / (this.state.zoom * this.game.worldScale),
-                0
-            ];
-            clickScreenPoint[1] *= -1;
-            clickScreenPoint[2] = Math.sqrt(1 - Math.pow(clickScreenPoint[0], 2) - Math.pow(clickScreenPoint[1], 2));
-
-            // compute sphere position
-            // const clickQuaternion = Quaternion.fromBetweenVectors([0, 0, 1], clickScreenPoint);
-            // const ship = this.getPlayerShip();
-            // const spherePoint = ship.position.clone()
-            //     .mul(ship.orientation.clone())
-            //     .mul(clickQuaternion)
-            //     .rotateVector([0, 0, 1]);
-        }
-    }
-
-    private renderGameControls() {
-        return (
-            <g key="game-controls">
-                <text x="0" y="30" fill="white">Zoom</text>
-                <rect x="0" y="45" width="20" height="20" fill="grey" onClick={this.decrementZoom.bind(this)}/>
-                <text x="25" y="60" textAnchor="center" fill="white">{(this.state.zoom * this.game.worldScale)}</text>
-                <rect x="40" y="45" width="20" height="20" fill="grey" onClick={this.incrementZoom.bind(this)}/>
-                <text x="5" y="60" onClick={this.decrementZoom.bind(this)}>-</text>
-                <text x="40" y="60" onClick={this.incrementZoom.bind(this)}>+</text>
-                {
-                    this.findPlayerShip() && (
-                        <>
-                            <rect key="return-to-menu-rect" x="5" y="75" width="50" height="20" fill="red" onClick={this.returnToMainMenu.bind(this)}/>
-                            <text key="return-to-menu-text" x="10" y="90" fill="white" onClick={this.returnToMainMenu.bind(this)}>Leave</text>
-                        </>
-                    )
-                }
-            </g>
-        );
-    }
-
-    private renderGameStatus() {
-        const playerShip = this.findPlayerShip();
-        const numPathingNodes = playerShip && playerShip.pathFinding.points.length;
-        const distanceToNode = playerShip && playerShip.pathFinding.points.length > 0 ?
-            VoronoiGraph.angularDistance(
-                playerShip.position.rotateVector([0, 0, 1]),
-                playerShip.pathFinding.points[0],
-                this.game.worldScale
-            ) :
-            0;
-
-        const order = playerShip && playerShip.orders[0];
-        const orderType = order ? order.orderType : "NONE";
-
-        if (numPathingNodes) {
-            return (
-                <g key="game-status" transform={`translate(${this.state.width - 80},0)`}>
-                    <text x="0" y="30" fontSize={8} fill="white">Node{numPathingNodes > 1 ? "s" : ""}: {numPathingNodes}</text>
-                    <text x="0" y="45" fontSize={8} fill="white">Distance: {Math.round(distanceToNode * 100000 / Math.PI) / 100}</text>
-                    <text x="0" y="60" fontSize={8} fill="white">Order: {orderType}</text>
-                </g>
-            );
-        } else {
-            return null;
-        }
-    }
-
-    private renderCargoStatus() {
-        const playerShip = this.findPlayerShip();
-        if (playerShip) {
-            const shipType = playerShip.shipType;
-            const shipData = SHIP_DATA.find(s => s.shipType === shipType);
-            if (!shipData) {
-                throw new Error("Could not find ship type");
-            }
-
-            const cargoSlotSize = Math.min(50, this.state.width / shipData.cargoSize);
-            const cargos = playerShip.cargo;
-            const cargoSize = shipData.cargoSize;
-            return (
-                <g key="cargo-status" transform={`translate(${this.state.width / 2},${this.state.height - 50})`}>
-                    {
-                        new Array(shipData.cargoSize).fill(0).map((v, i) => {
-                            const cargo = cargos[i];
-                            if (cargo) {
-                                return (
-                                    <g key={`cargo-slot-${i}`} transform={`translate(${cargoSlotSize * (i - cargoSize / 2 + 0.5)},0)`}>
-                                        <g transform={`scale(0.5)`}>
-                                            {this.renderItem(cargo.resourceType)}
-                                        </g>
-                                        <rect x={-25} y={-25} width={50} height={50} fill="none" stroke="grey" strokeWidth={3}/>
-                                    </g>
-                                );
-                            } else {
-                                return (
-                                    <g key={`cargo-slot-${i}`} transform={`translate(${cargoSlotSize * (i - cargoSize / 2 + 0.5)},0)`}>
-                                        <rect x={-25} y={-25} width={50} height={50} fill="none" stroke="grey" strokeWidth={3}/>
-                                    </g>
-                                );
-                            }
-                        })
-                    }
-                </g>
-            );
-        } else {
-            return null;
-        }
-    }
-
-    private renderFactionStatus() {
-        const planet = this.getPlayerPlanet();
-        const faction = planet?.county?.faction;
-        if (faction) {
-            return (
-                <g key="faction-status" transform={`translate(${this.state.width - 80},${this.state.height - 80})`}>
-                    <text x="0" y="30" fontSize={8} fill="white">Faction: {faction.id}</text>
-                    <text x="0" y="45" fontSize={8} fill="white">Gold: {planet && planet.moneyAccount ? planet.moneyAccount.cash.getGold() : "N/A"}</text>
-                    <text x="0" y="60" fontSize={8} fill="white">Planet{faction.planetIds.length > 1 ? "s" : ""}: {faction.planetIds.length}</text>
-                    <text x="0" y="75" fontSize={8} fill="white">Ship{faction.shipIds.length > 1 ? "s" : ""}: {faction.shipIds.length}</text>
-                </g>
-            );
-        } else {
-            return null;
-        }
-    }
-
-    private renderPlayerStatus() {
-        const player = this.findPlayer();
-        if (player) {
-            const moneyAccount = MoneyAccount.deserialize(player.moneyAccount as any);
-            return (
-                <g key="player-status" transform={`translate(0,${this.state.height - 80})`}>
-                    <text x="0" y="45" fontSize={8} fill="white">Gold: {moneyAccount.getGold()}</text>
-                </g>
-            );
-        } else {
-            return null;
-        }
     }
 
     public selectFaction(faction: EFaction) {
@@ -2717,76 +1368,6 @@ export class App extends React.Component<IAppProps, IAppState> {
         if (this.state.audioEnabled) {
             this.music.start();
         }
-    }
-
-    private renderLoginMenu() {
-        return (
-            <div key="login-menu">
-                <label>UserName
-                    <input value={this.state.userName} onChange={this.handleUserName.bind(this)}/>
-                </label>
-                <button onClick={this.handleLogin.bind(this)}>Login</button>
-            </div>
-        );
-    }
-
-    private renderMainMenu() {
-        return (
-            <g key="main-menu">
-                <text fontSize="28"
-                      fill="white"
-                      x={this.state.width / 2}
-                      y={this.state.height / 2 - 14}
-                      textAnchor="middle">
-                    Globular Marauders
-                </text>
-                {
-                    [{
-                        faction: EFaction.DUTCH,
-                        text: "Dutch"
-                    }, {
-                        faction: EFaction.ENGLISH,
-                        text: "English"
-                    }, {
-                        faction: EFaction.FRENCH,
-                        text: "French"
-                    }, {
-                        faction: EFaction.PORTUGUESE,
-                        text: "Portuguese"
-                    }, {
-                        faction: EFaction.SPANISH,
-                        text: "Spanish"
-                    }].map(({faction, text}, index) => {
-                        const x = this.state.width / 5 * (index + 0.5);
-                        const y = this.state.height / 2 + 50;
-                        const width = (this.state.width / 5) - 20;
-                        const height = 40;
-                        return (
-                            <>
-                                <rect key={`${text}-rect`}
-                                      stroke="white"
-                                      fill="transparent"
-                                      x={x - width / 2}
-                                      y={y - 20}
-                                      width={width}
-                                      height={height}
-                                      onClick={this.selectFaction.bind(this, faction)}
-                                />
-                                <text
-                                    key={`${text}-text`}
-                                    fill="white"
-                                    x={x}
-                                    y={y + 5}
-                                    textAnchor="middle"
-                                    onClick={this.selectFaction.bind(this, faction)}>
-                                    {text}
-                                </text>
-                            </>
-                        );
-                    })
-                }
-            </g>
-        );
     }
 
     public beginPickPlanet(planetId: string) {
@@ -2826,67 +1407,6 @@ export class App extends React.Component<IAppProps, IAppState> {
                 this.sendMessage("generic-message", message);
             }
         });
-    }
-
-    private renderPlanetMenu() {
-        const x = this.state.width / 3;
-        const y = this.state.height / 2 + 50;
-        const width = (this.state.width / 3) - 20;
-        const height = 40;
-        return (
-            <g key="planet-menu">
-                <text
-                    fill="white"
-                    fontSize="28"
-                    x={this.state.width / 2}
-                    y={this.state.height / 2 - 14 - 50}
-                    textAnchor="middle"
-                >{this.state.faction}</text>
-                {
-                    this.spawnPlanets.map((spawnPlanet, index) => {
-                        return (
-                            <>
-                                <rect
-                                    key={`${spawnPlanet.planetId}-spawn-planet-rect`}
-                                    stroke="white"
-                                    fill="white"
-                                    x={x * (index + 0.5) - width / 2}
-                                    y={y - 20 - 50}
-                                    width={width}
-                                    height={height + 50}
-                                    style={{opacity: 0.3}}
-                                    onClick={this.beginPickPlanet.bind(this, spawnPlanet.planetId)}
-                                />
-                                <text
-                                    key={`${spawnPlanet.planetId}-spawn-planet-text`}
-                                    fill="white"
-                                    x={x * (index + 0.5)}
-                                    y={y + 5}
-                                    textAnchor="middle"
-                                    onClick={this.beginPickPlanet.bind(this, spawnPlanet.planetId)}
-                                >{this.game.planets.get(spawnPlanet.planetId)?.name ?? spawnPlanet.planetId} ({spawnPlanet.numShipsAvailable} ships)</text>
-                            </>
-                        );
-                    })
-                }
-                <rect
-                    stroke="white"
-                    fill="transparent"
-                    x={x * 1.5 - width / 2}
-                    y={y - 20 + height}
-                    width={width}
-                    height={height}
-                    onClick={this.returnToMainMenu.bind(this)}
-                />
-                <text
-                    fill="white"
-                    x={x * 1.5}
-                    y={y + 5 + height}
-                    textAnchor="middle"
-                    onClick={this.returnToMainMenu.bind(this)}
-                >Back</text>
-            </g>
-        );
     }
 
     public beginSpawnShip(planetId: string, shipType: EShipType) {
@@ -2947,82 +1467,6 @@ export class App extends React.Component<IAppProps, IAppState> {
         });
     }
 
-    private renderSpawnMenu() {
-        const x = this.state.width / 3;
-        const y = this.state.height / 2 + 50;
-        const width = (this.state.width / 3) - 20;
-        const height = 40;
-        return (
-            <g key="spawn-menu">
-                <text
-                    fill="white"
-                    fontSize="28"
-                    x={this.state.width / 2}
-                    y={this.state.height / 2 - 14 - 50}
-                    textAnchor="middle"
-                >{this.state.faction}</text>
-                {
-                    this.spawnLocations.map((spawnLocation, index) => {
-                        return (
-                            <>
-                                <rect
-                                    key={`${spawnLocation.id}-spawn-location-rect`}
-                                    stroke="white"
-                                    fill="white"
-                                    x={x * (index + 0.5) - width / 2}
-                                    y={y - 20 - 50}
-                                    width={width}
-                                    height={height + 50}
-                                    style={{opacity: 0.3}}
-                                    onClick={this.beginSpawnShip.bind(this, spawnLocation.id, spawnLocation.shipType)}
-                                />
-                                {
-                                    <g
-                                        key={`${spawnLocation.id}-ship`}
-                                        transform={`translate(${x * (index + 0.5)},${y - 10 - 25})`}
-                                        onClick={this.beginSpawnShip.bind(this, spawnLocation.id, spawnLocation.shipType)}
-                                    >
-                                        {
-                                            this.renderShip(this.getShowShipDrawing(
-                                                `${spawnLocation.id}-spawn-location-ship`,
-                                                spawnLocation.shipType,
-                                                this.state.faction
-                                            ), 1)
-                                        }
-                                    </g>
-                                }
-                                <text
-                                    key={`${spawnLocation.id}-spawn-location-text`}
-                                    fill="white"
-                                    x={x * (index + 0.5)}
-                                    y={y + 5}
-                                    textAnchor="middle"
-                                    onClick={this.beginSpawnShip.bind(this, spawnLocation.id, spawnLocation.shipType)}
-                                >{spawnLocation.shipType} {spawnLocation.price}gp</text>
-                            </>
-                        );
-                    })
-                }
-                <rect
-                    stroke="white"
-                    fill="transparent"
-                    x={x * 1.5 - width / 2}
-                    y={y - 20 + height}
-                    width={width}
-                    height={height}
-                    onClick={this.returnToPlanetMenu.bind(this)}
-                />
-                <text
-                    fill="white"
-                    x={x * 1.5}
-                    y={y + 5 + height}
-                    textAnchor="middle"
-                    onClick={this.returnToPlanetMenu.bind(this)}
-                >Back</text>
-            </g>
-        );
-    }
-
     getShowShipDrawing(id: string, shipType: EShipType, factionType: EFaction | null = null): IDrawable<Ship> {
         const original: Ship = new Ship(this.game, shipType);
         original.id = id;
@@ -3045,222 +1489,246 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     render() {
+        if (this.showAppBodyRef.current) {
+            this.application.resizeTo = this.showAppBodyRef.current as HTMLElement;
+        }
+        const classes = {} as any;
+
         return (
-            <div className="App">
-                <div style={{display: "flex", justifyContent: "space-evenly"}}>
-                    <div style={{display: "inline-block", background: "lightskyblue"}}>
-                        <label>
-                            <input type="checkbox" tabIndex={-1} ref={this.showNotesRef} checked={this.state.showNotes} onChange={this.handleShowNotes.bind(this)}/>
-                            <span>Show Notes</span>
-                        </label>
-                    </div>
-                    <div style={{display: "inline-block", background: "lightskyblue"}}>
-                        <label>
-                            <input type="checkbox" tabIndex={-1} ref={this.showShipsRef} checked={this.state.showShips} onChange={this.handleShowShips.bind(this)}/>
-                            <span>Show Ships</span>
-                        </label>
-                    </div>
-                    <div style={{display: "inline-block", background: "lightskyblue"}}>
-                        <label>
-                            <input type="checkbox" tabIndex={-1} ref={this.showItemsRef} checked={this.state.showItems} onChange={this.handleShowItems.bind(this)}/>
-                            <span>Show Items</span>
-                        </label>
-                    </div>
-                    <div style={{display: "inline-block", background: "lightskyblue"}}>
-                        <label>
-                            <input type="checkbox" tabIndex={-1} ref={this.showVoronoiRef} checked={this.state.showVoronoi} onChange={this.handleShowVoronoi.bind(this)}/>
-                            <span>Show Voronoi</span>
-                        </label>
-                        <g key="voronoi-mode-radio-group">
-                            <label>
-                                <input type="radio" tabIndex={-1} checked={this.state.voronoiMode === EVoronoiMode.KINGDOM} onChange={this.handleChangeVoronoi.bind(this, EVoronoiMode.KINGDOM)}/>
-                                <span>Kingdom</span>
-                            </label>
-                            <label>
-                                <input type="radio" tabIndex={-1} checked={this.state.voronoiMode === EVoronoiMode.DUCHY} onChange={this.handleChangeVoronoi.bind(this, EVoronoiMode.DUCHY)}/>
-                                <span>Duchy</span>
-                            </label>
-                            <label>
-                                <input type="radio" tabIndex={-1} checked={this.state.voronoiMode === EVoronoiMode.COUNTY} onChange={this.handleChangeVoronoi.bind(this, EVoronoiMode.COUNTY)}/>
-                                <span>County</span>
-                            </label>
-                        </g>
-                    </div>
-                    <div style={{display: "inline-block", background: "lightskyblue"}}>
-                        <label>
-                            <input type="checkbox" tabIndex={-1} ref={this.autoPilotEnabledRef} checked={this.state.autoPilotEnabled} onChange={this.handleAutoPilotEnabled.bind(this)}/>
-                            <span>AutoPilot Enabled</span>
-                        </label>
-                    </div>
-                    <div style={{display: "inline-block", background: "lightskyblue"}}>
-                        <label>
-                            <input type="checkbox" tabIndex={-1} ref={this.audioEnabledRef} checked={this.state.audioEnabled} onChange={this.handleAudioEnabled.bind(this)}/>
-                            <span>Audio Enabled</span>
-                        </label>
+            <ThemeProvider theme={theme}>
+                <div className="App" style={{width: "100vw", height: "100vh"}}>
+                    <AppBar className="AppBar">
+                        <Toolbar>
+                            <Button
+                                className={classes.menuButton}
+                                color="inherit"
+                                aria-label="Menu"
+                            >
+                                <Typography>Home</Typography>
+                            </Button>
+                            <Typography variant="h1" color="inherit" className={classes.flex}>
+                                Globular Marauders
+                            </Typography>
+                            <Button color="inherit" onClick={this.handleShowSettings.bind(this)}>Settings</Button>
+                        </Toolbar>
+                    </AppBar>
+                    <div className="AppMain" ref={this.measureAppBodyRef}>
+                        <div style={{position: "absolute", top: this.state.marginTop, left: this.state.marginLeft, bottom: this.state.marginBottom, right: this.state.marginRight}}>
+                            <div style={{width: this.state.width, height: this.state.height}} ref={this.showAppBodyRef}/>
+                        </div>
+                        <div className="AppMainContent">
+                            <Grid direction="column" justifyContent="space-around" alignItems="center" spacing={2}>
+                                {
+                                    this.state.showLoginMenu ? (
+                                        <Grid item xs={3} justifyContent="center" alignItems="center">
+                                            <Card>
+                                                <CardHeader title="Login"/>
+                                                <CardContent>
+                                                    {
+                                                        this.state.init ? (
+                                                            <Fragment>
+                                                                <FormControlLabel control={<TextField value={this.state.userName} onChange={this.handleUserName.bind(this)}/>} label={"Username"}/>
+                                                                <Button onClick={this.handleLogin.bind(this)}>Login</Button>
+                                                            </Fragment>
+                                                        ) : (
+                                                            <Typography>Connecting to server...</Typography>
+                                                        )
+                                                    }
+                                                </CardContent>
+                                            </Card>
+                                        </Grid>
+                                    ) : null
+                                }
+                                {
+                                    this.state.showMainMenu ? (
+                                        <Grid item xs={3} justifyContent="center" alignItems="center">
+                                            <Card>
+                                                <CardHeader title="Factions"/>
+                                                <CardContent>
+                                                    <List>
+                                                        {
+                                                            Array.from(this.game.factions.values()).map(f => {
+                                                                return (
+                                                                    <ListItem onClick={this.selectFaction.bind(this, f.id)}>
+                                                                        <ListItemText>{f.id}</ListItemText>
+                                                                    </ListItem>
+                                                                );
+                                                            })
+                                                        }
+                                                    </List>
+                                                </CardContent>
+                                            </Card>
+                                        </Grid>
+                                    ) : null
+                                }
+                                {
+                                    this.state.showPlanetMenu ? (
+                                        <Grid item xs={3} justifyContent="center" alignItems="center">
+                                            <Card>
+                                                <CardHeader title="Planets"/>
+                                                <CardContent>
+                                                    <Button onClick={this.returnToFactionMenu.bind(this)}>Back</Button>
+                                                    <List>
+                                                        {
+                                                            this.spawnPlanets.map(f => {
+                                                                const planet = this.game.planets.get(f.planetId);
+                                                                const planetName = planet?.name ?? f.planetId;
+                                                                return (
+                                                                    <ListItem onClick={this.beginPickPlanet.bind(this, f.planetId)}>
+                                                                        <ListItemText>{planetName} ({f.numShipsAvailable} ships)</ListItemText>
+                                                                    </ListItem>
+                                                                );
+                                                            })
+                                                        }
+                                                    </List>
+                                                </CardContent>
+                                            </Card>
+                                        </Grid>
+                                    ) : null
+                                }
+                                {
+                                    this.state.showSpawnMenu ? (
+                                        <Grid item xs={3} justifyContent="center" alignItems="center">
+                                            <Card>
+                                                <CardHeader title="Ship Types"/>
+                                                <CardContent>
+                                                    <Button onClick={this.returnToPlanetMenu.bind(this)}>Back</Button>
+                                                    <List>
+                                                        {
+                                                            this.spawnLocations.map(f => {
+                                                                return (
+                                                                    <ListItem onClick={this.beginSpawnShip.bind(this, f.id, f.shipType)}>
+                                                                        <ListItemText>{f.shipType} ({f.price}) ({f.numShipsAvailable} ships)</ListItemText>
+                                                                    </ListItem>
+                                                                );
+                                                            })
+                                                        }
+                                                    </List>
+                                                </CardContent>
+                                            </Card>
+                                        </Grid>
+                                    ) : null
+                                }
+                            </Grid>
+                            {
+                                !this.state.showLoginMenu && !this.state.showMainMenu && !this.state.showPlanetMenu && !this.state.showSpawnMenu ? (
+                                    <Fragment>
+                                        <Card className="TopLeft">
+                                            <Button onClick={this.decrementZoom.bind(this)}>-</Button>
+                                            <Typography>{this.state.zoom * this.game.worldScale}</Typography>
+                                            <Button onClick={this.incrementZoom.bind(this)}>+</Button>
+                                        </Card>
+                                        <Card className="TopRight">
+                                            <Typography>Distance {VoronoiGraph.angularDistance(
+                                                this.getPlayerShip().position.rotateVector([0, 0, 1]),
+                                                this.getPlayerShip().pathFinding?.points[0] ?? this.getPlayerShip().position.rotateVector([0, 0, 1]),
+                                                this.game.worldScale
+                                            )} | {this.getPlayerShip().pathFinding?.points} points</Typography>
+                                        </Card>
+                                        <Card className="BottomRight">
+                                            <Typography>Gold {this.playerId && this.game.playerData.get(this.playerId)?.moneyAccount.currencies.find(f => f.currencyId === "GOLD")?.amount}</Typography>
+                                        </Card>
+                                        <Card className="BottomLeft">
+                                            <Typography>Faction {this.state.faction}</Typography>
+                                            <Typography>Ships {this.state.faction && this.game.factions.get(this.state.faction)?.shipIds.length}</Typography>
+                                            <Typography>Planets {this.state.faction && this.game.factions.get(this.state.faction)?.planetIds.length}</Typography>
+                                        </Card>
+                                    </Fragment>
+                                ) : null
+                            }
+                            <Dialog open={this.state.showSettings} onClose={() => this.setState({showSettings: false})}>
+                                <DialogTitle title="Options"/>
+                                <DialogContent>
+                                    <Grid container spacing={2}>
+                                        <Grid item>
+                                            <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.showShips}
+                                                                                 onChange={this.handleShowShips.bind(this)}/>} label="Show Ships"/>
+                                        </Grid>
+                                        <Grid item>
+                                            <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.showItems}
+                                                                                 onChange={this.handleShowItems.bind(this)}/>} label="Show Items"/>
+                                        </Grid>
+                                        <Grid item>
+                                            <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.showVoronoi}
+                                                                                 onChange={this.handleShowVoronoi.bind(this)}/>} label="Show Voronoi"/>
+                                            <RadioGroup>
+                                                <Grid container spacing={2}>
+                                                    <Grid item xs={4}>
+                                                        <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.voronoiMode === EVoronoiMode.KINGDOM}
+                                                                                             onChange={this.handleChangeVoronoi.bind(this, EVoronoiMode.KINGDOM)}/>} label="Kingdom"/>
+                                                    </Grid>
+                                                    <Grid item xs={4}>
+                                                        <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.voronoiMode === EVoronoiMode.DUCHY}
+                                                                                             onChange={this.handleChangeVoronoi.bind(this, EVoronoiMode.DUCHY)}/>} label="Duchy"/>
+                                                    </Grid>
+                                                    <Grid item xs={4}>
+                                                        <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.voronoiMode === EVoronoiMode.COUNTY}
+                                                                                             onChange={this.handleChangeVoronoi.bind(this, EVoronoiMode.COUNTY)}/>} label="County"/>
+                                                    </Grid>
+                                                </Grid>
+                                            </RadioGroup>
+                                        </Grid>
+                                        <Grid item>
+                                            <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.autoPilotEnabled}
+                                                                                 onChange={this.handleAutoPilotEnabled.bind(this)}/>} label="AutoPilot Enabled"/>
+                                        </Grid>
+                                        <Grid item>
+                                            <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.audioEnabled}
+                                                                                 onChange={this.handleAudioEnabled.bind(this)}/>} label="Audio Enabled"/>
+                                        </Grid>
+                                    </Grid>
+                                </DialogContent>
+                            </Dialog>
+                            <Dialog open={this.state.showShips} onClose={() => this.setState({showShips: false})}>
+                                <DialogTitle title="Ships"/>
+                                <DialogContent>
+                                    {
+                                        this.state.showShips && (
+                                            SHIP_DATA.map(ship => {
+                                                return (
+                                                    <Card key={`show-ship-${ship.shipType}`}>
+                                                        <CardHeader title={ship.shipType}/>
+                                                        <CardContent>
+                                                            <svg width="100" height="100">
+                                                                <g transform="translate(50, 50)">
+                                                                    {
+                                                                        this.renderShip(this.getShowShipDrawing(ship.shipType, ship.shipType), 1)
+                                                                    }
+                                                                </g>
+                                                            </svg>
+                                                        </CardContent>
+                                                    </Card>
+                                                );
+                                            })
+                                        )
+                                    }
+                                </DialogContent>
+                            </Dialog>
+                            <Dialog open={this.state.showItems} onClose={() => this.setState({showItems: false})}>
+                                <DialogTitle title="Items"/>
+                                <DialogContent>
+                                    {
+                                        this.state.showItems && (
+                                            ITEM_DATA.map(item => {
+                                                return (
+                                                    <Card key={`show-item-${item.resourceType}`}>
+                                                        <CardHeader title={item.resourceType}/>
+                                                        <CardContent>
+                                                            {
+                                                                this.renderItem(item.resourceType)
+                                                            }
+                                                        </CardContent>
+                                                    </Card>
+                                                );
+                                            })
+                                        )
+                                    }
+                                </DialogContent>
+                            </Dialog>
+                        </div>
                     </div>
                 </div>
-                {
-                    this.state.showNotes && (
-                        <ul>
-                            <li>Started 3/28/2021</li>
-                            <li>Create 3d sphere world which has different planets. -- DONE 3/28/2021</li>
-                            <li>Project 3d world onto a small area for viewing, yet still able to navigate in a circle like a 3d sphere. -- DONE 3/28/2021</li>
-                            <li>Create camera system centered around a small ship. Rotating will rotate camera/world. -- DONE 3/30/2021</li>
-                            <li>Add projectiles or cannon balls and small frictionless motion in space. -- DONE 4/17/2021</li>
-                            <li>Improve random distribution of planets using Voronoi and Lloyd Relaxation. -- DONE 4/17/2021</li>
-                            <li>Create factions which start from a home world and launch ships. - DONE 4/21/2021</li>
-                            <li>Spawn settler ships to colonize other worlds. Each world has upto 3 resources. DONE 4/21/2021</li>
-                            <li>Spawn merchant ships to trade with colonies. Trading is simplified flying between A and B. DONE 4/21/2021</li>
-                            <li>Add economics, price rising and falling based on supply and demand, traders will try to go towards important colonies. DONE 4/21/2021</li>
-                            <li>Add ship building economy for each planet. DONE 4/24/2021</li>
-                            <li>Planets will sell ships using dutch auction, 50% will go to faction as tax, 50% will go to island renovation. DONE 4/24/2021</li>
-                            <li>Make cannon balls damage merchant ships. -- DONE 4/27/2021</li>
-                            <li>Add ability to pirate merchants and raid colonies. -- DONE 4/30/2021</li>
-                            <li>Add ability for AI to aim at player. -- DONE 5/1/2021</li>
-                            <li>Add AI pirates. -- DONE 5/9/2021</li>
-                            <li>Construction and upgrade of buildings in capitals and colonies. -- DONE 5/15/2021</li>
-                            <li>Fix Delaunay and Voronoi. -- DONE 5/26/2021</li>
-                            <li>Add nested delaunay and nested voronoi. -- DONE 5/28/2021</li>
-                            <li>Add Imperial/Colonial empire design, the capital will upgrade certain locations into high level planets. -- DONE 5/31/2021</li>
-                            <li>Add Feudal tribute and Feudal offers to move ships to where they're needed. -- DONE 5/31/2021</li>
-                            <li>Add Feudal resource trading where planets will spoke and wheel resources back to the emperor.</li>
-                            <li>Add Feudal taxes where planets will pay taxes to the capital.</li>
-                            <li>Pirate hunters. Ships will report the position of pirates and the local ruler will send or request a ship to patrol the area.</li>
-                            <li>Factions will plan invasions of enemy colonies and capitals.</li>
-                            <li>Create a flotilla of boats to attack an area.</li>
-                            <li>Sitting on a planet with no enemies for 30 seconds will capture it.</li>
-                            <li>3 minutes of no reinforcements will confirm the capture.</li>
-                            <li>10 or 15 minute battles to capture as many planets within a kingdom or duchy as possible.</li>
-                            <li>Compute new nobility after each battle.</li>
-                            <li>Add multiplayer... (1 month)
-                                <ol>
-                                    <li>Break game into client and server. -- DONE 12/12/2021</li>
-                                    <li>Create bot clients based on bot code, copied into client. -- DONE 12/12/2021</li>
-                                    <li>Test number of bots on single process server before lagging. -- DONE 12/12/2021</li>
-                                    <li>Create multi process servers which divide each kingdom (1 out of 20 voronoi cells) into a process.</li>
-                                    <li>Test number of bots on multi process server.</li>
-                                    <li>Create code which can spawn multiple servers and release multiple servers.</li>
-                                    <li>Create random match making via Website (1 server).</li>
-                                    <li>Create infinite random match making via Website (automatic generated servers).</li>
-                                </ol>
-                            </li>
-                            <li>Play Styles:
-                                <ul>
-                                    <li>Pirate/Marauder will attack kingdoms and other pirates.</li>
-                                    <li>Bounty Hunter will find pirates in the outskirts of the trade empire.</li>
-                                    <li>Warship will attach kingdoms in large battles over colonies and capitals.</li>
-                                </ul>
-                            </li>
-                            <li>
-                                Places:
-                                <ul>
-                                    <li>Capitals: Home of a kingdom.</li>
-                                    <li>Colony: New world island which makes money and repairs ships.</li>
-                                    <li>Undiscovered Islands: Locations to build colonies.</li>
-                                </ul>
-                            </li>
-                            <li>
-                                Ships:
-                                <ul>
-                                    <li>Settler: Colonize</li>
-                                    <li>Merchant: Trade</li>
-                                    <li>Warship: Attack</li>
-                                </ul>
-                            </li>
-                            <li>Make multiple rooms/worlds for large amounts of players.</li>
-                        </ul>
-                    )
-                }
-                {
-                    this.state.showShips && (
-                        <ul>
-                            {
-                                SHIP_DATA.map(ship => {
-                                    return (
-                                        <svg key={`show-ship-${ship.shipType}`} width="100" height="100">
-                                            <g transform="translate(50, 50)">
-                                                {
-                                                    this.renderShip(this.getShowShipDrawing(ship.shipType, ship.shipType), 1)
-                                                }
-                                            </g>
-                                        </svg>
-                                    );
-                                })
-                            }
-                        </ul>
-                    )
-                }
-                {
-                    this.state.showItems && (
-                        <ul>
-                            {
-                                ITEM_DATA.map(item => {
-                                    return (
-                                        <div key={`show-item-${item.resourceType}`} style={{display: "inline-block"}}>
-                                            {
-                                                this.renderItem(item.resourceType)
-                                            }
-                                            <br/>
-                                            {item.resourceType}
-                                        </div>
-                                    );
-                                })
-                            }
-                        </ul>
-                    )
-                }
-                {this.state.showLoginMenu && this.state.init ? this.renderLoginMenu.call(this) : this.state.init ? null : <span>Connecting to server...</span>}
-                <span>Num Network Frames: {this.numNetworkFrames}</span>
-                <div style={{width: "100%", height: this.state.height}}>
-                    <div style={{position: "absolute", padding: "0px auto", width: "100%"}} ref={this.showAppBodyRef}/>
-                    <div style={{position: "absolute", padding: "0px auto", width: "100%"}}>
-                        <svg ref={this.svgRef} width={this.state.width} height={this.state.height}>
-                            <defs>
-                                <mask id="worldMask">
-                                    <circle
-                                        cx={this.state.width * 0.5}
-                                        cy={this.state.height * 0.5}
-                                        r={Math.min(this.state.width, this.state.height) * 0.5}
-                                        fill="white"
-                                    />
-                                </mask>
-                            </defs>
-                            <g mask="url(#worldMask)" onClick={this.handleSvgClick.bind(this)}>
-                                {
-                                    this.state.showMainMenu ? this.renderMainMenu.call(this) : null
-                                }
-                                {
-                                    this.state.showPlanetMenu ? this.renderPlanetMenu.call(this) : null
-                                }
-                                {
-                                    this.state.showSpawnMenu ? this.renderSpawnMenu.call(this) : null
-                                }
-                            </g>
-                            {
-                                this.renderGameControls()
-                            }
-                            {
-                                this.state.showLoginMenu ? null : (
-                                    <React.Fragment>
-                                        {
-                                            this.renderGameStatus()
-                                        }
-                                        {
-                                            this.renderCargoStatus()
-                                        }
-                                        {
-                                            this.renderFactionStatus()
-                                        }
-                                        {
-                                            this.renderPlayerStatus()
-                                        }
-                                    </React.Fragment>
-                                )
-                            }
-                        </svg>
-                    </div>
-                </div>
-            </div>
+            </ThemeProvider>
         );
     }
 }
