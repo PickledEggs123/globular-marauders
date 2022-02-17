@@ -58,6 +58,7 @@ export interface IAppState {
     showSpawnMenu: boolean;
     faction: EFaction | null;
     planetId: string | null;
+    spawnShipType: EShipType | null;
     userName: string;
     numNetworkFrames: number;
 }
@@ -79,6 +80,7 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         audioEnabled: true as boolean,
         faction: null as EFaction | null,
         planetId: null as string | null,
+        spawnShipType: null as EShipType | null,
         init: false as boolean,
         showSettings: false as boolean,
         showLoginMenu: true as boolean,

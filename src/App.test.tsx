@@ -59,7 +59,7 @@ const getTestShip = (app: App, wrapper: ShallowWrapper<any>, colonyWorldTrades: 
   app.money.currencies = homeWorldTradeItem.planet.shipyard.quoteShip(shipType);
 
   // spawn at home world
-  app.beginSpawnShip(homeWorldTradeItem.planet.id, shipType);
+  app.selectShip(homeWorldTradeItem.planet.id, shipType);
   wrapper.update();
 
   if (app.playerShip === null) {

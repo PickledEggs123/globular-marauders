@@ -56,7 +56,7 @@ import {
     RadioGroup,
     TextField,
     Toolbar,
-    Typography, Theme, createTheme, ThemeProvider, List, ListItem, ListItemText,
+    Typography, Theme, createTheme, ThemeProvider, List, ListItem, ListItemText, Avatar, SvgIcon, Paper,
 } from "@mui/material";
 import {makeStyles, createStyles} from "@mui/styles";
 import {DEFAULT_IMAGE, EVoronoiMode, RESOURCE_TYPE_TEXTURE_PAIRS} from "./Data";
@@ -755,6 +755,7 @@ export class App extends AppPixi {
             this.initialized = false;
             this.music.stop();
             this.game = new Game();
+            this.game.worldScale = 4;
             this.game.initializeGame();
             this.setState({
                 showSpawnMenu: false,
@@ -1224,7 +1225,7 @@ export class App extends AppPixi {
      * @private
      */
     private decrementZoom() {
-        const zoom = Math.max(this.state.zoom / 2, 1);
+        const zoom = Math.max(this.state.zoom / 2, 0.25);
         this.setState({
             ...this.state,
             zoom
@@ -1342,20 +1343,24 @@ export class App extends AppPixi {
     public selectFaction(faction: EFaction) {
         this.setState({
             faction,
-            planetId: null,
-            showSpawnMenu: false,
-            showPlanetMenu: true,
-            showMainMenu: false,
-            showLoginMenu: false,
-        }, () => {
-            if (this.socket) {
-                const message: IChooseFactionMessage = {
-                    messageType: EMessageType.CHOOSE_FACTION,
-                    factionId: faction
-                };
-                this.sendMessage("generic-message", message);
-            }
+            planetId: null
         });
+    }
+
+    public goToPlanetMenu() {
+        if (this.socket && this.state.faction) {
+            this.setState({
+                showSpawnMenu: false,
+                showPlanetMenu: true,
+                showMainMenu: false,
+                showLoginMenu: false,
+            });
+            const message: IChooseFactionMessage = {
+                messageType: EMessageType.CHOOSE_FACTION,
+                factionId: this.state.faction
+            };
+            this.sendMessage("generic-message", message);
+        }
     }
 
     private handleUserName(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1370,18 +1375,27 @@ export class App extends AppPixi {
         }
     }
 
-    public beginPickPlanet(planetId: string) {
+    public selectPlanet(planetId: string) {
         if (this.state.faction) {
+            this.setState({
+                planetId
+            });
+        } else {
+            this.returnToFactionMenu();
+        }
+    }
+
+    public goToSpawnMenu() {
+        if (this.state.faction && this.state.planetId) {
             this.setState({
                 showSpawnMenu: true,
                 showPlanetMenu: false,
                 showMainMenu: false,
                 showLoginMenu: false,
-                planetId
             });
             const message: IChoosePlanetMessage = {
                 messageType: EMessageType.CHOOSE_PLANET,
-                planetId
+                planetId: this.state.planetId
             };
             if (this.socket) {
                 this.sendMessage("generic-message", message);
@@ -1398,6 +1412,7 @@ export class App extends AppPixi {
             showMainMenu: true,
             showLoginMenu: false,
             planetId: null,
+            spawnShipType: null,
         }, () => {
             if (this.socket) {
                 const message: IChoosePlanetMessage = {
@@ -1409,8 +1424,19 @@ export class App extends AppPixi {
         });
     }
 
-    public beginSpawnShip(planetId: string, shipType: EShipType) {
+    public selectShip(planetId: string, spawnShipType: EShipType) {
         if (this.state.faction) {
+            this.setState({
+                planetId,
+                spawnShipType
+            });
+        } else {
+            this.returnToPlanetMenu();
+        }
+    }
+
+    public spawnShip() {
+        if (this.state.faction && this.state.planetId && this.state.spawnShipType) {
             this.setState({
                 showSpawnMenu: false,
                 showPlanetMenu: false,
@@ -1419,8 +1445,8 @@ export class App extends AppPixi {
             });
             const message: ISpawnMessage = {
                 messageType: EMessageType.SPAWN,
-                shipType,
-                planetId
+                shipType: this.state.spawnShipType,
+                planetId: this.state.planetId
             };
             if (this.socket) {
                 this.sendMessage("generic-message", message);
@@ -1502,14 +1528,14 @@ export class App extends AppPixi {
                             <Button
                                 className={classes.menuButton}
                                 color="inherit"
-                                aria-label="Menu"
+                                aria-label="Menu" variant="contained"
                             >
                                 <Typography>Home</Typography>
                             </Button>
-                            <Typography variant="h1" color="inherit" className={classes.flex}>
+                            <Typography variant="h1" color="inherit" className={classes.flex} style={{flexGrow: 1}} textAlign="center">
                                 Globular Marauders
                             </Typography>
-                            <Button color="inherit" onClick={this.handleShowSettings.bind(this)}>Settings</Button>
+                            <Button variant="contained" color="secondary" onClick={this.handleShowSettings.bind(this)}>Settings</Button>
                         </Toolbar>
                     </AppBar>
                     <div className="AppMain" ref={this.measureAppBodyRef}>
@@ -1517,214 +1543,250 @@ export class App extends AppPixi {
                             <div style={{width: this.state.width, height: this.state.height}} ref={this.showAppBodyRef}/>
                         </div>
                         <div className="AppMainContent">
-                            <Grid direction="column" justifyContent="space-around" alignItems="center" spacing={2}>
-                                {
-                                    this.state.showLoginMenu ? (
-                                        <Grid item xs={3} justifyContent="center" alignItems="center">
-                                            <Card>
-                                                <CardHeader title="Login"/>
-                                                <CardContent>
-                                                    {
-                                                        this.state.init ? (
-                                                            <Fragment>
-                                                                <FormControlLabel control={<TextField value={this.state.userName} onChange={this.handleUserName.bind(this)}/>} label={"Username"}/>
-                                                                <Button onClick={this.handleLogin.bind(this)}>Login</Button>
-                                                            </Fragment>
-                                                        ) : (
-                                                            <Typography>Connecting to server...</Typography>
-                                                        )
-                                                    }
-                                                </CardContent>
-                                            </Card>
-                                        </Grid>
-                                    ) : null
-                                }
-                                {
-                                    this.state.showMainMenu ? (
-                                        <Grid item xs={3} justifyContent="center" alignItems="center">
-                                            <Card>
-                                                <CardHeader title="Factions"/>
-                                                <CardContent>
-                                                    <List>
+                            <div style={{position: "absolute", top: this.state.marginTop, left: this.state.marginLeft, bottom: this.state.marginBottom, right: this.state.marginRight}}>
+                                <Grid container direction="column" justifyContent="center" alignItems="center" spacing={2} xs={12}>
+                                    {
+                                        this.state.showLoginMenu ? (
+                                            <Grid item xs={12} justifyContent="center" alignItems="center">
+                                                <Card>
+                                                    <CardHeader title="Login"/>
+                                                    <CardContent>
+                                                        {
+                                                            this.state.init ? (
+                                                                <Fragment>
+                                                                    <TextField fullWidth value={this.state.userName} onChange={this.handleUserName.bind(this)} label={"Username"} placeholder="PirateDude" helperText="A fun name to sow dread into your enemies"/>
+                                                                    <Button fullWidth variant="contained" onClick={this.handleLogin.bind(this)}>Login</Button>
+                                                                </Fragment>
+                                                            ) : (
+                                                                <Typography>Connecting to server...</Typography>
+                                                            )
+                                                        }
+                                                    </CardContent>
+                                                </Card>
+                                            </Grid>
+                                        ) : null
+                                    }
+                                    {
+                                        this.state.showMainMenu ? (
+                                            <Grid item xs={12} justifyContent="center" alignItems="center">
+                                                <Paper style={{marginTop: "20vh", maxHeight: "40vh", overflow: "auto", backgroundColor: "none", opacity: 0.66}}>
+                                                    <Grid container flexDirection="column" xs={12} spacing={2}>
+                                                        <Grid item xs={12}>
+                                                        </Grid>
+                                                        <Grid item xs={12}>
+                                                            <Button fullWidth variant="contained" onClick={this.goToPlanetMenu.bind(this)}>Next</Button>
+                                                        </Grid>
                                                         {
                                                             Array.from(this.game.factions.values()).map(f => {
                                                                 return (
-                                                                    <ListItem onClick={this.selectFaction.bind(this, f.id)}>
-                                                                        <ListItemText>{f.id}</ListItemText>
-                                                                    </ListItem>
+                                                                    <Grid item xs={12}>
+                                                                        <Card onClick={this.selectFaction.bind(this, f.id)}>
+                                                                            <CardContent>
+                                                                                <Avatar variant="rounded" style={{width: 256, height: 256, backgroundColor: f.factionColor}}>{f.id}</Avatar>
+                                                                            </CardContent>
+                                                                            <CardHeader title={f.id}>
+                                                                            </CardHeader>
+                                                                        </Card>
+                                                                    </Grid>
                                                                 );
                                                             })
                                                         }
-                                                    </List>
-                                                </CardContent>
-                                            </Card>
-                                        </Grid>
-                                    ) : null
-                                }
-                                {
-                                    this.state.showPlanetMenu ? (
-                                        <Grid item xs={3} justifyContent="center" alignItems="center">
-                                            <Card>
-                                                <CardHeader title="Planets"/>
-                                                <CardContent>
-                                                    <Button onClick={this.returnToFactionMenu.bind(this)}>Back</Button>
-                                                    <List>
+                                                    </Grid>
+                                                </Paper>
+                                            </Grid>
+                                        ) : null
+                                    }
+                                    {
+                                        this.state.showPlanetMenu ? (
+                                            <Grid item xs={12} justifyContent="center" alignItems="center">
+                                                <Paper style={{marginTop: "20vh", maxHeight: "40vh", overflow: "auto", backgroundColor: "none", opacity: 0.66}}>
+                                                    <Grid container flexDirection="column" xs={12} spacing={2}>
+                                                        <Grid item xs={12}>
+                                                            <Button fullWidth variant="contained" onClick={this.returnToFactionMenu.bind(this)}>Back</Button>
+                                                        </Grid>
+                                                        <Grid item xs={12}>
+                                                            <Button fullWidth variant="contained" onClick={this.goToSpawnMenu.bind(this)}>Next</Button>
+                                                        </Grid>
                                                         {
                                                             this.spawnPlanets.map(f => {
                                                                 const planet = this.game.planets.get(f.planetId);
                                                                 const planetName = planet?.name ?? f.planetId;
                                                                 return (
-                                                                    <ListItem onClick={this.beginPickPlanet.bind(this, f.planetId)}>
-                                                                        <ListItemText>{planetName} ({f.numShipsAvailable} ships)</ListItemText>
-                                                                    </ListItem>
+                                                                    <Grid item xs={12}>
+                                                                        <Card onClick={this.selectPlanet.bind(this, f.planetId)}>
+                                                                            <CardContent>
+                                                                                <Avatar variant="rounded" style={{width: 256, height: 256}}>
+                                                                                    Placeholder
+                                                                                </Avatar>
+                                                                            </CardContent>
+                                                                            <CardHeader title={planetName} subheader={`(${f.numShipsAvailable} ships)`}>
+                                                                            </CardHeader>
+                                                                        </Card>
+                                                                    </Grid>
                                                                 );
                                                             })
                                                         }
-                                                    </List>
-                                                </CardContent>
-                                            </Card>
-                                        </Grid>
-                                    ) : null
-                                }
-                                {
-                                    this.state.showSpawnMenu ? (
-                                        <Grid item xs={3} justifyContent="center" alignItems="center">
-                                            <Card>
-                                                <CardHeader title="Ship Types"/>
-                                                <CardContent>
-                                                    <Button onClick={this.returnToPlanetMenu.bind(this)}>Back</Button>
-                                                    <List>
+                                                    </Grid>
+                                                </Paper>
+                                            </Grid>
+                                        ) : null
+                                    }
+                                    {
+                                        this.state.showSpawnMenu ? (
+                                            <Grid item xs={12} justifyContent="center" alignItems="center">
+                                                <Paper style={{marginTop: "20vh", maxHeight: "40vh", overflow: "auto", backgroundColor: "none", opacity: 0.66}}>
+                                                    <Grid container flexDirection="column" xs={12} spacing={2}>
+                                                        <Grid item xs={12}>
+                                                            <Button fullWidth variant="contained" onClick={this.returnToPlanetMenu.bind(this)}>Back</Button>
+                                                        </Grid>
+                                                        <Grid item xs={12}>
+                                                            <Button fullWidth variant="contained" onClick={this.spawnShip.bind(this)}>Next</Button>
+                                                        </Grid>
                                                         {
                                                             this.spawnLocations.map(f => {
                                                                 return (
-                                                                    <ListItem onClick={this.beginSpawnShip.bind(this, f.id, f.shipType)}>
-                                                                        <ListItemText>{f.shipType} ({f.price}) ({f.numShipsAvailable} ships)</ListItemText>
-                                                                    </ListItem>
+                                                                    <Grid item xs={12}>
+                                                                        <Card onClick={this.selectShip.bind(this, f.id, f.shipType)}>
+                                                                            <CardContent>
+                                                                                <Avatar variant="rounded" style={{width: 256, height: 256}}>
+                                                                                    <svg width="100" height="100">
+                                                                                        <g transform="translate(50, 50)">
+                                                                                            {
+                                                                                                this.renderShip(this.getShowShipDrawing(f.shipType, f.shipType, this.state.faction), 1)
+                                                                                            }
+                                                                                        </g>
+                                                                                    </svg>
+                                                                                </Avatar>
+                                                                            </CardContent>
+                                                                            <CardHeader title={f.shipType} subheader={`(${f.price}) (${f.numShipsAvailable} ships)`}>
+                                                                            </CardHeader>
+                                                                        </Card>
+                                                                    </Grid>
                                                                 );
                                                             })
                                                         }
-                                                    </List>
-                                                </CardContent>
+                                                    </Grid>
+                                                </Paper>
+                                            </Grid>
+                                        ) : null
+                                    }
+                                </Grid>
+                                {
+                                    !this.state.showLoginMenu && !this.state.showMainMenu && !this.state.showPlanetMenu && !this.state.showSpawnMenu ? (
+                                        <Fragment>
+                                            <Card className="TopLeft">
+                                                <Button onClick={this.decrementZoom.bind(this)}>-</Button>
+                                                <Typography>{this.state.zoom * this.game.worldScale}</Typography>
+                                                <Button onClick={this.incrementZoom.bind(this)}>+</Button>
                                             </Card>
-                                        </Grid>
+                                            <Card className="TopRight">
+                                                <Typography>Distance {VoronoiGraph.angularDistance(
+                                                    this.getPlayerShip().position.rotateVector([0, 0, 1]),
+                                                    this.getPlayerShip().pathFinding?.points[0] ?? this.getPlayerShip().position.rotateVector([0, 0, 1]),
+                                                    this.game.worldScale
+                                                )} | {this.getPlayerShip().pathFinding?.points} points</Typography>
+                                            </Card>
+                                            <Card className="BottomRight">
+                                                <Typography>Gold {this.playerId && this.game.playerData.get(this.playerId)?.moneyAccount.currencies.find(f => f.currencyId === "GOLD")?.amount}</Typography>
+                                            </Card>
+                                            <Card className="BottomLeft">
+                                                <Typography>Faction {this.state.faction}</Typography>
+                                                <Typography>Ships {this.state.faction && this.game.factions.get(this.state.faction)?.shipIds.length}</Typography>
+                                                <Typography>Planets {this.state.faction && this.game.factions.get(this.state.faction)?.planetIds.length}</Typography>
+                                            </Card>
+                                        </Fragment>
                                     ) : null
                                 }
-                            </Grid>
-                            {
-                                !this.state.showLoginMenu && !this.state.showMainMenu && !this.state.showPlanetMenu && !this.state.showSpawnMenu ? (
-                                    <Fragment>
-                                        <Card className="TopLeft">
-                                            <Button onClick={this.decrementZoom.bind(this)}>-</Button>
-                                            <Typography>{this.state.zoom * this.game.worldScale}</Typography>
-                                            <Button onClick={this.incrementZoom.bind(this)}>+</Button>
-                                        </Card>
-                                        <Card className="TopRight">
-                                            <Typography>Distance {VoronoiGraph.angularDistance(
-                                                this.getPlayerShip().position.rotateVector([0, 0, 1]),
-                                                this.getPlayerShip().pathFinding?.points[0] ?? this.getPlayerShip().position.rotateVector([0, 0, 1]),
-                                                this.game.worldScale
-                                            )} | {this.getPlayerShip().pathFinding?.points} points</Typography>
-                                        </Card>
-                                        <Card className="BottomRight">
-                                            <Typography>Gold {this.playerId && this.game.playerData.get(this.playerId)?.moneyAccount.currencies.find(f => f.currencyId === "GOLD")?.amount}</Typography>
-                                        </Card>
-                                        <Card className="BottomLeft">
-                                            <Typography>Faction {this.state.faction}</Typography>
-                                            <Typography>Ships {this.state.faction && this.game.factions.get(this.state.faction)?.shipIds.length}</Typography>
-                                            <Typography>Planets {this.state.faction && this.game.factions.get(this.state.faction)?.planetIds.length}</Typography>
-                                        </Card>
-                                    </Fragment>
-                                ) : null
-                            }
-                            <Dialog open={this.state.showSettings} onClose={() => this.setState({showSettings: false})}>
-                                <DialogTitle title="Options"/>
-                                <DialogContent>
-                                    <Grid container spacing={2}>
-                                        <Grid item>
-                                            <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.showShips}
-                                                                                 onChange={this.handleShowShips.bind(this)}/>} label="Show Ships"/>
-                                        </Grid>
-                                        <Grid item>
-                                            <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.showItems}
-                                                                                 onChange={this.handleShowItems.bind(this)}/>} label="Show Items"/>
-                                        </Grid>
-                                        <Grid item>
-                                            <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.showVoronoi}
-                                                                                 onChange={this.handleShowVoronoi.bind(this)}/>} label="Show Voronoi"/>
-                                            <RadioGroup>
-                                                <Grid container spacing={2}>
-                                                    <Grid item xs={4}>
-                                                        <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.voronoiMode === EVoronoiMode.KINGDOM}
-                                                                                             onChange={this.handleChangeVoronoi.bind(this, EVoronoiMode.KINGDOM)}/>} label="Kingdom"/>
+                                <Dialog open={this.state.showSettings} onClose={() => this.setState({showSettings: false})}>
+                                    <DialogTitle title="Options"/>
+                                    <DialogContent>
+                                        <Grid container spacing={2}>
+                                            <Grid item>
+                                                <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.showShips}
+                                                                                     onChange={this.handleShowShips.bind(this)}/>} label="Show Ships"/>
+                                            </Grid>
+                                            <Grid item>
+                                                <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.showItems}
+                                                                                     onChange={this.handleShowItems.bind(this)}/>} label="Show Items"/>
+                                            </Grid>
+                                            <Grid item>
+                                                <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.showVoronoi}
+                                                                                     onChange={this.handleShowVoronoi.bind(this)}/>} label="Show Voronoi"/>
+                                                <RadioGroup>
+                                                    <Grid container spacing={2}>
+                                                        <Grid item xs={4}>
+                                                            <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.voronoiMode === EVoronoiMode.KINGDOM}
+                                                                                                 onChange={this.handleChangeVoronoi.bind(this, EVoronoiMode.KINGDOM)}/>} label="Kingdom"/>
+                                                        </Grid>
+                                                        <Grid item xs={4}>
+                                                            <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.voronoiMode === EVoronoiMode.DUCHY}
+                                                                                                 onChange={this.handleChangeVoronoi.bind(this, EVoronoiMode.DUCHY)}/>} label="Duchy"/>
+                                                        </Grid>
+                                                        <Grid item xs={4}>
+                                                            <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.voronoiMode === EVoronoiMode.COUNTY}
+                                                                                                 onChange={this.handleChangeVoronoi.bind(this, EVoronoiMode.COUNTY)}/>} label="County"/>
+                                                        </Grid>
                                                     </Grid>
-                                                    <Grid item xs={4}>
-                                                        <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.voronoiMode === EVoronoiMode.DUCHY}
-                                                                                             onChange={this.handleChangeVoronoi.bind(this, EVoronoiMode.DUCHY)}/>} label="Duchy"/>
-                                                    </Grid>
-                                                    <Grid item xs={4}>
-                                                        <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.voronoiMode === EVoronoiMode.COUNTY}
-                                                                                             onChange={this.handleChangeVoronoi.bind(this, EVoronoiMode.COUNTY)}/>} label="County"/>
-                                                    </Grid>
-                                                </Grid>
-                                            </RadioGroup>
+                                                </RadioGroup>
+                                            </Grid>
+                                            <Grid item>
+                                                <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.autoPilotEnabled}
+                                                                                     onChange={this.handleAutoPilotEnabled.bind(this)}/>} label="AutoPilot Enabled"/>
+                                            </Grid>
+                                            <Grid item>
+                                                <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.audioEnabled}
+                                                                                     onChange={this.handleAudioEnabled.bind(this)}/>} label="Audio Enabled"/>
+                                            </Grid>
                                         </Grid>
-                                        <Grid item>
-                                            <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.autoPilotEnabled}
-                                                                                 onChange={this.handleAutoPilotEnabled.bind(this)}/>} label="AutoPilot Enabled"/>
-                                        </Grid>
-                                        <Grid item>
-                                            <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.audioEnabled}
-                                                                                 onChange={this.handleAudioEnabled.bind(this)}/>} label="Audio Enabled"/>
-                                        </Grid>
-                                    </Grid>
-                                </DialogContent>
-                            </Dialog>
-                            <Dialog open={this.state.showShips} onClose={() => this.setState({showShips: false})}>
-                                <DialogTitle title="Ships"/>
-                                <DialogContent>
-                                    {
-                                        this.state.showShips && (
-                                            SHIP_DATA.map(ship => {
-                                                return (
-                                                    <Card key={`show-ship-${ship.shipType}`}>
-                                                        <CardHeader title={ship.shipType}/>
-                                                        <CardContent>
-                                                            <svg width="100" height="100">
-                                                                <g transform="translate(50, 50)">
-                                                                    {
-                                                                        this.renderShip(this.getShowShipDrawing(ship.shipType, ship.shipType), 1)
-                                                                    }
-                                                                </g>
-                                                            </svg>
-                                                        </CardContent>
-                                                    </Card>
-                                                );
-                                            })
-                                        )
-                                    }
-                                </DialogContent>
-                            </Dialog>
-                            <Dialog open={this.state.showItems} onClose={() => this.setState({showItems: false})}>
-                                <DialogTitle title="Items"/>
-                                <DialogContent>
-                                    {
-                                        this.state.showItems && (
-                                            ITEM_DATA.map(item => {
-                                                return (
-                                                    <Card key={`show-item-${item.resourceType}`}>
-                                                        <CardHeader title={item.resourceType}/>
-                                                        <CardContent>
-                                                            {
-                                                                this.renderItem(item.resourceType)
-                                                            }
-                                                        </CardContent>
-                                                    </Card>
-                                                );
-                                            })
-                                        )
-                                    }
-                                </DialogContent>
-                            </Dialog>
+                                    </DialogContent>
+                                </Dialog>
+                                <Dialog open={this.state.showShips} onClose={() => this.setState({showShips: false})}>
+                                    <DialogTitle title="Ships"/>
+                                    <DialogContent>
+                                        {
+                                            this.state.showShips && (
+                                                SHIP_DATA.map(ship => {
+                                                    return (
+                                                        <Card key={`show-ship-${ship.shipType}`}>
+                                                            <CardHeader title={ship.shipType}/>
+                                                            <CardContent>
+                                                                <svg width="100" height="100">
+                                                                    <g transform="translate(50, 50)">
+                                                                        {
+                                                                            this.renderShip(this.getShowShipDrawing(ship.shipType, ship.shipType), 1)
+                                                                        }
+                                                                    </g>
+                                                                </svg>
+                                                            </CardContent>
+                                                        </Card>
+                                                    );
+                                                })
+                                            )
+                                        }
+                                    </DialogContent>
+                                </Dialog>
+                                <Dialog open={this.state.showItems} onClose={() => this.setState({showItems: false})}>
+                                    <DialogTitle title="Items"/>
+                                    <DialogContent>
+                                        {
+                                            this.state.showItems && (
+                                                ITEM_DATA.map(item => {
+                                                    return (
+                                                        <Card key={`show-item-${item.resourceType}`}>
+                                                            <CardHeader title={item.resourceType}/>
+                                                            <CardContent>
+                                                                {
+                                                                    this.renderItem(item.resourceType)
+                                                                }
+                                                            </CardContent>
+                                                        </Card>
+                                                    );
+                                                })
+                                            )
+                                        }
+                                    </DialogContent>
+                                </Dialog>
+                            </div>
                         </div>
                     </div>
                 </div>
