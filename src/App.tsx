@@ -443,6 +443,18 @@ export class App extends AppPixi {
             }
             this.voronoiMeshes = this.voronoiMeshes.filter(m => m.tick === pixiTick);
 
+            const updateMeshIfVisible = (item: {position: Quaternion, mesh: PIXI.Mesh<any>}) => {
+                const shipPoint = DelaunayGraph.distanceFormula(
+                    cameraPosition.rotateVector([0, 0, 1]),
+                    item.position.rotateVector([0, 0, 1])
+                ) < 0.001 ? [0, 0, 1] as [number, number, number] : cameraOrientation.clone().inverse()
+                    .mul(cameraPosition.clone().inverse())
+                    .mul(item.position.clone())
+                    .rotateVector([0, 0, 1]);
+                item.mesh.visible = shipPoint[2] > 0;
+                item.mesh.tint = shipPoint[2] > 0 ? 0xaaaaaaaa : 0xffffffff;
+            };
+
             // update each star
             for (const item of this.starMeshes) {
                 const shader = item.mesh.shader;
@@ -523,6 +535,7 @@ export class App extends AppPixi {
                 shader.uniforms.uCameraScale = this.state.zoom;
                 shader.uniforms.uPosition = removeExtraRotation(item.position).toMatrix4();
                 shader.uniforms.uOrientation = this.convertOrientationToDisplay(item.orientation).toMatrix4();
+                updateMeshIfVisible(item);
 
                 // hide ships on the other side of the world
                 const shipPoint = DelaunayGraph.distanceFormula(
@@ -688,6 +701,7 @@ export class App extends AppPixi {
                 shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraScale = this.state.zoom;
                 shader.uniforms.uPosition = removeExtraRotation(item.position).toMatrix4();
+                updateMeshIfVisible(item);
             }
 
             // update each crate
@@ -700,6 +714,7 @@ export class App extends AppPixi {
                 meshShader.uniforms.uCameraScale = this.state.zoom;
                 meshShader.uniforms.uPosition = removeExtraRotation(item.position).toMatrix4();
                 meshShader.uniforms.uOrientation = this.convertOrientationToDisplay(item.orientation).toMatrix4();
+                updateMeshIfVisible(item);
 
                 const imageShader = item.image.shader;
                 imageShader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
@@ -707,6 +722,7 @@ export class App extends AppPixi {
                 imageShader.uniforms.uCameraScale = this.state.zoom;
                 imageShader.uniforms.uPosition = removeExtraRotation(item.position).toMatrix4();
                 imageShader.uniforms.uOrientation = this.convertOrientationToDisplay(item.orientation).toMatrix4();
+                updateMeshIfVisible({...item, mesh: item.image});
 
                 handleDrawingOfText(item.text, item.position);
             }
@@ -1568,19 +1584,21 @@ export class App extends AppPixi {
                                     }
                                     {
                                         this.state.showMainMenu ? (
-                                            <Grid item xs={12} justifyContent="center" alignItems="center">
-                                                <Paper style={{marginTop: "20vh", maxHeight: "40vh", overflow: "auto", backgroundColor: "none", opacity: 0.66}}>
-                                                    <Grid container flexDirection="column" xs={12} spacing={2}>
-                                                        <Grid item xs={12}>
-                                                        </Grid>
-                                                        <Grid item xs={12}>
-                                                            <Button fullWidth variant="contained" onClick={this.goToPlanetMenu.bind(this)}>Next</Button>
-                                                        </Grid>
+                                            <Grid item xs={12} justifyContent="center" alignItems="center" style={{marginTop: "20vh"}}>
+                                                <Grid container>
+                                                    <Grid item xs={12}>
+                                                    </Grid>
+                                                    <Grid item xs={12}>
+                                                        <Button fullWidth variant="contained" onClick={this.goToPlanetMenu.bind(this)}>Next</Button>
+                                                    </Grid>
+                                                </Grid>
+                                                <Paper style={{maxHeight: "40vh", overflow: "auto", backgroundColor: "none"}}>
+                                                    <Grid container xs={12} spacing={2}>
                                                         {
                                                             Array.from(this.game.factions.values()).map(f => {
                                                                 return (
-                                                                    <Grid item xs={12}>
-                                                                        <Card onClick={this.selectFaction.bind(this, f.id)}>
+                                                                    <Grid item xs={6}>
+                                                                        <Card onClick={this.selectFaction.bind(this, f.id)} color={this.state.faction === f.id ? "primary" : undefined}>
                                                                             <CardContent>
                                                                                 <Avatar variant="rounded" style={{width: 256, height: 256, backgroundColor: f.factionColor}}>{f.id}</Avatar>
                                                                             </CardContent>
@@ -1598,22 +1616,24 @@ export class App extends AppPixi {
                                     }
                                     {
                                         this.state.showPlanetMenu ? (
-                                            <Grid item xs={12} justifyContent="center" alignItems="center">
-                                                <Paper style={{marginTop: "20vh", maxHeight: "40vh", overflow: "auto", backgroundColor: "none", opacity: 0.66}}>
-                                                    <Grid container flexDirection="column" xs={12} spacing={2}>
-                                                        <Grid item xs={12}>
-                                                            <Button fullWidth variant="contained" onClick={this.returnToFactionMenu.bind(this)}>Back</Button>
-                                                        </Grid>
-                                                        <Grid item xs={12}>
-                                                            <Button fullWidth variant="contained" onClick={this.goToSpawnMenu.bind(this)}>Next</Button>
-                                                        </Grid>
+                                            <Grid item xs={12} justifyContent="center" alignItems="center" style={{marginTop: "20vh"}}>
+                                                <Grid container>
+                                                    <Grid item xs={12}>
+                                                        <Button fullWidth variant="contained" onClick={this.returnToFactionMenu.bind(this)}>Back</Button>
+                                                    </Grid>
+                                                    <Grid item xs={12}>
+                                                        <Button fullWidth variant="contained" onClick={this.goToSpawnMenu.bind(this)}>Next</Button>
+                                                    </Grid>
+                                                </Grid>
+                                                <Paper style={{maxHeight: "40vh", overflow: "auto", backgroundColor: "none"}}>
+                                                    <Grid container xs={12} spacing={2}>
                                                         {
                                                             this.spawnPlanets.map(f => {
                                                                 const planet = this.game.planets.get(f.planetId);
                                                                 const planetName = planet?.name ?? f.planetId;
                                                                 return (
-                                                                    <Grid item xs={12}>
-                                                                        <Card onClick={this.selectPlanet.bind(this, f.planetId)}>
+                                                                    <Grid item xs={6}>
+                                                                        <Card onClick={this.selectPlanet.bind(this, f.planetId)} color={this.state.planetId === f.planetId ? "primary" : undefined}>
                                                                             <CardContent>
                                                                                 <Avatar variant="rounded" style={{width: 256, height: 256}}>
                                                                                     Placeholder
@@ -1633,20 +1653,22 @@ export class App extends AppPixi {
                                     }
                                     {
                                         this.state.showSpawnMenu ? (
-                                            <Grid item xs={12} justifyContent="center" alignItems="center">
-                                                <Paper style={{marginTop: "20vh", maxHeight: "40vh", overflow: "auto", backgroundColor: "none", opacity: 0.66}}>
-                                                    <Grid container flexDirection="column" xs={12} spacing={2}>
-                                                        <Grid item xs={12}>
-                                                            <Button fullWidth variant="contained" onClick={this.returnToPlanetMenu.bind(this)}>Back</Button>
-                                                        </Grid>
-                                                        <Grid item xs={12}>
-                                                            <Button fullWidth variant="contained" onClick={this.spawnShip.bind(this)}>Next</Button>
-                                                        </Grid>
+                                            <Grid item xs={12} justifyContent="center" alignItems="center" style={{marginTop: "20vh"}}>
+                                                <Grid container>
+                                                    <Grid item xs={12}>
+                                                        <Button fullWidth variant="contained" onClick={this.returnToPlanetMenu.bind(this)}>Back</Button>
+                                                    </Grid>
+                                                    <Grid item xs={12}>
+                                                        <Button fullWidth variant="contained" onClick={this.spawnShip.bind(this)}>Next</Button>
+                                                    </Grid>
+                                                </Grid>
+                                                <Paper style={{maxHeight: "40vh", overflow: "auto", backgroundColor: "none"}}>
+                                                    <Grid container xs={12} spacing={2}>
                                                         {
                                                             this.spawnLocations.map(f => {
                                                                 return (
-                                                                    <Grid item xs={12}>
-                                                                        <Card onClick={this.selectShip.bind(this, f.id, f.shipType)}>
+                                                                    <Grid item xs={6}>
+                                                                        <Card onClick={this.selectShip.bind(this, f.id, f.shipType)} color={this.state.planetId === f.id && this.state.spawnShipType == f.shipType ? "primary" : undefined}>
                                                                             <CardContent>
                                                                                 <Avatar variant="rounded" style={{width: 256, height: 256}}>
                                                                                     <svg width="100" height="100">

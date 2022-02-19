@@ -181,7 +181,6 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         const planetGeometries: PIXI.Geometry[] = [];
         for (let i = 0; i < 10; i++) {
             const planetVoronoiCells = this.game.generateGoodPoints(100, 10);
-            const planetGeometry = new PIXI.Geometry();
             const planetGeometryData = planetVoronoiCells.reduce((acc, v) => {
                 // color of voronoi tile
                 const color: [number, number, number] = Math.random() > 0.33 ? [0.33, 0.33, 1] : [0.33, 1, 0.33];
@@ -206,6 +205,7 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
                 }
                 return acc;
             }, {position: [], color: [], index: []} as { position: number[], color: number[], index: number[] });
+            const planetGeometry = new PIXI.Geometry();
             planetGeometry.addAttribute("aPosition", planetGeometryData.position, 3);
             planetGeometry.addAttribute("aColor", planetGeometryData.color, 3);
             planetGeometry.addIndex(planetGeometryData.index);
@@ -1100,7 +1100,7 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         const uniforms = {
             uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
             uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
-            uCameraScale: this.game.worldScale * this.state.zoom,
+            uCameraScale: this.state.zoom,
             uWorldScale: this.game.worldScale,
             uColor
         };

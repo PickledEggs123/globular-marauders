@@ -8,7 +8,7 @@
     "@emotion/styled": "^11.6.0",
     "@mui/material": "^5.3.0",
     "@mui/styles": "^5.3.0",
-    "@pickledeggs123/globular-marauders-game": "^0.2.30",
+    "@pickledeggs123/globular-marauders-game": "^0.2.31",
     "@testing-library/jest-dom": "^5.11.10",
     "@testing-library/react": "^11.2.5",
     "@testing-library/user-event": "^12.8.3",
