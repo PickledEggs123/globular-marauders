@@ -1635,8 +1635,7 @@ export class App extends AppPixi {
                                                                     <Grid item xs={6}>
                                                                         <Card onClick={this.selectPlanet.bind(this, f.planetId)} color={this.state.planetId === f.planetId ? "primary" : undefined}>
                                                                             <CardContent>
-                                                                                <Avatar variant="rounded" style={{width: 256, height: 256}}>
-                                                                                    Placeholder
+                                                                                <Avatar variant="rounded" style={{width: 256, height: 256}} alt={planetName} srcSet={this.planetThumbnails.get(f.planetId) ?? undefined}>
                                                                                 </Avatar>
                                                                             </CardContent>
                                                                             <CardHeader title={planetName} subheader={`(${f.numShipsAvailable} ships)`}>

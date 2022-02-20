@@ -16,8 +16,18 @@ import {EResourceType} from "@pickledeggs123/globular-marauders-game/lib/src/Res
 import {Star} from "@pickledeggs123/globular-marauders-game/lib/src";
 import {Planet} from "@pickledeggs123/globular-marauders-game/lib/src/Planet";
 import {CannonBall, Crate} from "@pickledeggs123/globular-marauders-game/lib/src/Item";
-import {ICameraState} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
+import {ICameraState, IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
 import React from "react";
+import planetMesh0 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet0.mesh.json";
+import planetMesh1 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet1.mesh.json";
+import planetMesh2 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet2.mesh.json";
+import planetMesh3 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet3.mesh.json";
+import planetMesh4 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet4.mesh.json";
+import planetMesh5 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet5.mesh.json";
+import planetMesh6 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet6.mesh.json";
+import planetMesh7 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet7.mesh.json";
+import planetMesh8 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet8.mesh.json";
+import planetMesh9 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet9.mesh.json";
 
 /**
  * The input parameters of the app.
@@ -179,40 +189,29 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
     pixiPlanetResources = (() => {
         // generate planets
         const planetGeometries: PIXI.Geometry[] = [];
-        for (let i = 0; i < 10; i++) {
-            const planetVoronoiCells = this.game.generateGoodPoints(100, 10);
-            const planetGeometryData = planetVoronoiCells.reduce((acc, v) => {
-                // color of voronoi tile
-                const color: [number, number, number] = Math.random() > 0.33 ? [0.33, 0.33, 1] : [0.33, 1, 0.33];
-
-                // initial center index
-                const startingIndex = acc.index.reduce((acc, a) => Math.max(acc, a + 1), 0);
-                acc.position.push.apply(acc.position, v.centroid);
-                acc.color.push.apply(acc.color, color);
-
-                for (let i = 0; i < v.vertices.length; i++) {
-                    // vertex data
-                    const a = v.vertices[i % v.vertices.length];
-                    acc.position.push.apply(acc.position, a);
-                    acc.color.push.apply(acc.color, color);
-
-                    // triangle data
-                    acc.index.push(
-                        startingIndex,
-                        startingIndex + (i % v.vertices.length) + 1,
-                        startingIndex + ((i + 1) % v.vertices.length) + 1
-                    );
-                }
-                return acc;
-            }, {position: [], color: [], index: []} as { position: number[], color: number[], index: number[] });
+        const jsonFiles: IGameMesh[] = [
+            planetMesh0,
+            planetMesh1,
+            planetMesh2,
+            planetMesh3,
+            planetMesh4,
+            planetMesh5,
+            planetMesh6,
+            planetMesh7,
+            planetMesh8,
+            planetMesh9,
+        ];
+        for (const gameMesh of jsonFiles) {
             const planetGeometry = new PIXI.Geometry();
-            planetGeometry.addAttribute("aPosition", planetGeometryData.position, 3);
-            planetGeometry.addAttribute("aColor", planetGeometryData.color, 3);
-            planetGeometry.addIndex(planetGeometryData.index);
+            for (const attribute of gameMesh.attributes) {
+                planetGeometry.addAttribute(attribute.id, attribute.buffer, attribute.size);
+            }
+            planetGeometry.addIndex(gameMesh.index);
             planetGeometries.push(planetGeometry);
         }
-        const getPlanetGeometry = () => {
-            return planetGeometries[Math.floor(Math.random() * planetGeometries.length)];
+        const getPlanetGeometry = (): [PIXI.Geometry, number] => {
+            const index = Math.floor(Math.random() * planetGeometries.length);
+            return [planetGeometries[index], index];
         };
 
         // create material
@@ -722,6 +721,7 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         rotation: Quaternion,
         tick: number
     }> = [];
+    planetThumbnails: Map<string, string> = new Map<string, string>();
     shipMeshes: Array<{
         id: string,
         mesh: PIXI.Mesh<PIXI.Shader>,
@@ -815,7 +815,22 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         const shader = new PIXI.Shader(this.pixiPlanetResources.planetProgram, uniforms);
         const state = PIXI.State.for2d();
         state.depthTest = true;
-        const mesh = new PIXI.Mesh(this.pixiPlanetResources.getPlanetGeometry(), shader, state);
+        const [geometry, meshIndex] = this.pixiPlanetResources.getPlanetGeometry();
+        const planetThumbnail = [
+            planetMesh0,
+            planetMesh1,
+            planetMesh2,
+            planetMesh3,
+            planetMesh4,
+            planetMesh5,
+            planetMesh6,
+            planetMesh7,
+            planetMesh8,
+            planetMesh9,
+        ][meshIndex].image;
+        this.planetThumbnails.set(planet.id, planetThumbnail);
+
+        const mesh = new PIXI.Mesh(geometry, shader, state);
         mesh.zIndex = -5;
 
         const faction = new PIXI.Graphics();
