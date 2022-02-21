@@ -43,22 +43,30 @@ import {
 import {MusicPlayer} from "./MusicPlayer";
 import {
     AppBar,
+    Avatar, Badge,
     Button,
     Card,
     CardContent,
     CardHeader,
     Checkbox,
+    createTheme,
     Dialog,
     DialogContent,
     DialogTitle,
     FormControlLabel,
     Grid,
+    Paper,
     RadioGroup,
+    Stack,
     TextField,
+    Theme,
+    ThemeProvider,
     Toolbar,
-    Typography, Theme, createTheme, ThemeProvider, List, ListItem, ListItemText, Avatar, SvgIcon, Paper,
+    Typography,
 } from "@mui/material";
-import {makeStyles, createStyles} from "@mui/styles";
+import {createStyles, makeStyles} from "@mui/styles";
+import CheckBoxIcon from '@mui/icons-material/CheckBox';
+import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import {DEFAULT_IMAGE, EVoronoiMode, RESOURCE_TYPE_TEXTURE_PAIRS} from "./Data";
 import {AppPixi, IAppProps} from "./AppPixi";
 
@@ -1521,13 +1529,18 @@ export class App extends AppPixi {
         return this.convertToDrawable("draw-ships", 1, this.rotatePlanet(original));
     }
 
-    renderItem(resourceType: EResourceType) {
+    renderItemUrl(resourceType: EResourceType) {
         const item = RESOURCE_TYPE_TEXTURE_PAIRS.find(i => i.resourceType === resourceType);
         if (item) {
-            return <img src={item.url} width={100} height={100} alt={item.name}/>;
+            return {url: item.url, name: item.name};
         } else {
-            return <img src={DEFAULT_IMAGE} width={100} height={100} alt="missing"/>;
+            return {url: DEFAULT_IMAGE, name: "missing"};
         }
+    }
+
+    renderItem(resourceType: EResourceType) {
+        const data = this.renderItemUrl(resourceType);
+        return <img src={data.url} width={100} height={100} alt={data.name}/>;
     }
 
     render() {
@@ -1598,11 +1611,14 @@ export class App extends AppPixi {
                                                             Array.from(this.game.factions.values()).map(f => {
                                                                 return (
                                                                     <Grid item xs={6}>
-                                                                        <Card onClick={this.selectFaction.bind(this, f.id)} color={this.state.faction === f.id ? "primary" : undefined}>
+                                                                        <Card onClick={this.selectFaction.bind(this, f.id)}>
                                                                             <CardContent>
                                                                                 <Avatar variant="rounded" style={{width: 256, height: 256, backgroundColor: f.factionColor}}>{f.id}</Avatar>
                                                                             </CardContent>
-                                                                            <CardHeader title={f.id}>
+                                                                            <CardHeader title={<span>
+                                                                                {this.state.faction === f.id ? <CheckBoxIcon/> : <CheckBoxOutlineBlankIcon/>}
+                                                                                {f.id}
+                                                                            </span>}>
                                                                             </CardHeader>
                                                                         </Card>
                                                                     </Grid>
@@ -1628,17 +1644,20 @@ export class App extends AppPixi {
                                                 <Paper style={{maxHeight: "40vh", overflow: "auto", backgroundColor: "none"}}>
                                                     <Grid container xs={12} spacing={2}>
                                                         {
-                                                            this.spawnPlanets.map(f => {
+                                                            this.spawnPlanets.map((f, i, arr) => {
                                                                 const planet = this.game.planets.get(f.planetId);
                                                                 const planetName = planet?.name ?? f.planetId;
                                                                 return (
-                                                                    <Grid item xs={6}>
-                                                                        <Card onClick={this.selectPlanet.bind(this, f.planetId)} color={this.state.planetId === f.planetId ? "primary" : undefined}>
+                                                                    <Grid item xs={arr.length >= 2 ? 6 : 12}>
+                                                                        <Card onClick={this.selectPlanet.bind(this, f.planetId)}>
                                                                             <CardContent>
                                                                                 <Avatar variant="rounded" style={{width: 256, height: 256}} alt={planetName} srcSet={this.planetThumbnails.get(f.planetId) ?? undefined}>
                                                                                 </Avatar>
                                                                             </CardContent>
-                                                                            <CardHeader title={planetName} subheader={`(${f.numShipsAvailable} ships)`}>
+                                                                            <CardHeader title={<span>
+                                                                                {this.state.planetId === f.planetId ? <CheckBoxIcon/> : <CheckBoxOutlineBlankIcon/>}
+                                                                                {planetName}
+                                                                            </span>} subheader={`(${f.numShipsAvailable} ships)`}>
                                                                             </CardHeader>
                                                                         </Card>
                                                                     </Grid>
@@ -1664,10 +1683,10 @@ export class App extends AppPixi {
                                                 <Paper style={{maxHeight: "40vh", overflow: "auto", backgroundColor: "none"}}>
                                                     <Grid container xs={12} spacing={2}>
                                                         {
-                                                            this.spawnLocations.map(f => {
+                                                            this.spawnLocations.map((f, i, arr) => {
                                                                 return (
-                                                                    <Grid item xs={6}>
-                                                                        <Card onClick={this.selectShip.bind(this, f.id, f.shipType)} color={this.state.planetId === f.id && this.state.spawnShipType == f.shipType ? "primary" : undefined}>
+                                                                    <Grid item xs={arr.length >= 2 ? 6 : 12}>
+                                                                        <Card onClick={this.selectShip.bind(this, f.id, f.shipType)}>
                                                                             <CardContent>
                                                                                 <Avatar variant="rounded" style={{width: 256, height: 256}}>
                                                                                     <svg width="100" height="100">
@@ -1679,7 +1698,10 @@ export class App extends AppPixi {
                                                                                     </svg>
                                                                                 </Avatar>
                                                                             </CardContent>
-                                                                            <CardHeader title={f.shipType} subheader={`(${f.price}) (${f.numShipsAvailable} ships)`}>
+                                                                            <CardHeader title={<span>
+                                                                                {this.state.planetId === f.id && this.state.spawnShipType === f.shipType ? <CheckBoxIcon/> : <CheckBoxOutlineBlankIcon/>}
+                                                                                {f.shipType}
+                                                                            </span>} subheader={`(${f.price}) (${f.numShipsAvailable} ships)`}>
                                                                             </CardHeader>
                                                                         </Card>
                                                                     </Grid>
@@ -1715,6 +1737,24 @@ export class App extends AppPixi {
                                                 <Typography>Ships {this.state.faction && this.game.factions.get(this.state.faction)?.shipIds.length}</Typography>
                                                 <Typography>Planets {this.state.faction && this.game.factions.get(this.state.faction)?.planetIds.length}</Typography>
                                             </Card>
+                                            <Stack className="Bottom" direction="row" spacing={2} justifyItems="center">
+                                                {
+                                                    new Array(GetShipData(this.findPlayerShip()?.shipType ?? EShipType.CUTTER, this.game.worldScale).cargoSize).fill(0).map((v, i) => {
+                                                        return (
+                                                            <Card>
+                                                                <CardContent>
+                                                                    <Badge badgeContent={this.findPlayerShip()?.cargo[i] ? this.findPlayerShip()?.cargo[i].amount : null}>
+                                                                        <Avatar variant="rounded" style={{width: 50, height: 50}} srcSet={this.findPlayerShip()?.cargo[i] ? this.renderItemUrl(this.findPlayerShip()?.cargo[i].resourceType ?? EResourceType.CACAO).url : undefined}>
+                                                                            {null}
+                                                                        </Avatar>
+                                                                    </Badge>
+                                                                </CardContent>
+                                                                <CardHeader title={this.findPlayerShip()?.cargo[i] ? this.findPlayerShip()?.cargo[i].resourceType : undefined}/>
+                                                            </Card>
+                                                        )
+                                                    })
+                                                }
+                                            </Stack>
                                         </Fragment>
                                     ) : null
                                 }
