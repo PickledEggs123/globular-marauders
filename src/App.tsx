@@ -1729,6 +1729,13 @@ export class App extends AppPixi {
                                                     this.game.worldScale
                                                 )} | {this.getPlayerShip().pathFinding?.points} points</Typography>
                                             </Card>
+                                            <Card className="Top">
+                                                <svg style={{width: this.state.width - 600, height: 10}}>
+                                                    <rect x={0} y={0} width={((this.findPlayerShip()?.health ?? 100) + (this.findPlayerShip()?.repairTicks.reduce((acc, i) => acc + i, 0) ?? 0) ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (this.state.width - 600)} height={10} fill="green" stroke="none"/>
+                                                    <rect x={0} y={0} width={(this.findPlayerShip()?.health ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (this.state.width - 600)} height={10} fill="yellow" stroke="none"/>
+                                                    <rect x={0} y={0} width={((this.findPlayerShip()?.health ?? 100) - (this.findPlayerShip()?.burnTicks.reduce((acc, i) => acc + i, 0) ?? 0) ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (this.state.width - 600)} height={10} fill="red" stroke="none"/>
+                                                </svg>
+                                            </Card>
                                             <Card className="BottomRight">
                                                 <Typography>Gold {this.playerId && this.game.playerData.get(this.playerId)?.moneyAccount.currencies.find(f => f.currencyId === "GOLD")?.amount}</Typography>
                                             </Card>

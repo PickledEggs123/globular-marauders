@@ -252,10 +252,10 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
                         0.0,     0.0,    0.0, 1.0
                     );
                     
-                    mat4 translation = cameraRotation * uCameraPosition * uPosition;
-                    mat4 rotation = objectRotation;
+                    vec4 translation = cameraRotation * uCameraPosition * uPosition * vec4(0, 0, uCameraScale, 1.0) - vec4(0, 0, uCameraScale, 1.0);
+                    mat4 rotation = cameraRotation * objectRotation;
                     
-                    vec4 pos = translation * vec4((rotation * vec4(aPosition, 1.0)).xyz * uScale * uCameraScale / uWorldScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
+                    vec4 pos = translation + vec4((rotation * vec4(aPosition, 1.0)).xyz * uScale * uCameraScale / uWorldScale, 1.0);
                     gl_Position = pos * vec4(1.0 * uWorldScale, -1.0 * uWorldScale, 0.0625, 1);
                 }
             `;
@@ -613,10 +613,10 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
                         0.0,     0.0,    0.0, 1.0
                     );
                     
-                    mat4 translation = cameraRotation * uCameraPosition * uPosition;
-                    mat4 rotation = objectRotation;
+                    vec4 translation = cameraRotation * uCameraPosition * uPosition * vec4(0, 0, uCameraScale, 1.0) - vec4(0, 0, uCameraScale, 1.0);
+                    mat4 rotation = cameraRotation * objectRotation;
                     
-                    vec4 pos = translation * vec4((rotation * vec4(aPosition, 1.0)).xyz * uScale * uCameraScale / uWorldScale + vec3(0, 0, uCameraScale), 1.0) - vec4(0, 0, uCameraScale, 0);
+                    vec4 pos = translation + vec4((rotation * vec4(aPosition, 1.0)).xyz * uScale * uCameraScale / uWorldScale, 1.0);
                     gl_Position = pos * vec4(1.0 * uWorldScale, -1.0 * uWorldScale, 0.0625, 1);
                 }
             `;
