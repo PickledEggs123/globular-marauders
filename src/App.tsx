@@ -321,6 +321,7 @@ export class App extends AppPixi {
                     shipMesh.isEnemy = this.findPlayerShip()?.faction?.id !== ship.faction?.id;
                     shipMesh.healthValue = Math.ceil(ship.health / ship.maxHealth * 100);
                     shipMesh.position = removeExtraRotation(ship.position);
+                    shipMesh.positionVelocity = removeExtraRotation(ship.positionVelocity);
                     shipMesh.orientation = ship.orientation.clone();
                     const playerData = (this.playerId && this.game.playerData.get(this.playerId)) ?? null;
                     if (ship.pathFinding.points.length > 0 && !(
@@ -559,22 +560,18 @@ export class App extends AppPixi {
 
                 // draw player dotted line
                 if (item.isPlayer) {
-                    const startPoint = DelaunayGraph.distanceFormula(
-                        cameraPosition.rotateVector([0, 0, 1]),
-                        item.position.rotateVector([0, 0, 1])
-                    ) < 0.001 ? [0, 0, 1] as [number, number, number] : cameraOrientation.clone().inverse()
-                        .mul(cameraPosition.clone().inverse())
-                        .mul(item.position.clone())
-                        .rotateVector([0, 0, 1]);
-                    const lineXS = ((-startPoint[0] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.width;
-                    const lineYS = ((-startPoint[1] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.height;
+                    const lineXS = 1 / 2 * this.application.renderer.width;
+                    const lineYS = 1 / 2 * this.application.renderer.height;
 
-                    const endPoint = cameraOrientation.clone().inverse()
-                        .mul(cameraPosition.clone().inverse())
-                        .mul(item.position.clone())
-                        .mul(item.orientation.clone())
-                        .mul(Quaternion.fromAxisAngle([1, 0, 0], Math.PI / this.state.zoom * this.game.worldScale))
-                        .rotateVector([0, 0, 1]);
+                    const endPoint = DelaunayGraph.distanceFormula(
+                        [0, 0, 1],
+                        item.positionVelocity.rotateVector([0, 0, 1])
+                    ) < 0.00001 ? [0, 0, 1] as [number, number, number] :
+                        cameraOrientation.clone().inverse().mul(item.positionVelocity.clone()).rotateVector([0, 0, 1]);
+                    endPoint[2] = 0;
+                    const endPointScaleFactor = 1 / Math.max(Math.abs(endPoint[0]), Math.abs(endPoint[1]));
+                    endPoint[0] *= endPointScaleFactor;
+                    endPoint[1] *= endPointScaleFactor;
                     const lineXE = ((-endPoint[0] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.width;
                     const lineYE = ((-endPoint[1] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.height;
 
@@ -592,8 +589,8 @@ export class App extends AppPixi {
 
                     // draw line
                     item.line.clear();
-                    item.line.beginFill(0x0000ff);
-                    item.line.lineStyle(1, 0x0000ff);
+                    item.line.beginFill(0xff0000ff);
+                    item.line.lineStyle(1, 0xff0000ff);
                     for (let i = 0; i < lineLength; i += dashLength * 2) {
                         item.line.moveTo(
                             lineXS + lineDirection[0] * i,
@@ -647,21 +644,21 @@ export class App extends AppPixi {
                     );
 
                     // draw line
-                    item.line.clear();
-                    item.line.beginFill(0xffffff);
-                    item.line.lineStyle(1, 0xffffff);
-                    for (let i = 0; i < lineLength; i += dashLength * 3) {
-                        item.line.moveTo(
-                            lineXS + lineDirection[0] * i,
-                            lineYS + lineDirection[1] * i
+                    item.autoPilotLines[i].clear();
+                    item.autoPilotLines[i].beginFill(0xffffff);
+                    item.autoPilotLines[i].lineStyle(1, 0xffffff);
+                    for (let j = 0; j < lineLength; j += dashLength * 3) {
+                        item.autoPilotLines[i].moveTo(
+                            lineXS + lineDirection[0] * j,
+                            lineYS + lineDirection[1] * j
                         );
-                        item.line.lineTo(
-                            lineXS + lineDirection[0] * (i + dashLength),
-                            lineYS + lineDirection[1] * (i + dashLength)
+                        item.autoPilotLines[i].lineTo(
+                            lineXS + lineDirection[0] * (j + dashLength),
+                            lineYS + lineDirection[1] * (j + dashLength)
                         );
                     }
-                    item.line.endFill();
-                    item.line.visible = true;
+                    item.autoPilotLines[i].endFill();
+                    item.autoPilotLines[i].visible = true;
                 }
 
                 // draw health bar

@@ -736,6 +736,7 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         isEnemy: boolean,
         position: Quaternion,
         orientation: Quaternion,
+        positionVelocity: Quaternion,
         tick: number
     }> = [];
     cannonBallMeshes: Array<{
@@ -914,6 +915,7 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         ship: Ship, cameraPosition: Quaternion, cameraOrientation: Quaternion, tick: number
     }) => {
         const position: Quaternion = ship.position.clone();
+        const positionVelocity: Quaternion = ship.positionVelocity.clone();
         const orientation: Quaternion = ship.orientation.clone();
 
         // create mesh
@@ -964,6 +966,7 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
             isEnemy,
             position,
             orientation,
+            positionVelocity,
             tick,
         });
     };
