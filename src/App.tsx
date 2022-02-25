@@ -67,7 +67,7 @@ import {
 import {createStyles, makeStyles} from "@mui/styles";
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
-import {DEFAULT_IMAGE, EVoronoiMode, RESOURCE_TYPE_TEXTURE_PAIRS} from "./Data";
+import {DEFAULT_IMAGE, EVoronoiMode, RESOURCE_TYPE_TEXTURE_PAIRS, SPACE_BACKGROUND_TEXTURES} from "./Data";
 import {AppPixi, IAppProps} from "./AppPixi";
 
 const theme = createTheme();
@@ -199,6 +199,10 @@ export class App extends AppPixi {
                 loader.add(item.name, item.url);
             }
         }
+        for (const textureUrl of SPACE_BACKGROUND_TEXTURES) {
+            const index = SPACE_BACKGROUND_TEXTURES.indexOf(textureUrl);
+            loader.add(`space${index}`, textureUrl);
+        }
         loader.load((loader, resources) => {
             // load images into cache
             for (const resourceType of Object.values(EResourceType)) {
@@ -209,6 +213,14 @@ export class App extends AppPixi {
                     this.sprites[resourceType] = item.texture;
                 } else {
                     this.sprites[resourceType] = resources.missing.texture;
+                }
+            }
+            for (const textureUrl of SPACE_BACKGROUND_TEXTURES) {
+                const index = SPACE_BACKGROUND_TEXTURES.indexOf(textureUrl);
+                const textureName = `space${index}`;
+                const item = resources[textureName];
+                if (item) {
+                    this.sprites[textureName] = item.texture;
                 }
             }
         });
@@ -404,6 +416,7 @@ export class App extends AppPixi {
                 this.application.stage.removeChild(item.image);
             }
             this.crateMeshes = this.crateMeshes.filter(m => m.tick === pixiTick);
+
             // voronoi tiles
             if (this.state.showVoronoi) {
                 const voronoiDataStuff = this.voronoiData.reduce((acc, {id, voronoi}) => {
@@ -451,6 +464,70 @@ export class App extends AppPixi {
                 this.application.stage.removeChild(item.mesh);
             }
             this.voronoiMeshes = this.voronoiMeshes.filter(m => m.tick === pixiTick);
+
+            // background voronoi tiles
+            const backgroundVoronoiDataStuff = this.voronoiData.reduce((acc, {id, voronoi}) => {
+                const qCentroid = Quaternion.fromBetweenVectors([0, 0, 1], voronoi.centroid);
+                const qVertices = voronoi.vertices.map(v => Quaternion.fromBetweenVectors([0, 0, 1], v));
+                const pCentroidVertices = qVertices.map(v => v.rotateVector([0, 0, 1]));
+                const bounds = {
+                    minX: pCentroidVertices.reduce((acc, v) => Math.min(acc, v[0]), 1),
+                    maxX: pCentroidVertices.reduce((acc, v) => Math.max(acc, v[0]), -1),
+                    minY: pCentroidVertices.reduce((acc, v) => Math.min(acc, v[1]), 1),
+                    maxY: pCentroidVertices.reduce((acc, v) => Math.max(acc, v[1]), -1),
+                };
+                const tiles = this.game.getDelaunayTileTessellation(
+                    qCentroid,
+                    qVertices,
+                    3
+                );
+                acc.push(...Array.from(tiles).map((tile, index) => ({
+                    id: `${id}-${index}`,
+                    tile,
+                    tileUv: tile.vertices.map(q => {
+                        const v = q.rotateVector([0, 0, 1]);
+                        return [
+                            (v[0] - bounds.minX) / (bounds.maxX - bounds.minX),
+                            (v[1] - bounds.minY) / (bounds.maxY - bounds.minY),
+                        ] as [number, number];
+                    }),
+                    textureName: `space${Math.abs(this.hashCode(id)) % SPACE_BACKGROUND_TEXTURES.length}`,
+                })));
+                return acc;
+            }, [] as Array<{id: string, tile: ITessellatedTriangle, tileUv: [number, number][], textureName: string}>).filter(({tile}) => {
+                const vertices = tile.vertices.map(v => {
+                    const item = v.rotateVector([0, 0, 1]);
+                    return [
+                        item[0],
+                        item[1],
+                        item[2]
+                    ] as [number, number, number];
+                });
+                return DelaunayGraph.dotProduct(DelaunayGraph.crossProduct(
+                    DelaunayGraph.subtract(vertices[1], vertices[0]),
+                    DelaunayGraph.subtract(vertices[2], vertices[0]),
+                ), cameraPosition.rotateVector([0, 0, 1])) > 0;
+            });
+            for (const {id, tile, tileUv, textureName} of backgroundVoronoiDataStuff) {
+                const voronoiMesh = this.backgroundVoronoiMeshes.find(p => p.id === id);
+                if (voronoiMesh) {
+                    voronoiMesh.tick = pixiTick;
+                } else {
+                    this.addBackgroundVoronoi({
+                        id,
+                        tile,
+                        tileUv,
+                        cameraPosition,
+                        cameraOrientation,
+                        tick: pixiTick,
+                        textureName
+                    });
+                }
+            }
+            for (const item of this.backgroundVoronoiMeshes.filter(m => m.tick !== pixiTick)) {
+                this.application.stage.removeChild(item.mesh);
+            }
+            this.backgroundVoronoiMeshes = this.backgroundVoronoiMeshes.filter(m => m.tick === pixiTick);
 
             const updateMeshIfVisible = (item: {position: Quaternion, mesh: PIXI.Mesh<any>}) => {
                 const shipPoint = DelaunayGraph.distanceFormula(
@@ -740,6 +817,14 @@ export class App extends AppPixi {
                     shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
                     shader.uniforms.uCameraScale = this.state.zoom;
                 }
+            }
+
+            // draw background voronoi terrain tiles for background images
+            for (const item of this.backgroundVoronoiMeshes) {
+                const shader = item.mesh.shader;
+                shader.uniforms.uCameraPosition = cameraPosition.clone().toMatrix4();
+                shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
+                shader.uniforms.uCameraScale = this.state.zoom;
             }
         });
 

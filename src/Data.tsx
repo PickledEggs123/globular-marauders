@@ -80,3 +80,22 @@ export const RESOURCE_TYPE_TEXTURE_PAIRS: IResourceTypeTexturePair[] = [{
     url: "images/tobacco.svg"
 }];
 export const DEFAULT_IMAGE: string = "images/no_image.svg";
+
+export const SPACE_BACKGROUND_TEXTURES: string[] = [
+    "images/space/AlphaCentauriStar.jpg",
+    "images/space/AndromedaGalaxySHO.jpg",
+    "images/space/CatsEyeNebulaSHO.jpg",
+    "images/space/EtaCarinaSHO.jpg",
+    "images/space/GalaxyRGB1.jpg",
+    "images/space/GlobularClusterLRGB1.jpg",
+    "images/space/GreatBarredSpiralGalaxyLRGB.jpg",
+    "images/space/HeartNebulaSHO.jpg",
+    "images/space/HelixNebulaSHO.jpg",
+    "images/space/LargeMagellanicCloudSHO.jpg",
+    "images/space/LeoTripletLGB.jpg",
+    "images/space/OrionNebulaSHO.jpg",
+    "images/space/OwlNebulaSHO.jpg",
+    "images/space/PleiadesRGB.jpg",
+    "images/space/RosettaNebulaSHO.jpg",
+    "images/space/ThorsHelmetSHO.jpg"
+];
