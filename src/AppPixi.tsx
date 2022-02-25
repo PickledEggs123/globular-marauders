@@ -13,7 +13,7 @@ import * as PIXI from "pixi.js";
 import {ITessellatedTriangle} from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
 import Quaternion from "quaternion";
 import {EResourceType} from "@pickledeggs123/globular-marauders-game/lib/src/Resource";
-import {Star} from "@pickledeggs123/globular-marauders-game/lib/src";
+import {Faction, Star} from "@pickledeggs123/globular-marauders-game/lib/src";
 import {Planet} from "@pickledeggs123/globular-marauders-game/lib/src/Planet";
 import {CannonBall, Crate} from "@pickledeggs123/globular-marauders-game/lib/src/Item";
 import {ICameraState, IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
@@ -705,7 +705,7 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
             voronoiGeometry.addAttribute("aPosition", (tile.vertices.reduce((acc, v) => {
                 acc.push(...v.rotateVector([0, 0, 1]));
                 return acc;
-            }, [] as number[])), 3);
+            }, [] as number[]).map(x => -x)), 3);
             voronoiGeometry.addAttribute("aUv", (tileUv.reduce((acc, i) => {
                 acc.push(...i);
                 return acc;
@@ -744,7 +744,7 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
                     0.0,      0.0,     0.0, 1.0
                 );
                 vec4 pos = cameraRotation * uCameraPosition * vec4(-aPosition * uCameraScale, 1.0);
-                gl_Position = pos * vec4(1.0 * uWorldScale, -1.0 * uWorldScale, 0.0625, 1);
+                gl_Position = pos * vec4(-1.0 * uWorldScale, 1.0 * uWorldScale, 0.0625, 1);
             }
         `;
         const voronoiFragmentShader = `
@@ -865,6 +865,32 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         });
     };
 
+    getFactionColor(ownerFaction: Faction | undefined | null) {
+        let factionColorName: string | null = null;
+        if (ownerFaction) {
+            factionColorName = ownerFaction.factionColor;
+        }
+        let factionColor: number | null = null;
+        switch (factionColorName) {
+            case "red":
+                factionColor = 0xff0000;
+                break;
+            case "orange":
+                factionColor = 0xff8000;
+                break;
+            case "yellow":
+                factionColor = 0xffff00;
+                break;
+            case "green":
+                factionColor = 0x00ff00;
+                break;
+            case "blue":
+                factionColor = 0x0000ff;
+                break;
+        }
+        return factionColor;
+    }
+
     addPlanet = ({planet, cameraPosition, cameraOrientation, tick}: {
         planet: Planet, cameraPosition: Quaternion, cameraOrientation: Quaternion, tick: number
     }) => {
@@ -915,29 +941,8 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         faction2.alpha = 0.5;
 
         const factionRadius = (planet.size * 10 + 3) * PHYSICS_SCALE;
-        let factionColorName: string | null = null;
         const ownerFaction = Array.from(this.game.factions.values()).find(faction => faction.planetIds.includes(planet.id));
-        if (ownerFaction) {
-            factionColorName = ownerFaction.factionColor;
-        }
-        let factionColor: number | null = null;
-        switch (factionColorName) {
-            case "red":
-                factionColor = 0xff0000;
-                break;
-            case "orange":
-                factionColor = 0xff8000;
-                break;
-            case "yellow":
-                factionColor = 0xffff00;
-                break;
-            case "green":
-                factionColor = 0x00ff00;
-                break;
-            case "blue":
-                factionColor = 0x0000ff;
-                break;
-        }
+        const factionColor = this.getFactionColor(ownerFaction)
 
         const textName = new PIXI.Text(planet.name ?? planet.id ?? "");
         textName.style.fill = "white";
@@ -1051,12 +1056,14 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         const positionVelocity: Quaternion = cannonBall.positionVelocity.clone();
 
         // create mesh
+        const ownerFaction = cannonBall.factionId && this.game.factions.get(cannonBall.factionId);
+        const factionColor = this.getFactionColor(ownerFaction);
         const uniforms = {
             uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
             uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
             uCameraScale: this.state.zoom,
             uPosition: position.toMatrix4(),
-            uColor: [0.75, 0.75, 0.75, 1],
+            uColor: factionColor != null ? [((factionColor & 0xff0000) >> 16) / 0xff, ((factionColor & 0x00ff00) >> 8) / 0xff, (factionColor & 0x0000ff) / 0xff, 1] : [0.75, 0.75, 0.75, 1],
             uScale: 5 * PHYSICS_SCALE,
             uWorldScale: this.game.worldScale,
         };

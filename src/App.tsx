@@ -100,6 +100,10 @@ export class App extends AppPixi {
         id: string,
         voronoi: VoronoiCell
     }> = [];
+    public backgroundVoronoiData: Array<{
+        id: string,
+        voronoi: VoronoiCell
+    }> = [];
     public refreshVoronoiDataTick: number = 0;
     public music: MusicPlayer = new MusicPlayer();
     public initialized: boolean = false;
@@ -466,15 +470,21 @@ export class App extends AppPixi {
             this.voronoiMeshes = this.voronoiMeshes.filter(m => m.tick === pixiTick);
 
             // background voronoi tiles
-            const backgroundVoronoiDataStuff = this.voronoiData.reduce((acc, {id, voronoi}) => {
+            const backgroundVoronoiDataStuff = this.backgroundVoronoiData.reduce((acc, {id, voronoi}) => {
                 const qCentroid = Quaternion.fromBetweenVectors([0, 0, 1], voronoi.centroid);
                 const qVertices = voronoi.vertices.map(v => Quaternion.fromBetweenVectors([0, 0, 1], v));
-                const pCentroidVertices = qVertices.map(v => v.rotateVector([0, 0, 1]));
+                const pCentroidVertices = qVertices.map(v => v.rotateVector([0, 0, 1])).map((v): [number, number, number] => [v[0], v[1], 0]);
+                const iLongestCentroidVerticesSegmentIndex = pCentroidVertices.map((_, i, arr): [number, number] => [i, DelaunayGraph.distanceFormula(arr[i % arr.length], arr[(i + 1) % arr.length])]).sort((a, b) => b[1] - a[1])[0][0];
+                const pLongestCentroidVerticesSegmentOrigin = pCentroidVertices[iLongestCentroidVerticesSegmentIndex];
+                const pLongestCentroidVerticesSegmentAxisPoint = DelaunayGraph.subtract(pCentroidVertices[(iLongestCentroidVerticesSegmentIndex + 1) % pCentroidVertices.length], pLongestCentroidVerticesSegmentOrigin);
+                const fLongestCentroidVerticesSegmentRotationAngle = Math.atan2(pLongestCentroidVerticesSegmentAxisPoint[1], pLongestCentroidVerticesSegmentAxisPoint[0]);
+                const qLongestCentroidVerticesSegmentRotation = Quaternion.fromAxisAngle([0, 0, 1], -fLongestCentroidVerticesSegmentRotationAngle);
+                const pRotatedCentroidVertices = pCentroidVertices.map(p => Quaternion.fromBetweenVectors([0, 0, 1], p).mul(qLongestCentroidVerticesSegmentRotation.clone()).rotateVector([0, 0, 1]));
                 const bounds = {
-                    minX: pCentroidVertices.reduce((acc, v) => Math.min(acc, v[0]), 1),
-                    maxX: pCentroidVertices.reduce((acc, v) => Math.max(acc, v[0]), -1),
-                    minY: pCentroidVertices.reduce((acc, v) => Math.min(acc, v[1]), 1),
-                    maxY: pCentroidVertices.reduce((acc, v) => Math.max(acc, v[1]), -1),
+                    minX: pRotatedCentroidVertices.reduce((acc, v) => Math.min(acc, v[0]), 1),
+                    maxX: pRotatedCentroidVertices.reduce((acc, v) => Math.max(acc, v[0]), -1),
+                    minY: pRotatedCentroidVertices.reduce((acc, v) => Math.min(acc, v[1]), 1),
+                    maxY: pRotatedCentroidVertices.reduce((acc, v) => Math.max(acc, v[1]), -1),
                 };
                 const tiles = this.game.getDelaunayTileTessellation(
                     qCentroid,
@@ -485,7 +495,8 @@ export class App extends AppPixi {
                     id: `${id}-${index}`,
                     tile,
                     tileUv: tile.vertices.map(q => {
-                        const v = q.rotateVector([0, 0, 1]);
+                        const v1 = q.rotateVector([0, 0, 1]);
+                        const v = Quaternion.fromBetweenVectors([0, 0, 1], v1).mul(qLongestCentroidVerticesSegmentRotation.clone()).rotateVector([0, 0, 1]);
                         return [
                             (v[0] - bounds.minX) / (bounds.maxX - bounds.minX),
                             (v[1] - bounds.minY) / (bounds.maxY - bounds.minY),
@@ -1407,6 +1418,22 @@ export class App extends AppPixi {
                 break;
             }
         }
+
+        this.backgroundVoronoiData = this.game.voronoiTerrain.kingdoms.reduce((acc, k, index) => {
+            if (k.isNearBy(position)) {
+                return [
+                    ...acc, {
+                        id: `kingdom-${index}`,
+                        voronoi: k.voronoiCell
+                    }
+                ];
+            } else {
+                return acc;
+            }
+        }, [] as Array<{
+            id: string,
+            voronoi: VoronoiCell
+        }>);
     }
 
     /**
