@@ -1,13 +1,17 @@
 import {EVoronoiMode} from "./Data";
 import {
+    Ship
+} from "@pickledeggs123/globular-marauders-game/lib/src/Ship";
+import {
     CorvetteHull,
-    EFaction,
     EShipType,
     GetShipData,
     IShipData,
     PHYSICS_SCALE,
-    Ship
-} from "@pickledeggs123/globular-marauders-game/lib/src/Ship";
+} from "@pickledeggs123/globular-marauders-game/lib/src/ShipType";
+import {
+    EFaction,
+} from "@pickledeggs123/globular-marauders-game/lib/src/EFaction";
 import {Game, IPlayerData} from "@pickledeggs123/globular-marauders-game/lib/src/Game";
 import * as PIXI from "pixi.js";
 import {ITessellatedTriangle} from "@pickledeggs123/globular-marauders-game/lib/src/Graph";

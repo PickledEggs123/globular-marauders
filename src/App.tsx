@@ -11,13 +11,14 @@ import {
     MIN_DISTANCE
 } from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
 import {
-    EFaction,
-    EShipType,
-    GetShipData,
-    PHYSICS_SCALE,
     Ship,
-    SHIP_DATA
 } from "@pickledeggs123/globular-marauders-game/lib/src/Ship";
+import {
+    EShipType, GetShipData, PHYSICS_SCALE,
+} from "@pickledeggs123/globular-marauders-game/lib/src/ShipType";
+import {
+    EFaction,
+} from "@pickledeggs123/globular-marauders-game/lib/src/EFaction";
 import {
     DelaunayGraph,
     ITessellatedTriangle,
@@ -69,6 +70,7 @@ import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import {DEFAULT_IMAGE, EVoronoiMode, RESOURCE_TYPE_TEXTURE_PAIRS, SPACE_BACKGROUND_TEXTURES} from "./Data";
 import {AppPixi, IAppProps} from "./AppPixi";
+import {SHIP_DATA} from "@pickledeggs123/globular-marauders-game/lib/src/ShipType";
 
 const theme = createTheme();
 
