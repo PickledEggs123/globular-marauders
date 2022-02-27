@@ -56,7 +56,7 @@ import {
     DialogTitle,
     FormControlLabel,
     Grid,
-    Paper,
+    Paper, Radio,
     RadioGroup,
     Stack,
     TextField,
@@ -71,6 +71,7 @@ import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import {DEFAULT_IMAGE, EVoronoiMode, RESOURCE_TYPE_TEXTURE_PAIRS, SPACE_BACKGROUND_TEXTURES} from "./Data";
 import {AppPixi, IAppProps} from "./AppPixi";
 import {SHIP_DATA} from "@pickledeggs123/globular-marauders-game/lib/src/ShipType";
+import {MusicNote, MusicOff, Tv, TvOff} from "@mui/icons-material";
 
 const theme = createTheme();
 
@@ -265,7 +266,7 @@ export class App extends AppPixi {
                 text.y += normalizedDirectionTowardsCenter[1] * 25;
             }
             text.anchor.set(0.5);
-            text.visible = textPosition[2] > 0 && this.state.zoom * this.game.worldScale > 6;
+            text.visible = textPosition[2] > 0 && this.state.zoom * this.game.worldScale >= 6;
         }
 
         const removeExtraRotation = (q: Quaternion): Quaternion => {
@@ -1675,6 +1676,10 @@ export class App extends AppPixi {
                             <Typography variant="h1" color="inherit" className={classes.flex} style={{flexGrow: 1}} textAlign="center">
                                 Globular Marauders
                             </Typography>
+                            <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.autoPilotEnabled}
+                                                                 onChange={this.handleAutoPilotEnabled.bind(this)} icon={<TvOff/>} checkedIcon={<Tv/>} color="default" />} label="AutoPilot"/>
+                            <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.audioEnabled}
+                                                                 onChange={this.handleAudioEnabled.bind(this)} icon={<MusicOff/>} checkedIcon={<MusicNote/>} color="default" />} label="Audio"/>
                             <Button variant="contained" color="secondary" onClick={this.handleShowSettings.bind(this)}>Settings</Button>
                         </Toolbar>
                     </AppBar>
@@ -1834,11 +1839,12 @@ export class App extends AppPixi {
                                                 <Button onClick={this.incrementZoom.bind(this)}>+</Button>
                                             </Card>
                                             <Card className="TopRight">
-                                                <Typography>Distance {VoronoiGraph.angularDistance(
-                                                    this.getPlayerShip().position.rotateVector([0, 0, 1]),
-                                                    this.getPlayerShip().pathFinding?.points[0] ?? this.getPlayerShip().position.rotateVector([0, 0, 1]),
+                                                <Typography>Distance {Math.ceil(VoronoiGraph.angularDistance(
+                                                    this.findPlayerShip()?.position.rotateVector([0, 0, 1]) ?? [0, 0, 1],
+                                                    this.findPlayerShip()?.pathFinding?.points[0] ?? this.findPlayerShip()?.position.rotateVector([0, 0, 1]) ?? [0, 0, 1],
                                                     this.game.worldScale
-                                                )} | {this.getPlayerShip().pathFinding?.points} points</Typography>
+                                                ) * 1000)} | {this.findPlayerShip()?.pathFinding?.points.length ?? 0} points</Typography>
+                                                <Typography>Mission {(this.findPlayerShip()?.orders[0] ?? null)?.orderType}</Typography>
                                             </Card>
                                             <Card className="Top">
                                                 <svg style={{width: this.state.width - 600, height: 10}}>
@@ -1891,30 +1897,19 @@ export class App extends AppPixi {
                                             <Grid item>
                                                 <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.showVoronoi}
                                                                                      onChange={this.handleShowVoronoi.bind(this)}/>} label="Show Voronoi"/>
-                                                <RadioGroup>
+                                                <RadioGroup name="Voronoi Mode" value={this.state.voronoiMode} onChange={(e, value) => this.handleChangeVoronoi(value as EVoronoiMode)}>
                                                     <Grid container spacing={2}>
                                                         <Grid item xs={4}>
-                                                            <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.voronoiMode === EVoronoiMode.KINGDOM}
-                                                                                                 onChange={this.handleChangeVoronoi.bind(this, EVoronoiMode.KINGDOM)}/>} label="Kingdom"/>
+                                                            <FormControlLabel control={<Radio tabIndex={-1}/>} value={EVoronoiMode.KINGDOM} label="Kingdom"/>
                                                         </Grid>
                                                         <Grid item xs={4}>
-                                                            <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.voronoiMode === EVoronoiMode.DUCHY}
-                                                                                                 onChange={this.handleChangeVoronoi.bind(this, EVoronoiMode.DUCHY)}/>} label="Duchy"/>
+                                                            <FormControlLabel control={<Radio tabIndex={-1}/>} value={EVoronoiMode.DUCHY} label="Duchy"/>
                                                         </Grid>
                                                         <Grid item xs={4}>
-                                                            <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.voronoiMode === EVoronoiMode.COUNTY}
-                                                                                                 onChange={this.handleChangeVoronoi.bind(this, EVoronoiMode.COUNTY)}/>} label="County"/>
+                                                            <FormControlLabel control={<Radio tabIndex={-1}/>} value={EVoronoiMode.COUNTY} label="County"/>
                                                         </Grid>
                                                     </Grid>
                                                 </RadioGroup>
-                                            </Grid>
-                                            <Grid item>
-                                                <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.autoPilotEnabled}
-                                                                                     onChange={this.handleAutoPilotEnabled.bind(this)}/>} label="AutoPilot Enabled"/>
-                                            </Grid>
-                                            <Grid item>
-                                                <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.audioEnabled}
-                                                                                     onChange={this.handleAudioEnabled.bind(this)}/>} label="Audio Enabled"/>
                                             </Grid>
                                         </Grid>
                                     </DialogContent>
