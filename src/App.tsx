@@ -38,6 +38,7 @@ import {
     IMessage,
     IPlayerData,
     ISpawnLocation,
+    ISpawnLocationResult,
     ISpawnMessage,
     ISpawnPlanet
 } from "@pickledeggs123/globular-marauders-game/lib/src/Game";
@@ -72,6 +73,8 @@ import {DEFAULT_IMAGE, EVoronoiMode, RESOURCE_TYPE_TEXTURE_PAIRS, SPACE_BACKGROU
 import {AppPixi, IAppProps} from "./AppPixi";
 import {SHIP_DATA} from "@pickledeggs123/globular-marauders-game/lib/src/ShipType";
 import {MusicNote, MusicOff, Tv, TvOff} from "@mui/icons-material";
+import {EOrderType} from "@pickledeggs123/globular-marauders-game/lib/src/Order";
+import {EInvasionPhase, Invasion} from "@pickledeggs123/globular-marauders-game/lib/src/Invasion";
 
 const theme = createTheme();
 
@@ -114,7 +117,10 @@ export class App extends AppPixi {
     public socket: WebSocket | undefined;
     public socketEvents: Record<string, (data: any) => void> = {};
     public spawnPlanets: ISpawnPlanet[] = [];
-    public spawnLocations: ISpawnLocation[] = [];
+    public spawnLocations: ISpawnLocationResult = {
+        results: [],
+        message: undefined
+    };
     public shardPortNumber: number | null = null;
     public messages: IMessage[] = [];
 
@@ -960,7 +966,7 @@ export class App extends AppPixi {
         this.socketEvents["send-spawn-planets"] = (data: ISpawnPlanet[]) => {
             this.spawnPlanets = data;
         };
-        this.socketEvents["send-spawn-locations"] = (data: ISpawnLocation[]) => {
+        this.socketEvents["send-spawn-locations"] = (data: ISpawnLocationResult) => {
             this.spawnLocations = data;
         };
     }
@@ -1655,6 +1661,56 @@ export class App extends AppPixi {
         return <img src={data.url} width={100} height={100} alt={data.name}/>;
     }
 
+    invasionGauge(): React.ReactElement | null {
+        const order = this.findPlayerShip()?.orders.find(o => o.orderType === EOrderType.INVADE);
+        if (!order) {
+            return null;
+        }
+
+        const invasion = order.planetId && this.game.invasions.get(order.planetId);
+        if (!invasion) {
+            return null;
+        }
+
+        let timeLeft = 0;
+        let progress = 0;
+        let maxProgress = 0;
+        let progress2 = 0;
+        let maxProgress2 = 0;
+        switch (invasion.invasionPhase) {
+            case EInvasionPhase.STARTING: {
+                timeLeft = invasion.startExpiration;
+                maxProgress = 30 * 10;
+                progress = invasion.startProgress;
+                break;
+            }
+            case EInvasionPhase.CAPTURING: {
+                timeLeft = invasion.captureExpiration;
+                maxProgress = 3 * 60 * 10;
+                progress = invasion.captureProgress;
+                maxProgress2 = 3 * 10;
+                progress2 = invasion.liberationProgress;
+                break;
+            }
+        }
+        const minute = timeLeft > 0 ? Math.floor(timeLeft / 10 / 60) : 0;
+        const second = timeLeft > 0 ? Math.floor((timeLeft / 10) % 60) : 0;
+
+        return (
+            <svg style={{width: this.state.width - 400, height: 100}}>
+                <rect x={0} y={0} width={this.state.width - 400} height={30} stroke="white" fill={invasion.defending.factionColor}/>
+                <rect x={0} y={0} width={progress / maxProgress * (this.state.width - 400)} height={30} stroke="white" fill={invasion.attacking.factionColor}/>
+                <rect x={0} y={30} width={this.state.width - 400} height={30} stroke="white" fill={invasion.attacking.factionColor}/>
+                <rect x={0} y={30} width={progress2 / maxProgress2 * (this.state.width - 400)} height={30} stroke="white" fill={invasion.defending.factionColor}/>
+                <text x={(this.state.width - 400) / 2} y={20} textAnchor="middle" fill="white">{minute}:{second < 10 ? "0" : ""}{second}</text>
+                <text x={(this.state.width - 400) / 2} y={50} textAnchor="middle" fill="white">{invasion.invasionPhase}</text>
+                {
+                    timeLeft < 0 ? <text x={(this.state.width - 400) / 2} y={80} textAnchor="middle" fill="white">Overtime</text> : null
+                }
+            </svg>
+        );
+    }
+
     render() {
         if (this.showAppBodyRef.current) {
             this.application.resizeTo = this.showAppBodyRef.current as HTMLElement;
@@ -1799,7 +1855,18 @@ export class App extends AppPixi {
                                                 <Paper style={{maxHeight: "40vh", overflow: "auto", backgroundColor: "none"}}>
                                                     <Grid container xs={12} spacing={2}>
                                                         {
-                                                            this.spawnLocations.map((f, i, arr) => {
+                                                            this.spawnLocations.message ? (
+                                                                <Grid item xs={12}>
+                                                                    <Card>
+                                                                        <CardContent>
+                                                                            <Typography>{this.spawnLocations.message}</Typography>
+                                                                        </CardContent>
+                                                                    </Card>
+                                                                </Grid>
+                                                            ) : null
+                                                        }
+                                                        {
+                                                            this.spawnLocations.results.map((f, i, arr) => {
                                                                 return (
                                                                     <Grid item xs={arr.length >= 2 ? 6 : 12}>
                                                                         <Card onClick={this.selectShip.bind(this, f.id, f.shipType)}>
@@ -1846,13 +1913,16 @@ export class App extends AppPixi {
                                                 ) * 1000)} | {this.findPlayerShip()?.pathFinding?.points.length ?? 0} points</Typography>
                                                 <Typography>Mission {(this.findPlayerShip()?.orders[0] ?? null)?.orderType}</Typography>
                                             </Card>
-                                            <Card className="Top">
-                                                <svg style={{width: this.state.width - 600, height: 10}}>
-                                                    <rect x={0} y={0} width={((this.findPlayerShip()?.health ?? 100) + (this.findPlayerShip()?.repairTicks.reduce((acc, i) => acc + i, 0) ?? 0) ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (this.state.width - 600)} height={10} fill="green" stroke="none"/>
-                                                    <rect x={0} y={0} width={(this.findPlayerShip()?.health ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (this.state.width - 600)} height={10} fill="yellow" stroke="none"/>
-                                                    <rect x={0} y={0} width={((this.findPlayerShip()?.health ?? 100) - (this.findPlayerShip()?.burnTicks.reduce((acc, i) => acc + i, 0) ?? 0) ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (this.state.width - 600)} height={10} fill="red" stroke="none"/>
+                                            <div className="Top">
+                                                <svg style={{width: this.state.width - 400, height: 10}}>
+                                                    <rect x={0} y={0} width={((this.findPlayerShip()?.health ?? 100) + (this.findPlayerShip()?.repairTicks.reduce((acc, i) => acc + i, 0) ?? 0) ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (this.state.width - 400)} height={10} fill="green" stroke="none"/>
+                                                    <rect x={0} y={0} width={(this.findPlayerShip()?.health ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (this.state.width - 400)} height={10} fill="yellow" stroke="none"/>
+                                                    <rect x={0} y={0} width={((this.findPlayerShip()?.health ?? 100) - (this.findPlayerShip()?.burnTicks.reduce((acc, i) => acc + i, 0) ?? 0) ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (this.state.width - 400)} height={10} fill="red" stroke="none"/>
                                                 </svg>
-                                            </Card>
+                                                {
+                                                    this.invasionGauge()
+                                                }
+                                            </div>
                                             <Card className="BottomRight">
                                                 <Typography>Gold {this.playerId && this.game.playerData.get(this.playerId)?.moneyAccount.currencies.find(f => f.currencyId === "GOLD")?.amount}</Typography>
                                             </Card>

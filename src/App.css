@@ -28,11 +28,11 @@
 .Top {
   position: absolute;
   top: 0;
-  left: 300px;
-  right: 300px;
-  svg {
-    width: 100%;
-  }
+  left: 200px;
+  right: 200px;
+}
+.Top svg {
+  width: 100%;
 }
 
 .BottomRight {
@@ -50,8 +50,8 @@
 .Bottom {
   position: absolute;
   bottom: 0;
-  left: 300px;
-  right: 300px;
+  left: 200px;
+  right: 200px;
 }
 
 .AppMainContent {
