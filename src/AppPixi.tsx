@@ -778,7 +778,6 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         id: string,
         mesh: PIXI.Mesh<PIXI.Shader>,
         faction: PIXI.Graphics,
-        faction2: PIXI.Graphics,
         factionRadius: number,
         factionColor: number | null,
         settlementLevel: number,
@@ -940,11 +939,8 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         const faction = new PIXI.Graphics();
         faction.zIndex = -6;
         faction.alpha = 0.75;
-        const faction2 = new PIXI.Graphics();
-        faction2.zIndex = -6;
-        faction2.alpha = 0.5;
 
-        const factionRadius = (planet.size * 10 + 3) * PHYSICS_SCALE;
+        const factionRadius = (planet.size * this.game.worldScale + 3) * PHYSICS_SCALE;
         const ownerFaction = Array.from(this.game.factions.values()).find(faction => faction.planetIds.includes(planet.id));
         const factionColor = this.getFactionColor(ownerFaction)
 
@@ -966,7 +962,6 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
 
         this.application.stage.addChild(mesh);
         this.application.stage.addChild(faction);
-        this.application.stage.addChild(faction2);
         this.application.stage.addChild(textName);
         this.application.stage.addChild(textTitle);
         this.application.stage.addChild(textResource1);
@@ -976,7 +971,6 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
             id: planet.id,
             mesh,
             faction,
-            faction2,
             factionRadius,
             factionColor,
             settlementLevel,

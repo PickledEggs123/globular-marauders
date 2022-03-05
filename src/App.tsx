@@ -315,6 +315,9 @@ export class App extends AppPixi {
                 const planetMesh = this.planetMeshes.find(p => p.id === planet.id);
                 if (planetMesh) {
                     planetMesh.orientation = planetMesh.rotation.clone().mul(planetMesh.orientation.clone());
+                    const ownerFaction = Array.from(this.game.factions.values()).find(faction => faction.planetIds.includes(planet.id));
+                    const factionColor = this.getFactionColor(ownerFaction)
+                    planetMesh.factionColor = factionColor;
                     planetMesh.settlementLevel = planet.settlementLevel;
                     planetMesh.settlementProgress = planet.settlementProgress;
                     planetMesh.tick = pixiTick;
@@ -330,7 +333,6 @@ export class App extends AppPixi {
             for (const item of this.planetMeshes.filter(m => m.tick !== pixiTick)) {
                 this.application.stage.removeChild(item.mesh);
                 this.application.stage.removeChild(item.faction);
-                this.application.stage.removeChild(item.faction2);
                 this.application.stage.removeChild(item.textName);
                 this.application.stage.removeChild(item.textTitle);
                 this.application.stage.removeChild(item.textResource1);
@@ -594,36 +596,31 @@ export class App extends AppPixi {
                     const radius = item.factionRadius * this.state.zoom * this.game.worldScale * this.application.renderer.width;
                     const radius2 = (item.factionRadius + 3 * PHYSICS_SCALE) * this.state.zoom * this.game.worldScale * this.application.renderer.width;
 
+                    // inner circle
                     item.faction.clear();
                     item.faction.position.set(centerX, centerY);
                     item.faction.beginFill(item.factionColor);
-                    item.faction2.moveTo(0, 0);
-                    item.faction2.lineTo(radius, 0);
+                    item.faction.moveTo(0, 0);
+                    item.faction.lineTo(radius, 0);
                     item.faction.arc(0, 0, radius, 0, settlementProgressSlice);
-                    item.faction2.lineTo(0, 0);
+                    item.faction.lineTo(0, 0);
                     item.faction.endFill();
-                    item.faction.visible = startPoint[2] > 0 &&
-                        centerX >= 0 &&
-                        centerX <= this.application.renderer.width &&
-                        centerY >= 0 &&
-                        centerY <= this.application.renderer.height;
 
-                    item.faction2.clear();
-                    item.faction2.position.set(centerX, centerY);
-                    item.faction2.beginFill(item.factionColor);
-                    item.faction2.moveTo(0, 0);
-                    item.faction2.lineTo(radius2, 0);
-                    item.faction2.arc(0, 0, radius2, 0, settlementProgressSlice2);
-                    item.faction2.lineTo(0, 0);
-                    item.faction2.endFill();
-                    item.faction2.visible = startPoint[2] > 0 &&
+                    // outer circle
+                    item.faction.beginFill(item.factionColor);
+                    item.faction.moveTo(0, 0);
+                    item.faction.lineTo(radius2, 0);
+                    item.faction.arc(0, 0, radius2, 0, settlementProgressSlice2);
+                    item.faction.lineTo(0, 0);
+                    item.faction.endFill();
+
+                    item.faction.visible = startPoint[2] > 0 &&
                         centerX >= 0 &&
                         centerX <= this.application.renderer.width &&
                         centerY >= 0 &&
                         centerY <= this.application.renderer.height;
                 } else {
                     item.faction.visible = false;
-                    item.faction2.visible = false;
                 }
 
                 handleDrawingOfText(item.textName, item.position, {x: 0, y: item.factionRadius / PHYSICS_SCALE * 2 + 40 - 160});
