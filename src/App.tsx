@@ -1659,12 +1659,20 @@ export class App extends AppPixi {
     }
 
     invasionGauge(): React.ReactElement | null {
-        const order = this.findPlayerShip()?.orders.find(o => o.orderType === EOrderType.INVADE);
-        if (!order) {
+        const playerShip = this.findPlayerShip();
+        if (!playerShip) {
             return null;
         }
 
-        const invasion = order.planetId && this.game.invasions.get(order.planetId);
+        const nearestPlanet = this.game.voronoiTerrain.getNearestPlanet(playerShip.position.rotateVector([0, 0, 1]));
+        let invasion: Invasion | null = this.game.invasions.get(nearestPlanet.id) ?? null;
+
+        if (!invasion) {
+            const order = playerShip.orders.find(o => o.orderType === EOrderType.INVADE);
+            if (order && order.planetId) {
+                invasion = this.game.invasions.get(order.planetId) ?? null;
+            }
+        }
         if (!invasion) {
             return null;
         }
