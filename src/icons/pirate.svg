@@ -1,0 +1,16 @@
+<svg viewBox="0 0 240 240" fill="transparent" xmlns="http://www.w3.org/2000/svg">
+    <g>
+        <path d="M30,210 l0,-10 l50,-35 l50-45 l50,-55 l50-65 l10,0 l0,10 l-50,65 l-50,55 l-50,45 l-50,35 z" stroke="black" fill="black"/>
+        <path d="M75,140 l30,60 l-5,5 l-5,-5 l-30,-60 l5,-5 z"/>
+    </g>
+    <g transform="translate(240) scale(-1,1)">
+        <path d="M30,210 l0,-10 l50,-35 l50-45 l50,-55 l50-65 l10,0 l0,10 l-50,65 l-50,55 l-50,45 l-50,35 z" stroke="black" fill="black"/>
+        <path d="M75,140 l30,60 l-5,5 l-5,-5 l-30,-60 l5,-5 z"/>
+    </g>
+    <g>
+        <path d="M85,15 l30,30 l-30,30 z"/>
+        <path d="M90,10 l30,30 l30,-30 z"/>
+        <path d="M155,15 l-30,30 l30,30 z"/>
+        <path d="M150,80 l-30,-30 l-30,30 z"/>
+    </g>
+</svg>

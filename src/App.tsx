@@ -37,7 +37,7 @@ import {
     IGameSyncFrame,
     IMessage,
     IPlayerData,
-    ISpawnLocation,
+    ISpawnFaction,
     ISpawnLocationResult,
     ISpawnMessage,
     ISpawnPlanet
@@ -47,7 +47,7 @@ import {
     AppBar,
     Avatar, Badge,
     Button,
-    Card,
+    Card, CardActionArea, CardActions,
     CardContent,
     CardHeader,
     Checkbox,
@@ -59,7 +59,7 @@ import {
     Grid,
     Paper, Radio,
     RadioGroup,
-    Stack,
+    Stack, SvgIcon,
     TextField,
     Theme,
     ThemeProvider,
@@ -72,9 +72,28 @@ import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import {DEFAULT_IMAGE, EVoronoiMode, RESOURCE_TYPE_TEXTURE_PAIRS, SPACE_BACKGROUND_TEXTURES} from "./Data";
 import {AppPixi, IAppProps} from "./AppPixi";
 import {SHIP_DATA} from "@pickledeggs123/globular-marauders-game/lib/src/ShipType";
-import {MusicNote, MusicOff, Tv, TvOff} from "@mui/icons-material";
+import {DirectionsBoat, MusicNote, MusicOff, Public, Tv, TvOff} from "@mui/icons-material";
 import {EOrderType} from "@pickledeggs123/globular-marauders-game/lib/src/Order";
 import {EInvasionPhase, Invasion} from "@pickledeggs123/globular-marauders-game/lib/src/Invasion";
+import { ReactComponent as Pirate } from "./icons/pirate.svg";
+import { ReactComponent as Attack } from "./icons/attack.svg";
+
+const GetFactionSubheader = (faction: EFaction): string | null => {
+    switch (faction) {
+        case EFaction.DUTCH:
+            return "Think of the economy! We have the cheapest and most ships medium ships.";
+        case EFaction.ENGLISH:
+            return "Maximum firepower! We have the most cannons per gold piece.";
+        case EFaction.FRENCH:
+            return "Be agile! We accelerate and rotate the fastest."
+        case EFaction.PORTUGUESE:
+            return "Full speed ahead! We have the fastest small ships. Great for trading long distances.";
+        case EFaction.SPANISH:
+            return "All of the gold! We have the largest ship which stores gold coins.";
+        default:
+            return null;
+    }
+}
 
 const theme = createTheme();
 
@@ -116,6 +135,7 @@ export class App extends AppPixi {
     public frameCounter: number = 0;
     public socket: WebSocket | undefined;
     public socketEvents: Record<string, (data: any) => void> = {};
+    public spawnFactions: ISpawnFaction[] = [];
     public spawnPlanets: ISpawnPlanet[] = [];
     public spawnLocations: ISpawnLocationResult = {
         results: [],
@@ -767,7 +787,7 @@ export class App extends AppPixi {
                     const centerX = ((-startPoint[0] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.width;
                     const centerY = ((-startPoint[1] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.height;
 
-                    const radius = 10 * PHYSICS_SCALE * this.state.zoom * this.game.worldScale * this.application.renderer.width;
+                    const radius = 20 * PHYSICS_SCALE * this.state.zoom * this.game.worldScale * this.application.renderer.width;
                     const thickness = 3 * PHYSICS_SCALE * this.state.zoom * this.game.worldScale * this.application.renderer.width;
                     const sliceSize = Math.PI * 2 / 100;
                     item.health.clear();
@@ -959,6 +979,9 @@ export class App extends AppPixi {
         };
         this.socketEvents["generic-message"] = (data: IMessage) => {
             this.messages.push(data);
+        };
+        this.socketEvents["send-spawn-factions"] = (data: ISpawnFaction[]) => {
+            this.spawnFactions = data;
         };
         this.socketEvents["send-spawn-planets"] = (data: ISpawnPlanet[]) => {
             this.spawnPlanets = data;
@@ -1785,18 +1808,34 @@ export class App extends AppPixi {
                                                 <Paper style={{maxHeight: "40vh", overflow: "auto", backgroundColor: "none"}}>
                                                     <Grid container xs={12} spacing={2}>
                                                         {
-                                                            Array.from(this.game.factions.values()).map(f => {
+                                                            this.spawnFactions.map(f => {
+                                                                const faction = this.game.factions.get(f.factionId);
+                                                                if (!faction) {
+                                                                    return null;
+                                                                }
                                                                 return (
                                                                     <Grid item xs={6}>
-                                                                        <Card onClick={this.selectFaction.bind(this, f.id)}>
-                                                                            <CardContent>
-                                                                                <Avatar variant="rounded" style={{width: 256, height: 256, backgroundColor: f.factionColor}}>{f.id}</Avatar>
-                                                                            </CardContent>
-                                                                            <CardHeader title={<span>
-                                                                                {this.state.faction === f.id ? <CheckBoxIcon/> : <CheckBoxOutlineBlankIcon/>}
-                                                                                {f.id}
-                                                                            </span>}>
-                                                                            </CardHeader>
+                                                                        <Card>
+                                                                            <CardActionArea onClick={this.selectFaction.bind(this, faction.id)}>
+                                                                                <CardContent>
+                                                                                    <Avatar variant="rounded" style={{width: 256, height: 256, backgroundColor: faction.factionColor}}>{faction.id}</Avatar>
+                                                                                </CardContent>
+                                                                                <CardHeader title={<span>{this.state.faction === faction.id ? <CheckBoxIcon/> : <CheckBoxOutlineBlankIcon/>} {faction.id}</span>} subheader={GetFactionSubheader(faction.id)}>
+                                                                                </CardHeader>
+                                                                            </CardActionArea>
+                                                                            <CardActions>
+                                                                                <Badge badgeContent={f.numPlanets} color={"primary"}>
+                                                                                    <Public/>
+                                                                                </Badge>
+                                                                                <Badge badgeContent={f.numShips} color={"primary"}>
+                                                                                    <DirectionsBoat/>
+                                                                                </Badge>
+                                                                                <Badge badgeContent={f.numInvasions} color={"primary"}>
+                                                                                    <SvgIcon>
+                                                                                        <Attack/>
+                                                                                    </SvgIcon>
+                                                                                </Badge>
+                                                                            </CardActions>
                                                                         </Card>
                                                                     </Grid>
                                                                 );
@@ -1826,16 +1865,33 @@ export class App extends AppPixi {
                                                                 const planetName = planet?.name ?? f.planetId;
                                                                 return (
                                                                     <Grid item xs={arr.length >= 2 ? 6 : 12}>
-                                                                        <Card onClick={this.selectPlanet.bind(this, f.planetId)}>
-                                                                            <CardContent>
-                                                                                <Avatar variant="rounded" style={{width: 256, height: 256}} alt={planetName} srcSet={this.planetThumbnails.get(f.planetId) ?? undefined}>
-                                                                                </Avatar>
-                                                                            </CardContent>
-                                                                            <CardHeader title={<span>
-                                                                                {this.state.planetId === f.planetId ? <CheckBoxIcon/> : <CheckBoxOutlineBlankIcon/>}
-                                                                                {planetName}
-                                                                            </span>} subheader={`(${f.numShipsAvailable} ships)`}>
-                                                                            </CardHeader>
+                                                                        <Card>
+                                                                            <CardActionArea onClick={this.selectPlanet.bind(this, f.planetId)}>
+                                                                                <CardContent>
+                                                                                    <Avatar variant="rounded" style={{width: 256, height: 256}} alt={planetName} srcSet={this.planetThumbnails.get(f.planetId) ?? undefined}>
+                                                                                    </Avatar>
+                                                                                </CardContent>
+                                                                                <CardHeader title={<span>{this.state.planetId === f.planetId ? <CheckBoxIcon/> : <CheckBoxOutlineBlankIcon/>} {planetName}</span>} subheader={`(${f.numShipsAvailable} ships)`}>
+                                                                                </CardHeader>
+                                                                            </CardActionArea>
+                                                                            <CardActions>
+                                                                                <Badge badgeContent={f.numSettlers} color={"primary"}>
+                                                                                    <Public/>
+                                                                                </Badge>
+                                                                                <Badge badgeContent={f.numTraders} color={"primary"}>
+                                                                                    <DirectionsBoat/>
+                                                                                </Badge>
+                                                                                <Badge badgeContent={f.numPirates} color={"primary"}>
+                                                                                    <SvgIcon>
+                                                                                        <Pirate/>
+                                                                                    </SvgIcon>
+                                                                                </Badge>
+                                                                                <Badge badgeContent={f.numInvaders} color={"primary"}>
+                                                                                    <SvgIcon>
+                                                                                        <Attack/>
+                                                                                    </SvgIcon>
+                                                                                </Badge>
+                                                                            </CardActions>
                                                                         </Card>
                                                                     </Grid>
                                                                 );
@@ -1874,23 +1930,22 @@ export class App extends AppPixi {
                                                             this.spawnLocations.results.map((f, i, arr) => {
                                                                 return (
                                                                     <Grid item xs={arr.length >= 2 ? 6 : 12}>
-                                                                        <Card onClick={this.selectShip.bind(this, f.id, f.shipType)}>
-                                                                            <CardContent>
-                                                                                <Avatar variant="rounded" style={{width: 256, height: 256}}>
-                                                                                    <svg width="100" height="100">
-                                                                                        <g transform="translate(50, 50)">
-                                                                                            {
-                                                                                                this.renderShip(this.getShowShipDrawing(f.shipType, f.shipType, this.state.faction), 1)
-                                                                                            }
-                                                                                        </g>
-                                                                                    </svg>
-                                                                                </Avatar>
-                                                                            </CardContent>
-                                                                            <CardHeader title={<span>
-                                                                                {this.state.planetId === f.id && this.state.spawnShipType === f.shipType ? <CheckBoxIcon/> : <CheckBoxOutlineBlankIcon/>}
-                                                                                {f.shipType}
-                                                                            </span>} subheader={`(${f.price}) (${f.numShipsAvailable} ships)`}>
-                                                                            </CardHeader>
+                                                                        <Card>
+                                                                            <CardActionArea onClick={this.selectShip.bind(this, f.id, f.shipType)}>
+                                                                                <CardContent>
+                                                                                    <Avatar variant="rounded" style={{width: 256, height: 256}}>
+                                                                                        <svg width="100" height="100">
+                                                                                            <g transform="translate(50, 50)">
+                                                                                                {
+                                                                                                    this.renderShip(this.getShowShipDrawing(f.shipType, f.shipType, this.state.faction), 1)
+                                                                                                }
+                                                                                            </g>
+                                                                                        </svg>
+                                                                                    </Avatar>
+                                                                                </CardContent>
+                                                                                <CardHeader title={<span>{this.state.planetId === f.id && this.state.spawnShipType === f.shipType ? <CheckBoxIcon/> : <CheckBoxOutlineBlankIcon/>} {f.shipType}</span>} subheader={`(${f.price}) (${f.numShipsAvailable} ships)`}>
+                                                                                </CardHeader>
+                                                                            </CardActionArea>
                                                                         </Card>
                                                                     </Grid>
                                                                 );
@@ -1942,7 +1997,7 @@ export class App extends AppPixi {
                                                         return (
                                                             <Card>
                                                                 <CardContent>
-                                                                    <Badge badgeContent={this.findPlayerShip()?.cargo[i] ? this.findPlayerShip()?.cargo[i].amount : null}>
+                                                                    <Badge badgeContent={this.findPlayerShip()?.cargo[i] ? this.findPlayerShip()?.cargo[i].amount : null} color={"primary"}>
                                                                         <Avatar variant="rounded" style={{width: 50, height: 50}} srcSet={this.findPlayerShip()?.cargo[i] ? this.renderItemUrl(this.findPlayerShip()?.cargo[i].resourceType ?? EResourceType.CACAO).url : undefined}>
                                                                             {null}
                                                                         </Avatar>
