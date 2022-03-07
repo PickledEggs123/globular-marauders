@@ -65,6 +65,7 @@ export interface IAppState {
     autoPilotEnabled: boolean;
     audioEnabled: boolean;
     init: boolean;
+    showScoreboard: boolean;
     showSettings: boolean;
     showLoginMenu: boolean;
     showMainMenu: boolean;
@@ -96,6 +97,7 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         planetId: null as string | null,
         spawnShipType: null as EShipType | null,
         init: false as boolean,
+        showScoreboard: false as boolean,
         showSettings: false as boolean,
         showLoginMenu: true as boolean,
         showMainMenu: false as boolean,

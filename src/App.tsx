@@ -56,14 +56,14 @@ import {
     DialogContent,
     DialogTitle,
     FormControlLabel,
-    Grid,
+    Grid, List, ListItem, ListItemText,
     Paper, Radio,
     RadioGroup,
     Stack, SvgIcon,
     TextField,
     Theme,
     ThemeProvider,
-    Toolbar,
+    Toolbar, Tooltip,
     Typography,
 } from "@mui/material";
 import {createStyles, makeStyles} from "@mui/styles";
@@ -119,6 +119,7 @@ export class App extends AppPixi {
     private activeKeys: any[] = [];
     private keyDownHandlerInstance: any;
     private keyUpHandlerInstance: any;
+    private mouseWheelHandlerInstance: any;
 
     // game data stuff
     public voronoiData: Array<{
@@ -1215,8 +1216,18 @@ export class App extends AppPixi {
      */
 
     /**
-     * Show different type of ships in the screen above the game. Used for debugging the appearance of each ship
-     * without buying the ship in game.
+     * Show scores for all players in the game.
+     * @private
+     */
+    private handleShowScoreboard() {
+        this.setState((s) => ({
+            ...s,
+            showScoreboard: !s.showScoreboard,
+        }));
+    }
+
+    /**
+     * Show different settings to change the appearance of the game.
      * @private
      */
     private handleShowSettings() {
@@ -1355,27 +1366,23 @@ export class App extends AppPixi {
     }
 
     /**
-     * Change the zoom of the client, Increase zoom, get closer to see smaller detail.
+     * Make the mouse wheel change the zoom factor for the game.
+     * @param event
      * @private
      */
-    private incrementZoom() {
-        const zoom = Math.min(this.state.zoom * 2, 32);
-        this.setState({
-            ...this.state,
-            zoom
-        });
-    }
-
-    /**
-     * Change the zoom of the client, Decrease zoom, get farther to see larger detail.
-     * @private
-     */
-    private decrementZoom() {
-        const zoom = Math.max(this.state.zoom / 2, 0.25);
-        this.setState({
-            ...this.state,
-            zoom
-        });
+    private handleMouseWheel(event: WheelEvent) {
+        if (event.deltaY < 0) {
+            this.setState((state) => ({
+                ...state,
+                zoom: Math.min(state.zoom * (((Math.E - 1) / 10) + 1), 32)
+            }));
+        }
+        else {
+            this.setState((state) => ({
+                ...state,
+                zoom: Math.max(state.zoom / (((Math.E - 1) / 10) + 1), 0.25)
+            }));
+        }
     }
 
     /**
@@ -1483,8 +1490,10 @@ export class App extends AppPixi {
         }
         this.keyDownHandlerInstance = this.handleKeyDown.bind(this);
         this.keyUpHandlerInstance = this.handleKeyUp.bind(this);
+        this.mouseWheelHandlerInstance = this.handleMouseWheel.bind(this);
         document.addEventListener("keydown", this.keyDownHandlerInstance);
         document.addEventListener("keyup", this.keyUpHandlerInstance);
+        document.addEventListener("wheel", this.mouseWheelHandlerInstance);
     }
 
     componentWillUnmount() {
@@ -1499,6 +1508,7 @@ export class App extends AppPixi {
         }
         document.removeEventListener("keydown", this.keyDownHandlerInstance);
         document.removeEventListener("keyup", this.keyUpHandlerInstance);
+        document.removeEventListener("wheel", this.mouseWheelHandlerInstance);
         this.music.stop();
     }
 
@@ -1764,6 +1774,7 @@ export class App extends AppPixi {
                                                                  onChange={this.handleAutoPilotEnabled.bind(this)} icon={<TvOff/>} checkedIcon={<Tv/>} color="default" />} label="AutoPilot"/>
                             <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.audioEnabled}
                                                                  onChange={this.handleAudioEnabled.bind(this)} icon={<MusicOff/>} checkedIcon={<MusicNote/>} color="default" />} label="Audio"/>
+                            <Button variant="contained" color="secondary" onClick={this.handleShowScoreboard.bind(this)}>Scoreboard</Button>
                             <Button variant="contained" color="secondary" onClick={this.handleShowSettings.bind(this)}>Settings</Button>
                         </Toolbar>
                     </AppBar>
@@ -1824,17 +1835,23 @@ export class App extends AppPixi {
                                                                                 </CardHeader>
                                                                             </CardActionArea>
                                                                             <CardActions>
-                                                                                <Badge badgeContent={f.numPlanets} color={"primary"}>
-                                                                                    <Public/>
-                                                                                </Badge>
-                                                                                <Badge badgeContent={f.numShips} color={"primary"}>
-                                                                                    <DirectionsBoat/>
-                                                                                </Badge>
-                                                                                <Badge badgeContent={f.numInvasions} color={"primary"}>
-                                                                                    <SvgIcon>
-                                                                                        <Attack/>
-                                                                                    </SvgIcon>
-                                                                                </Badge>
+                                                                                <Tooltip title="Planets owned">
+                                                                                    <Badge badgeContent={f.numPlanets} color={"primary"}>
+                                                                                        <Public/>
+                                                                                    </Badge>
+                                                                                </Tooltip>
+                                                                                <Tooltip title="Ships in play">
+                                                                                    <Badge badgeContent={f.numShips} color={"primary"}>
+                                                                                        <DirectionsBoat/>
+                                                                                    </Badge>
+                                                                                </Tooltip>
+                                                                                <Tooltip title="Invasion events">
+                                                                                    <Badge badgeContent={f.numInvasions} color={"primary"}>
+                                                                                        <SvgIcon>
+                                                                                            <Attack/>
+                                                                                        </SvgIcon>
+                                                                                    </Badge>
+                                                                                </Tooltip>
                                                                             </CardActions>
                                                                         </Card>
                                                                     </Grid>
@@ -1875,22 +1892,30 @@ export class App extends AppPixi {
                                                                                 </CardHeader>
                                                                             </CardActionArea>
                                                                             <CardActions>
-                                                                                <Badge badgeContent={f.numSettlers} color={"primary"}>
-                                                                                    <Public/>
-                                                                                </Badge>
-                                                                                <Badge badgeContent={f.numTraders} color={"primary"}>
-                                                                                    <DirectionsBoat/>
-                                                                                </Badge>
-                                                                                <Badge badgeContent={f.numPirates} color={"primary"}>
-                                                                                    <SvgIcon>
-                                                                                        <Pirate/>
-                                                                                    </SvgIcon>
-                                                                                </Badge>
-                                                                                <Badge badgeContent={f.numInvaders} color={"primary"}>
-                                                                                    <SvgIcon>
-                                                                                        <Attack/>
-                                                                                    </SvgIcon>
-                                                                                </Badge>
+                                                                                <Tooltip title="Settlers">
+                                                                                    <Badge badgeContent={f.numSettlers} color={"primary"}>
+                                                                                        <Public/>
+                                                                                    </Badge>
+                                                                                </Tooltip>
+                                                                                <Tooltip title="Traders">
+                                                                                    <Badge badgeContent={f.numTraders} color={"primary"}>
+                                                                                        <DirectionsBoat/>
+                                                                                    </Badge>
+                                                                                </Tooltip>
+                                                                                <Tooltip title="Pirates">
+                                                                                    <Badge badgeContent={f.numPirates} color={"primary"}>
+                                                                                        <SvgIcon>
+                                                                                            <Pirate/>
+                                                                                        </SvgIcon>
+                                                                                    </Badge>
+                                                                                </Tooltip>
+                                                                                <Tooltip title="Invaders">
+                                                                                    <Badge badgeContent={f.numInvaders} color={"primary"}>
+                                                                                        <SvgIcon>
+                                                                                            <Attack/>
+                                                                                        </SvgIcon>
+                                                                                    </Badge>
+                                                                                </Tooltip>
                                                                             </CardActions>
                                                                         </Card>
                                                                     </Grid>
@@ -1961,9 +1986,8 @@ export class App extends AppPixi {
                                     !this.state.showLoginMenu && !this.state.showMainMenu && !this.state.showPlanetMenu && !this.state.showSpawnMenu ? (
                                         <Fragment>
                                             <Card className="TopLeft">
-                                                <Button onClick={this.decrementZoom.bind(this)}>-</Button>
                                                 <Typography>{this.state.zoom * this.game.worldScale}</Typography>
-                                                <Button onClick={this.incrementZoom.bind(this)}>+</Button>
+                                                <Typography>{this.game.scoreBoard.damage.find(p => p.playerId === this.playerId)?.damage ?? 0} Damage</Typography>
                                             </Card>
                                             <Card className="TopRight">
                                                 <Typography>Distance {Math.ceil(VoronoiGraph.angularDistance(
@@ -2002,8 +2026,8 @@ export class App extends AppPixi {
                                                                             {null}
                                                                         </Avatar>
                                                                     </Badge>
+                                                                    <Typography variant="caption">{this.findPlayerShip()?.cargo[i] ? this.findPlayerShip()?.cargo[i].resourceType : ""}</Typography>
                                                                 </CardContent>
-                                                                <CardHeader title={this.findPlayerShip()?.cargo[i] ? this.findPlayerShip()?.cargo[i].resourceType : undefined}/>
                                                             </Card>
                                                         )
                                                     })
@@ -2012,8 +2036,123 @@ export class App extends AppPixi {
                                         </Fragment>
                                     ) : null
                                 }
+                                <Dialog open={this.state.showScoreboard} onClose={() => this.setState({showScoreboard: false})}>
+                                    <DialogTitle title="Scoreboard"/>
+                                    <DialogContent>
+                                        <Grid container spacing={2} xs={12}>
+                                            <Grid item xs={6}>
+                                                <Card>
+                                                    <CardHeader title="Damage"/>
+                                                    <CardContent>
+                                                        <List>
+                                                            {
+                                                                this.game.scoreBoard.damage.map(d => {
+                                                                    return (
+                                                                        <ListItem key={d.playerId} dense>
+                                                                            <ListItemText primary={d.name} secondary={d.damage}/>
+                                                                        </ListItem>
+                                                                    );
+                                                                })
+                                                            }
+                                                        </List>
+                                                    </CardContent>
+                                                </Card>
+                                            </Grid>
+                                            <Grid item xs={6}>
+                                                <Card>
+                                                    <CardHeader title="Loot"/>
+                                                    <CardContent>
+                                                        <List>
+                                                            {
+                                                                this.game.scoreBoard.loot.map(d => {
+                                                                    return (
+                                                                        <ListItem key={d.playerId} dense>
+                                                                            <ListItemText primary={d.name} secondary={d.count}/>
+                                                                        </ListItem>
+                                                                    );
+                                                                })
+                                                            }
+                                                        </List>
+                                                    </CardContent>
+                                                </Card>
+                                            </Grid>
+                                            <Grid item xs={6}>
+                                                <Card>
+                                                    <CardHeader title="Money"/>
+                                                    <CardContent>
+                                                        <List>
+                                                            {
+                                                                this.game.scoreBoard.money.map(d => {
+                                                                    return (
+                                                                        <ListItem key={d.playerId} dense>
+                                                                            <ListItemText primary={d.name} secondary={d.amount}/>
+                                                                        </ListItem>
+                                                                    );
+                                                                })
+                                                            }
+                                                        </List>
+                                                    </CardContent>
+                                                </Card>
+                                            </Grid>
+                                            <Grid item xs={6}>
+                                                <Card>
+                                                    <CardHeader title="Land"/>
+                                                    <CardContent>
+                                                        <List>
+                                                            {
+                                                                this.game.scoreBoard.land.map(d => {
+                                                                    return (
+                                                                        <ListItem key={d.playerId} dense>
+                                                                            <ListItemText primary={d.name} secondary={d.amount}/>
+                                                                        </ListItem>
+                                                                    );
+                                                                })
+                                                            }
+                                                        </List>
+                                                    </CardContent>
+                                                </Card>
+                                            </Grid>
+                                            <Grid item xs={6}>
+                                                <Card>
+                                                    <CardHeader title="Bounty"/>
+                                                    <CardContent>
+                                                        <List>
+                                                            {
+                                                                this.game.scoreBoard.bounty.map(d => {
+                                                                    return (
+                                                                        <ListItem key={d.playerId} dense>
+                                                                            <ListItemText primary={d.name} secondary={d.bountyAmount}/>
+                                                                        </ListItem>
+                                                                    );
+                                                                })
+                                                            }
+                                                        </List>
+                                                    </CardContent>
+                                                </Card>
+                                            </Grid>
+                                            <Grid item xs={6}>
+                                                <Card>
+                                                    <CardHeader title="Capture"/>
+                                                    <CardContent>
+                                                        <List>
+                                                            {
+                                                                this.game.scoreBoard.capture.map(d => {
+                                                                    return (
+                                                                        <ListItem key={d.playerId} dense>
+                                                                            <ListItemText primary={d.name} secondary={d.count}/>
+                                                                        </ListItem>
+                                                                    );
+                                                                })
+                                                            }
+                                                        </List>
+                                                    </CardContent>
+                                                </Card>
+                                            </Grid>
+                                        </Grid>
+                                    </DialogContent>
+                                </Dialog>
                                 <Dialog open={this.state.showSettings} onClose={() => this.setState({showSettings: false})}>
-                                    <DialogTitle title="Options"/>
+                                    <DialogTitle title="Settings"/>
                                     <DialogContent>
                                         <Grid container spacing={2}>
                                             <Grid item>

@@ -9,7 +9,7 @@
     "@mui/icons-material": "^5.4.2",
     "@mui/material": "^5.3.0",
     "@mui/styles": "^5.3.0",
-    "@pickledeggs123/globular-marauders-game": "^0.2.54",
+    "@pickledeggs123/globular-marauders-game": "^0.2.57",
     "@pickledeggs123/globular-marauders-generator": "^0.1.2",
     "@testing-library/jest-dom": "^5.11.10",
     "@testing-library/react": "^11.2.5",
