@@ -404,6 +404,8 @@ export class App extends AppPixi {
                 this.application.stage.removeChild(item.mesh);
                 this.application.stage.removeChild(item.text);
                 this.application.stage.removeChild(item.line);
+                this.application.stage.removeChild(item.cannonBallLeft);
+                this.application.stage.removeChild(item.cannonBallRight);
                 this.application.stage.removeChild(item.health);
                 for (const autoPilotLine of item.autoPilotLines) {
                     this.application.stage.removeChild(autoPilotLine);
@@ -599,6 +601,8 @@ export class App extends AppPixi {
                 const shader = item.mesh.shader;
                 shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
+                shader.uniforms.uCameraPositionInv = cameraPosition.clone().toMatrix4();
+                shader.uniforms.uCameraOrientationInv = cameraOrientation.clone().toMatrix4();
                 shader.uniforms.uCameraScale = this.state.zoom;
                 shader.uniforms.uOrientation = this.convertOrientationToDisplay(item.orientation).toMatrix4();
 
@@ -656,9 +660,11 @@ export class App extends AppPixi {
                 const shader = item.mesh.shader;
                 shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
+                shader.uniforms.uCameraPositionInv = cameraPosition.clone().toMatrix4();
+                shader.uniforms.uCameraOrientationInv = cameraOrientation.clone().toMatrix4();
                 shader.uniforms.uCameraScale = this.state.zoom;
                 shader.uniforms.uPosition = removeExtraRotation(item.position).toMatrix4();
-                shader.uniforms.uOrientation = this.convertOrientationToDisplay(item.orientation).toMatrix4();
+                shader.uniforms.uOrientation = this.convertOrientationToDisplay(item.orientation.mul(Quaternion.fromAxisAngle([0, 0, 1], Math.PI))).toMatrix4();
                 updateMeshIfVisible(item);
 
                 // hide ships on the other side of the world
@@ -678,48 +684,102 @@ export class App extends AppPixi {
                     const lineXS = 1 / 2 * this.application.renderer.width;
                     const lineYS = 1 / 2 * this.application.renderer.height;
 
-                    const endPoint = DelaunayGraph.distanceFormula(
-                        [0, 0, 1],
-                        item.positionVelocity.rotateVector([0, 0, 1])
-                    ) < 0.00001 ? [0, 0, 1] as [number, number, number] :
-                        cameraOrientation.clone().inverse().mul(item.positionVelocity.clone()).rotateVector([0, 0, 1]);
-                    endPoint[2] = 0;
-                    const endPointScaleFactor = 1 / Math.max(Math.abs(endPoint[0]), Math.abs(endPoint[1]));
-                    endPoint[0] *= endPointScaleFactor;
-                    endPoint[1] *= endPointScaleFactor;
-                    const lineXE = ((-endPoint[0] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.width;
-                    const lineYE = ((-endPoint[1] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.height;
+                    // velocity line
+                    {
+                        const endPoint = DelaunayGraph.distanceFormula(
+                            [0, 0, 1],
+                            item.positionVelocity.rotateVector([0, 0, 1])
+                        ) < 0.00001 ? [0, 0, 1] as [number, number, number] :
+                            cameraOrientation.clone().inverse().mul(item.positionVelocity.clone()).rotateVector([0, 0, 1]);
+                        endPoint[2] = 0;
+                        const endPointScaleFactor = 1 / Math.max(Math.abs(endPoint[0]), Math.abs(endPoint[1]));
+                        endPoint[0] *= endPointScaleFactor;
+                        endPoint[1] *= endPointScaleFactor;
+                        const lineXE = ((-endPoint[0] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.width;
+                        const lineYE = ((-endPoint[1] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.height;
 
-                    const dashLength = 5;
-                    const lineDirection = DelaunayGraph.normalize(
-                        DelaunayGraph.subtract(
+                        const dashLength = 5;
+                        const lineDirection = DelaunayGraph.normalize(
+                            DelaunayGraph.subtract(
+                                [lineXE, lineYE, 0],
+                                [lineXS, lineYS, 0]
+                            )
+                        );
+                        const lineLength = DelaunayGraph.distanceFormula(
                             [lineXE, lineYE, 0],
                             [lineXS, lineYS, 0]
-                        )
-                    );
-                    const lineLength = DelaunayGraph.distanceFormula(
-                        [lineXE, lineYE, 0],
-                        [lineXS, lineYS, 0]
-                    );
+                        );
 
-                    // draw line
-                    item.line.clear();
-                    item.line.beginFill(0xff0000ff);
-                    item.line.lineStyle(1, 0xff0000ff);
-                    for (let i = 0; i < lineLength; i += dashLength * 2) {
-                        item.line.moveTo(
-                            lineXS + lineDirection[0] * i,
-                            lineYS + lineDirection[1] * i
-                        );
-                        item.line.lineTo(
-                            lineXS + lineDirection[0] * (i + dashLength),
-                            lineYS + lineDirection[1] * (i + dashLength)
-                        );
+                        // draw line
+                        item.line.clear();
+                        item.line.beginFill(0xff0000ff);
+                        item.line.lineStyle(1, 0xff0000ff);
+                        for (let i = 0; i < lineLength; i += dashLength * 2) {
+                            item.line.moveTo(
+                                lineXS + lineDirection[0] * i,
+                                lineYS + lineDirection[1] * i
+                            );
+                            item.line.lineTo(
+                                lineXS + lineDirection[0] * (i + dashLength),
+                                lineYS + lineDirection[1] * (i + dashLength)
+                            );
+                        }
+                        item.line.endFill();
+                        item.line.visible = true;
                     }
-                    item.line.endFill();
-                    item.line.visible = true;
+                    //  left side cannonball line
+                    {
+                        const jitterPoint = item.orientation.clone().rotateVector([1, 0, 0]);
+                        const worldPoint = item.position.clone().mul(Quaternion.fromBetweenVectors([0, 0, 1], jitterPoint)).rotateVector([0, 0, 1]);
+                        const position = Quaternion.fromBetweenVectors([0, 0, 1], worldPoint);
+                        const endPoint = DelaunayGraph.distanceFormula(
+                            cameraPosition.rotateVector([0, 0, 1]),
+                            position.rotateVector([0, 0, 1])
+                        ) < 0.001 ? [0, 0, 1] as [number, number, number] : cameraOrientation.clone().inverse()
+                            .mul(cameraPosition.clone().inverse())
+                            .mul(position.clone())
+                            .rotateVector([0, 0, 1]);
+                        console.log("END POINT", endPoint);
+                        endPoint[2] = 0;
+                        const endPointScaleFactor = 1 / Math.max(Math.abs(endPoint[0]), Math.abs(endPoint[1]));
+                        endPoint[0] *= endPointScaleFactor;
+                        endPoint[1] *= endPointScaleFactor;
+                        const lineXE = ((-endPoint[0] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.width;
+                        const lineYE = ((-endPoint[1] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.height;
+
+                        const dashLength = 5;
+                        const lineDirection = DelaunayGraph.normalize(
+                            DelaunayGraph.subtract(
+                                [lineXE, lineYE, 0],
+                                [lineXS, lineYS, 0]
+                            )
+                        );
+                        const lineLength = DelaunayGraph.distanceFormula(
+                            [lineXE, lineYE, 0],
+                            [lineXS, lineYS, 0]
+                        );
+
+                        // draw line
+                        item.cannonBallLeft.clear();
+                        item.cannonBallLeft.beginFill(0xffffff88);
+                        item.cannonBallLeft.lineStyle(1, 0xffffff88);
+                        for (let i = 0; i < lineLength; i += dashLength * 2) {
+                            item.cannonBallLeft.moveTo(
+                                lineXS + lineDirection[0] * i,
+                                lineYS + lineDirection[1] * i
+                            );
+                            item.cannonBallLeft.lineTo(
+                                lineXS + lineDirection[0] * (i + dashLength),
+                                lineYS + lineDirection[1] * (i + dashLength)
+                            );
+                        }
+                        item.cannonBallLeft.endFill();
+                        item.cannonBallLeft.visible = true;
+                    }
                 } else {
                     item.line.visible = false;
+                    item.cannonBallLeft.visible = false;
+                    item.cannonBallRight.visible = false;
                 }
 
                 // draw AutoPilot dotted lines

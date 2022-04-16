@@ -229,6 +229,9 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
                 
                 uniform mat4 uCameraPosition;
                 uniform mat4 uCameraOrientation;
+                uniform mat4 uCameraPositionInv;
+                uniform mat4 uCameraOrientationInv;
+                uniform mat4 uRight;
                 uniform float uCameraScale;
                 uniform mat4 uPosition;
                 uniform mat4 uOrientation;
@@ -258,8 +261,20 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
                         0.0,     0.0,    0.0, 1.0
                     );
                     
+                    vec4 cameraOrientationPositionPoint = uCameraPositionInv * vec4(0.0, 0.0, 1.0, 0.0);
+                    float crp = atan(cameraOrientationPositionPoint.y, cameraOrientationPositionPoint.x);
+                    vec4 orientationPositionPoint = uPosition * vec4(0.0, 0.0, 1.0, 0.0);
+                    float rp = atan(orientationPositionPoint.y, orientationPositionPoint.x);
+                    float rpDiff = 2.0 * (rp - crp);
+                    mat4 orientationDiffRotation = mat4(
+                        cos(rpDiff), -sin(rpDiff), 0.0, 0.0,
+                        sin(rpDiff),  cos(rpDiff), 0.0, 0.0,
+                        0.0,     0.0,    1.0, 0.0,
+                        0.0,     0.0,    0.0, 1.0
+                    );
+                    
                     vec4 translation = cameraRotation * uCameraPosition * uPosition * vec4(0, 0, uCameraScale, 1.0) - vec4(0, 0, uCameraScale, 1.0);
-                    mat4 rotation = cameraRotation * objectRotation;
+                    mat4 rotation = cameraRotation * objectRotation * orientationDiffRotation;
                     
                     vec4 pos = translation + vec4((rotation * vec4(aPosition, 1.0)).xyz * uScale * uCameraScale / uWorldScale, 1.0);
                     gl_Position = pos * vec4(1.0 * uWorldScale, -1.0 * uWorldScale, 0.0625, 1);
@@ -346,7 +361,11 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
                 shipGeometryData.position.push.apply(shipGeometryData.position, this.GetHullPoint([0, 0]));
                 shipGeometryData.color.push.apply(shipGeometryData.color, shipColor);
                 for (let i = 0; i < shipToDraw.hull.length; i++) {
-                    const a = shipToDraw.hull[i % shipToDraw.hull.length];
+                    // const a = shipToDraw.hull[i % shipToDraw.hull.length];
+                    const a = [
+                        shipToDraw.hull[i % shipToDraw.hull.length][0],
+                        -shipToDraw.hull[i % shipToDraw.hull.length][1]
+                    ] as [number, number];
 
                     shipGeometryData.position.push.apply(shipGeometryData.position, this.GetHullPoint(a));
                     shipGeometryData.color.push.apply(shipGeometryData.color, shipColor);
@@ -800,6 +819,8 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         mesh: PIXI.Mesh<PIXI.Shader>,
         text: PIXI.Text,
         line: PIXI.Graphics,
+        cannonBallLeft: PIXI.Graphics,
+        cannonBallRight: PIXI.Graphics,
         autoPilotLines: PIXI.Graphics[],
         autoPilotLinePoints: [number, number, number][],
         health: PIXI.Graphics,
@@ -911,6 +932,9 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         const uniforms = {
             uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
             uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
+            uCameraPositionInv: cameraPosition.clone().toMatrix4(),
+            uCameraOrientationInv: cameraOrientation.clone().toMatrix4(),
+            uRight: Quaternion.fromBetweenVectors([0, 0, 1], [1, 0, 0]).toMatrix4(),
             uCameraScale: this.state.zoom,
             uPosition: planet.position.toMatrix4(),
             uOrientation: orientation.toMatrix4(),
@@ -1000,6 +1024,9 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         const uniforms = {
             uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
             uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
+            uCameraPositionInv: cameraPosition.clone().toMatrix4(),
+            uCameraOrientationInv: cameraOrientation.clone().toMatrix4(),
+            uRight: Quaternion.fromBetweenVectors([0, 0, 1], [1, 0, 0]).toMatrix4(),
             uCameraScale: this.state.zoom,
             uPosition: position.toMatrix4(),
             uOrientation: orientation.toMatrix4(),
@@ -1017,6 +1044,12 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         const line = new PIXI.Graphics();
         line.zIndex = -4;
 
+        const cannonBallLeft = new PIXI.Graphics();
+        cannonBallLeft.zIndex = -4;
+
+        const cannonBallRight = new PIXI.Graphics();
+        cannonBallRight.zIndex = -4;
+
         const health = new PIXI.Graphics();
         health.zIndex = -4;
         health.alpha = 0.5;
@@ -1029,12 +1062,16 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         this.application.stage.addChild(mesh);
         this.application.stage.addChild(text);
         this.application.stage.addChild(line);
+        this.application.stage.addChild(cannonBallLeft);
+        this.application.stage.addChild(cannonBallRight);
         this.application.stage.addChild(health);
         this.shipMeshes.push({
             id: ship.id,
             mesh,
             text,
             line,
+            cannonBallLeft,
+            cannonBallRight,
             autoPilotLines: [],
             autoPilotLinePoints: [],
             health,
