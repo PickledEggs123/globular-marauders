@@ -2049,6 +2049,7 @@ export class App extends AppPixi {
                                                 <Typography>{Math.round(this.state.zoom * this.game.worldScale * 100) / 100} Zoom</Typography>
                                                 <Typography>{this.game.scoreBoard.damage.find(p => p.playerId === this.playerId)?.damage ?? 0} Damage</Typography>
                                                 <Typography>{Math.round(100 * Math.atan2((this.findPlayerShip()?.position.rotateVector([0, 0, 1]) ?? [0, 0, 1])[1], (this.findPlayerShip()?.position.rotateVector([0, 0, 1]) ?? [0, 0, 1])[0]) / Math.PI * 180) / 100} Position</Typography>
+                                                <Typography>{Math.round(100 * Math.acos((this.findPlayerShip()?.position.rotateVector([0, 0, 1]) ?? [0, 0, 1])[2]) / Math.PI * 180) / 100} Radius</Typography>
                                                 <Typography>{Math.round(100 * Math.atan2((this.findPlayerShip()?.orientation.rotateVector([1, 0, 0]) ?? [1, 0, 0])[1], (this.findPlayerShip()?.orientation.rotateVector([1, 0, 0]) ?? [1, 0, 0])[0]) / Math.PI * 180) / 100} Orientation</Typography>
                                             </Card>
                                             <Card className="TopRight">

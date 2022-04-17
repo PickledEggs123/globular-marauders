@@ -243,6 +243,22 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
                 void main() {
                     vColor = aColor;
                     
+                    // compute difference of orientation
+                    vec4 cameraOrientationPositionPoint = uCameraPositionInv * vec4(0.0, 0.0, 1.0, 0.0);
+                    float crp = atan(cameraOrientationPositionPoint.y, cameraOrientationPositionPoint.x);
+                    vec4 orientationPositionPoint = uPosition * vec4(0.0, 0.0, 1.0, 0.0);
+                    float rp = atan(orientationPositionPoint.y, orientationPositionPoint.x);
+                    // difference of orientation between two points on a sphere, especially around the south pole
+                    float rpDiff = 2.0 * (rp - crp);
+                    // combined orientation adjustment
+                    mat4 orientationDiffRotation = mat4(
+                        cos(rpDiff), -sin(rpDiff), 0.0, 0.0,
+                        sin(rpDiff),  cos(rpDiff), 0.0, 0.0,
+                        0.0,     0.0,    1.0, 0.0,
+                        0.0,     0.0,    0.0, 1.0
+                    );
+                    
+                    // the camera orientation
                     vec4 cameraOrientationPoint = uCameraOrientation * vec4(1.0, 0.0, 0.0, 0.0);
                     float cr = atan(cameraOrientationPoint.y, cameraOrientationPoint.x);
                     mat4 cameraRotation = mat4(
@@ -252,29 +268,30 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
                         0.0,      0.0,     0.0, 1.0
                     );
                     
-                    vec4 orientationPoint = uOrientation * vec4(1.0, 0.0, 0.0, 0.0);
-                    float r = atan(orientationPoint.y, orientationPoint.x);
-                    mat4 objectRotation = mat4(
-                        cos(r), -sin(r), 0.0, 0.0,
-                        sin(r),  cos(r), 0.0, 0.0,
-                        0.0,     0.0,    1.0, 0.0,
-                        0.0,     0.0,    0.0, 1.0
+                    // the camera orientation, but for only rotation
+                    vec4 cameraOrientationWorldPoint = uCameraPositionInv * uCameraOrientationInv * uRight * vec4(0.0, 0.0, 1.0, 0.0);
+                    vec4 cameraOrientationLocalPoint = cameraRotation * uCameraPosition * -cameraOrientationWorldPoint;
+                    float crw = -atan(cameraOrientationLocalPoint.y, cameraOrientationLocalPoint.x);
+                    mat4 cameraRotation2 = mat4(
+                        cos(crw), -sin(crw), 0.0, 0.0,
+                        sin(crw),  cos(crw), 0.0, 0.0,
+                        0.0,      0.0,     1.0, 0.0,
+                        0.0,      0.0,     0.0, 1.0
                     );
                     
-                    vec4 cameraOrientationPositionPoint = uCameraPositionInv * vec4(0.0, 0.0, 1.0, 0.0);
-                    float crp = atan(cameraOrientationPositionPoint.y, cameraOrientationPositionPoint.x);
-                    vec4 orientationPositionPoint = uPosition * vec4(0.0, 0.0, 1.0, 0.0);
-                    float rp = atan(orientationPositionPoint.y, orientationPositionPoint.x);
-                    float rpDiff = 2.0 * (rp - crp);
-                    mat4 orientationDiffRotation = mat4(
-                        cos(rpDiff), -sin(rpDiff), 0.0, 0.0,
-                        sin(rpDiff),  cos(rpDiff), 0.0, 0.0,
+                    // the object orientation, but only for rotation
+                    vec4 orientationWorldPoint = uPosition * uOrientation * uRight * vec4(0.0, 0.0, 1.0, 0.0);
+                    vec4 orientationLocalPoint = cameraRotation * uCameraPosition * -orientationWorldPoint;
+                    float rw = atan(orientationLocalPoint.y, orientationLocalPoint.x);
+                    mat4 objectRotation = mat4(
+                        cos(rw), -sin(rw), 0.0, 0.0,
+                        sin(rw),  cos(rw), 0.0, 0.0,
                         0.0,     0.0,    1.0, 0.0,
                         0.0,     0.0,    0.0, 1.0
                     );
                     
                     vec4 translation = cameraRotation * uCameraPosition * uPosition * vec4(0, 0, uCameraScale, 1.0) - vec4(0, 0, uCameraScale, 1.0);
-                    mat4 rotation = cameraRotation * objectRotation * orientationDiffRotation;
+                    mat4 rotation = cameraRotation2 * objectRotation * orientationDiffRotation;
                     
                     vec4 pos = translation + vec4((rotation * vec4(aPosition, 1.0)).xyz * uScale * uCameraScale / uWorldScale, 1.0);
                     gl_Position = pos * vec4(1.0 * uWorldScale, -1.0 * uWorldScale, 0.0625, 1);
