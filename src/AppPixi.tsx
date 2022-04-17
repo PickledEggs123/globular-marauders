@@ -249,7 +249,7 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
                     vec4 orientationPositionPoint = uPosition * vec4(0.0, 0.0, 1.0, 0.0);
                     float rp = atan(orientationPositionPoint.y, orientationPositionPoint.x);
                     // difference of orientation between two points on a sphere, especially around the south pole
-                    float rpDiff = 2.0 * (rp - crp);
+                    float rpDiff = orientationPositionPoint.z < 0.0 ? 4.0 * (rp - crp) : 0.0;
                     // combined orientation adjustment
                     mat4 orientationDiffRotation = mat4(
                         cos(rpDiff), -sin(rpDiff), 0.0, 0.0,
