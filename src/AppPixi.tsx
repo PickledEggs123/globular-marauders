@@ -237,26 +237,12 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
                 uniform mat4 uOrientation;
                 uniform float uScale;
                 uniform float uWorldScale;
+                uniform float uHomeWorldPositionTheta;
                 
                 varying vec3 vColor;
                 
                 void main() {
                     vColor = aColor;
-                    
-                    // compute difference of orientation
-                    vec4 cameraOrientationPositionPoint = uCameraPositionInv * vec4(0.0, 0.0, 1.0, 0.0);
-                    float crp = atan(cameraOrientationPositionPoint.y, cameraOrientationPositionPoint.x);
-                    vec4 orientationPositionPoint = uPosition * vec4(0.0, 0.0, 1.0, 0.0);
-                    float rp = atan(orientationPositionPoint.y, orientationPositionPoint.x);
-                    // difference of orientation between two points on a sphere, especially around the south pole
-                    float rpDiff = orientationPositionPoint.z < 0.0 ? 4.0 * (rp - crp) : 0.0;
-                    // combined orientation adjustment
-                    mat4 orientationDiffRotation = mat4(
-                        cos(rpDiff), -sin(rpDiff), 0.0, 0.0,
-                        sin(rpDiff),  cos(rpDiff), 0.0, 0.0,
-                        0.0,     0.0,    1.0, 0.0,
-                        0.0,     0.0,    0.0, 1.0
-                    );
                     
                     // the camera orientation
                     vec4 cameraOrientationPoint = uCameraOrientation * vec4(1.0, 0.0, 0.0, 0.0);
@@ -286,6 +272,24 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
                     mat4 objectRotation = mat4(
                         cos(rw), -sin(rw), 0.0, 0.0,
                         sin(rw),  cos(rw), 0.0, 0.0,
+                        0.0,     0.0,    1.0, 0.0,
+                        0.0,     0.0,    0.0, 1.0
+                    );
+                    
+                    // compute difference of orientation
+                    vec4 cameraOrientationPositionPoint = uCameraPositionInv * vec4(0.0, 0.0, 1.0, 0.0);
+                    float crp = atan(cameraOrientationPositionPoint.y, cameraOrientationPositionPoint.x);
+                    vec4 orientationPositionPoint = uPosition * vec4(0.0, 0.0, 1.0, 0.0);
+                    float rp = atan(orientationPositionPoint.y, orientationPositionPoint.x);
+                    // difference of orientation between two points on a sphere, especially around the south pole
+                    float rpDiff = orientationPositionPoint.z < 0.0 ? 4.0 * (rp - crp) : 0.0;
+                    // difference of orientation while traveling along latitude
+                    float rpRadial = (rw - rp) - rw;
+                    // combined orientation adjustment
+                    float rpCombined = rpDiff + rpRadial;
+                    mat4 orientationDiffRotation = mat4(
+                        cos(rpCombined), -sin(rpCombined), 0.0, 0.0,
+                        sin(rpCombined),  cos(rpCombined), 0.0, 0.0,
                         0.0,     0.0,    1.0, 0.0,
                         0.0,     0.0,    0.0, 1.0
                     );
@@ -944,6 +948,8 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         const rotation: Quaternion = Quaternion.fromAxisAngle([Math.cos(randomRotationAngle), Math.sin(randomRotationAngle), 0], Math.PI * 2 / 60 / 10 / 10);
         const settlementLevel = planet.settlementLevel;
         const settlementProgress = planet.settlementProgress;
+        const positionPoint = position.rotateVector([0, 0, 1]);
+        const homeWorldPositionTheta = -Math.PI / 2 ?? Math.atan2(positionPoint[1], positionPoint[0]);
 
         // create mesh
         const uniforms = {
@@ -951,6 +957,7 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
             uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
             uCameraPositionInv: cameraPosition.clone().toMatrix4(),
             uCameraOrientationInv: cameraOrientation.clone().toMatrix4(),
+            uHomeWorldPositionTheta: homeWorldPositionTheta,
             uRight: Quaternion.fromBetweenVectors([0, 0, 1], [1, 0, 0]).toMatrix4(),
             uCameraScale: this.state.zoom,
             uPosition: planet.position.toMatrix4(),
@@ -1036,6 +1043,8 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         const position: Quaternion = ship.position.clone();
         const positionVelocity: Quaternion = ship.positionVelocity.clone();
         const orientation: Quaternion = ship.orientation.clone();
+        const positionPoint = position.rotateVector([0, 0, 1]);
+        const homeWorldPositionTheta = -Math.PI / 2 ?? Math.atan2(positionPoint[1], positionPoint[0]);
 
         // create mesh
         const uniforms = {
@@ -1043,6 +1052,7 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
             uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
             uCameraPositionInv: cameraPosition.clone().toMatrix4(),
             uCameraOrientationInv: cameraOrientation.clone().toMatrix4(),
+            uHomeWorldPositionTheta: homeWorldPositionTheta,
             uRight: Quaternion.fromBetweenVectors([0, 0, 1], [1, 0, 0]).toMatrix4(),
             uCameraScale: this.state.zoom,
             uPosition: position.toMatrix4(),

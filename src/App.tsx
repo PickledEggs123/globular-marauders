@@ -299,13 +299,16 @@ export class App extends AppPixi {
         const removeExtraRotation = (q: Quaternion): Quaternion => {
             return Quaternion.fromBetweenVectors([0, 0, 1], q.rotateVector([0, 0, 1]));
         };
+        const removeExtraOrientation = (q: Quaternion): Quaternion => {
+            return Quaternion.fromBetweenVectors([1, 0, 0], q.rotateVector([1, 0, 0]));
+        }
 
         // draw rotating app
         let pixiTick: number = 0;
         this.application.ticker.add(() => {
             const playerShip = this.getPlayerShip();
             cameraPosition = removeExtraRotation(playerShip.position);
-            cameraOrientation = playerShip.orientation.clone();
+            cameraOrientation = removeExtraOrientation(playerShip.orientation.clone());
             pixiTick += 1;
 
             // sync game to Pixi renderer
