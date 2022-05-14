@@ -700,7 +700,7 @@ export class App extends AppPixi {
                             [0, 0, 1],
                             item.positionVelocity.rotateVector([0, 0, 1])
                         ) < 0.00001 ? [0, 0, 1] as [number, number, number] :
-                            cameraOrientation.clone().inverse().mul(item.positionVelocity.clone()).rotateVector([0, 0, 1]);
+                            Quaternion.fromAxisAngle([0, 0, 1], -item.mesh.shader.uniforms.uHomeWorldPositionTheta).rotateVector(cameraOrientation.clone().inverse().mul(item.positionVelocity.clone()).rotateVector([0, 0, 1]));
                         endPoint[2] = 0;
                         const endPointScaleFactor = 1 / Math.max(Math.abs(endPoint[0]), Math.abs(endPoint[1]));
                         endPoint[0] *= endPointScaleFactor;
@@ -737,9 +737,9 @@ export class App extends AppPixi {
                         item.line.endFill();
                         item.line.visible = true;
                     }
-                    //  left side cannonball line
-                    {
-                        const jitterPoint = item.orientation.clone().rotateVector([1, 0, 0]);
+                    //  cannonball lines
+                    for (const values of [{jitterPoint: [1, 0, 0] as [number, number, number], property: "cannonBallLeft"}, {jitterPoint: [-1, 0, 0] as [number, number, number], property: "cannonBallRight"}]) {
+                        const jitterPoint = item.orientation.clone().rotateVector(Quaternion.fromAxisAngle([0, 0, 1], -item.mesh.shader.uniforms.uHomeWorldPositionTheta).rotateVector(values.jitterPoint));
                         const worldPoint = item.position.clone().mul(Quaternion.fromBetweenVectors([0, 0, 1], jitterPoint)).rotateVector([0, 0, 1]);
                         const position = Quaternion.fromBetweenVectors([0, 0, 1], worldPoint);
                         const endPoint = DelaunayGraph.distanceFormula(
@@ -749,7 +749,6 @@ export class App extends AppPixi {
                             .mul(cameraPosition.clone().inverse())
                             .mul(position.clone())
                             .rotateVector([0, 0, 1]);
-                        console.log("END POINT", endPoint);
                         endPoint[2] = 0;
                         const endPointScaleFactor = 1 / Math.max(Math.abs(endPoint[0]), Math.abs(endPoint[1]));
                         endPoint[0] *= endPointScaleFactor;
@@ -770,21 +769,22 @@ export class App extends AppPixi {
                         );
 
                         // draw line
-                        item.cannonBallLeft.clear();
-                        item.cannonBallLeft.beginFill(0xffffff88);
-                        item.cannonBallLeft.lineStyle(1, 0xffffff88);
+                        const graphics: PIXI.Graphics = (item as any)[values.property] as PIXI.Graphics;
+                        graphics.clear();
+                        graphics.beginFill(0xffffff88);
+                        graphics.lineStyle(1, 0xffffff88);
                         for (let i = 0; i < lineLength; i += dashLength * 2) {
-                            item.cannonBallLeft.moveTo(
+                            graphics.moveTo(
                                 lineXS + lineDirection[0] * i,
                                 lineYS + lineDirection[1] * i
                             );
-                            item.cannonBallLeft.lineTo(
+                            graphics.lineTo(
                                 lineXS + lineDirection[0] * (i + dashLength),
                                 lineYS + lineDirection[1] * (i + dashLength)
                             );
                         }
-                        item.cannonBallLeft.endFill();
-                        item.cannonBallLeft.visible = true;
+                        graphics.endFill();
+                        graphics.visible = true;
                     }
                 } else {
                     item.line.visible = false;
