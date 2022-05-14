@@ -371,6 +371,7 @@ export class App extends AppPixi {
                     shipMesh.isPlayer = this.getPlayerShip().id === ship.id;
                     shipMesh.isEnemy = this.findPlayerShip()?.faction?.id !== ship.faction?.id;
                     shipMesh.healthValue = Math.ceil(ship.health / ship.maxHealth * 100);
+                    shipMesh.positionOld = shipMesh.position;
                     shipMesh.position = removeExtraRotation(ship.position);
                     shipMesh.positionVelocity = removeExtraRotation(ship.positionVelocity);
                     shipMesh.orientation = ship.orientation.clone();
@@ -665,6 +666,12 @@ export class App extends AppPixi {
                 shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraPositionInv = cameraPosition.clone().toMatrix4();
                 shader.uniforms.uCameraOrientationInv = cameraOrientation.clone().toMatrix4();
+                const positionInitial = item.positionOld.rotateVector([0, 0, 1]);
+                const positionFinal = item.position.rotateVector([0, 0, 1]);
+                const positionThetaInitial = Math.atan2(positionInitial[1], positionInitial[0]);
+                const positionThetaFinal = Math.atan2(positionFinal[1], positionFinal[0]);
+                const positionThetaDiff = -(positionThetaFinal - positionThetaInitial);
+                shader.uniforms.uHomeWorldPositionTheta += positionThetaDiff;
                 shader.uniforms.uCameraScale = this.state.zoom;
                 shader.uniforms.uPosition = removeExtraRotation(item.position).toMatrix4();
                 shader.uniforms.uOrientation = this.convertOrientationToDisplay(item.orientation.mul(Quaternion.fromAxisAngle([0, 0, 1], Math.PI))).toMatrix4();

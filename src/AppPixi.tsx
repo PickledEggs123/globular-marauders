@@ -283,13 +283,10 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
                     float rp = atan(orientationPositionPoint.y, orientationPositionPoint.x);
                     // difference of orientation between two points on a sphere, especially around the south pole
                     float rpDiff = orientationPositionPoint.z < 0.0 ? 4.0 * (rp - crp) : 0.0;
-                    // difference of orientation while traveling along latitude
-                    float rpRadial = (rw - rp) - rw;
                     // combined orientation adjustment
-                    float rpCombined = rpDiff + rpRadial;
                     mat4 orientationDiffRotation = mat4(
-                        cos(rpCombined), -sin(rpCombined), 0.0, 0.0,
-                        sin(rpCombined),  cos(rpCombined), 0.0, 0.0,
+                        cos(rpDiff + uHomeWorldPositionTheta), -sin(rpDiff + uHomeWorldPositionTheta), 0.0, 0.0,
+                        sin(rpDiff + uHomeWorldPositionTheta),  cos(rpDiff + uHomeWorldPositionTheta), 0.0, 0.0,
                         0.0,     0.0,    1.0, 0.0,
                         0.0,     0.0,    0.0, 1.0
                     );
@@ -850,6 +847,7 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         isPlayer: boolean,
         isEnemy: boolean,
         position: Quaternion,
+        positionOld: Quaternion,
         orientation: Quaternion,
         positionVelocity: Quaternion,
         tick: number
@@ -948,8 +946,7 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         const rotation: Quaternion = Quaternion.fromAxisAngle([Math.cos(randomRotationAngle), Math.sin(randomRotationAngle), 0], Math.PI * 2 / 60 / 10 / 10);
         const settlementLevel = planet.settlementLevel;
         const settlementProgress = planet.settlementProgress;
-        const positionPoint = position.rotateVector([0, 0, 1]);
-        const homeWorldPositionTheta = -Math.PI / 2 ?? Math.atan2(positionPoint[1], positionPoint[0]);
+        const homeWorldPositionTheta = 0;
 
         // create mesh
         const uniforms = {
@@ -1043,8 +1040,7 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         const position: Quaternion = ship.position.clone();
         const positionVelocity: Quaternion = ship.positionVelocity.clone();
         const orientation: Quaternion = ship.orientation.clone();
-        const positionPoint = position.rotateVector([0, 0, 1]);
-        const homeWorldPositionTheta = -Math.PI / 2 ?? Math.atan2(positionPoint[1], positionPoint[0]);
+        const homeWorldPositionTheta = 0;
 
         // create mesh
         const uniforms = {
@@ -1107,6 +1103,7 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
             isPlayer,
             isEnemy,
             position,
+            positionOld: position,
             orientation,
             positionVelocity,
             tick,
