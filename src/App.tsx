@@ -371,10 +371,16 @@ export class App extends AppPixi {
                     shipMesh.isPlayer = this.getPlayerShip().id === ship.id;
                     shipMesh.isEnemy = this.findPlayerShip()?.faction?.id !== ship.faction?.id;
                     shipMesh.healthValue = Math.ceil(ship.health / ship.maxHealth * 100);
-                    shipMesh.positionOld = shipMesh.position;
+                    const currentPositionPolar = this.convertPositionQuaternionToPositionPolar(ship.position);
+                    if (this.isPositionPolarDifferent(shipMesh.positionPolarNew, currentPositionPolar)) {
+                        shipMesh.positionPolarOld = shipMesh.positionPolarNew;
+                        shipMesh.positionPolarNew = currentPositionPolar;
+                        shipMesh.correctionFactorTheta = -this.computePositionPolarCorrectionFactorTheta(shipMesh.positionPolarOld, shipMesh.positionPolarNew) + Math.PI / 2;
+                    }
                     shipMesh.position = removeExtraRotation(ship.position);
                     shipMesh.positionVelocity = removeExtraRotation(ship.positionVelocity);
-                    shipMesh.orientation = ship.orientation.clone();
+                    shipMesh.orientation = Quaternion.ONE;
+                    // shipMesh.orientation = ship.orientation.clone();
                     const playerData = (this.playerId && this.game.playerData.get(this.playerId)) ?? null;
                     if (ship.pathFinding.points.length > 0 && !(
                         shipMesh.autoPilotLines.length === ship.pathFinding.points.length &&
@@ -666,12 +672,7 @@ export class App extends AppPixi {
                 shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraPositionInv = cameraPosition.clone().toMatrix4();
                 shader.uniforms.uCameraOrientationInv = cameraOrientation.clone().toMatrix4();
-                const positionInitial = item.positionOld.rotateVector([0, 0, 1]);
-                const positionFinal = item.position.rotateVector([0, 0, 1]);
-                const positionThetaInitial = Math.atan2(positionInitial[1], positionInitial[0]);
-                const positionThetaFinal = Math.atan2(positionFinal[1], positionFinal[0]);
-                const positionThetaDiff = -(positionThetaFinal - positionThetaInitial);
-                shader.uniforms.uHomeWorldPositionTheta += positionThetaDiff;
+                shader.uniforms.uCorrectionFactorTheta = item.correctionFactorTheta;
                 shader.uniforms.uCameraScale = this.state.zoom;
                 shader.uniforms.uPosition = removeExtraRotation(item.position).toMatrix4();
                 shader.uniforms.uOrientation = this.convertOrientationToDisplay(item.orientation.mul(Quaternion.fromAxisAngle([0, 0, 1], Math.PI))).toMatrix4();
@@ -700,7 +701,7 @@ export class App extends AppPixi {
                             [0, 0, 1],
                             item.positionVelocity.rotateVector([0, 0, 1])
                         ) < 0.00001 ? [0, 0, 1] as [number, number, number] :
-                            Quaternion.fromAxisAngle([0, 0, 1], -item.mesh.shader.uniforms.uHomeWorldPositionTheta).rotateVector(cameraOrientation.clone().inverse().mul(item.positionVelocity.clone()).rotateVector([0, 0, 1]));
+                            Quaternion.fromAxisAngle([0, 0, 1], -item.mesh.shader.uniforms.uCorrectionFactorTheta - Math.PI / 2).mul(item.positionVelocity.clone()).rotateVector([0, 0, 1]);
                         endPoint[2] = 0;
                         const endPointScaleFactor = 1 / Math.max(Math.abs(endPoint[0]), Math.abs(endPoint[1]));
                         endPoint[0] *= endPointScaleFactor;
@@ -739,7 +740,7 @@ export class App extends AppPixi {
                     }
                     //  cannonball lines
                     for (const values of [{jitterPoint: [1, 0, 0] as [number, number, number], property: "cannonBallLeft"}, {jitterPoint: [-1, 0, 0] as [number, number, number], property: "cannonBallRight"}]) {
-                        const jitterPoint = item.orientation.clone().rotateVector(Quaternion.fromAxisAngle([0, 0, 1], -item.mesh.shader.uniforms.uHomeWorldPositionTheta).rotateVector(values.jitterPoint));
+                        const jitterPoint = Quaternion.fromAxisAngle([0, 0, 1], -item.mesh.shader.uniforms.uCorrectionFactorTheta).rotateVector(values.jitterPoint);
                         const worldPoint = item.position.clone().mul(Quaternion.fromBetweenVectors([0, 0, 1], jitterPoint)).rotateVector([0, 0, 1]);
                         const position = Quaternion.fromBetweenVectors([0, 0, 1], worldPoint);
                         const endPoint = DelaunayGraph.distanceFormula(

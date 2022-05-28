@@ -136,6 +136,26 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         ];
     };
 
+    // compute polar position of position
+    convertPositionQuaternionToPositionPolar = (q: Quaternion): [number, number] => {
+        const point = q.rotateVector([0, 0, 1]);
+        const polarCoordinate = {
+            angle: Math.atan2(point[1], point[0]),
+            radius: Math.acos(point[2])
+        };
+        const coordinate = {
+            x: Math.cos(polarCoordinate.angle) * polarCoordinate.radius / Math.PI,
+            y: Math.sin(polarCoordinate.angle) * polarCoordinate.radius / Math.PI
+        };
+        return [coordinate.x, coordinate.y];
+    };
+    isPositionPolarDifferent = (a: [number, number], b: [number, number]): boolean => {
+        return Math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2) > 0.001;
+    };
+    computePositionPolarCorrectionFactorTheta = (a: [number, number], b: [number, number]): number => {
+        return Math.atan2(b[1] - a[1], b[0] - a[0]);
+    };
+
     pixiStarResources = (() => {
         // create geometry
         const starGeometry = new PIXI.Geometry();
@@ -237,7 +257,7 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
                 uniform mat4 uOrientation;
                 uniform float uScale;
                 uniform float uWorldScale;
-                uniform float uHomeWorldPositionTheta;
+                uniform float uCorrectionFactorTheta;
                 
                 varying vec3 vColor;
                 
@@ -285,8 +305,8 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
                     float rpDiff = orientationPositionPoint.z < 0.0 ? 4.0 * (rp - crp) : 0.0;
                     // combined orientation adjustment
                     mat4 orientationDiffRotation = mat4(
-                        cos(rpDiff + uHomeWorldPositionTheta), -sin(rpDiff + uHomeWorldPositionTheta), 0.0, 0.0,
-                        sin(rpDiff + uHomeWorldPositionTheta),  cos(rpDiff + uHomeWorldPositionTheta), 0.0, 0.0,
+                        cos(rpDiff + uCorrectionFactorTheta), -sin(rpDiff + uCorrectionFactorTheta), 0.0, 0.0,
+                        sin(rpDiff + uCorrectionFactorTheta),  cos(rpDiff + uCorrectionFactorTheta), 0.0, 0.0,
                         0.0,     0.0,    1.0, 0.0,
                         0.0,     0.0,    0.0, 1.0
                     );
@@ -847,7 +867,9 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         isPlayer: boolean,
         isEnemy: boolean,
         position: Quaternion,
-        positionOld: Quaternion,
+        positionPolarNew: [number, number],
+        positionPolarOld: [number, number],
+        correctionFactorTheta: number,
         orientation: Quaternion,
         positionVelocity: Quaternion,
         tick: number
@@ -946,7 +968,7 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         const rotation: Quaternion = Quaternion.fromAxisAngle([Math.cos(randomRotationAngle), Math.sin(randomRotationAngle), 0], Math.PI * 2 / 60 / 10 / 10);
         const settlementLevel = planet.settlementLevel;
         const settlementProgress = planet.settlementProgress;
-        const homeWorldPositionTheta = 0;
+        const correctionFactorTheta = 0;
 
         // create mesh
         const uniforms = {
@@ -954,7 +976,7 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
             uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
             uCameraPositionInv: cameraPosition.clone().toMatrix4(),
             uCameraOrientationInv: cameraOrientation.clone().toMatrix4(),
-            uHomeWorldPositionTheta: homeWorldPositionTheta,
+            uCorrectionFactorTheta: correctionFactorTheta,
             uRight: Quaternion.fromBetweenVectors([0, 0, 1], [1, 0, 0]).toMatrix4(),
             uCameraScale: this.state.zoom,
             uPosition: planet.position.toMatrix4(),
@@ -1040,7 +1062,7 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         const position: Quaternion = ship.position.clone();
         const positionVelocity: Quaternion = ship.positionVelocity.clone();
         const orientation: Quaternion = ship.orientation.clone();
-        const homeWorldPositionTheta = 0;
+        const correctionFactorTheta = 0;
 
         // create mesh
         const uniforms = {
@@ -1048,7 +1070,7 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
             uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
             uCameraPositionInv: cameraPosition.clone().toMatrix4(),
             uCameraOrientationInv: cameraOrientation.clone().toMatrix4(),
-            uHomeWorldPositionTheta: homeWorldPositionTheta,
+            uCorrectionFactorTheta: correctionFactorTheta,
             uRight: Quaternion.fromBetweenVectors([0, 0, 1], [1, 0, 0]).toMatrix4(),
             uCameraScale: this.state.zoom,
             uPosition: position.toMatrix4(),
@@ -1103,7 +1125,9 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
             isPlayer,
             isEnemy,
             position,
-            positionOld: position,
+            positionPolarNew: this.convertPositionQuaternionToPositionPolar(position),
+            positionPolarOld: this.convertPositionQuaternionToPositionPolar(position),
+            correctionFactorTheta: 0,
             orientation,
             positionVelocity,
             tick,
