@@ -872,6 +872,7 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         correctionFactorTheta: number,
         orientation: Quaternion,
         positionVelocity: Quaternion,
+        positionVelocityTheta: number,
         tick: number
     }> = [];
     cannonBallMeshes: Array<{
@@ -1130,6 +1131,7 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
             correctionFactorTheta: 0,
             orientation,
             positionVelocity,
+            positionVelocityTheta: 0,
             tick,
         });
     };

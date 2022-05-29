@@ -379,8 +379,12 @@ export class App extends AppPixi {
                     }
                     shipMesh.position = removeExtraRotation(ship.position);
                     shipMesh.positionVelocity = removeExtraRotation(ship.positionVelocity);
-                    shipMesh.orientation = Quaternion.ONE;
-                    // shipMesh.orientation = ship.orientation.clone();
+                    const positionVelocityPoint = ship.positionVelocity.rotateVector([0, 0, 1]);
+                    const positionVelocityPointLength = Math.sqrt(positionVelocityPoint[0] ** 2 + positionVelocityPoint[1] ** 2);
+                    if (positionVelocityPointLength > 0.0001) {
+                        shipMesh.positionVelocityTheta = Math.atan2(positionVelocityPoint[1], positionVelocityPoint[0]);
+                    }
+                    shipMesh.orientation = ship.orientation.clone().mul(Quaternion.fromAxisAngle([0, 0, 1], -shipMesh.positionVelocityTheta + Math.PI / 2));
                     const playerData = (this.playerId && this.game.playerData.get(this.playerId)) ?? null;
                     if (ship.pathFinding.points.length > 0 && !(
                         shipMesh.autoPilotLines.length === ship.pathFinding.points.length &&
@@ -701,7 +705,7 @@ export class App extends AppPixi {
                             [0, 0, 1],
                             item.positionVelocity.rotateVector([0, 0, 1])
                         ) < 0.00001 ? [0, 0, 1] as [number, number, number] :
-                            Quaternion.fromAxisAngle([0, 0, 1], -item.mesh.shader.uniforms.uCorrectionFactorTheta - Math.PI / 2).mul(item.positionVelocity.clone()).rotateVector([0, 0, 1]);
+                            item.positionVelocity.rotateVector([0, 0, 1]);
                         endPoint[2] = 0;
                         const endPointScaleFactor = 1 / Math.max(Math.abs(endPoint[0]), Math.abs(endPoint[1]));
                         endPoint[0] *= endPointScaleFactor;
@@ -740,7 +744,7 @@ export class App extends AppPixi {
                     }
                     //  cannonball lines
                     for (const values of [{jitterPoint: [1, 0, 0] as [number, number, number], property: "cannonBallLeft"}, {jitterPoint: [-1, 0, 0] as [number, number, number], property: "cannonBallRight"}]) {
-                        const jitterPoint = Quaternion.fromAxisAngle([0, 0, 1], -item.mesh.shader.uniforms.uCorrectionFactorTheta).rotateVector(values.jitterPoint);
+                        const jitterPoint = Quaternion.fromAxisAngle([0, 0, 1], -item.mesh.shader.uniforms.uCorrectionFactorTheta).mul(item.orientation.clone()).rotateVector(values.jitterPoint);
                         const worldPoint = item.position.clone().mul(Quaternion.fromBetweenVectors([0, 0, 1], jitterPoint)).rotateVector([0, 0, 1]);
                         const position = Quaternion.fromBetweenVectors([0, 0, 1], worldPoint);
                         const endPoint = DelaunayGraph.distanceFormula(
