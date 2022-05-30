@@ -3,6 +3,7 @@ import './App.css';
 import Quaternion from "quaternion";
 import SockJS from "sockjs-client";
 import * as PIXI from "pixi.js";
+import {IMediaInstance, PlayOptions, sound} from "@pixi/sound";
 import {EResourceType, ITEM_DATA} from "@pickledeggs123/globular-marauders-game/lib/src/Resource";
 import {
     ICameraState,
@@ -10,15 +11,14 @@ import {
     IDrawable,
     MIN_DISTANCE
 } from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
+import {Ship,} from "@pickledeggs123/globular-marauders-game/lib/src/Ship";
 import {
-    Ship,
-} from "@pickledeggs123/globular-marauders-game/lib/src/Ship";
-import {
-    EShipType, GetShipData, PHYSICS_SCALE,
+    EShipType,
+    GetShipData,
+    PHYSICS_SCALE,
+    SHIP_DATA,
 } from "@pickledeggs123/globular-marauders-game/lib/src/ShipType";
-import {
-    EFaction,
-} from "@pickledeggs123/globular-marauders-game/lib/src/EFaction";
+import {EFaction,} from "@pickledeggs123/globular-marauders-game/lib/src/EFaction";
 import {
     DelaunayGraph,
     ITessellatedTriangle,
@@ -29,6 +29,8 @@ import {Planet} from "@pickledeggs123/globular-marauders-game/lib/src/Planet";
 import {DeserializeQuaternion, SerializeQuaternion,} from "@pickledeggs123/globular-marauders-game/lib/src/Item";
 import {
     EMessageType,
+    ESoundEventType,
+    ESoundType,
     Game,
     IAutoPilotMessage,
     IChooseFactionMessage,
@@ -45,9 +47,12 @@ import {
 import {MusicPlayer} from "./MusicPlayer";
 import {
     AppBar,
-    Avatar, Badge,
+    Avatar,
+    Badge,
     Button,
-    Card, CardActionArea, CardActions,
+    Card,
+    CardActionArea,
+    CardActions,
     CardContent,
     CardHeader,
     Checkbox,
@@ -56,14 +61,20 @@ import {
     DialogContent,
     DialogTitle,
     FormControlLabel,
-    Grid, List, ListItem, ListItemText,
-    Paper, Radio,
+    Grid,
+    List,
+    ListItem,
+    ListItemText,
+    Paper,
+    Radio,
     RadioGroup,
-    Stack, SvgIcon,
+    Stack,
+    SvgIcon,
     TextField,
     Theme,
     ThemeProvider,
-    Toolbar, Tooltip,
+    Toolbar,
+    Tooltip,
     Typography,
 } from "@mui/material";
 import {createStyles, makeStyles} from "@mui/styles";
@@ -71,12 +82,11 @@ import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import {DEFAULT_IMAGE, EVoronoiMode, RESOURCE_TYPE_TEXTURE_PAIRS, SPACE_BACKGROUND_TEXTURES} from "./Data";
 import {AppPixi, IAppProps} from "./AppPixi";
-import {SHIP_DATA} from "@pickledeggs123/globular-marauders-game/lib/src/ShipType";
 import {DirectionsBoat, MusicNote, MusicOff, Public, Tv, TvOff} from "@mui/icons-material";
 import {EOrderType} from "@pickledeggs123/globular-marauders-game/lib/src/Order";
 import {EInvasionPhase, Invasion} from "@pickledeggs123/globular-marauders-game/lib/src/Invasion";
-import { ReactComponent as Pirate } from "./icons/pirate.svg";
-import { ReactComponent as Attack } from "./icons/attack.svg";
+import {ReactComponent as Pirate} from "./icons/pirate.svg";
+import {ReactComponent as Attack} from "./icons/attack.svg";
 
 const GetFactionSubheader = (faction: EFaction): string | null => {
     switch (faction) {
@@ -221,6 +231,15 @@ export class App extends AppPixi {
         // draw rotating app
         let cameraPosition: Quaternion = Quaternion.ONE;
         let cameraOrientation: Quaternion = Quaternion.ONE;
+
+        // load sounds into memory
+        sound.add(ESoundType.FIRE, {url: "sounds/FireSFX.m4a", preload: true});
+        sound.add(ESoundType.HIT, {url: "sounds/WoodHitSFX.m4a", preload: true});
+        sound.add(ESoundType.ACCELERATE, {url: "sounds/SpeedSFX.m4a", preload: true});
+        sound.add(ESoundType.DECELERATE, {url: "sounds/SlowSFX.m4a", preload: true});
+        sound.add(ESoundType.MONEY, {url: "sounds/MoneySFX.m4a", preload: true});
+        sound.add(ESoundType.LAND, {url: "sounds/RoyalSFX.m4a", preload: true});
+        sound.add(ESoundType.LOOT, {url: "sounds/LootSFX.m4a", preload: true});
 
         // load sprites into memory
         const loader = new PIXI.Loader();
@@ -945,6 +964,55 @@ export class App extends AppPixi {
         this.setupNetworking.call(this, false);
     }
 
+    continuousSounds = new Map<string, IMediaInstance>();
+    handleSoundEffects = (serverFrame: boolean) => {
+        // handle sounds
+        const continuousSoundCheck = new Set<string>();
+        for (const soundEvent of this.game.soundEvents) {
+            if (!(soundEvent.shipId === this.findPlayerShip()?.id || soundEvent.soundType === ESoundType.FIRE || soundEvent.soundType === ESoundType.HIT)) {
+                continue;
+            }
+            const playOptions: PlayOptions = {
+                volume: soundEvent.shipId === this.findPlayerShip()?.id ? 1 : 0.25
+            };
+            switch (soundEvent.soundEventType) {
+                case ESoundEventType.ONE_OFF: {
+                    const soundItem = sound.find(soundEvent.soundType);
+                    if (soundItem && soundItem.isLoaded) {
+                        sound.play(soundEvent.soundType, playOptions);
+                    }
+                    break;
+                }
+                case ESoundEventType.CONTINUOUS: {
+                    playOptions.volume! *= 0.25;
+                    const key = `${soundEvent.shipId}-${soundEvent.soundType}`;
+                    if (!this.continuousSounds.has(key)) {
+                        const soundItem = sound.find(soundEvent.soundType);
+                        if (soundItem && soundItem.isLoaded) {
+                            playOptions.complete = () => {
+                                this.continuousSounds.delete(key);
+                            };
+                            const mediaInstance = sound.play(soundEvent.soundType, playOptions) as IMediaInstance;
+                            if (!(mediaInstance as any).then) {
+                                this.continuousSounds.set(key, mediaInstance);
+                            }
+                        }
+                    }
+                    continuousSoundCheck.add(key);
+                    break;
+                }
+            }
+        }
+        if (serverFrame) {
+            const stoppedContinuousSounds = Array.from(this.continuousSounds.keys()).filter(key => !continuousSoundCheck.has(key));
+            for (const key of stoppedContinuousSounds) {
+                const mediaInstance = this.continuousSounds.get(key)!;
+                mediaInstance.stop();
+                this.continuousSounds.delete(key);
+            }
+        }
+    }
+
     setupNetworking(autoLogin: boolean) {
         this.socket = new SockJS(window.location.protocol + "//" + window.location.hostname + ":" + (this.shardPortNumber ?? 4000) + "/game");
         this.socket.onerror = (err) => {
@@ -1045,6 +1113,7 @@ export class App extends AppPixi {
             }
             this.game.applyGameSyncFrame(data);
             this.resetClientLoop();
+            this.handleSoundEffects(true);
         };
         this.socketEvents["send-players"] = (data: { players: IPlayerData[], playerId: string }) => {
             this.game.playerData = new Map<string, IPlayerData>();
@@ -1282,6 +1351,8 @@ export class App extends AppPixi {
         // draw onto screen
         this.handleClientLoop();
         this.forceUpdate();
+
+        this.handleSoundEffects(false);
     }
 
     /**
