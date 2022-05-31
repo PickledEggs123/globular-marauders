@@ -1361,6 +1361,12 @@ export class App extends AppPixi {
      * -----------------------------------------------------------
      */
 
+    private cancelSpacebar(e: React.KeyboardEvent) {
+        if (e.key === " ") {
+            e.preventDefault();
+        }
+    }
+
     /**
      * Show scores for all players in the game.
      * @private
@@ -1910,6 +1916,7 @@ export class App extends AppPixi {
                                 className={classes.menuButton}
                                 color="inherit"
                                 aria-label="Menu" variant="contained"
+                                onKeyDown={this.cancelSpacebar.bind(this)}
                             >
                                 <Typography>Home</Typography>
                             </Button>
@@ -1917,11 +1924,13 @@ export class App extends AppPixi {
                                 Globular Marauders
                             </Typography>
                             <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.autoPilotEnabled}
-                                                                 onChange={this.handleAutoPilotEnabled.bind(this)} icon={<TvOff/>} checkedIcon={<Tv/>} color="default" />} label="AutoPilot"/>
+                                                                 onKeyDown={this.cancelSpacebar.bind(this)} onChange={this.handleAutoPilotEnabled.bind(this)} icon={<TvOff/>} checkedIcon={<Tv/>} color="default" />} label="AutoPilot"/>
                             <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.audioEnabled}
-                                                                 onChange={this.handleAudioEnabled.bind(this)} icon={<MusicOff/>} checkedIcon={<MusicNote/>} color="default" />} label="Audio"/>
-                            <Button variant="contained" color="secondary" onClick={this.handleShowScoreboard.bind(this)}>Scoreboard</Button>
-                            <Button variant="contained" color="secondary" onClick={this.handleShowSettings.bind(this)}>Settings</Button>
+                                                                 onKeyDown={this.cancelSpacebar.bind(this)} onChange={this.handleAudioEnabled.bind(this)} icon={<MusicOff/>} checkedIcon={<MusicNote/>} color="default" />} label="Audio"/>
+                            <Button variant="contained" color="secondary"
+                                    onKeyDown={this.cancelSpacebar.bind(this)} onClick={this.handleShowScoreboard.bind(this)}>Scoreboard</Button>
+                            <Button variant="contained" color="secondary"
+                                    onKeyDown={this.cancelSpacebar.bind(this)} onClick={this.handleShowSettings.bind(this)}>Settings</Button>
                         </Toolbar>
                     </AppBar>
                     <div className="AppMain" ref={this.measureAppBodyRef}>
@@ -1941,7 +1950,8 @@ export class App extends AppPixi {
                                                             this.state.init ? (
                                                                 <Fragment>
                                                                     <TextField fullWidth value={this.state.userName} onChange={this.handleUserName.bind(this)} label={"Username"} placeholder="PirateDude" helperText="A fun name to sow dread into your enemies"/>
-                                                                    <Button fullWidth variant="contained" onClick={this.handleLogin.bind(this)}>Login</Button>
+                                                                    <Button fullWidth variant="contained"
+                                                                            onKeyDown={this.cancelSpacebar.bind(this)} onClick={this.handleLogin.bind(this)}>Login</Button>
                                                                 </Fragment>
                                                             ) : (
                                                                 <Typography>Connecting to server...</Typography>
@@ -1959,7 +1969,8 @@ export class App extends AppPixi {
                                                     <Grid item xs={12}>
                                                     </Grid>
                                                     <Grid item xs={12}>
-                                                        <Button fullWidth variant="contained" onClick={this.goToPlanetMenu.bind(this)}>Next</Button>
+                                                        <Button fullWidth variant="contained"
+                                                                onKeyDown={this.cancelSpacebar.bind(this)} onClick={this.goToPlanetMenu.bind(this)}>Next</Button>
                                                     </Grid>
                                                 </Grid>
                                                 <Paper style={{maxHeight: "40vh", overflow: "auto", backgroundColor: "none"}}>
@@ -2014,10 +2025,12 @@ export class App extends AppPixi {
                                             <Grid item xs={12} justifyContent="center" alignItems="center" style={{marginTop: "20vh"}}>
                                                 <Grid container>
                                                     <Grid item xs={12}>
-                                                        <Button fullWidth variant="contained" onClick={this.returnToFactionMenu.bind(this)}>Back</Button>
+                                                        <Button fullWidth variant="contained"
+                                                                onKeyDown={this.cancelSpacebar.bind(this)} onClick={this.returnToFactionMenu.bind(this)}>Back</Button>
                                                     </Grid>
                                                     <Grid item xs={12}>
-                                                        <Button fullWidth variant="contained" onClick={this.goToSpawnMenu.bind(this)}>Next</Button>
+                                                        <Button fullWidth variant="contained"
+                                                                onKeyDown={this.cancelSpacebar.bind(this)} onClick={this.goToSpawnMenu.bind(this)}>Next</Button>
                                                     </Grid>
                                                 </Grid>
                                                 <Paper style={{maxHeight: "40vh", overflow: "auto", backgroundColor: "none"}}>
@@ -2078,10 +2091,12 @@ export class App extends AppPixi {
                                             <Grid item xs={12} justifyContent="center" alignItems="center" style={{marginTop: "20vh"}}>
                                                 <Grid container>
                                                     <Grid item xs={12}>
-                                                        <Button fullWidth variant="contained" onClick={this.returnToPlanetMenu.bind(this)}>Back</Button>
+                                                        <Button fullWidth variant="contained"
+                                                                onKeyDown={this.cancelSpacebar.bind(this)} onClick={this.returnToPlanetMenu.bind(this)}>Back</Button>
                                                     </Grid>
                                                     <Grid item xs={12}>
-                                                        <Button fullWidth variant="contained" onClick={this.spawnShip.bind(this)}>Next</Button>
+                                                        <Button fullWidth variant="contained"
+                                                                onKeyDown={this.cancelSpacebar.bind(this)} onClick={this.spawnShip.bind(this)}>Next</Button>
                                                     </Grid>
                                                 </Grid>
                                                 <Paper style={{maxHeight: "40vh", overflow: "auto", backgroundColor: "none"}}>
@@ -2312,15 +2327,15 @@ export class App extends AppPixi {
                                         <Grid container spacing={2}>
                                             <Grid item>
                                                 <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.showShips}
-                                                                                     onChange={this.handleShowShips.bind(this)}/>} label="Show Ships"/>
+                                                                                     onKeyDown={this.cancelSpacebar.bind(this)} onChange={this.handleShowShips.bind(this)}/>} label="Show Ships"/>
                                             </Grid>
                                             <Grid item>
                                                 <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.showItems}
-                                                                                     onChange={this.handleShowItems.bind(this)}/>} label="Show Items"/>
+                                                                                     onKeyDown={this.cancelSpacebar.bind(this)} onChange={this.handleShowItems.bind(this)}/>} label="Show Items"/>
                                             </Grid>
                                             <Grid item>
                                                 <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.showVoronoi}
-                                                                                     onChange={this.handleShowVoronoi.bind(this)}/>} label="Show Voronoi"/>
+                                                                                     onKeyDown={this.cancelSpacebar.bind(this)} onChange={this.handleShowVoronoi.bind(this)}/>} label="Show Voronoi"/>
                                                 <RadioGroup name="Voronoi Mode" value={this.state.voronoiMode} onChange={(e, value) => this.handleChangeVoronoi(value as EVoronoiMode)}>
                                                     <Grid container spacing={2}>
                                                         <Grid item xs={4}>
