@@ -47,6 +47,13 @@ export interface IAppProps {
     worldScale?: number;
 }
 
+export enum EGameMode {
+    MAIN_MENU,
+    TUTORIAL,
+    SINGLE_PLAYER,
+    MULTI_PLAYER
+}
+
 /**
  * The state of the app.
  */
@@ -76,6 +83,7 @@ export interface IAppState {
     spawnShipType: EShipType | null;
     userName: string;
     numNetworkFrames: number;
+    gameMode: EGameMode;
 }
 
 export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
@@ -99,12 +107,13 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         init: false as boolean,
         showScoreboard: false as boolean,
         showSettings: false as boolean,
-        showLoginMenu: true as boolean,
+        showLoginMenu: false as boolean,
         showMainMenu: false as boolean,
         showPlanetMenu: false as boolean,
         showSpawnMenu: false as boolean,
         userName: "" as string,
         numNetworkFrames: 0 as number,
+        gameMode: EGameMode.MAIN_MENU,
     };
     public game: Game = new Game();
     public playerId: string | null = null;

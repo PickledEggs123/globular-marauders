@@ -63,7 +63,7 @@ import {
     FormControlLabel,
     Grid,
     List,
-    ListItem,
+    ListItem, ListItemAvatar,
     ListItemText,
     Paper,
     Radio,
@@ -81,12 +81,13 @@ import {createStyles, makeStyles} from "@mui/styles";
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import {DEFAULT_IMAGE, EVoronoiMode, RESOURCE_TYPE_TEXTURE_PAIRS, SPACE_BACKGROUND_TEXTURES} from "./Data";
-import {AppPixi, IAppProps} from "./AppPixi";
-import {DirectionsBoat, MusicNote, MusicOff, Public, Tv, TvOff} from "@mui/icons-material";
+import {AppPixi, EGameMode, IAppProps} from "./AppPixi";
+import {DirectionsBoat, MusicNote, MusicOff, People, Public, School, SmartToy, Tv, TvOff} from "@mui/icons-material";
 import {EOrderType} from "@pickledeggs123/globular-marauders-game/lib/src/Order";
 import {EInvasionPhase, Invasion} from "@pickledeggs123/globular-marauders-game/lib/src/Invasion";
 import {ReactComponent as Pirate} from "./icons/pirate.svg";
 import {ReactComponent as Attack} from "./icons/attack.svg";
+import {MoneyAccount} from "@pickledeggs123/globular-marauders-game/src/Interface";
 
 const GetFactionSubheader = (faction: EFaction): string | null => {
     switch (faction) {
@@ -209,29 +210,7 @@ export class App extends AppPixi {
         return old.clone();
     };
 
-    constructor(props: IAppProps) {
-        super(props);
-
-        // setup rendering
-        this.application = new PIXI.Application({
-            width: this.state.width,
-            height: this.state.height,
-            backgroundColor: 0xff110022,
-        });
-        this.application.stage.sortableChildren = true;
-        // this.application.stage.mask = new Graphics()
-        //     .beginFill(0xffffff)
-        //     .drawCircle(this.application.stage.width / 2, this.application.stage.height / 2,
-        //         Math.min(this.application.stage.width, this.application.stage.height) / 2)
-        //     .endFill();
-
-        // draw app
-        this.game.initializeGame();
-
-        // draw rotating app
-        let cameraPosition: Quaternion = Quaternion.ONE;
-        let cameraOrientation: Quaternion = Quaternion.ONE;
-
+    loadSoundIntoMemory = () => {
         // load sounds into memory
         sound.add(ESoundType.FIRE, {url: "sounds/FireSFX.m4a", preload: true});
         sound.add(ESoundType.HIT, {url: "sounds/WoodHitSFX.m4a", preload: true});
@@ -240,7 +219,9 @@ export class App extends AppPixi {
         sound.add(ESoundType.MONEY, {url: "sounds/MoneySFX.m4a", preload: true});
         sound.add(ESoundType.LAND, {url: "sounds/RoyalSFX.m4a", preload: true});
         sound.add(ESoundType.LOOT, {url: "sounds/LootSFX.m4a", preload: true});
+    };
 
+    loadSpritesIntoMemory = () => {
         // load sprites into memory
         const loader = new PIXI.Loader();
 
@@ -277,6 +258,101 @@ export class App extends AppPixi {
                 }
             }
         });
+    };
+
+    handleSwitchGameMode = (gameMode: EGameMode) => {
+        if (this.state.gameMode === EGameMode.MULTI_PLAYER && gameMode !== EGameMode.MULTI_PLAYER && this.socket) {
+            this.socket.close();
+            this.setState({
+                showSpawnMenu: false,
+                showPlanetMenu: false,
+                showMainMenu: false,
+                showLoginMenu: false,
+                init: false,
+            });
+        }
+        switch (gameMode) {
+            case EGameMode.MAIN_MENU: {
+                break;
+            }
+            case EGameMode.TUTORIAL: {
+                // initialize game
+                this.game = new Game();
+                const tutorialServer: Game = new Game();
+                tutorialServer.worldScale = 1;
+                tutorialServer.voronoiTerrain.setRecursionNodeLevels([5, 3, 1]);
+                tutorialServer.spawnAiShips = false;
+                tutorialServer.initializeGame();
+
+                // add player
+                const tutorialPlayerData: IPlayerData = {
+                    id: "pirateDude",
+                    name: "Pirate Dude",
+                    factionId: EFaction.DUTCH,
+                    planetId: null,
+                    shipId: "",
+                    activeKeys: [],
+                    moneyAccount: new MoneyAccount(0),
+                    autoPilotEnabled: false,
+                    aiNodeName: undefined,
+                };
+                tutorialServer.playerData.set(tutorialPlayerData.id, tutorialPlayerData);
+
+                this.game.applyGameInitializationFrame(tutorialServer.getInitializationFrame());
+                this.initialized = true;
+                // setInterval(() => {
+                //     tutorialServer.handleServerLoop();
+                //     for (const [_, message] of tutorialServer.outgoingMessages) {
+                //         this.handleGenericMessage(message);
+                //     }
+                //     tutorialServer.outgoingMessages.splice(0, tutorialServer.outgoingMessages.length);
+                // }, 100);
+
+                break;
+            }
+            case EGameMode.SINGLE_PLAYER: {
+                break;
+            }
+            case EGameMode.MULTI_PLAYER: {
+                this.setState({
+                    showSpawnMenu: false,
+                    showPlanetMenu: false,
+                    showMainMenu: false,
+                    showLoginMenu: true,
+                    init: false,
+                });
+                // setup networking
+                this.setupNetworking.call(this, false);
+            }
+        }
+        this.setState({gameMode});
+    }
+
+    constructor(props: IAppProps) {
+        super(props);
+
+        // setup rendering
+        this.application = new PIXI.Application({
+            width: this.state.width,
+            height: this.state.height,
+            backgroundColor: 0xff110022,
+        });
+        this.application.stage.sortableChildren = true;
+        // this.application.stage.mask = new Graphics()
+        //     .beginFill(0xffffff)
+        //     .drawCircle(this.application.stage.width / 2, this.application.stage.height / 2,
+        //         Math.min(this.application.stage.width, this.application.stage.height) / 2)
+        //     .endFill();
+
+        // draw app
+        this.game.initializeGame();
+
+        // draw rotating app
+        let cameraPosition: Quaternion = Quaternion.ONE;
+        let cameraOrientation: Quaternion = Quaternion.ONE;
+
+        this.loadSoundIntoMemory();
+        this.loadSpritesIntoMemory();
 
         const handleDrawingOfText = (text: PIXI.Text, position: Quaternion, offset?: {x: number, y: number}) => {
             const textPosition = DelaunayGraph.distanceFormula(
@@ -959,9 +1035,6 @@ export class App extends AppPixi {
                 shader.uniforms.uCameraScale = this.state.zoom;
             }
         });
-
-        // setup networking
-        this.setupNetworking.call(this, false);
     }
 
     continuousSounds = new Map<string, IMediaInstance>();
@@ -1013,7 +1086,81 @@ export class App extends AppPixi {
         }
     }
 
+    handleSendWorld = (data: IGameInitializationFrame) => {
+        this.setState({
+            showSpawnMenu: false,
+            showPlanetMenu: false,
+            showMainMenu: true,
+            showLoginMenu: false,
+        });
+        this.game.applyGameInitializationFrame(data);
+        this.initialized = true;
+        setTimeout(() => {
+            this.sendMessage("init-loop");
+        }, 500);
+    };
+
+    handleSendFrame = (data: IGameSyncFrame) => {
+        this.numNetworkFrames += 1;
+        setTimeout(() => {
+            this.numNetworkFrames -= 1;
+        }, 1000);
+
+        const playerData = (this.playerId && this.game.playerData.get(this.playerId)) ?? null;
+        if (playerData) {
+            const ship = this.game.ships.get(playerData.shipId);
+            const shipData = data.ships.update.find(s => s.id === playerData.shipId);
+            if (ship && shipData && !playerData.autoPilotEnabled) {
+                // cancel server position if the position difference is small
+                if (VoronoiGraph.angularDistance(
+                    ship.position.rotateVector([0, 0, 1]),
+                    DeserializeQuaternion(shipData.position).rotateVector([0, 0, 1]),
+                    this.game.worldScale
+                ) < PHYSICS_SCALE * 100) {
+                    shipData.position = SerializeQuaternion(ship.position);
+                    shipData.positionVelocity = SerializeQuaternion(ship.positionVelocity);
+                    shipData.orientation = SerializeQuaternion(ship.orientation);
+                    shipData.orientationVelocity = SerializeQuaternion(ship.orientationVelocity);
+                    shipData.cannonLoading = ship.cannonLoading;
+                    shipData.cannonCoolDown = ship.cannonCoolDown;
+                    shipData.cannonadeCoolDown = ship.cannonadeCoolDown;
+                }
+            }
+        }
+        this.game.applyGameSyncFrame(data);
+        this.resetClientLoop();
+        this.handleSoundEffects(true);
+    };
+
+    handleSendPlayers = (data: { players: IPlayerData[], playerId: string }) => {
+        this.game.playerData = new Map<string, IPlayerData>();
+        data.players.forEach((d) => {
+            this.game.playerData.set(d.id, d);
+        });
+        this.playerId = data.playerId;
+    };
+
+    handleGenericMessage = (data: IMessage) => {
+        this.messages.push(data);
+    };
+
+    handleSpawnFactions = (data: ISpawnFaction[]) => {
+        this.spawnFactions = data;
+    };
+
+    handleSpawnPlanets = (data: ISpawnPlanet[]) => {
+        this.spawnPlanets = data;
+    };
+
+    handleSpawnLocations = (data: ISpawnLocationResult) => {
+        this.spawnLocations = data;
+    };
+
     setupNetworking(autoLogin: boolean) {
+        if (this.state.gameMode !== EGameMode.MULTI_PLAYER) {
+            return;
+        }
+
         this.socket = new SockJS(window.location.protocol + "//" + window.location.hostname + ":" + (this.shardPortNumber ?? 4000) + "/game");
         this.socket.onerror = (err) => {
             console.log("Failed to connect", err);
@@ -1069,71 +1216,15 @@ export class App extends AppPixi {
                 this.socket.close();
             }
         };
-        this.socketEvents["send-world"] = (data: IGameInitializationFrame) => {
-            this.setState({
-                showSpawnMenu: false,
-                showPlanetMenu: false,
-                showMainMenu: true,
-                showLoginMenu: false,
-            });
-            this.game.applyGameInitializationFrame(data);
-            this.initialized = true;
-            setTimeout(() => {
-                this.sendMessage("init-loop");
-            }, 500);
-        };
+        this.socketEvents["send-world"] = this.handleSendWorld;
         this.socketEvents["ack-init-loop"] = () => {
         };
-        this.socketEvents["send-frame"] = (data: IGameSyncFrame) => {
-            this.numNetworkFrames += 1;
-            setTimeout(() => {
-                this.numNetworkFrames -= 1;
-            }, 1000);
-
-            const playerData = (this.playerId && this.game.playerData.get(this.playerId)) ?? null;
-            if (playerData) {
-                const ship = this.game.ships.get(playerData.shipId);
-                const shipData = data.ships.update.find(s => s.id === playerData.shipId);
-                if (ship && shipData && !playerData.autoPilotEnabled) {
-                    // cancel server position if the position difference is small
-                    if (VoronoiGraph.angularDistance(
-                        ship.position.rotateVector([0, 0, 1]),
-                        DeserializeQuaternion(shipData.position).rotateVector([0, 0, 1]),
-                        this.game.worldScale
-                    ) < PHYSICS_SCALE * 100) {
-                        shipData.position = SerializeQuaternion(ship.position);
-                        shipData.positionVelocity = SerializeQuaternion(ship.positionVelocity);
-                        shipData.orientation = SerializeQuaternion(ship.orientation);
-                        shipData.orientationVelocity = SerializeQuaternion(ship.orientationVelocity);
-                        shipData.cannonLoading = ship.cannonLoading;
-                        shipData.cannonCoolDown = ship.cannonCoolDown;
-                        shipData.cannonadeCoolDown = ship.cannonadeCoolDown;
-                    }
-                }
-            }
-            this.game.applyGameSyncFrame(data);
-            this.resetClientLoop();
-            this.handleSoundEffects(true);
-        };
-        this.socketEvents["send-players"] = (data: { players: IPlayerData[], playerId: string }) => {
-            this.game.playerData = new Map<string, IPlayerData>();
-            data.players.forEach((d) => {
-                this.game.playerData.set(d.id, d);
-            });
-            this.playerId = data.playerId;
-        };
-        this.socketEvents["generic-message"] = (data: IMessage) => {
-            this.messages.push(data);
-        };
-        this.socketEvents["send-spawn-factions"] = (data: ISpawnFaction[]) => {
-            this.spawnFactions = data;
-        };
-        this.socketEvents["send-spawn-planets"] = (data: ISpawnPlanet[]) => {
-            this.spawnPlanets = data;
-        };
-        this.socketEvents["send-spawn-locations"] = (data: ISpawnLocationResult) => {
-            this.spawnLocations = data;
-        };
+        this.socketEvents["send-frame"] = this.handleSendFrame;
+        this.socketEvents["send-players"] = this.handleSendPlayers;
+        this.socketEvents["generic-message"] = this.handleGenericMessage;
+        this.socketEvents["send-spawn-factions"] = this.handleSpawnFactions;
+        this.socketEvents["send-spawn-planets"] = this.handleSpawnPlanets;
+        this.socketEvents["send-spawn-locations"] = this.handleSpawnLocations;
     }
 
     /**
@@ -1940,6 +2031,37 @@ export class App extends AppPixi {
                         <div className="AppMainContent">
                             <div style={{position: "absolute", top: this.state.marginTop, left: this.state.marginLeft, bottom: this.state.marginBottom, right: this.state.marginRight}}>
                                 <Grid container direction="column" justifyContent="center" alignItems="center" spacing={2} xs={12}>
+                                    {
+                                        this.state.gameMode === EGameMode.MAIN_MENU ? (
+                                            <Grid item xs={12} justifyContent="center" alignItems="center" onWheel={(e) => {e.preventDefault();}}>
+                                                <Card>
+                                                    <CardHeader title="Globular Marauders"/>
+                                                    <CardContent>
+                                                        <List>
+                                                            <ListItem onClick={this.handleSwitchGameMode.bind(this, EGameMode.TUTORIAL)}>
+                                                                <ListItemAvatar>
+                                                                    <School/>
+                                                                </ListItemAvatar>
+                                                                <ListItemText>Tutorial</ListItemText>
+                                                            </ListItem>
+                                                            <ListItem onClick={this.handleSwitchGameMode.bind(this, EGameMode.SINGLE_PLAYER)}>
+                                                                <ListItemAvatar>
+                                                                    <SmartToy/>
+                                                                </ListItemAvatar>
+                                                                <ListItemText>Single Player</ListItemText>
+                                                            </ListItem>
+                                                            <ListItem onClick={this.handleSwitchGameMode.bind(this, EGameMode.MULTI_PLAYER)}>
+                                                                <ListItemAvatar>
+                                                                    <People/>
+                                                                </ListItemAvatar>
+                                                                <ListItemText>Multiplayer</ListItemText>
+                                                            </ListItem>
+                                                        </List>
+                                                    </CardContent>
+                                                </Card>
+                                            </Grid>
+                                        ) : null
+                                    }
                                     {
                                         this.state.showLoginMenu ? (
                                             <Grid item xs={12} justifyContent="center" alignItems="center">
