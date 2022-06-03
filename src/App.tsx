@@ -3,7 +3,7 @@ import './App.css';
 import Quaternion from "quaternion";
 import SockJS from "sockjs-client";
 import * as PIXI from "pixi.js";
-import {IMediaInstance, PlayOptions, sound} from "@pixi/sound";
+import {IMediaInstance, PlayOptions, Sound, sound} from "@pixi/sound";
 import {EResourceType, ITEM_DATA} from "@pickledeggs123/globular-marauders-game/lib/src/Resource";
 import {
     ICameraState,
@@ -394,6 +394,9 @@ export class App extends AppPixi {
                         this.game.outgoingMessages.push(["pirateDude", message]);
                     });
 
+                    // disable keyboard
+                    tutorialPlayerData.filterActiveKeys = [];
+
                     // pick spawn location
                     while (true) {
                         const spawnLocations = sendSpawnLocations();
@@ -409,6 +412,113 @@ export class App extends AppPixi {
                         this.game.outgoingMessages.push(["pirateDude", spawnMessage]);
                         break;
                     }
+
+                    // play intro
+                    {
+                        let introSoundComplete: boolean = false;
+                        const introSound = Sound.from({
+                            url: "audio/tutorial/TutorialWelcomeZoom.m4a",
+                            autoplay: true,
+                            complete: () => {
+                                introSoundComplete = true;
+                            }
+                        });
+                        introSound.play();
+                        let zoomOut: boolean = false;
+                        while (!zoomOut) {
+                            if (this.state.zoom * this.game.worldScale <= 2) {
+                                zoomOut = true;
+                            }
+                            if (zoomOut) {
+                                break;
+                            }
+                            yield;
+                        }
+                        let zoomIn: boolean = false;
+                        while (!zoomIn) {
+                            if (this.state.zoom * this.game.worldScale >= 8) {
+                                zoomIn = true;
+                            }
+                            if (zoomIn) {
+                                break;
+                            }
+                            yield;
+                        }
+                        if (!introSoundComplete) {
+                            introSound.stop();
+                        }
+                    }
+
+                    // play movement
+                    {
+                        tutorialPlayerData.filterActiveKeys = ["w"];
+                        let movementSoundComplete: boolean = false;
+                        const movementSound = Sound.from({
+                            url: "audio/tutorial/TutorialMovement.m4a",
+                            autoplay: true,
+                            complete: () => {
+                                movementSoundComplete = true;
+                            }
+                        });
+                        movementSound.play();
+                        // speed up
+                        let forward: boolean = false;
+                        while (!forward) {
+                            if (this.activeKeys.includes("w")) {
+                                forward = true;
+                            }
+                            if (forward) {
+                                break;
+                            }
+                            yield;
+                        }
+                        for (let i = 0; i < 10; i++) {
+                            yield;
+                        }
+                        // drift forward
+                        let coast: boolean = false;
+                        while (!coast) {
+                            if (!this.activeKeys.includes("w")) {
+                                coast = true;
+                            }
+                            if (coast) {
+                                break;
+                            }
+                            yield;
+                        }
+                        for (let i = 0; i < 10; i++) {
+                            yield;
+                        }
+                        // slow down
+                        tutorialPlayerData.filterActiveKeys = ["w", "s"];
+                        let slowDown: boolean = false;
+                        while (!slowDown) {
+                            if (this.activeKeys.includes("s")) {
+                                slowDown = true;
+                            }
+                            if (slowDown) {
+                                break;
+                            }
+                            yield;
+                        }
+                        for (let i = 0; i < 10; i++) {
+                            yield;
+                        }
+                        // stop
+                        let stopped: boolean = false;
+                        while (!stopped) {
+                            if (this.findPlayerShip() && VoronoiGraph.angularDistanceQuaternion(this.findPlayerShip()!.positionVelocity, this.game.worldScale) <= Game.VELOCITY_STEP * Math.PI / 2 * 3) {
+                                stopped = true;
+                            }
+                            if (stopped) {
+                                break;
+                            }
+                            yield;
+                        }
+                        if (!movementSoundComplete) {
+                            movementSound.stop();
+                        }
+                    }
                 }).call(this));
                 setInterval(() => {
                     this.game.outgoingMessages.splice(0, this.game.outgoingMessages.length);
@@ -417,11 +527,17 @@ export class App extends AppPixi {
                     // perform client side movement
                     if (tutorialPlayerData && !tutorialPlayerData.autoPilotEnabled) {
                         if (this.game.ships.has(tutorialPlayerData.shipId)) {
-                            this.game.handleShipLoop(tutorialPlayerData.shipId, () => this.activeKeys, false);
+                            this.game.handleShipLoop(tutorialPlayerData.shipId, () => {
+                                if (tutorialPlayerData.filterActiveKeys) {
+                                    return this.activeKeys.filter(x => tutorialPlayerData.filterActiveKeys!.includes(x));
+                                } else {
+                                    return this.activeKeys;
+                                }
+                            }, false);
                         }
                     }
 
-                    for (const [_, message] of this.game.outgoingMessages) {
+                    for (const [, message] of this.game.outgoingMessages) {
                         this.handleSendFrame(sendFrame());
                         this.handleSendPlayers(sendPlayers());
                         this.game.incomingMessages.push(["pirateDude", message]);
