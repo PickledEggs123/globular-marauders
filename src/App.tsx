@@ -37,6 +37,7 @@ import {
     IChoosePlanetMessage,
     IGameInitializationFrame,
     IGameSyncFrame,
+    IJoinMessage,
     IMessage,
     IPlayerData,
     ISpawnFaction,
@@ -63,7 +64,8 @@ import {
     FormControlLabel,
     Grid,
     List,
-    ListItem, ListItemAvatar,
+    ListItem,
+    ListItemAvatar,
     ListItemText,
     Paper,
     Radio,
@@ -87,7 +89,6 @@ import {EOrderType} from "@pickledeggs123/globular-marauders-game/lib/src/Order"
 import {EInvasionPhase, Invasion} from "@pickledeggs123/globular-marauders-game/lib/src/Invasion";
 import {ReactComponent as Pirate} from "./icons/pirate.svg";
 import {ReactComponent as Attack} from "./icons/attack.svg";
-import {MoneyAccount} from "@pickledeggs123/globular-marauders-game/src/Interface";
 
 const GetFactionSubheader = (faction: EFaction): string | null => {
     switch (faction) {
@@ -278,35 +279,154 @@ export class App extends AppPixi {
             case EGameMode.TUTORIAL: {
                 // initialize game
                 this.game = new Game();
-                const tutorialServer: Game = new Game();
-                tutorialServer.worldScale = 1;
-                tutorialServer.voronoiTerrain.setRecursionNodeLevels([5, 3, 1]);
-                tutorialServer.spawnAiShips = false;
-                tutorialServer.initializeGame();
+                this.clearMeshes = true;
+                this.game.worldScale = 4;
+                this.game.voronoiTerrain.setRecursionNodeLevels([5, 3, 1]);
+                this.game.spawnAiShips = false;
+                this.game.initializeGame();
 
                 // add player
-                const tutorialPlayerData: IPlayerData = {
-                    id: "pirateDude",
-                    name: "Pirate Dude",
-                    factionId: EFaction.DUTCH,
-                    planetId: null,
-                    shipId: "",
-                    activeKeys: [],
-                    moneyAccount: new MoneyAccount(0),
-                    autoPilotEnabled: false,
-                    aiNodeName: undefined,
+                const joinMessage: IJoinMessage = {
+                    messageType: EMessageType.JOIN,
+                    name: "pirateDude"
                 };
-                tutorialServer.playerData.set(tutorialPlayerData.id, tutorialPlayerData);
+                this.game.incomingMessages.push(["pirateDude", joinMessage]);
+                this.game.handleServerLoop();
+                const tutorialPlayerData = this.game.playerData.get("pirateDude")!;
 
-                this.game.applyGameInitializationFrame(tutorialServer.getInitializationFrame());
+                const sendFrame = () => {
+                    const playerData = tutorialPlayerData;
+                    if (!playerData) {
+                        throw new Error("Could not find player data");
+                    }
+                    const playerShip = this.game.ships.get(playerData.shipId);
+                    let position: [number, number, number] = [0, 0, 1];
+                    if (playerShip) {
+                        // get frame centered on player ship
+                        position = playerShip.position.rotateVector([0, 0, 1]);
+                    } else if (playerData.planetId) {
+                        // get frame centered on last faction ship
+                        const planet = this.game.planets.get(playerData.planetId);
+                        if (planet) {
+                            position = planet.position.rotateVector([0, 0, 1]);
+                        }
+                    } else if (playerData.factionId) {
+                        // get frame centered on last faction ship
+                        const faction = this.game.factions.get(playerData.factionId)!;
+                        const lastShipId = faction.shipIds[faction.shipIds.length - 1];
+                        if (lastShipId) {
+                            const ship = this.game.ships.get(lastShipId);
+                            if (ship) {
+                                position = ship.position.rotateVector([0, 0, 1]);
+                            }
+                        }
+                    } else {
+                        // get random orbiting frame in over world
+                        const numSecondsToCircle = 120 * this.game.worldScale;
+                        const millisecondsPerSecond = 1000;
+                        const circleSlice = numSecondsToCircle * millisecondsPerSecond;
+                        const circleFraction = (+new Date() % circleSlice) / circleSlice;
+                        const angle = circleFraction * (Math.PI * 2);
+                        position = Quaternion.fromAxisAngle([1, 0, 0], -angle).rotateVector([0, 0, 1]);
+                    }
+                    return this.game.voronoiTerrain.getClientFrame(playerData, position);
+                };
+                const sendPlayers = () => {
+                    return {
+                        players: Array.from(this.game.playerData.values()),
+                        playerId: tutorialPlayerData.id
+                    };
+                };
+                const sendSpawnFactions = () => {
+                    return this.game.getSpawnFactions();
+                }
+                const sendSpawnPlanets = () => {
+                    const player = tutorialPlayerData;
+                    if (player) {
+                        return this.game.getSpawnPlanets(player);
+                    } else {
+                        return null;
+                    }
+                };
+                const sendSpawnLocations = () => {
+                    const player = tutorialPlayerData;
+                    if (player) {
+                        return this.game.getSpawnLocations(player);
+                    } else {
+                        return null;
+                    }
+                };
                 this.initialized = true;
-                // setInterval(() => {
-                //     tutorialServer.handleServerLoop();
-                //     for (const [_, message] of tutorialServer.outgoingMessages) {
-                //         this.handleGenericMessage(message);
-                //     }
-                //     tutorialServer.outgoingMessages.splice(0, tutorialServer.outgoingMessages.length);
-                // }, 100);
+                this.game.scriptEvents.push((function*(this: App) {
+                    // pick dutch
+                    const chooseFactionMessage: IChooseFactionMessage = {
+                        messageType: EMessageType.CHOOSE_FACTION,
+                        factionId: EFaction.DUTCH,
+                    };
+                    this.game.outgoingMessages.push(["pirateDude", chooseFactionMessage]);
+
+                    // pick first planet
+                    let planetId: string | undefined;
+                    while (true) {
+                        const spawnPlanets = sendSpawnPlanets();
+                        if (!(spawnPlanets && spawnPlanets[0])) {
+                            yield;
+                            continue;
+                        }
+                        planetId = spawnPlanets![0].planetId;
+                        const choosePlanetMessage: IChoosePlanetMessage = {
+                            messageType: EMessageType.CHOOSE_PLANET,
+                            planetId: planetId!,
+                        };
+                        this.game.outgoingMessages.push(["pirateDude", choosePlanetMessage]);
+                        break;
+                    }
+
+                    // disable autopilot
+                    this.setState({
+                        ...this.state,
+                        autoPilotEnabled: false,
+                    }, () => {
+                        const message: IAutoPilotMessage = {
+                            messageType: EMessageType.AUTOPILOT,
+                            enabled: false
+                        };
+                        this.game.outgoingMessages.push(["pirateDude", message]);
+                    });
+
+                    // pick spawn location
+                    while (true) {
+                        const spawnLocations = sendSpawnLocations();
+                        if (!(spawnLocations && spawnLocations.results[0])) {
+                            yield;
+                            continue;
+                        }
+                        const spawnMessage: ISpawnMessage = {
+                            messageType: EMessageType.SPAWN,
+                            planetId: planetId!,
+                            shipType: spawnLocations.results[0]!.shipType
+                        };
+                        this.game.outgoingMessages.push(["pirateDude", spawnMessage]);
+                        break;
+                    }
+                }).call(this));
+                setInterval(() => {
+                    this.game.outgoingMessages.splice(0, this.game.outgoingMessages.length);
+                    this.game.handleServerLoop();
+
+                    // perform client side movement
+                    if (tutorialPlayerData && !tutorialPlayerData.autoPilotEnabled) {
+                        if (this.game.ships.has(tutorialPlayerData.shipId)) {
+                            this.game.handleShipLoop(tutorialPlayerData.shipId, () => this.activeKeys, false);
+                        }
+                    }
+
+                    for (const [_, message] of this.game.outgoingMessages) {
+                        this.handleSendFrame(sendFrame());
+                        this.handleSendPlayers(sendPlayers());
+                        this.game.incomingMessages.push(["pirateDude", message]);
+                    }
+                }, 100);
 
                 break;
             }
@@ -425,10 +545,10 @@ export class App extends AppPixi {
                     });
                 }
             }
-            for (const item of this.starMeshes.filter(m => m.tick !== pixiTick)) {
+            for (const item of this.starMeshes.filter(m => m.tick !== pixiTick || this.clearMeshes)) {
                 this.application.stage.removeChild(item.mesh);
             }
-            this.starMeshes = this.starMeshes.filter(m => m.tick === pixiTick);
+            this.starMeshes = this.starMeshes.filter(m => m.tick === pixiTick && !this.clearMeshes);
             // planets
             for (const planet of Array.from(this.game.voronoiTerrain.getPlanets(cameraPosition.rotateVector([0, 0, 1])))) {
                 const planetMesh = this.planetMeshes.find(p => p.id === planet.id);
@@ -449,7 +569,7 @@ export class App extends AppPixi {
                     });
                 }
             }
-            for (const item of this.planetMeshes.filter(m => m.tick !== pixiTick)) {
+            for (const item of this.planetMeshes.filter(m => m.tick !== pixiTick || this.clearMeshes)) {
                 this.application.stage.removeChild(item.mesh);
                 this.application.stage.removeChild(item.faction);
                 this.application.stage.removeChild(item.textName);
@@ -458,7 +578,7 @@ export class App extends AppPixi {
                 this.application.stage.removeChild(item.textResource2);
                 this.application.stage.removeChild(item.textResource3);
             }
-            this.planetMeshes = this.planetMeshes.filter(m => m.tick === pixiTick);
+            this.planetMeshes = this.planetMeshes.filter(m => m.tick === pixiTick && !this.clearMeshes);
             // ships
             for (const [, ship] of Array.from(this.game.ships)) {
                 const shipMesh = this.shipMeshes.find(s => s.id === ship.id);
@@ -509,7 +629,7 @@ export class App extends AppPixi {
                     });
                 }
             }
-            for (const item of this.shipMeshes.filter(m => m.tick !== pixiTick)) {
+            for (const item of this.shipMeshes.filter(m => m.tick !== pixiTick || this.clearMeshes)) {
                 this.application.stage.removeChild(item.mesh);
                 this.application.stage.removeChild(item.text);
                 this.application.stage.removeChild(item.line);
@@ -521,7 +641,7 @@ export class App extends AppPixi {
                 }
                 item.autoPilotLines.splice(0, item.autoPilotLines.length);
             }
-            this.shipMeshes = this.shipMeshes.filter(m => m.tick === pixiTick);
+            this.shipMeshes = this.shipMeshes.filter(m => m.tick === pixiTick && !this.clearMeshes);
             // cannonBalls
             for (const [, cannonBall] of Array.from(this.game.cannonBalls)) {
                 const cannonBallMesh = this.cannonBallMeshes.find(c => c.id === cannonBall.id);
@@ -538,10 +658,10 @@ export class App extends AppPixi {
                     });
                 }
             }
-            for (const item of this.cannonBallMeshes.filter(m => m.tick !== pixiTick)) {
+            for (const item of this.cannonBallMeshes.filter(m => m.tick !== pixiTick || this.clearMeshes)) {
                 this.application.stage.removeChild(item.mesh);
             }
-            this.cannonBallMeshes = this.cannonBallMeshes.filter(m => m.tick === pixiTick);
+            this.cannonBallMeshes = this.cannonBallMeshes.filter(m => m.tick === pixiTick && !this.clearMeshes);
             // crates
             for (const [, crate] of Array.from(this.game.crates)) {
                 const createMesh = this.crateMeshes.find(c => c.id === crate.id);
@@ -558,11 +678,11 @@ export class App extends AppPixi {
                     });
                 }
             }
-            for (const item of this.crateMeshes.filter(m => m.tick !== pixiTick)) {
+            for (const item of this.crateMeshes.filter(m => m.tick !== pixiTick || this.clearMeshes)) {
                 this.application.stage.removeChild(item.mesh);
                 this.application.stage.removeChild(item.image);
             }
-            this.crateMeshes = this.crateMeshes.filter(m => m.tick === pixiTick);
+            this.crateMeshes = this.crateMeshes.filter(m => m.tick === pixiTick && !this.clearMeshes);
 
             // voronoi tiles
             if (this.state.showVoronoi) {
@@ -607,10 +727,10 @@ export class App extends AppPixi {
                     }
                 }
             }
-            for (const item of this.voronoiMeshes.filter(m => m.tick !== pixiTick)) {
+            for (const item of this.voronoiMeshes.filter(m => m.tick !== pixiTick || this.clearMeshes)) {
                 this.application.stage.removeChild(item.mesh);
             }
-            this.voronoiMeshes = this.voronoiMeshes.filter(m => m.tick === pixiTick);
+            this.voronoiMeshes = this.voronoiMeshes.filter(m => m.tick === pixiTick && !this.clearMeshes);
 
             // background voronoi tiles
             const backgroundVoronoiDataStuff = this.backgroundVoronoiData.reduce((acc, {id, voronoi}) => {
@@ -678,10 +798,12 @@ export class App extends AppPixi {
                     });
                 }
             }
-            for (const item of this.backgroundVoronoiMeshes.filter(m => m.tick !== pixiTick)) {
+            for (const item of this.backgroundVoronoiMeshes.filter(m => m.tick !== pixiTick || this.clearMeshes)) {
                 this.application.stage.removeChild(item.mesh);
             }
-            this.backgroundVoronoiMeshes = this.backgroundVoronoiMeshes.filter(m => m.tick === pixiTick);
+            this.backgroundVoronoiMeshes = this.backgroundVoronoiMeshes.filter(m => m.tick === pixiTick && !this.clearMeshes);
+
+            this.clearMeshes = false;
 
             const updateMeshIfVisible = (item: {position: Quaternion, mesh: PIXI.Mesh<any>}) => {
                 const shipPoint = DelaunayGraph.distanceFormula(
@@ -701,6 +823,7 @@ export class App extends AppPixi {
                 shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraScale = this.state.zoom;
+                updateMeshIfVisible(item);
             }
 
             // update each planet
@@ -714,6 +837,7 @@ export class App extends AppPixi {
                 shader.uniforms.uCameraOrientationInv = cameraOrientation.clone().toMatrix4();
                 shader.uniforms.uCameraScale = this.state.zoom;
                 shader.uniforms.uOrientation = this.convertOrientationToDisplay(item.orientation).toMatrix4();
+                updateMeshIfVisible(item);
 
                 if (item.factionColor) {
                     const startPoint = DelaunayGraph.distanceFormula(
@@ -1189,6 +1313,7 @@ export class App extends AppPixi {
             this.initialized = false;
             this.music.stop();
             this.game = new Game();
+            this.clearMeshes = true;
             this.game.worldScale = 4;
             this.game.initializeGame();
             this.setState({

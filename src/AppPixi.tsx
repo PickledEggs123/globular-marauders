@@ -838,8 +838,11 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         };
     })();
 
+    clearMeshes: boolean = false;
     starMeshes: Array<{
-        id: string, mesh: PIXI.Mesh<PIXI.Shader>,
+        id: string,
+        mesh: PIXI.Mesh<PIXI.Shader>,
+        position: Quaternion,
         tick: number
     }> = [];
     planetMeshes: Array<{
@@ -938,6 +941,7 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         this.starMeshes.push({
             id: star.id,
             mesh,
+            position: star.position.clone(),
             tick
         });
     };
