@@ -6,6 +6,8 @@ import * as PIXI from "pixi.js";
 import {IMediaInstance, PlayOptions, Sound, sound} from "@pixi/sound";
 import {EResourceType, ITEM_DATA} from "@pickledeggs123/globular-marauders-game/lib/src/Resource";
 import {
+    EAutomatedShipBuffType,
+    IAutomatedShipBuff,
     ICameraState,
     ICameraStateWithOriginal,
     IDrawable,
@@ -85,7 +87,7 @@ import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import {DEFAULT_IMAGE, EVoronoiMode, RESOURCE_TYPE_TEXTURE_PAIRS, SPACE_BACKGROUND_TEXTURES} from "./Data";
 import {AppPixi, EGameMode, IAppProps} from "./AppPixi";
 import {DirectionsBoat, MusicNote, MusicOff, People, Public, School, SmartToy, Tv, TvOff} from "@mui/icons-material";
-import {EOrderType} from "@pickledeggs123/globular-marauders-game/lib/src/Order";
+import {EOrderType, Order} from "@pickledeggs123/globular-marauders-game/lib/src/Order";
 import {EInvasionPhase, Invasion} from "@pickledeggs123/globular-marauders-game/lib/src/Invasion";
 import {ReactComponent as Pirate} from "./icons/pirate.svg";
 import {ReactComponent as Attack} from "./icons/attack.svg";
@@ -358,165 +360,354 @@ export class App extends AppPixi {
                 };
                 this.initialized = true;
                 this.game.scriptEvents.push((function*(this: App) {
-                    // pick dutch
-                    const chooseFactionMessage: IChooseFactionMessage = {
-                        messageType: EMessageType.CHOOSE_FACTION,
-                        factionId: EFaction.DUTCH,
-                    };
-                    this.game.outgoingMessages.push(["pirateDude", chooseFactionMessage]);
-
-                    // pick first planet
-                    let planetId: string | undefined;
-                    while (true) {
-                        const spawnPlanets = sendSpawnPlanets();
-                        if (!(spawnPlanets && spawnPlanets[0])) {
-                            yield;
-                            continue;
-                        }
-                        planetId = spawnPlanets![0].planetId;
-                        const choosePlanetMessage: IChoosePlanetMessage = {
-                            messageType: EMessageType.CHOOSE_PLANET,
-                            planetId: planetId!,
-                        };
-                        this.game.outgoingMessages.push(["pirateDude", choosePlanetMessage]);
-                        break;
-                    }
-
-                    // disable autopilot
-                    this.setState({
-                        ...this.state,
-                        autoPilotEnabled: false,
-                    }, () => {
-                        const message: IAutoPilotMessage = {
-                            messageType: EMessageType.AUTOPILOT,
-                            enabled: false
-                        };
+                    const sendMessage = (message: IMessage) => {
                         this.game.outgoingMessages.push(["pirateDude", message]);
-                    });
-
-                    // disable keyboard
-                    tutorialPlayerData.filterActiveKeys = [];
-
-                    // pick spawn location
-                    while (true) {
-                        const spawnLocations = sendSpawnLocations();
-                        if (!(spawnLocations && spawnLocations.results[0])) {
-                            yield;
-                            continue;
-                        }
-                        const spawnMessage: ISpawnMessage = {
-                            messageType: EMessageType.SPAWN,
-                            planetId: planetId!,
-                            shipType: spawnLocations.results[0]!.shipType
-                        };
-                        this.game.outgoingMessages.push(["pirateDude", spawnMessage]);
-                        break;
-                    }
-
-                    // play intro
-                    {
-                        let introSoundComplete: boolean = false;
-                        const introSound = Sound.from({
-                            url: "audio/tutorial/TutorialWelcomeZoom.m4a",
-                            autoplay: true,
-                            complete: () => {
-                                introSoundComplete = true;
-                            }
-                        });
-                        introSound.play();
-                        let zoomOut: boolean = false;
-                        while (!zoomOut) {
-                            if (this.state.zoom * this.game.worldScale <= 2) {
-                                zoomOut = true;
-                            }
-                            if (zoomOut) {
+                    };
+                    const waitForValue = (check: () => boolean, save: () => void): IterableIterator<void> => {
+                        return (function*(this: App) {
+                            while (true) {
+                                if (!(check())) {
+                                    yield;
+                                    continue;
+                                }
+                                save();
                                 break;
                             }
-                            yield;
-                        }
-                        let zoomIn: boolean = false;
-                        while (!zoomIn) {
-                            if (this.state.zoom * this.game.worldScale >= 8) {
-                                zoomIn = true;
+                        }).call(this);
+                    };
+                    const waitFor = (numTicks: number): IterableIterator<void> => {
+                        return (function*(this: App) {
+                            for (let i = 0; i < numTicks; i++) {
+                                yield;
                             }
-                            if (zoomIn) {
-                                break;
-                            }
-                            yield;
-                        }
-                        if (!introSoundComplete) {
-                            introSound.stop();
-                        }
-                    }
+                        }).call(this);
+                    };
 
-                    // play movement
-                    {
-                        tutorialPlayerData.filterActiveKeys = ["w"];
-                        let movementSoundComplete: boolean = false;
-                        const movementSound = Sound.from({
-                            url: "audio/tutorial/TutorialMovement.m4a",
-                            autoplay: true,
-                            complete: () => {
-                                movementSoundComplete = true;
+                    const context: {
+                        planetId: string | undefined;
+                        shipType: EShipType | undefined;
+                        tutorialSound: Sound | undefined;
+                        tutorialSoundComplete: boolean;
+                    } = {
+                        planetId: undefined,
+                        shipType: undefined,
+                        tutorialSound: undefined,
+                        tutorialSoundComplete: false,
+                    };
+                    const handlePlaySound = () => {
+                        const instance = context.tutorialSound!.play();
+                        context.tutorialSoundComplete = false;
+                        if ("on" in instance) {
+                            instance.on("end", () => {
+                                context.tutorialSoundComplete = true;
+                            });
+                        } else {
+                            instance.then((i) => {
+                                i.on("end", () => {
+                                    context.tutorialSoundComplete = true;
+                                });
+                            });
+                        }
+                    };
+
+                    const actions: Array<IterableIterator<void>> = [
+                        // login as tutorial player
+                        //
+                        // pick dutch
+                        (function*(this: App) {
+                            const chooseFactionMessage: IChooseFactionMessage = {
+                                messageType: EMessageType.CHOOSE_FACTION,
+                                factionId: EFaction.DUTCH,
+                            };
+                            sendMessage(chooseFactionMessage);
+                            yield;
+                        }).call(this),
+                        // pick first planet
+                        waitForValue(() => {
+                            const spawnPlanets = sendSpawnPlanets();
+                            return !!spawnPlanets && !!spawnPlanets[0];
+                        }, () => {
+                            const spawnPlanets = sendSpawnPlanets();
+                            context.planetId = spawnPlanets![0].planetId;
+                        }),
+                        (function*(this: App) {
+                            const choosePlanetMessage: IChoosePlanetMessage = {
+                                messageType: EMessageType.CHOOSE_PLANET,
+                                planetId: context.planetId!,
+                            };
+                            sendMessage(choosePlanetMessage);
+                            yield;
+                        }).call(this),
+                        // disable autopilot
+                        (function*(this: App) {
+                            this.setState({
+                                ...this.state,
+                                autoPilotEnabled: false,
+                            }, () => {
+                                const message: IAutoPilotMessage = {
+                                    messageType: EMessageType.AUTOPILOT,
+                                    enabled: false
+                                };
+                                this.game.outgoingMessages.push(["pirateDude", message]);
+                            });
+                            yield;
+                        }).call(this),
+                        // disable keyboard
+                        (function*(this: App) {
+                            tutorialPlayerData.filterActiveKeys = [];
+                            yield;
+                        }).call(this),
+                        // pick spawn location
+                        waitForValue(() => {
+                            const spawnLocations = sendSpawnLocations();
+                            return !!spawnLocations && !!spawnLocations.results[0];
+                        }, () => {
+                            const spawnLocations = sendSpawnLocations();
+                            context.shipType = spawnLocations!.results[0]!.shipType;
+                        }),
+                        (function*(this: App) {
+                            const spawnMessage: ISpawnMessage = {
+                                messageType: EMessageType.SPAWN,
+                                planetId: context.planetId!,
+                                shipType: context.shipType!
+                            };
+                            sendMessage(spawnMessage);
+                            yield;
+                        }).call(this),
+
+                        // zoom tutorial
+                        //
+                        // play intro
+                        (function*(this: App) {
+                            context.tutorialSound = Sound.from({
+                                url: "audio/tutorial/TutorialWelcomeZoom.m4a",
+                                autoplay: true,
+                            });
+                            handlePlaySound();
+                            yield;
+                        }).call(this),
+                        waitForValue(() => {
+                            return this.state.zoom * this.game.worldScale <= 2;
+                        }, () => {}),
+                        waitForValue(() => {
+                            return this.state.zoom * this.game.worldScale >= 8;
+                        }, () => {}),
+                        (function*(this: App) {
+                            if (!context.tutorialSoundComplete) {
+                                context.tutorialSound!.stop();
                             }
-                        });
-                        movementSound.play();
+                            yield;
+                        }).call(this),
+
+                        // movement tutorial
+                        //
+                        // play movement
+                        (function*(this: App) {
+                            tutorialPlayerData.filterActiveKeys = ["w"];
+                            yield;
+                        }).call(this),
+                        (function*(this: App) {
+                            context.tutorialSound = Sound.from({
+                                url: "audio/tutorial/TutorialMovement.m4a",
+                                autoplay: true,
+                            });
+                            handlePlaySound();
+                            yield;
+                        }).call(this),
                         // speed up
-                        let forward: boolean = false;
-                        while (!forward) {
-                            if (this.activeKeys.includes("w")) {
-                                forward = true;
-                            }
-                            if (forward) {
-                                break;
-                            }
-                            yield;
-                        }
-                        for (let i = 0; i < 10; i++) {
-                            yield;
-                        }
+                        waitForValue(() => {
+                            return this.activeKeys.includes("w");
+                        }, () => {}),
+                        waitFor(10),
                         // drift forward
-                        let coast: boolean = false;
-                        while (!coast) {
-                            if (!this.activeKeys.includes("w")) {
-                                coast = true;
-                            }
-                            if (coast) {
-                                break;
-                            }
-                            yield;
-                        }
-                        for (let i = 0; i < 10; i++) {
-                            yield;
-                        }
+                        waitForValue(() => {
+                            return !this.activeKeys.includes("w");
+                        }, () => {}),
+                        waitFor(10),
                         // slow down
-                        tutorialPlayerData.filterActiveKeys = ["w", "s"];
-                        let slowDown: boolean = false;
-                        while (!slowDown) {
-                            if (this.activeKeys.includes("s")) {
-                                slowDown = true;
-                            }
-                            if (slowDown) {
-                                break;
-                            }
+                        (function*(this: App) {
+                            tutorialPlayerData.filterActiveKeys = ["w", "s"];
                             yield;
-                        }
-                        for (let i = 0; i < 10; i++) {
-                            yield;
-                        }
+                        }).call(this),
+                        waitForValue(() => {
+                            return this.activeKeys.includes("s");
+                        }, () => {}),
+                        waitFor(10),
                         // stop
-                        let stopped: boolean = false;
-                        while (!stopped) {
-                            if (this.findPlayerShip() && VoronoiGraph.angularDistanceQuaternion(this.findPlayerShip()!.positionVelocity, this.game.worldScale) <= Game.VELOCITY_STEP * Math.PI / 2 * 3) {
-                                stopped = true;
-                            }
-                            if (stopped) {
-                                break;
+                        waitForValue(() => {
+                            return !!this.findPlayerShip() && VoronoiGraph.angularDistanceQuaternion(this.findPlayerShip()!.positionVelocity, this.game.worldScale) <= Game.VELOCITY_STEP * Math.PI / 2 * 3;
+                        }, () => {}),
+                        (function*(this: App) {
+                            if (!context.tutorialSoundComplete) {
+                                context.tutorialSound!.stop();
                             }
                             yield;
-                        }
-                        if (!movementSoundComplete) {
-                            movementSound.stop();
+                        }).call(this),
+
+                        // rotate tutorial
+                        //
+                        // play rotate
+                        (function*(this: App) {
+                            tutorialPlayerData.filterActiveKeys = ["w", "s", "d"];
+                            yield;
+                        }).call(this),
+                        (function*(this: App) {
+                            context.tutorialSound = Sound.from({
+                                url: "audio/tutorial/TutorialRotate.m4a",
+                                autoplay: true,
+                            });
+                            handlePlaySound();
+                            yield;
+                        }).call(this),
+                        // speed up
+                        waitForValue(() => {
+                            return this.activeKeys.includes("d");
+                        }, () => {}),
+                        waitFor(10),
+                        // drift left
+                        waitForValue(() => {
+                            return !this.activeKeys.includes("d");
+                        }, () => {}),
+                        waitFor(10),
+                        // slow down
+                        (function*(this: App) {
+                            tutorialPlayerData.filterActiveKeys = ["w", "a", "s", "d"];
+                            yield;
+                        }).call(this),
+                        waitForValue(() => {
+                            return this.activeKeys.includes("a");
+                        }, () => {}),
+                        waitFor(10),
+                        // stop
+                        waitForValue(() => {
+                            return !!this.findPlayerShip() && VoronoiGraph.angularDistanceQuaternion(this.findPlayerShip()!.orientationVelocity, 1) < Game.ROTATION_STEP * Math.PI / 2 * 1;
+                        }, () => {}),
+                        (function*(this: App) {
+                            if (!context.tutorialSoundComplete) {
+                                context.tutorialSound!.stop();
+                            }
+                            yield;
+                        }).call(this),
+
+                        // movement and rotation done
+                        (function*(this: App) {
+                            context.tutorialSound = Sound.from({
+                                url: "audio/tutorial/TutorialRotateDone.m4a",
+                                autoplay: true,
+                            });
+                            handlePlaySound();
+                            yield;
+                        }).call(this),
+                        (function*(this: App) {
+                            while (!context.tutorialSoundComplete) {
+                                yield;
+                            }
+                        }).call(this),
+
+                        // press space bar
+                        (function*(this: App) {
+                            tutorialPlayerData.filterActiveKeys = ["w", "a", "s", "d", " "];
+                            yield;
+                        }).call(this),
+                        (function*(this: App) {
+                            context.tutorialSound = Sound.from({
+                                url: "audio/tutorial/TutorialPressSpacebar.m4a",
+                                autoplay: true,
+                            });
+                            handlePlaySound();
+                            yield;
+                        }).call(this),
+                        // space bar
+                        waitForValue(() => {
+                            return this.activeKeys.includes(" ");
+                        }, () => {}),
+                        (function*(this: App) {
+                            if (!context.tutorialSoundComplete) {
+                                context.tutorialSound!.stop();
+                            }
+                            yield;
+                        }).call(this),
+
+                        // attack enemy ship
+                        (function*(this: App) {
+                            tutorialPlayerData.filterActiveKeys = undefined;
+                            yield;
+                        }).call(this),
+                        (function*(this: App) {
+                            context.tutorialSound = Sound.from({
+                                url: "audio/tutorial/TutorialPleaseDestroyEnemyShip.m4a",
+                                autoplay: true,
+                            });
+                            handlePlaySound();
+                            yield;
+                        }).call(this),
+                        (function*(this: App) {
+                            const englishFaction = this.game.factions.get(EFaction.ENGLISH)!;
+                            const englishHomeWorld = this.game.planets.get(englishFaction.homeWorldPlanetId)!;
+                            englishHomeWorld.spawnEventShip(tutorialPlayerData.moneyAccount, EShipType.CUTTER, (ship) => {
+                                const playerShip = this.getPlayerShip()!;
+                                ship.position = playerShip.position.clone().mul(Quaternion.fromBetweenVectors([0, 0, 1], playerShip.orientation.rotateVector([1, 0, 0])).pow(Game.VELOCITY_STEP * 300));
+                                const disabledBuff: IAutomatedShipBuff = {
+                                    buffType: EAutomatedShipBuffType.DISABLED,
+                                    expireTicks: 24 * 60 * 60 * 10,
+                                };
+                                const order = new Order(this.game, ship, ship.faction!);
+                                order.orderType = EOrderType.ROAM;
+                                order.expireTicks = 24 * 60 * 60 * 10;
+                                ship.orders[0] = order;
+                                ship.buffs.push(disabledBuff);
+                                ship.cargo[0] = {
+                                    sourcePlanetId: englishHomeWorld.id,
+                                    resourceType: EResourceType.CACAO,
+                                    amount: 1,
+                                    pirated: false,
+                                };
+                            });
+                            yield;
+                        }).call(this),
+                        // destroyed ship
+                        waitForValue(() => {
+                            const englishFaction = this.game.factions.get(EFaction.ENGLISH)!;
+                            return englishFaction.shipIds.length === 0;
+                        }, () => {}),
+                        (function*(this: App) {
+                            if (!context.tutorialSoundComplete) {
+                                context.tutorialSound!.stop();
+                            }
+                            yield;
+                        }).call(this),
+
+                        // deliver pirate cargo
+                        (function*(this: App) {
+                            context.tutorialSound = Sound.from({
+                                url: "audio/tutorial/TutorialPirate.m4a",
+                                autoplay: true,
+                            });
+                            handlePlaySound();
+                            yield;
+                        }).call(this),
+                        // picked up cargo
+                        waitForValue(() => {
+                            return !!this.findPlayerShip()!.cargo[0];
+                        }, () => {}),
+                        // delivered cargo
+                        waitForValue(() => {
+                            return !this.findPlayerShip()!.cargo[0];
+                        }, () => {}),
+                        (function*(this: App) {
+                            if (!context.tutorialSoundComplete) {
+                                context.tutorialSound!.stop();
+                            }
+                            yield;
+                        }).call(this),
+                    ];
+
+                    while (actions.length > 0) {
+                        const result = actions[0]!.next();
+                        if (result.done) {
+                            actions.shift();
+                        } else {
+                            yield;
                         }
                     }
                 }).call(this));
@@ -538,7 +729,6 @@ export class App extends AppPixi {
                     }
 
                     for (const [, message] of this.game.outgoingMessages) {
-                        this.handleSendFrame(sendFrame());
                         this.handleSendPlayers(sendPlayers());
                         this.game.incomingMessages.push(["pirateDude", message]);
                     }
