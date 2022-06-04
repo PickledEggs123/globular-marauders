@@ -54,12 +54,11 @@
   },
   "devDependencies": {
     "@types/enzyme": "^3.10.8",
-    "@types/enzyme-adapter-react-16": "^1.0.6",
     "@types/pixi.js": "^5.0.0",
     "@types/sinon": "^10.0.0",
     "@types/sockjs-client": "^1.5.0",
+    "@wojtekmaj/enzyme-adapter-react-17": "^0.6.7",
     "enzyme": "^3.11.0",
-    "enzyme-adapter-react-16": "^1.15.6",
     "sinon": "^10.0.0"
   }
 }
