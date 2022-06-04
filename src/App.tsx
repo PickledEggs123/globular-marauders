@@ -69,7 +69,7 @@ import {
     ListItem,
     ListItemAvatar,
     ListItemText,
-    Paper, Popper,
+    Paper,
     Radio,
     RadioGroup,
     Stack,
@@ -297,43 +297,6 @@ export class App extends AppPixi {
                 this.game.handleServerLoop();
                 const tutorialPlayerData = this.game.playerData.get("pirateDude")!;
 
-                const sendFrame = () => {
-                    const playerData = tutorialPlayerData;
-                    if (!playerData) {
-                        throw new Error("Could not find player data");
-                    }
-                    const playerShip = this.game.ships.get(playerData.shipId);
-                    let position: [number, number, number] = [0, 0, 1];
-                    if (playerShip) {
-                        // get frame centered on player ship
-                        position = playerShip.position.rotateVector([0, 0, 1]);
-                    } else if (playerData.planetId) {
-                        // get frame centered on last faction ship
-                        const planet = this.game.planets.get(playerData.planetId);
-                        if (planet) {
-                            position = planet.position.rotateVector([0, 0, 1]);
-                        }
-                    } else if (playerData.factionId) {
-                        // get frame centered on last faction ship
-                        const faction = this.game.factions.get(playerData.factionId)!;
-                        const lastShipId = faction.shipIds[faction.shipIds.length - 1];
-                        if (lastShipId) {
-                            const ship = this.game.ships.get(lastShipId);
-                            if (ship) {
-                                position = ship.position.rotateVector([0, 0, 1]);
-                            }
-                        }
-                    } else {
-                        // get random orbiting frame in over world
-                        const numSecondsToCircle = 120 * this.game.worldScale;
-                        const millisecondsPerSecond = 1000;
-                        const circleSlice = numSecondsToCircle * millisecondsPerSecond;
-                        const circleFraction = (+new Date() % circleSlice) / circleSlice;
-                        const angle = circleFraction * (Math.PI * 2);
-                        position = Quaternion.fromAxisAngle([1, 0, 0], -angle).rotateVector([0, 0, 1]);
-                    }
-                    return this.game.voronoiTerrain.getClientFrame(playerData, position);
-                };
                 const sendPlayers = () => {
                     return {
                         players: Array.from(this.game.playerData.values()),
@@ -756,8 +719,8 @@ export class App extends AppPixi {
                         }
                     }
 
+                    this.handleSendPlayers(sendPlayers());
                     for (const [, message] of this.game.outgoingMessages) {
-                        this.handleSendPlayers(sendPlayers());
                         this.game.incomingMessages.push(["pirateDude", message]);
                     }
                 }, 100);
@@ -765,6 +728,87 @@ export class App extends AppPixi {
                 break;
             }
             case EGameMode.SINGLE_PLAYER: {
+                // initialize game
+                this.game = new Game();
+                this.clearMeshes = true;
+                this.game.worldScale = 4;
+                this.game.initializeGame();
+
+                // add player
+                const joinMessage: IJoinMessage = {
+                    messageType: EMessageType.JOIN,
+                    name: "pirateDude"
+                };
+                this.game.incomingMessages.push(["pirateDude", joinMessage]);
+                this.game.handleServerLoop();
+                const tutorialPlayerData = this.game.playerData.get("pirateDude")!;
+
+                const sendPlayers = () => {
+                    return {
+                        players: Array.from(this.game.playerData.values()),
+                        playerId: tutorialPlayerData.id
+                    };
+                };
+                const sendSpawnFactions = () => {
+                    return this.game.getSpawnFactions();
+                }
+                const sendSpawnPlanets = () => {
+                    const player = tutorialPlayerData;
+                    if (player) {
+                        return this.game.getSpawnPlanets(player);
+                    } else {
+                        return null;
+                    }
+                };
+                const sendSpawnLocations = () => {
+                    const player = tutorialPlayerData;
+                    if (player) {
+                        return this.game.getSpawnLocations(player);
+                    } else {
+                        return null;
+                    }
+                };
+                this.initialized = true;
+
+                this.setState({
+                    showSpawnMenu: false,
+                    showPlanetMenu: false,
+                    showMainMenu: true,
+                    showLoginMenu: false,
+                    init: true,
+                });
+
+                setInterval(() => {
+                    this.game.outgoingMessages.splice(0, this.game.outgoingMessages.length);
+                    this.game.handleServerLoop();
+
+                    // perform client side movement
+                    if (tutorialPlayerData && !tutorialPlayerData.autoPilotEnabled) {
+                        if (this.game.ships.has(tutorialPlayerData.shipId)) {
+                            this.game.handleShipLoop(tutorialPlayerData.shipId, () => {
+                                if (tutorialPlayerData.filterActiveKeys) {
+                                    return this.activeKeys.filter(x => tutorialPlayerData.filterActiveKeys!.includes(x));
+                                } else {
+                                    return this.activeKeys;
+                                }
+                            }, false);
+                        }
+                    }
+
+                    this.handleSendPlayers(sendPlayers());
+                    this.handleSpawnFactions(sendSpawnFactions());
+                    this.handleSpawnPlanets(sendSpawnPlanets() ?? []);
+                    this.handleSpawnLocations(sendSpawnLocations() ?? {results:[], message: undefined});
+                    for (const [, message] of this.game.outgoingMessages) {
+                        if (message.messageType === EMessageType.DEATH) {
+                            this.setState({
+                                showPlanetMenu: true
+                            });
+                        } else {
+                            this.game.incomingMessages.push(["pirateDude", message]);
+                        }
+                    }
+                }, 100);
                 break;
             }
             case EGameMode.MULTI_PLAYER: {
@@ -2005,6 +2049,9 @@ export class App extends AppPixi {
             if (this.socket) {
                 this.sendMessage("generic-message", message);
             }
+            if (this.state.gameMode === EGameMode.SINGLE_PLAYER) {
+                this.game.incomingMessages.push(["pirateDude", message]);
+            }
         });
     }
 
@@ -2222,18 +2269,23 @@ export class App extends AppPixi {
     }
 
     public goToPlanetMenu() {
-        if (this.socket && this.state.faction) {
+        const message: IChooseFactionMessage = {
+            messageType: EMessageType.CHOOSE_FACTION,
+            factionId: this.state.faction
+        };
+        if (this.state.faction) {
             this.setState({
                 showSpawnMenu: false,
                 showPlanetMenu: true,
                 showMainMenu: false,
                 showLoginMenu: false,
             });
-            const message: IChooseFactionMessage = {
-                messageType: EMessageType.CHOOSE_FACTION,
-                factionId: this.state.faction
-            };
-            this.sendMessage("generic-message", message);
+            if (this.socket) {
+                this.sendMessage("generic-message", message);
+            }
+            if (this.state.gameMode === EGameMode.SINGLE_PLAYER) {
+                this.game.incomingMessages.push(["pirateDude", message]);
+            }
         }
     }
 
@@ -2274,6 +2326,9 @@ export class App extends AppPixi {
             if (this.socket) {
                 this.sendMessage("generic-message", message);
             }
+            if (this.state.gameMode === EGameMode.SINGLE_PLAYER) {
+                this.game.incomingMessages.push(["pirateDude", message]);
+            }
         } else {
             this.returnToFactionMenu();
         }
@@ -2288,12 +2343,15 @@ export class App extends AppPixi {
             planetId: null,
             spawnShipType: null,
         }, () => {
+            const message: IChoosePlanetMessage = {
+                messageType: EMessageType.CHOOSE_PLANET,
+                planetId: null
+            };
             if (this.socket) {
-                const message: IChoosePlanetMessage = {
-                    messageType: EMessageType.CHOOSE_PLANET,
-                    planetId: null
-                };
                 this.sendMessage("generic-message", message);
+            }
+            if (this.state.gameMode === EGameMode.SINGLE_PLAYER) {
+                this.game.incomingMessages.push(["pirateDude", message]);
             }
         });
     }
@@ -2325,6 +2383,9 @@ export class App extends AppPixi {
             if (this.socket) {
                 this.sendMessage("generic-message", message);
             }
+            if (this.state.gameMode === EGameMode.SINGLE_PLAYER) {
+                this.game.incomingMessages.push(["pirateDude", message]);
+            }
         } else {
             this.returnToPlanetMenu();
         }
@@ -2338,12 +2399,15 @@ export class App extends AppPixi {
             showLoginMenu: false,
             planetId: null,
         }, () => {
+            const message: IChoosePlanetMessage = {
+                messageType: EMessageType.CHOOSE_PLANET,
+                planetId: null
+            };
             if (this.socket) {
-                const message: IChoosePlanetMessage = {
-                    messageType: EMessageType.CHOOSE_PLANET,
-                    planetId: null
-                };
                 this.sendMessage("generic-message", message);
+            }
+            if (this.state.gameMode === EGameMode.SINGLE_PLAYER) {
+                this.game.incomingMessages.push(["pirateDude", message]);
             }
         });
     }
@@ -2357,12 +2421,15 @@ export class App extends AppPixi {
             faction: null,
             planetId: null,
         }, () => {
+            const message: IChooseFactionMessage = {
+                messageType: EMessageType.CHOOSE_FACTION,
+                factionId: null
+            };
             if (this.socket) {
-                const message: IChooseFactionMessage = {
-                    messageType: EMessageType.CHOOSE_FACTION,
-                    factionId: null
-                };
                 this.sendMessage("generic-message", message);
+            }
+            if (this.state.gameMode === EGameMode.SINGLE_PLAYER) {
+                this.game.incomingMessages.push(["pirateDude", message]);
             }
         });
     }
