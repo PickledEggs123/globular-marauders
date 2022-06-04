@@ -67,3 +67,39 @@
   bottom: 0;
   right: 0;
 }
+
+.wasd-image-w .keyboard-image-w polygon {
+  stroke: orange;
+  fill: orangered;
+}
+.wasd-image-w .keyboard-image-w polygon {
+  fill: orangered;
+}
+.wasd-image-a .keyboard-image-a polygon {
+  stroke: orange;
+  fill: orangered;
+}
+.wasd-image-a .keyboard-image-a polygon {
+  fill: orangered;
+}
+.wasd-image-s .keyboard-image-s polygon {
+  stroke: orange;
+  fill: orangered;
+}
+.wasd-image-s .keyboard-image-s polygon {
+  fill: orangered;
+}
+.wasd-image-d .keyboard-image-d polygon {
+  stroke: orange;
+  fill: orangered;
+}
+.wasd-image-d .keyboard-image-d polygon {
+  fill: orangered;
+}
+.wasd-image-space .keyboard-image-space polygon {
+  stroke: orange;
+  fill: orangered;
+}
+.wasd-image-space .keyboard-image-space polygon {
+  fill: orangered;
+}

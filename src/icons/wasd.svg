@@ -1,0 +1,141 @@
+<svg viewBox="-50 -30 200 130" fill="transparent" xmlns="http://www.w3.org/2000/svg">
+    <g transform="translate(-20, -20)" class="keyboard-image-w">
+        <polygon
+                fill="grey"
+                stroke="darkgray"
+                stroke-width="3"
+                points="0,30 30,0 35,10 35,35 5,35"
+        />
+        <polygon
+                fill="grey"
+                stroke="darkgray"
+                stroke-width="3"
+                points="0,0 30,0 30,30 0,30"
+        />
+        <text fill="black" text-anchor="middle" font-size="24" x="15" y="25">W</text>
+    </g>
+    <g transform="translate(-45, 10)" class="keyboard-image-a">
+        <polygon
+                fill="grey"
+                stroke="darkgray"
+                stroke-width="3"
+                points="0,30 30,0 35,10 35,35 5,35"
+        />
+        <polygon
+                fill="grey"
+                stroke="darkgray"
+                stroke-width="3"
+                points="0,0 30,0 30,30 0,30"
+        />
+        <text fill="black" text-anchor="middle" font-size="24" x="15" y="25">A</text>
+    </g>
+    <g transform="translate(-15, 10)" class="keyboard-image-s">
+        <polygon
+                fill="grey"
+                stroke="darkgray"
+                stroke-width="3"
+                points="0,30 30,0 35,10 35,35 5,35"
+        />
+        <polygon
+                fill="grey"
+                stroke="darkgray"
+                stroke-width="3"
+                points="0,0 30,0 30,30 0,30"
+        />
+        <text fill="black" text-anchor="middle" font-size="24" x="15" y="25">S</text>
+    </g>
+    <g transform="translate(15, 10)" class="keyboard-image-d">
+        <polygon
+                fill="grey"
+                stroke="darkgray"
+                stroke-width="3"
+                points="0,30 30,0 35,10 35,35 5,35"
+        />
+        <polygon
+                fill="grey"
+                stroke="darkgray"
+                stroke-width="3"
+                points="0,0 30,0 30,30 0,30"
+        />
+        <text fill="black" text-anchor="middle" font-size="24" x="15" y="25">D</text>
+    </g>
+
+
+    <g transform="translate(85, -20)" class="keyboard-image-w">
+        <polygon
+                fill="grey"
+                stroke="darkgray"
+                stroke-width="3"
+                points="0,30 30,0 35,10 35,35 5,35"
+        />
+        <polygon
+                fill="grey"
+                stroke="darkgray"
+                stroke-width="3"
+                points="0,0 30,0 30,30 0,30"
+        />
+        <text fill="black" text-anchor="middle" font-size="24" x="15" y="20">↑</text>
+    </g>
+    <g transform="translate(55, 10)" class="keyboard-image-a">
+        <polygon
+                fill="grey"
+                stroke="darkgray"
+                stroke-width="3"
+                points="0,30 30,0 35,10 35,35 5,35"
+        />
+        <polygon
+                fill="grey"
+                stroke="darkgray"
+                stroke-width="3"
+                points="0,0 30,0 30,30 0,30"
+        />
+        <text fill="black" text-anchor="middle" font-size="24" x="15" y="20">←</text>
+    </g>
+    <g transform="translate(85, 10)" class="keyboard-image-s">
+        <polygon
+                fill="grey"
+                stroke="darkgray"
+                stroke-width="3"
+                points="0,30 30,0 35,10 35,35 5,35"
+        />
+        <polygon
+                fill="grey"
+                stroke="darkgray"
+                stroke-width="3"
+                points="0,0 30,0 30,30 0,30"
+        />
+        <text fill="black" text-anchor="middle" font-size="24" x="15" y="20">↓</text>
+    </g>
+    <g transform="translate(115, 10)" class="keyboard-image-d">
+        <polygon
+                fill="grey"
+                stroke="darkgray"
+                stroke-width="3"
+                points="0,30 30,0 35,10 35,35 5,35"
+        />
+        <polygon
+                fill="grey"
+                stroke="darkgray"
+                stroke-width="3"
+                points="0,0 30,0 30,30 0,30"
+        />
+        <text fill="black" text-anchor="middle" font-size="24" x="15" y="20">→</text>
+    </g>
+
+
+    <g transform="translate(0, 50)" class="keyboard-image-space">
+        <polygon
+                fill="grey"
+                stroke="darkgray"
+                stroke-width="3"
+                points="0,30 100,0 105,10 105,35 5,35"
+        />
+        <polygon
+                fill="grey"
+                stroke="darkgray"
+                stroke-width="3"
+                points="0,0 100,0 100,30 0,30"
+        />
+        <text fill="black" text-anchor="middle" font-size="24" x="50" y="22">Space</text>
+    </g>
+</svg>

@@ -69,7 +69,7 @@ import {
     ListItem,
     ListItemAvatar,
     ListItemText,
-    Paper,
+    Paper, Popper,
     Radio,
     RadioGroup,
     Stack,
@@ -91,6 +91,7 @@ import {EOrderType, Order} from "@pickledeggs123/globular-marauders-game/lib/src
 import {EInvasionPhase, Invasion} from "@pickledeggs123/globular-marauders-game/lib/src/Invasion";
 import {ReactComponent as Pirate} from "./icons/pirate.svg";
 import {ReactComponent as Attack} from "./icons/attack.svg";
+import {ReactComponent as Wasd} from "./icons/wasd.svg";
 
 const GetFactionSubheader = (faction: EFaction): string | null => {
     switch (faction) {
@@ -409,6 +410,12 @@ export class App extends AppPixi {
                             });
                         }
                     };
+                    const setKeyboardImageClass = (keyboardImageClass: string | undefined) => {
+                        return (function*(this: App) {
+                            this.setState({keyboardImageClass});
+                            yield;
+                        }).call(this);
+                    };
 
                     const actions: Array<IterableIterator<void>> = [
                         // login as tutorial player
@@ -506,6 +513,7 @@ export class App extends AppPixi {
                             tutorialPlayerData.filterActiveKeys = ["w"];
                             yield;
                         }).call(this),
+                        setKeyboardImageClass("w"),
                         (function*(this: App) {
                             context.tutorialSound = Sound.from({
                                 url: "audio/tutorial/TutorialMovement.m4a",
@@ -529,6 +537,7 @@ export class App extends AppPixi {
                             tutorialPlayerData.filterActiveKeys = ["w", "s"];
                             yield;
                         }).call(this),
+                        setKeyboardImageClass("s"),
                         waitForValue(() => {
                             return this.activeKeys.includes("s");
                         }, () => {}),
@@ -551,6 +560,7 @@ export class App extends AppPixi {
                             tutorialPlayerData.filterActiveKeys = ["w", "s", "d"];
                             yield;
                         }).call(this),
+                        setKeyboardImageClass("a"),
                         (function*(this: App) {
                             context.tutorialSound = Sound.from({
                                 url: "audio/tutorial/TutorialRotate.m4a",
@@ -574,6 +584,7 @@ export class App extends AppPixi {
                             tutorialPlayerData.filterActiveKeys = ["w", "a", "s", "d"];
                             yield;
                         }).call(this),
+                        setKeyboardImageClass("d"),
                         waitForValue(() => {
                             return this.activeKeys.includes("a");
                         }, () => {}),
@@ -590,6 +601,7 @@ export class App extends AppPixi {
                         }).call(this),
 
                         // movement and rotation done
+                        setKeyboardImageClass(undefined),
                         (function*(this: App) {
                             context.tutorialSound = Sound.from({
                                 url: "audio/tutorial/TutorialRotateDone.m4a",
@@ -609,6 +621,7 @@ export class App extends AppPixi {
                             tutorialPlayerData.filterActiveKeys = ["w", "a", "s", "d", " "];
                             yield;
                         }).call(this),
+                        setKeyboardImageClass("space"),
                         (function*(this: App) {
                             context.tutorialSound = Sound.from({
                                 url: "audio/tutorial/TutorialPressSpacebar.m4a",
@@ -621,6 +634,7 @@ export class App extends AppPixi {
                         waitForValue(() => {
                             return this.activeKeys.includes(" ");
                         }, () => {}),
+                        setKeyboardImageClass(undefined),
                         (function*(this: App) {
                             if (!context.tutorialSoundComplete) {
                                 context.tutorialSound!.stop();
@@ -680,7 +694,7 @@ export class App extends AppPixi {
                         // deliver pirate cargo
                         (function*(this: App) {
                             context.tutorialSound = Sound.from({
-                                url: "audio/tutorial/TutorialPirate.m4a",
+                                url: "audio/tutorial/TutorialDropOffLoot.m4a",
                                 autoplay: true,
                             });
                             handlePlaySound();
@@ -690,6 +704,20 @@ export class App extends AppPixi {
                         waitForValue(() => {
                             return !!this.findPlayerShip()!.cargo[0];
                         }, () => {}),
+                        (function*(this: App) {
+                            if (!context.tutorialSoundComplete) {
+                                context.tutorialSound!.stop();
+                            }
+                            yield;
+                        }).call(this),
+                        (function*(this: App) {
+                            context.tutorialSound = Sound.from({
+                                url: "audio/tutorial/TutorialPirate.m4a",
+                                autoplay: true,
+                            });
+                            handlePlaySound();
+                            yield;
+                        }).call(this),
                         // delivered cargo
                         waitForValue(() => {
                             return !this.findPlayerShip()!.cargo[0];
@@ -2462,6 +2490,18 @@ export class App extends AppPixi {
                         <div className="AppMainContent">
                             <div style={{position: "absolute", top: this.state.marginTop, left: this.state.marginLeft, bottom: this.state.marginBottom, right: this.state.marginRight}}>
                                 <Grid container direction="column" justifyContent="center" alignItems="center" spacing={2} xs={12}>
+                                    {
+                                        this.state.keyboardImageClass ? (
+                                            <Grid item xs={12} justifyContent="center" alignItems="center">
+                                                <Card>
+                                                    <CardHeader title="Press Keyboard"/>
+                                                    <CardContent>
+                                                        <Wasd className={`wasd-image-${this.state.keyboardImageClass}`}/>
+                                                    </CardContent>
+                                                </Card>
+                                            </Grid>
+                                        ) : null
+                                    }
                                     {
                                         this.state.gameMode === EGameMode.MAIN_MENU ? (
                                             <Grid item xs={12} justifyContent="center" alignItems="center" onWheel={(e) => {e.preventDefault();}}>

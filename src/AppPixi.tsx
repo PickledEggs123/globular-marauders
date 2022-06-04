@@ -84,6 +84,7 @@ export interface IAppState {
     userName: string;
     numNetworkFrames: number;
     gameMode: EGameMode;
+    keyboardImageClass: string | undefined;
 }
 
 export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
@@ -114,6 +115,7 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         userName: "" as string,
         numNetworkFrames: 0 as number,
         gameMode: EGameMode.MAIN_MENU,
+        keyboardImageClass: undefined,
     };
     public game: Game = new Game();
     public playerId: string | null = null;
