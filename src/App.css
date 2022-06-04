@@ -72,34 +72,31 @@
   stroke: orange;
   fill: orangered;
 }
-.wasd-image-w .keyboard-image-w polygon {
-  fill: orangered;
-}
 .wasd-image-a .keyboard-image-a polygon {
   stroke: orange;
-  fill: orangered;
-}
-.wasd-image-a .keyboard-image-a polygon {
   fill: orangered;
 }
 .wasd-image-s .keyboard-image-s polygon {
   stroke: orange;
   fill: orangered;
 }
-.wasd-image-s .keyboard-image-s polygon {
-  fill: orangered;
-}
 .wasd-image-d .keyboard-image-d polygon {
   stroke: orange;
-  fill: orangered;
-}
-.wasd-image-d .keyboard-image-d polygon {
   fill: orangered;
 }
 .wasd-image-space .keyboard-image-space polygon {
   stroke: orange;
   fill: orangered;
 }
-.wasd-image-space .keyboard-image-space polygon {
+.mouse-image-left-button .left-button {
+  stroke: orange;
+  fill: orangered;
+}
+.mouse-image-right-button .right-button {
+  stroke: orange;
+  fill: orangered;
+}
+.mouse-image-middle-wheel .middle-wheel {
+  stroke: orange;
   fill: orangered;
 }

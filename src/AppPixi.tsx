@@ -85,6 +85,8 @@ export interface IAppState {
     numNetworkFrames: number;
     gameMode: EGameMode;
     keyboardImageClass: string | undefined;
+    mouseImageClass: string | undefined;
+    highlightAutopilotButton: boolean;
 }
 
 export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
@@ -116,6 +118,8 @@ export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
         numNetworkFrames: 0 as number,
         gameMode: EGameMode.MAIN_MENU,
         keyboardImageClass: undefined,
+        mouseImageClass: undefined,
+        highlightAutopilotButton: false as boolean,
     };
     public game: Game = new Game();
     public playerId: string | null = null;

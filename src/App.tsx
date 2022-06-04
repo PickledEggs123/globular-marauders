@@ -50,7 +50,7 @@ import {
 import {MusicPlayer} from "./MusicPlayer";
 import {
     AppBar,
-    Avatar,
+    Avatar, Backdrop,
     Badge,
     Button,
     Card,
@@ -69,7 +69,7 @@ import {
     ListItem,
     ListItemAvatar,
     ListItemText,
-    Paper,
+    Paper, Popper,
     Radio,
     RadioGroup,
     Stack,
@@ -91,7 +91,8 @@ import {EOrderType, Order} from "@pickledeggs123/globular-marauders-game/lib/src
 import {EInvasionPhase, Invasion} from "@pickledeggs123/globular-marauders-game/lib/src/Invasion";
 import {ReactComponent as Pirate} from "./icons/pirate.svg";
 import {ReactComponent as Attack} from "./icons/attack.svg";
-import {ReactComponent as Wasd} from "./icons/wasd.svg";
+import {ReactComponent as WasdImage} from "./icons/wasd.svg";
+import {ReactComponent as MouseImage} from "./icons/mouse.svg";
 
 const GetFactionSubheader = (faction: EFaction): string | null => {
     switch (faction) {
@@ -373,9 +374,38 @@ export class App extends AppPixi {
                             });
                         }
                     };
+                    const setMouseImageClass = (mouseImageClass: string | undefined) => {
+                        return (function*(this: App) {
+                            this.setState({mouseImageClass});
+                            yield;
+                        }).call(this);
+                    };
                     const setKeyboardImageClass = (keyboardImageClass: string | undefined) => {
                         return (function*(this: App) {
                             this.setState({keyboardImageClass});
+                            yield;
+                        }).call(this);
+                    };
+                    const giveTradeMission = (): IterableIterator<void> => {
+                        return (function*(this: App) {
+                            const dutchFaction = this.game.factions.get(EFaction.DUTCH)!;
+                            const dutchHomeWorld = this.game.planets.get(dutchFaction.homeWorldPlanetId)!;
+                            const dutchColonies = dutchHomeWorld.county.duchy.kingdom.duchies.reduce((acc: Planet[], d): Planet[] => {
+                                acc.push(...d.counties.reduce((acc2: Planet[], c): Planet[] => {
+                                    if (c.planet && c.planet !== dutchHomeWorld) {
+                                        acc2.push(c.planet);
+                                    }
+                                    return acc2;
+                                }, [] as Planet[]));
+                                return acc;
+                            }, [] as Planet[]);
+                            const randomColony = dutchColonies[Math.floor(dutchColonies.length * Math.random())];
+                            const ship = this.findPlayerShip()!;
+                            ship.orders.forEach(o => o.cancelOrder(0));
+                            const tradeOrder = new Order(this.game, ship, ship.faction!);
+                            tradeOrder.orderType = EOrderType.SETTLE;
+                            tradeOrder.planetId = randomColony.id;
+                            ship.orders.push(tradeOrder);
                             yield;
                         }).call(this);
                     };
@@ -456,12 +486,14 @@ export class App extends AppPixi {
                             handlePlaySound();
                             yield;
                         }).call(this),
+                        setMouseImageClass("middle-wheel"),
                         waitForValue(() => {
                             return this.state.zoom * this.game.worldScale <= 2;
                         }, () => {}),
                         waitForValue(() => {
                             return this.state.zoom * this.game.worldScale >= 8;
                         }, () => {}),
+                        setMouseImageClass(undefined),
                         (function*(this: App) {
                             if (!context.tutorialSoundComplete) {
                                 context.tutorialSound!.stop();
@@ -691,6 +723,83 @@ export class App extends AppPixi {
                             }
                             yield;
                         }).call(this),
+
+                        // trade mission
+                        (function*(this: App) {
+                            context.tutorialSound = Sound.from({
+                                url: "audio/tutorial/TutorialTrading.m4a",
+                                autoplay: true,
+                            });
+                            handlePlaySound();
+                            yield;
+                        }).call(this),
+                        giveTradeMission(),
+                        waitForValue(() => {
+                            return !this.findPlayerShip()!.orders.some(o => o.orderType === EOrderType.SETTLE);
+                        }, () => {}),
+                        giveTradeMission(),
+                        (function*(this: App) {
+                            if (!context.tutorialSoundComplete) {
+                                context.tutorialSound!.stop();
+                            }
+                            yield;
+                        }).call(this),
+
+                        // auto pilot mission
+                        (function*(this: App) {
+                            context.tutorialSound = Sound.from({
+                                url: "audio/tutorial/TutorialAutoPilot.m4a",
+                                autoplay: true,
+                            });
+                            handlePlaySound();
+                            yield;
+                        }).call(this),
+                        (function*(this: App) {
+                            tutorialPlayerData.filterActiveKeys = [];
+                            this.setState({
+                                highlightAutopilotButton: true
+                            });
+                            yield;
+                        }).call(this),
+                        waitForValue(() => {
+                            return tutorialPlayerData.autoPilotEnabled;
+                        }, () => {}),
+                        (function*(this: App) {
+                            tutorialPlayerData.filterActiveKeys = undefined;
+                            this.setState({
+                                highlightAutopilotButton: false
+                            });
+                            yield;
+                        }).call(this),
+                        (function*(this: App) {
+                            if (!context.tutorialSoundComplete) {
+                                context.tutorialSound!.stop();
+                            }
+                            yield;
+                        }).call(this),
+
+                        // auto pilot enabled
+                        (function*(this: App) {
+                            context.tutorialSound = Sound.from({
+                                url: "audio/tutorial/TutorialAutoPilotEnabled.m4a",
+                                autoplay: true,
+                            });
+                            handlePlaySound();
+                            yield;
+                        }).call(this),
+                        waitForValue(() => {
+                            return !this.findPlayerShip()!.orders.some(o => o.orderType === EOrderType.SETTLE);
+                        }, () => {}),
+                        giveTradeMission(),
+                        waitForValue(() => {
+                            return !this.findPlayerShip()!.orders.some(o => o.orderType === EOrderType.SETTLE);
+                        }, () => {}),
+                        (function*(this: App) {
+                            if (!context.tutorialSoundComplete) {
+                                context.tutorialSound!.stop();
+                            }
+                            yield;
+                        }).call(this),
                     ];
 
                     while (actions.length > 0) {
@@ -721,7 +830,13 @@ export class App extends AppPixi {
 
                     this.handleSendPlayers(sendPlayers());
                     for (const [, message] of this.game.outgoingMessages) {
-                        this.game.incomingMessages.push(["pirateDude", message]);
+                        if (message.messageType === EMessageType.DEATH) {
+                            this.setState({
+                                showPlanetMenu: true
+                            });
+                        } else {
+                            this.game.incomingMessages.push(["pirateDude", message]);
+                        }
                     }
                 }, 100);
 
@@ -2049,7 +2164,7 @@ export class App extends AppPixi {
             if (this.socket) {
                 this.sendMessage("generic-message", message);
             }
-            if (this.state.gameMode === EGameMode.SINGLE_PLAYER) {
+            if (this.state.gameMode === EGameMode.SINGLE_PLAYER || this.state.gameMode === EGameMode.TUTORIAL) {
                 this.game.incomingMessages.push(["pirateDude", message]);
             }
         });
@@ -2283,7 +2398,7 @@ export class App extends AppPixi {
             if (this.socket) {
                 this.sendMessage("generic-message", message);
             }
-            if (this.state.gameMode === EGameMode.SINGLE_PLAYER) {
+            if (this.state.gameMode === EGameMode.SINGLE_PLAYER || this.state.gameMode === EGameMode.TUTORIAL) {
                 this.game.incomingMessages.push(["pirateDude", message]);
             }
         }
@@ -2326,7 +2441,7 @@ export class App extends AppPixi {
             if (this.socket) {
                 this.sendMessage("generic-message", message);
             }
-            if (this.state.gameMode === EGameMode.SINGLE_PLAYER) {
+            if (this.state.gameMode === EGameMode.SINGLE_PLAYER || this.state.gameMode === EGameMode.TUTORIAL) {
                 this.game.incomingMessages.push(["pirateDude", message]);
             }
         } else {
@@ -2350,7 +2465,7 @@ export class App extends AppPixi {
             if (this.socket) {
                 this.sendMessage("generic-message", message);
             }
-            if (this.state.gameMode === EGameMode.SINGLE_PLAYER) {
+            if (this.state.gameMode === EGameMode.SINGLE_PLAYER || this.state.gameMode === EGameMode.TUTORIAL) {
                 this.game.incomingMessages.push(["pirateDude", message]);
             }
         });
@@ -2383,7 +2498,7 @@ export class App extends AppPixi {
             if (this.socket) {
                 this.sendMessage("generic-message", message);
             }
-            if (this.state.gameMode === EGameMode.SINGLE_PLAYER) {
+            if (this.state.gameMode === EGameMode.SINGLE_PLAYER || this.state.gameMode === EGameMode.TUTORIAL) {
                 this.game.incomingMessages.push(["pirateDude", message]);
             }
         } else {
@@ -2406,7 +2521,7 @@ export class App extends AppPixi {
             if (this.socket) {
                 this.sendMessage("generic-message", message);
             }
-            if (this.state.gameMode === EGameMode.SINGLE_PLAYER) {
+            if (this.state.gameMode === EGameMode.SINGLE_PLAYER || this.state.gameMode === EGameMode.TUTORIAL) {
                 this.game.incomingMessages.push(["pirateDude", message]);
             }
         });
@@ -2428,7 +2543,7 @@ export class App extends AppPixi {
             if (this.socket) {
                 this.sendMessage("generic-message", message);
             }
-            if (this.state.gameMode === EGameMode.SINGLE_PLAYER) {
+            if (this.state.gameMode === EGameMode.SINGLE_PLAYER || this.state.gameMode === EGameMode.TUTORIAL) {
                 this.game.incomingMessages.push(["pirateDude", message]);
             }
         });
@@ -2540,8 +2655,23 @@ export class App extends AppPixi {
                             <Typography variant="h1" color="inherit" className={classes.flex} style={{flexGrow: 1}} textAlign="center">
                                 Globular Marauders
                             </Typography>
-                            <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.autoPilotEnabled}
-                                                                 onKeyDown={this.cancelSpacebar.bind(this)} onChange={this.handleAutoPilotEnabled.bind(this)} icon={<TvOff/>} checkedIcon={<Tv/>} color="default" />} label="AutoPilot"/>
+                            {
+                                this.state.highlightAutopilotButton ? (
+                                    <Backdrop open>
+                                        <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.autoPilotEnabled}
+                                                                             onKeyDown={this.cancelSpacebar.bind(this)} onChange={this.handleAutoPilotEnabled.bind(this)} icon={<TvOff/>} checkedIcon={<Tv/>} color="default" />} label="AutoPilot"/>
+                                        <Popper open>
+                                            <Card>
+                                                <CardHeader title="Click Me"/>
+                                                <CardContent title="This is the autopilot button"/>
+                                            </Card>
+                                        </Popper>
+                                    </Backdrop>
+                                ) : (
+                                    <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.autoPilotEnabled}
+                                                                         onKeyDown={this.cancelSpacebar.bind(this)} onChange={this.handleAutoPilotEnabled.bind(this)} icon={<TvOff/>} checkedIcon={<Tv/>} color="default" />} label="AutoPilot"/>
+                                )
+                            }
                             <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.audioEnabled}
                                                                  onKeyDown={this.cancelSpacebar.bind(this)} onChange={this.handleAudioEnabled.bind(this)} icon={<MusicOff/>} checkedIcon={<MusicNote/>} color="default" />} label="Audio"/>
                             <Button variant="contained" color="secondary"
@@ -2558,12 +2688,24 @@ export class App extends AppPixi {
                             <div style={{position: "absolute", top: this.state.marginTop, left: this.state.marginLeft, bottom: this.state.marginBottom, right: this.state.marginRight}}>
                                 <Grid container direction="column" justifyContent="center" alignItems="center" spacing={2} xs={12}>
                                     {
+                                        this.state.mouseImageClass ? (
+                                            <Grid item xs={12} justifyContent="center" alignItems="center">
+                                                <Card>
+                                                    <CardHeader title="Use Mouse"/>
+                                                    <CardContent>
+                                                        <MouseImage className={`mouse-image-${this.state.mouseImageClass}`}/>
+                                                    </CardContent>
+                                                </Card>
+                                            </Grid>
+                                        ) : null
+                                    }
+                                    {
                                         this.state.keyboardImageClass ? (
                                             <Grid item xs={12} justifyContent="center" alignItems="center">
                                                 <Card>
                                                     <CardHeader title="Press Keyboard"/>
                                                     <CardContent>
-                                                        <Wasd className={`wasd-image-${this.state.keyboardImageClass}`}/>
+                                                        <WasdImage className={`wasd-image-${this.state.keyboardImageClass}`}/>
                                                     </CardContent>
                                                 </Card>
                                             </Grid>

@@ -1,0 +1,6 @@
+<svg viewBox="-50 -50 100 100" fill="transparent" xmlns="http://www.w3.org/2000/svg">
+    <path d="M-20,-30 C -20,-30 0,-40 20,-30 C 20,-30 30,0 20,30 C 20,30 0,40 -20,30 -20,30 -30,0 -20,-30 z" fill="grey" stroke="black"/>
+    <path d="M-20,-30 C -20,-30 -10,-35 0,-34 L 0,-15 L -23,-15 z" fill="darkgrey" stroke="black" class="left-button"/>
+    <path d="M-20,-30 C -20,-30 -10,-35 0,-34 L 0,-15 L -23,-15 z" fill="darkgrey" stroke="black" transform="scale(-1,1)" class="right-button"/>
+    <path d="M-5,-10 L 5,-10 L 5,-30 L -5,-30 z" fill="darkgrey" stroke="black" class="middle-wheel"/>
+</svg>
