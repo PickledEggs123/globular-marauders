@@ -50,7 +50,7 @@ import {
 import {MusicPlayer} from "./MusicPlayer";
 import {
     AppBar,
-    Avatar, Backdrop,
+    Avatar,
     Badge,
     Button,
     Card,
@@ -69,7 +69,8 @@ import {
     ListItem,
     ListItemAvatar,
     ListItemText,
-    Paper, Popper,
+    Paper,
+    Popper,
     Radio,
     RadioGroup,
     Stack,
@@ -353,11 +354,13 @@ export class App extends AppPixi {
                         shipType: EShipType | undefined;
                         tutorialSound: Sound | undefined;
                         tutorialSoundComplete: boolean;
+                        invasion: Invasion | undefined;
                     } = {
                         planetId: undefined,
                         shipType: undefined,
                         tutorialSound: undefined,
                         tutorialSoundComplete: false,
+                        invasion: undefined,
                     };
                     const handlePlaySound = () => {
                         const instance = context.tutorialSound!.play();
@@ -799,6 +802,76 @@ export class App extends AppPixi {
                                 context.tutorialSound!.stop();
                             }
                             yield;
+                        }).call(this),
+
+                        // invasion mode
+                        (function*(this: App) {
+                            context.tutorialSound = Sound.from({
+                                url: "audio/tutorial/TutorialInvasion.m4a",
+                                autoplay: true,
+                            });
+                            handlePlaySound();
+                            yield;
+                        }).call(this),
+                        (function*(this: App) {
+                            const dutchFaction = this.game.factions.get(EFaction.DUTCH)!;
+                            const dutchHomeWorld = this.game.planets.get(dutchFaction.homeWorldPlanetId)!;
+
+                            const englishFaction = this.game.factions.get(EFaction.ENGLISH)!;
+                            const englishHomeWorld = this.game.planets.get(englishFaction.homeWorldPlanetId)!;
+
+                            context.invasion = new Invasion(this.game, dutchFaction, englishFaction, englishHomeWorld.id);
+                            this.game.invasions.set(englishHomeWorld.id, context.invasion!);
+
+                            const configureFriendlyShip = (ship: Ship) => {
+                                const playerShip = this.getPlayerShip()!;
+                                if (playerShip !== ship) {
+                                    ship.position = playerShip.position.clone().mul(Quaternion.fromBetweenVectors([0, 0, 1], playerShip.orientation.rotateVector([1, 0, 0])).pow(Game.VELOCITY_STEP * 300));
+                                }
+                                const order = new Order(this.game, ship, ship.faction!);
+                                order.orderType = EOrderType.INVADE;
+                                order.expireTicks = 10 * 60 * 10;
+                                order.planetId = englishHomeWorld.id;
+                                ship.orders.forEach(o => o.cancelOrder(0));
+                                ship.orders.push(order);
+                            };
+                            dutchHomeWorld.spawnEventShip(dutchHomeWorld.moneyAccount!.cash!, EShipType.CUTTER, configureFriendlyShip);
+                            dutchHomeWorld.spawnEventShip(dutchHomeWorld.moneyAccount!.cash!, EShipType.CUTTER, configureFriendlyShip);
+                            dutchHomeWorld.spawnEventShip(dutchHomeWorld.moneyAccount!.cash!, EShipType.CUTTER, configureFriendlyShip);
+                            dutchHomeWorld.spawnEventShip(dutchHomeWorld.moneyAccount!.cash!, EShipType.SLOOP, configureFriendlyShip);
+                            dutchHomeWorld.spawnEventShip(dutchHomeWorld.moneyAccount!.cash!, EShipType.SLOOP, configureFriendlyShip);
+                            dutchHomeWorld.spawnEventShip(dutchHomeWorld.moneyAccount!.cash!, EShipType.CORVETTE, configureFriendlyShip);
+                            configureFriendlyShip(this.findPlayerShip()!);
+
+                            englishHomeWorld.spawnEventShip(englishHomeWorld.moneyAccount!.cash!, EShipType.CUTTER, () => {});
+                            englishHomeWorld.spawnEventShip(englishHomeWorld.moneyAccount!.cash!, EShipType.CUTTER, () => {});
+                            englishHomeWorld.spawnEventShip(englishHomeWorld.moneyAccount!.cash!, EShipType.SLOOP, () => {});
+                            yield;
+                        }).call(this),
+                        // destroyed ship
+                        waitForValue(() => {
+                            return context.invasion!.invasionPhase === EInvasionPhase.CAPTURED;
+                        }, () => {}),
+                        (function*(this: App) {
+                            if (!context.tutorialSoundComplete) {
+                                context.tutorialSound!.stop();
+                            }
+                            yield;
+                        }).call(this),
+
+                        // end of tutorial
+                        (function*(this: App) {
+                            context.tutorialSound = Sound.from({
+                                url: "audio/tutorial/TutorialDone.m4a",
+                                autoplay: true,
+                            });
+                            handlePlaySound();
+                            yield;
+                        }).call(this),
+                        (function*(this: App) {
+                            while (!context.tutorialSoundComplete) {
+                                yield;
+                            }
                         }).call(this),
                     ];
 
@@ -2657,7 +2730,10 @@ export class App extends AppPixi {
                             </Typography>
                             {
                                 this.state.highlightAutopilotButton ? (
-                                    <Backdrop open>
+                                    <div style={{
+                                        boxShadow: "0 0 0 100vmax rgb(0,0,0,0.3)",
+                                        borderRadius: 8
+                                    }}>
                                         <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.autoPilotEnabled}
                                                                              onKeyDown={this.cancelSpacebar.bind(this)} onChange={this.handleAutoPilotEnabled.bind(this)} icon={<TvOff/>} checkedIcon={<Tv/>} color="default" />} label="AutoPilot"/>
                                         <Popper open>
@@ -2666,7 +2742,7 @@ export class App extends AppPixi {
                                                 <CardContent title="This is the autopilot button"/>
                                             </Card>
                                         </Popper>
-                                    </Backdrop>
+                                    </div>
                                 ) : (
                                     <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.autoPilotEnabled}
                                                                          onKeyDown={this.cancelSpacebar.bind(this)} onChange={this.handleAutoPilotEnabled.bind(this)} icon={<TvOff/>} checkedIcon={<Tv/>} color="default" />} label="AutoPilot"/>
