@@ -1,6 +1,6 @@
 import React, {useState} from "react";
 import {AppBar, Button, Drawer, List, ListItem, ListItemIcon, ListItemText, Toolbar, Typography} from "@mui/material";
-import {Person, PieChart, PlayArrow, QuestionMark} from "@mui/icons-material";
+import {Person, PieChart, PlayArrow, Public, QuestionMark} from "@mui/icons-material";
 import PixiGame from "./PixiGame";
 import {Link} from "react-router-dom";
 
@@ -46,6 +46,14 @@ export const WebsiteDrawer = ({rightSide}: {
                                 <PieChart/>
                             </ListItemIcon>
                             <ListItemText>Game Model</ListItemText>
+                        </ListItem>
+                    </Link>
+                    <Link to="/planet-generator">
+                        <ListItem>
+                            <ListItemIcon>
+                                <Public/>
+                            </ListItemIcon>
+                            <ListItemText>Planet Generator</ListItemText>
                         </ListItem>
                     </Link>
                     <Link to="/about">
