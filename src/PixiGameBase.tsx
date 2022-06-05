@@ -36,7 +36,7 @@ import planetMesh9 from "@pickledeggs123/globular-marauders-generator/meshes/pla
 /**
  * The input parameters of the app.
  */
-export interface IAppProps {
+export interface IPixiGameProps {
     /**
      * If the app is in test mode.
      */
@@ -57,7 +57,7 @@ export enum EGameMode {
 /**
  * The state of the app.
  */
-export interface IAppState {
+export interface IPixiGameState {
     showShips: boolean;
     showItems: boolean;
     width: number;
@@ -89,7 +89,7 @@ export interface IAppState {
     highlightAutopilotButton: boolean;
 }
 
-export abstract class AppPixi extends React.Component<IAppProps, IAppState> {
+export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixiGameState> {
     state = {
         showShips: false as boolean,
         showItems: false as boolean,

@@ -1,5 +1,5 @@
 import React from 'react';
-import App from './App';
+import PixiGame from './PixiGame';
 import {shallow, ShallowWrapper} from "enzyme";
 import Quaternion from "quaternion";
 import sinon, {SinonSpy} from 'sinon';
@@ -22,7 +22,7 @@ import {ESettlementLevel, MoneyAccount} from "./Interface";
  * @param shipType The type of ship to spawn.
  * @param wrapGetOrder If the function should wrap getOrder.
  */
-const getTestShip = (app: App, wrapper: ShallowWrapper<any>, colonyWorldTrades: Array<{
+const getTestShip = (app: PixiGame, wrapper: ShallowWrapper<any>, colonyWorldTrades: Array<{
   id: string, trade: sinon.SinonSpy<[ship: Ship, unloaded?: boolean | undefined, specificBuy?: EResourceType | null | undefined], void>, planet: Planet
 }>, factionType: EFaction, shipType: EShipType, wrapGetOrder?: sinon.SinonSpy<[ship: Ship], Order>) => {
   // setup test ship and nav point
@@ -110,7 +110,7 @@ const assertFactionData = (faction: Faction) => {
  */
 const setupPlanetBuildingUpgradingTest = (numMinutes: number = 60) => {
   // setup wrapper to run test
-  const wrapper = shallow<App>(<App isTestMode worldScale={1} />);
+  const wrapper = shallow<PixiGame>(<PixiGame isTestMode worldScale={1} />);
   const app = wrapper.instance();
   app.forceUpdate = () => undefined;
 
@@ -174,7 +174,7 @@ const setupPlanetBuildingUpgradingTest = (numMinutes: number = 60) => {
  */
 const setupPlanetManufactoryTest = (numMinutes: number = 60) => {
   // setup wrapper to run test
-  const wrapper = shallow<App>(<App isTestMode worldScale={1} />);
+  const wrapper = shallow<PixiGame>(<PixiGame isTestMode worldScale={1} />);
   const app = wrapper.instance();
   app.forceUpdate = () => undefined;
 
@@ -294,7 +294,7 @@ const setupPlanetManufactoryTest = (numMinutes: number = 60) => {
  */
 const setupPathingTest = (points: Array<[number, number, number]>, numMinutes: number = 2) => {
   // setup wrapper to run test
-  const wrapper = shallow<App>(<App isTestMode worldScale={1} />);
+  const wrapper = shallow<PixiGame>(<PixiGame isTestMode worldScale={1} />);
   const app = wrapper.instance();
   app.forceUpdate = () => undefined;
 
@@ -351,7 +351,7 @@ const setupPathingTest = (points: Array<[number, number, number]>, numMinutes: n
  */
 const setupTradingTest = (numMinutes: number = 20) => {
   // setup wrapper to run test
-  const wrapper = shallow<App>(<App isTestMode worldScale={1} />);
+  const wrapper = shallow<PixiGame>(<PixiGame isTestMode worldScale={1} />);
   const app = wrapper.instance();
   app.forceUpdate = () => undefined;
 
@@ -437,7 +437,7 @@ const setupTradingTest = (numMinutes: number = 20) => {
  */
 const setupFeudalismTest = (numMinutes: number = 20) => {
   // setup wrapper to run test
-  const wrapper = shallow<App>(<App isTestMode worldScale={1} />);
+  const wrapper = shallow<PixiGame>(<PixiGame isTestMode worldScale={1} />);
   const app = wrapper.instance();
   app.forceUpdate = () => undefined;
 
@@ -610,7 +610,7 @@ const setupFeudalismTest = (numMinutes: number = 20) => {
  */
 const setupPiracyTest = (numMinutes: number = 20) => {
   // setup wrapper to run test
-  const wrapper = shallow<App>(<App isTestMode worldScale={1} />);
+  const wrapper = shallow<PixiGame>(<PixiGame isTestMode worldScale={1} />);
   const app = wrapper.instance();
   app.forceUpdate = () => undefined;
 
@@ -747,7 +747,7 @@ const setupPiracyTest = (numMinutes: number = 20) => {
       expect(dutchPirateShip.pathFinding.points.length).toBeGreaterThan(0);
       expect(DelaunayGraph.distanceFormula(
           dutchPirateShip.pathFinding.points[dutchPirateShip.pathFinding.points.length - 1],
-          DelaunayGraph.normalize(App.lerp(
+          DelaunayGraph.normalize(PixiGame.lerp(
               closestEnglishPlanet.planet.position.rotateVector([0, 0, 1]),
               englishHomeWorld.position.rotateVector([0, 0, 1]),
               0.25
@@ -766,7 +766,7 @@ const setupPiracyTest = (numMinutes: number = 20) => {
     }
     const dutchClosestApproachToColony = VoronoiGraph.angularDistance(
         dutchPirateShip.position.rotateVector([0, 0, 1]),
-        DelaunayGraph.normalize(App.lerp(
+        DelaunayGraph.normalize(PixiGame.lerp(
             closestEnglishPlanet.planet.position.rotateVector([0, 0, 1]),
             englishHomeWorld.position.rotateVector([0, 0, 1]),
             0.25
@@ -845,8 +845,8 @@ const setupPiracyTest = (numMinutes: number = 20) => {
   expect(dutchBegunPirating).toBeTruthy();
   expect(beginningPiracyMission).toBeTruthy();
   expect(goingToEnemyColonyToPirate).toBeTruthy();
-  expect(englishMerchantShipClosestApproach).toBeLessThan(App.VELOCITY_STEP * 400 * app.worldScale);
-  expect(dutchPirateShipClosestApproach).toBeLessThan(App.PROJECTILE_DETECTION_RANGE);
+  expect(englishMerchantShipClosestApproach).toBeLessThan(PixiGame.VELOCITY_STEP * 400 * app.worldScale);
+  expect(dutchPirateShipClosestApproach).toBeLessThan(PixiGame.PROJECTILE_DETECTION_RANGE);
   expect(dutchPirateShipBegunAttacking).toBeTruthy();
   expect(englishMerchantShipDestroyed).toBeTruthy();
   expect(dutchPiratePickUpCargo).toBeTruthy();
@@ -903,7 +903,7 @@ describe('Collision Detection', () => {
       const b = DelaunayGraph.normalize([1, 0, -1]);
       const c: [number, number, number] = [0, 1, 0];
       const d: [number, number, number] = [1, 0, 0];
-      const intercept = App.computeIntercept(a, b, c, d);
+      const intercept = PixiGame.computeIntercept(a, b, c, d);
       expect(VoronoiGraph.angularDistance(intercept, [1, 0, 0], 1)).toBeLessThan(PHYSICS_SCALE / 1000);
 
       const segmentDistance: number = VoronoiGraph.angularDistance(a, b, 1);
@@ -915,7 +915,7 @@ describe('Collision Detection', () => {
       const b = DelaunayGraph.normalize([1, 0, -1]);
       const c: [number, number, number] = [0, 1, 0];
       const d: [number, number, number] = DelaunayGraph.normalize([PHYSICS_SCALE, 1, 0]);
-      const intercept = App.computeIntercept(a, b, c, d);
+      const intercept = PixiGame.computeIntercept(a, b, c, d);
       expect(VoronoiGraph.angularDistance(intercept, [1, 0, 0], 1)).toBeLessThan(PHYSICS_SCALE / 1000);
 
       const segmentDistance: number = VoronoiGraph.angularDistance(a, b, 1);
@@ -927,7 +927,7 @@ describe('Collision Detection', () => {
       const b = DelaunayGraph.normalize([1, 0, 1 - PHYSICS_SCALE]);
       const c: [number, number, number] = [0, 1, 0];
       const d: [number, number, number] = DelaunayGraph.normalize([PHYSICS_SCALE, 1, 0]);
-      const intercept = App.computeIntercept(a, b, c, d);
+      const intercept = PixiGame.computeIntercept(a, b, c, d);
       expect(VoronoiGraph.angularDistance(intercept, [1, 0, 0], 1)).toBeLessThan(PHYSICS_SCALE / 1000);
 
       const segmentDistance: number = VoronoiGraph.angularDistance(a, b, 1);
@@ -935,7 +935,7 @@ describe('Collision Detection', () => {
       expect(Math.abs(segmentDistance - interceptDistance)).not.toBeLessThan(PHYSICS_SCALE / 1000);
     });
     it('cannon ball hits ship', () => {
-      const ship = new Ship({} as App, EShipType.CORVETTE);
+      const ship = new Ship({} as PixiGame, EShipType.CORVETTE);
       ship.id = "test-ship";
       const cannonBall = new CannonBall(EFaction.ENGLISH);
       cannonBall.position = Quaternion.fromBetweenVectors(
@@ -943,7 +943,7 @@ describe('Collision Detection', () => {
           DelaunayGraph.normalize([0, 1 - PHYSICS_SCALE * 10, 1])
       );
       cannonBall.positionVelocity = Quaternion.fromBetweenVectors([0, 0, 1], [0, -1, 0]);
-      const hit = App.cannonBallCollision(cannonBall, ship, 1);
+      const hit = PixiGame.cannonBallCollision(cannonBall, ship, 1);
       expect(hit).toEqual({
         success: true,
         point: [-0, 0.0003, 0.009995498987044117],
@@ -952,7 +952,7 @@ describe('Collision Detection', () => {
       });
     });
     it('cannon ball misses ship (too slow)', () => {
-      const ship = new Ship({} as App, EShipType.CORVETTE);
+      const ship = new Ship({} as PixiGame, EShipType.CORVETTE);
       ship.id = "test-ship";
       const cannonBall = new CannonBall(EFaction.ENGLISH);
       cannonBall.position = Quaternion.fromBetweenVectors(
@@ -963,7 +963,7 @@ describe('Collision Detection', () => {
           [0, 0, 1],
           DelaunayGraph.normalize([0, -PHYSICS_SCALE, 1])
       );
-      const hit = App.cannonBallCollision(cannonBall, ship, 1);
+      const hit = PixiGame.cannonBallCollision(cannonBall, ship, 1);
       expect(hit).toEqual({
         success: false,
         point: null,
@@ -972,7 +972,7 @@ describe('Collision Detection', () => {
       });
     });
     it('cannon ball misses ship (opposite direction)', () => {
-      const ship = new Ship({} as App, EShipType.CORVETTE);
+      const ship = new Ship({} as PixiGame, EShipType.CORVETTE);
       ship.id = "test-ship";
       const cannonBall = new CannonBall(EFaction.ENGLISH);
       cannonBall.position = Quaternion.fromBetweenVectors(
@@ -980,7 +980,7 @@ describe('Collision Detection', () => {
           DelaunayGraph.normalize([0, 1 - PHYSICS_SCALE * 10, 1])
       );
       cannonBall.positionVelocity = Quaternion.fromBetweenVectors([0, 0, 1], [0, 1, 0]);
-      const hit = App.cannonBallCollision(cannonBall, ship, 1);
+      const hit = PixiGame.cannonBallCollision(cannonBall, ship, 1);
       expect(hit).toEqual({
         success: false,
         point: null,
@@ -989,7 +989,7 @@ describe('Collision Detection', () => {
       });
     });
     it('cannon ball misses ship (parallel direction)', () => {
-      const ship = new Ship({} as App, EShipType.CORVETTE);
+      const ship = new Ship({} as PixiGame, EShipType.CORVETTE);
       ship.id = "test-ship";
       const cannonBall = new CannonBall(EFaction.ENGLISH);
       cannonBall.position = Quaternion.fromBetweenVectors(
@@ -997,7 +997,7 @@ describe('Collision Detection', () => {
           DelaunayGraph.normalize([0, 1 - PHYSICS_SCALE * 10, 1])
       );
       cannonBall.positionVelocity = Quaternion.fromBetweenVectors([0, 0, 1], [1, 0, 0]);
-      const hit = App.cannonBallCollision(cannonBall, ship, 1);
+      const hit = PixiGame.cannonBallCollision(cannonBall, ship, 1);
       expect(hit).toEqual({
         success: false,
         point: null,
@@ -1006,7 +1006,7 @@ describe('Collision Detection', () => {
       });
     });
     it('ship hits still cannon ball', () => {
-      const ship = new Ship({} as App, EShipType.CORVETTE);
+      const ship = new Ship({} as PixiGame, EShipType.CORVETTE);
       ship.id = "test-ship";
       ship.position = Quaternion.fromBetweenVectors(
           [0, 0, 1],
@@ -1014,7 +1014,7 @@ describe('Collision Detection', () => {
       );
       ship.positionVelocity = Quaternion.fromBetweenVectors([0, 0, 1], [0, -1, 0]);
       const cannonBall = new CannonBall(EFaction.ENGLISH);
-      const hit = App.cannonBallCollision(cannonBall, ship, 1);
+      const hit = PixiGame.cannonBallCollision(cannonBall, ship, 1);
       expect(hit).toEqual({
         success: true,
         point: [0, 0.0034277921407224843, 0.0036400880538801747],
