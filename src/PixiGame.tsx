@@ -1026,6 +1026,9 @@ export class PixiGame extends PixiGameBase {
         // draw rotating app
         let cameraPosition: Quaternion = Quaternion.ONE;
         let cameraOrientation: Quaternion = Quaternion.ONE;
+        let lastCameraOrientation: Quaternion = Quaternion.ONE;
+        let cameraCorrectionFactor: number = 0;
+        let cameraPositionVelocityTheta: number = Math.PI / 2;
 
         this.loadSoundIntoMemory();
         this.loadSpritesIntoMemory();
@@ -1079,7 +1082,9 @@ export class PixiGame extends PixiGameBase {
         this.application.ticker.add(() => {
             const playerShip = this.getPlayerShip();
             cameraPosition = removeExtraRotation(playerShip.position);
-            cameraOrientation = removeExtraOrientation(playerShip.orientation.clone());
+            lastCameraOrientation = cameraOrientation;
+            const nextCameraOrientation = removeExtraOrientation(playerShip.orientation.clone().mul(Quaternion.fromAxisAngle([0, 0, 1], -cameraPositionVelocityTheta + Math.PI / 2 - cameraCorrectionFactor)));
+            cameraOrientation = lastCameraOrientation.slerp(nextCameraOrientation)(0.05 * (1 - VoronoiGraph.angularDistanceQuaternion(lastCameraOrientation.clone().inverse().mul(nextCameraOrientation.clone()), 1) / Math.PI));
             pixiTick += 1;
 
             // sync game to Pixi renderer
@@ -1147,6 +1152,9 @@ export class PixiGame extends PixiGameBase {
                         shipMesh.positionPolarOld = shipMesh.positionPolarNew;
                         shipMesh.positionPolarNew = currentPositionPolar;
                         shipMesh.correctionFactorTheta = -this.computePositionPolarCorrectionFactorTheta(shipMesh.positionPolarOld, shipMesh.positionPolarNew) + Math.PI / 2;
+                        if (ship === this.findPlayerShip()) {
+                            cameraCorrectionFactor = shipMesh.correctionFactorTheta;
+                        }
                     }
                     shipMesh.position = removeExtraRotation(ship.position);
                     shipMesh.positionVelocity = removeExtraRotation(ship.positionVelocity);
@@ -1154,6 +1162,9 @@ export class PixiGame extends PixiGameBase {
                     const positionVelocityPointLength = Math.sqrt(positionVelocityPoint[0] ** 2 + positionVelocityPoint[1] ** 2);
                     if (positionVelocityPointLength > 0.0001) {
                         shipMesh.positionVelocityTheta = Math.atan2(positionVelocityPoint[1], positionVelocityPoint[0]);
+                        if (ship === this.findPlayerShip()) {
+                            cameraPositionVelocityTheta = shipMesh.positionVelocityTheta;
+                        }
                     }
                     shipMesh.orientation = ship.orientation.clone().mul(Quaternion.fromAxisAngle([0, 0, 1], -shipMesh.positionVelocityTheta + Math.PI / 2));
                     const playerData = (this.playerId && this.game.playerData.get(this.playerId)) ?? null;
@@ -1237,6 +1248,7 @@ export class PixiGame extends PixiGameBase {
             for (const item of this.crateMeshes.filter(m => m.tick !== pixiTick || this.clearMeshes)) {
                 this.application.stage.removeChild(item.mesh);
                 this.application.stage.removeChild(item.image);
+                this.application.stage.removeChild(item.text);
             }
             this.crateMeshes = this.crateMeshes.filter(m => m.tick === pixiTick && !this.clearMeshes);
 
@@ -1480,7 +1492,7 @@ export class PixiGame extends PixiGameBase {
                             [0, 0, 1],
                             item.positionVelocity.rotateVector([0, 0, 1])
                         ) < 0.00001 ? [0, 0, 1] as [number, number, number] :
-                            item.positionVelocity.rotateVector([0, 0, 1]);
+                            item.orientation.clone().inverse().mul(Quaternion.fromAxisAngle([0, 0, 1], item.positionVelocityTheta + item.correctionFactorTheta - Math.PI / 2)).rotateVector([0, 1, 0]);
                         endPoint[2] = 0;
                         const endPointScaleFactor = 1 / Math.max(Math.abs(endPoint[0]), Math.abs(endPoint[1]));
                         endPoint[0] *= endPointScaleFactor;
@@ -2741,7 +2753,7 @@ export class PixiGame extends PixiGameBase {
                     </div>
                     <div className="AppMainContent">
                         <div style={{position: "absolute", top: this.state.marginTop, left: this.state.marginLeft, bottom: this.state.marginBottom, right: this.state.marginRight}}>
-                            <Grid container direction="column" justifyContent="center" alignItems="center" spacing={2} xs={12}>
+                            <Grid container direction="column" justifyContent="center" alignItems="center" spacing={2} xs={12} paddingTop={12}>
                                 {
                                     this.state.mouseImageClass ? (
                                         <Grid item xs={12} justifyContent="center" alignItems="center">
@@ -3019,16 +3031,16 @@ export class PixiGame extends PixiGameBase {
                                             <Typography>Mission {(this.findPlayerShip()?.orders[0] ?? null)?.orderType}</Typography>
                                         </Card>
                                         <div className="Top">
-                                            <svg style={{width: this.state.width - 400, height: 10}}>
-                                                <rect x={0} y={0} width={((this.findPlayerShip()?.health ?? 100) + (this.findPlayerShip()?.repairTicks.reduce((acc, i) => acc + i, 0) ?? 0) ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (this.state.width - 400)} height={10} fill="green" stroke="none"/>
+                                            <svg style={{width: this.state.width - 400, height: 24}}>
+                                                <rect x={0} y={0} width={((this.findPlayerShip()?.health ?? 100) + (this.findPlayerShip()?.repairTicks.reduce((acc, i) => acc + i, 0) ?? 0) ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (this.state.width - 400)} height={24} fill="green" stroke="none"/>
                                                 <rect x={0} y={0} width={(this.findPlayerShip()?.health ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (this.state.width - 400)} height={10} fill="yellow" stroke="none"/>
-                                                <rect x={0} y={0} width={((this.findPlayerShip()?.health ?? 100) - (this.findPlayerShip()?.burnTicks.reduce((acc, i) => acc + i, 0) ?? 0) ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (this.state.width - 400)} height={10} fill="red" stroke="none"/>
-                                                <text x={(this.state.width - 400) * (1 / 7)} y={10} fill="white" stroke="none" textAnchor="middle">Damage {(this.playerId && this.game.scoreBoard.damage.find(x => x.playerId === this.playerId)?.damage) ?? 0}</text>
-                                                <text x={(this.state.width - 400) * (2 / 7)} y={10} fill="white" stroke="none" textAnchor="middle">Loot {(this.playerId && this.game.scoreBoard.loot.find(x => x.playerId === this.playerId)?.count) ?? 0}</text>
-                                                <text x={(this.state.width - 400) * (3 / 7)} y={10} fill="white" stroke="none" textAnchor="middle">Money {(this.playerId && this.game.scoreBoard.money.find(x => x.playerId === this.playerId)?.amount) ?? 0}</text>
-                                                <text x={(this.state.width - 400) * (4 / 7)} y={10} fill="white" stroke="none" textAnchor="middle">Land {(this.playerId && this.game.scoreBoard.land.find(x => x.playerId === this.playerId)?.amount) ?? 0}</text>
-                                                <text x={(this.state.width - 400) * (5 / 7)} y={10} fill="white" stroke="none" textAnchor="middle">Capture {(this.playerId && this.game.scoreBoard.capture.find(x => x.playerId === this.playerId)?.count) ?? 0}</text>
-                                                <text x={(this.state.width - 400) * (6 / 7)} y={10} fill="white" stroke="none" textAnchor="middle">Bounty {(this.playerId && this.game.scoreBoard.bounty.find(x => x.playerId === this.playerId)?.bountyAmount) ?? 0}</text>
+                                                <rect x={0} y={0} width={((this.findPlayerShip()?.health ?? 100) - (this.findPlayerShip()?.burnTicks.reduce((acc, i) => acc + i, 0) ?? 0) ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (this.state.width - 400)} height={24} fill="red" stroke="none"/>
+                                                <text x={(this.state.width - 400) * (1 / 7)} y={18} fill="white" stroke="none" textAnchor="middle">Damage {(this.playerId && this.game.scoreBoard.damage.find(x => x.playerId === this.playerId)?.damage) ?? 0}</text>
+                                                <text x={(this.state.width - 400) * (2 / 7)} y={18} fill="white" stroke="none" textAnchor="middle">Loot {(this.playerId && this.game.scoreBoard.loot.find(x => x.playerId === this.playerId)?.count) ?? 0}</text>
+                                                <text x={(this.state.width - 400) * (3 / 7)} y={18} fill="white" stroke="none" textAnchor="middle">Money {(this.playerId && this.game.scoreBoard.money.find(x => x.playerId === this.playerId)?.amount) ?? 0}</text>
+                                                <text x={(this.state.width - 400) * (4 / 7)} y={18} fill="white" stroke="none" textAnchor="middle">Land {(this.playerId && this.game.scoreBoard.land.find(x => x.playerId === this.playerId)?.amount) ?? 0}</text>
+                                                <text x={(this.state.width - 400) * (5 / 7)} y={18} fill="white" stroke="none" textAnchor="middle">Capture {(this.playerId && this.game.scoreBoard.capture.find(x => x.playerId === this.playerId)?.count) ?? 0}</text>
+                                                <text x={(this.state.width - 400) * (6 / 7)} y={18} fill="white" stroke="none" textAnchor="middle">Bounty {(this.playerId && this.game.scoreBoard.bounty.find(x => x.playerId === this.playerId)?.bountyAmount) ?? 0}</text>
                                             </svg>
                                             {
                                                 this.invasionGauge()

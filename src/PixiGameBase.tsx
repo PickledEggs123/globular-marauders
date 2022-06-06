@@ -1150,7 +1150,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
             correctionFactorTheta: 0,
             orientation,
             positionVelocity,
-            positionVelocityTheta: 0,
+            positionVelocityTheta: Math.PI / 2,
             tick,
         });
     };
