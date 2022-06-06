@@ -6,6 +6,7 @@ import {Button, Card, CardContent, CardHeader, Grid, Typography} from "@mui/mate
 import {generatePlanet, generatePlanetGltf} from "@pickledeggs123/globular-marauders-generator/dist/helpers";
 import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
 import * as PIXI from "pixi.js";
+import Quaternion from "quaternion";
 
 export const PlanetGenerator = () => {
     const [context] = useState<any>({});
@@ -26,13 +27,15 @@ export const PlanetGenerator = () => {
 
             attribute vec3 aPosition;
             attribute vec3 aColor;
+            
+            uniform mat4 uRotation;
 
             varying vec3 vColor;
 
             void main() {
                 vColor = aColor;
 
-                gl_Position = vec4(aPosition, 1.0);
+                gl_Position = uRotation * vec4(aPosition, 1.0);
             }
         `;
         const planetFragmentShader = `
@@ -46,7 +49,9 @@ export const PlanetGenerator = () => {
         `;
         const planetProgram = new PIXI.Program(planetVertexShader, planetFragmentShader);
 
-        const shader = new PIXI.Shader(planetProgram, {});
+        const shader = new PIXI.Shader(planetProgram, {
+            uRotation: Quaternion.ONE.toMatrix4()
+        });
         const state = PIXI.State.for2d();
         state.depthTest = true;
         const mesh = new PIXI.Mesh(planetGeometry, shader, state);
@@ -59,6 +64,14 @@ export const PlanetGenerator = () => {
     useEffect(() => {
         context.app = new PIXI.Application({ width : 256, height: 256 });
         ref.current!.appendChild(context.app.view);
+        context.app!.ticker.add(() => {
+            context.app!.stage.children.forEach((c: any) => {
+                const mesh = c as PIXI.Mesh;
+                if (mesh?.shader?.uniforms?.uRotation) {
+                    mesh.shader.uniforms.uRotation = Quaternion.fromAxisAngle([0, 1, 0], Math.PI * 2 / 100 * (+new Date() % (10 * 1000) / 100)).toMatrix4();
+                }
+            });
+        });
         drawGraph();
         return () => {};
     }, [context, drawGraph, ref]);
