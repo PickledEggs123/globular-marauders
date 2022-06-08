@@ -1,7 +1,7 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import '../App.css';
 import {WebsiteDrawer} from "../Drawer";
-import {Button, Card, CardContent, CardHeader, Grid, Typography} from "@mui/material";
+import {Button, Card, CardContent, CardHeader, Container, Grid, Typography} from "@mui/material";
 // @ts-ignore
 import {generatePlanet, generatePlanetGltf} from "@pickledeggs123/globular-marauders-generator/dist/helpers";
 import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
@@ -106,38 +106,40 @@ export const PlanetGenerator = () => {
     return (
         <div className="App">
             <WebsiteDrawer rightSide={null}/>
-            <Grid container xs={12} spacing={2}>
-                <Grid item xs={12}>
-                    <Card>
-                        <CardHeader>Planet Generator</CardHeader>
-                        <CardContent>
-                            <Button onClick={() => {
-                                drawGraph();
-                            }}>Refresh</Button>
-                            <Button onClick={download}>Download</Button>
-                            <div ref={ref}>
-                            </div>
-                            <Typography variant="body1">
-                                This page allows you to generate a random planet, using the generator package. This is a
-                                package written by me which computes spherical voronoi tesselation. Voronoi tesselation
-                                is the drawing of polygons around a bunch of random points so that the area of each polygon
-                                is closest to that point. It's essentially a map with perfect borders. I color each tile
-                                blue or green randomly to create mini planets.
-                            </Typography>
-                            <br/>
-                            <Typography variant="body1">
-                                Do not forget to download your custom planet so you can view it in full 3d with the Windows 10 3D Viewer app.
-                                Go to the Windows Store and download 3D Viewer so you can view the file from all angles.
-                            </Typography>
-                            <br/>
-                            <Typography variant="body1">
-                                There is a bug where the output of the generator is not valid with part of the sphere missing.
-                                I don't know how to prevent that from happening other than to run the app again.
-                            </Typography>
-                        </CardContent>
-                    </Card>
+            <Container>
+                <Grid container xs={12} spacing={2}>
+                    <Grid item xs={12}>
+                        <Card>
+                            <CardHeader>Planet Generator</CardHeader>
+                            <CardContent>
+                                <div ref={ref}>
+                                </div>
+                                <Button onClick={() => {
+                                    drawGraph();
+                                }}>Refresh</Button>
+                                <Button onClick={download}>Download</Button>
+                                <Typography variant="body1">
+                                    This page allows you to generate a random planet, using the generator package. This is a
+                                    package written by me which computes spherical voronoi tesselation. Voronoi tesselation
+                                    is the drawing of polygons around a bunch of random points so that the area of each polygon
+                                    is closest to that point. It's essentially a map with perfect borders. I color each tile
+                                    blue or green randomly to create mini planets.
+                                </Typography>
+                                <br/>
+                                <Typography variant="body1">
+                                    Do not forget to download your custom planet so you can view it in full 3d with the Windows 10 3D Viewer app.
+                                    Go to the Windows Store and download 3D Viewer so you can view the file from all angles.
+                                </Typography>
+                                <br/>
+                                <Typography variant="body1">
+                                    There is a bug where the output of the generator is not valid with part of the sphere missing.
+                                    I don't know how to prevent that from happening other than to run the app again.
+                                </Typography>
+                            </CardContent>
+                        </Card>
+                    </Grid>
                 </Grid>
-            </Grid>
+            </Container>
         </div>
     );
 }

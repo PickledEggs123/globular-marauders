@@ -2153,7 +2153,12 @@ export class PixiGame extends PixiGameBase {
             <div className="App" style={{width: "100vw", height: "100vh"}}>
                 <WebsiteDrawer rightSide={
                     <React.Fragment>
-
+                        <Button variant="contained" color="secondary"
+                                onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.handleShowSettings.bind(this)}>Settings</Button>
+                        <Button variant="contained" color="secondary"
+                                onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.handleShowScoreboard.bind(this)}>Scoreboard</Button>
+                        <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.audioEnabled}
+                                                             onKeyDown={PixiGame.cancelSpacebar.bind(this)} onChange={this.handleAudioEnabled.bind(this)} icon={<MusicOff/>} checkedIcon={<MusicNote/>} color="default" />} label="Audio"/>
                         {
                             this.state.highlightAutopilotButton ? (
                                 <div style={{
@@ -2174,12 +2179,6 @@ export class PixiGame extends PixiGameBase {
                                                                      onKeyDown={PixiGame.cancelSpacebar.bind(this)} onChange={this.handleAutoPilotEnabled.bind(this)} icon={<TvOff/>} checkedIcon={<Tv/>} color="default" />} label="AutoPilot"/>
                             )
                         }
-                        <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.audioEnabled}
-                                                             onKeyDown={PixiGame.cancelSpacebar.bind(this)} onChange={this.handleAudioEnabled.bind(this)} icon={<MusicOff/>} checkedIcon={<MusicNote/>} color="default" />} label="Audio"/>
-                        <Button variant="contained" color="secondary"
-                                onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.handleShowScoreboard.bind(this)}>Scoreboard</Button>
-                        <Button variant="contained" color="secondary"
-                                onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.handleShowSettings.bind(this)}>Settings</Button>
                     </React.Fragment>
                 }/>
                 <div className="AppMain" ref={this.measureAppBodyRef}>
@@ -2277,16 +2276,19 @@ export class PixiGame extends PixiGameBase {
                                                             onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.goToPlanetMenu.bind(this)}>Next</Button>
                                                 </Grid>
                                             </Grid>
-                                            <Paper style={{maxHeight: "40vh", overflow: "auto", backgroundColor: "none"}}>
-                                                <Grid container xs={12} spacing={2}>
+                                            <Paper style={{maxHeight: "40vh", maxWidth: "80vw", overflow: "auto", backgroundColor: "none"}}>
+                                                <Grid container spacing={2} columns={{
+                                                    xs: 6,
+                                                    lg: 12,
+                                                }}>
                                                     {
-                                                        this.spawnFactions.map(f => {
+                                                        this.spawnFactions.map((f, _, arr) => {
                                                             const faction = this.game.factions.get(f.factionId);
                                                             if (!faction) {
                                                                 return null;
                                                             }
                                                             return (
-                                                                <Grid item xs={6}>
+                                                                <Grid item xs={12} lg={arr.length >= 2 ? 6 : 12}>
                                                                     <Card>
                                                                         <CardActionArea onClick={this.selectFaction.bind(this, faction.id)}>
                                                                             <CardContent>
@@ -2337,14 +2339,17 @@ export class PixiGame extends PixiGameBase {
                                                             onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.goToSpawnMenu.bind(this)}>Next</Button>
                                                 </Grid>
                                             </Grid>
-                                            <Paper style={{maxHeight: "40vh", overflow: "auto", backgroundColor: "none"}}>
-                                                <Grid container xs={12} spacing={2}>
+                                            <Paper style={{maxHeight: "40vh", maxWidth: "80vw", overflow: "auto", backgroundColor: "none"}}>
+                                                <Grid container spacing={2} columns={{
+                                                    xs: 6,
+                                                    lg: 12,
+                                                }}>
                                                     {
                                                         this.spawnPlanets.map((f, i, arr) => {
                                                             const planet = this.game.planets.get(f.planetId);
                                                             const planetName = planet?.name ?? f.planetId;
                                                             return (
-                                                                <Grid item xs={arr.length >= 2 ? 6 : 12}>
+                                                                <Grid item xs={12} lg={arr.length >= 2 ? 6 : 12}>
                                                                     <Card>
                                                                         <CardActionArea onClick={this.selectPlanet.bind(this, f.planetId)}>
                                                                             <CardContent>
@@ -2403,8 +2408,11 @@ export class PixiGame extends PixiGameBase {
                                                             onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.spawnShip.bind(this)}>Next</Button>
                                                 </Grid>
                                             </Grid>
-                                            <Paper style={{maxHeight: "40vh", overflow: "auto", backgroundColor: "none"}}>
-                                                <Grid container xs={12} spacing={2}>
+                                            <Paper style={{maxHeight: "40vh", maxWidth: "80vw", overflow: "auto", backgroundColor: "none"}}>
+                                                <Grid container spacing={2} columns={{
+                                                    xs: 6,
+                                                    lg: 12,
+                                                }}>
                                                     {
                                                         this.spawnLocations.message ? (
                                                             <Grid item xs={12}>
@@ -2419,7 +2427,7 @@ export class PixiGame extends PixiGameBase {
                                                     {
                                                         this.spawnLocations.results.map((f, i, arr) => {
                                                             return (
-                                                                <Grid item xs={arr.length >= 2 ? 6 : 12}>
+                                                                <Grid item xs={12} lg={arr.length >= 2 ? 6 : 12}>
                                                                     <Card>
                                                                         <CardActionArea onClick={this.selectShip.bind(this, f.id, f.shipType)}>
                                                                             <CardContent>

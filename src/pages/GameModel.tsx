@@ -1,7 +1,7 @@
 import React, {useEffect} from 'react';
 import '../App.css';
 import {WebsiteDrawer} from "../Drawer";
-import {Button, Card, CardContent, CardHeader, Grid, Typography} from "@mui/material";
+import {Button, Card, CardContent, CardHeader, Container, Grid, Typography} from "@mui/material";
 import {DelaunayGraph} from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
 import Quaternion from "quaternion";
 
@@ -76,37 +76,40 @@ export const GameModel = () => {
     return (
         <div className="App">
             <WebsiteDrawer rightSide={null}/>
-            <Grid container xs={12} spacing={2}>
-                <Grid item xs={12}>
-                    <Card>
-                        <CardHeader>Straight Lines along a sphere</CardHeader>
-                        <CardContent>
-                            <Button onClick={() => {
-                                drawGraph();
-                            }}>Refresh</Button>
-                            <canvas id="canvas" width={1024} height={1024}></canvas>
-                            <Typography variant="body1">
-                                This chart shows the great circle arcs across a sphere but mapped onto a pizza pie chart. Notice
-                                that the forward direction follows the curve of the circle. Follow the curve with your finger and the direction of
-                                the curve should also be the same direction. What's strange is how the curve bends and warps but the video game should
-                                render that bendy curve as the same direction. We need to figure out how the direction of the curve changes relative to
-                                the x y flat plane the game is projected onto. For example: notice how the middle of the chart is a straight line with very
-                                little change in direction, that will result in the north pole having a small change in direction. The edge has a large
-                                change of direction, that will result in the south pole having a large change in direction. I think the game renders
-                                sprites in x y flat plane which contains the projection of a sphere, this is the source of the error. The AI and
-                                physics works correctly so the root cause of the rotation bug is the projection. Projecting position works fine, Projecting
-                                rotation does not. This is the most difficult part to make this game work, once this is solved, it's a matter of adding content.
-                            </Typography>
-                            <br/>
-                            <Typography variant="body1">
-                                If we add the rotation/angular/orientation gradient/derivative to the angle, we might approximate
-                                the rotation bug, this would require storing two positions. The two positions are projected onto this pizza pie chart and
-                                the angle between the two points are computed. This correction value is then added to the angle.
-                            </Typography>
-                        </CardContent>
-                    </Card>
+            <Container>
+                <Grid container xs={12} spacing={2}>
+                    <Grid item xs={12}>
+                        <Card>
+                            <CardHeader>Straight Lines along a sphere</CardHeader>
+                            <CardContent>
+                                <canvas id="canvas" width={256} height={256}></canvas>
+                                <br/>
+                                <Button onClick={() => {
+                                    drawGraph();
+                                }}>Refresh</Button>
+                                <Typography variant="body1">
+                                    This chart shows the great circle arcs across a sphere but mapped onto a pizza pie chart. Notice
+                                    that the forward direction follows the curve of the circle. Follow the curve with your finger and the direction of
+                                    the curve should also be the same direction. What's strange is how the curve bends and warps but the video game should
+                                    render that bendy curve as the same direction. We need to figure out how the direction of the curve changes relative to
+                                    the x y flat plane the game is projected onto. For example: notice how the middle of the chart is a straight line with very
+                                    little change in direction, that will result in the north pole having a small change in direction. The edge has a large
+                                    change of direction, that will result in the south pole having a large change in direction. I think the game renders
+                                    sprites in x y flat plane which contains the projection of a sphere, this is the source of the error. The AI and
+                                    physics works correctly so the root cause of the rotation bug is the projection. Projecting position works fine, Projecting
+                                    rotation does not. This is the most difficult part to make this game work, once this is solved, it's a matter of adding content.
+                                </Typography>
+                                <br/>
+                                <Typography variant="body1">
+                                    If we add the rotation/angular/orientation gradient/derivative to the angle, we might approximate
+                                    the rotation bug, this would require storing two positions. The two positions are projected onto this pizza pie chart and
+                                    the angle between the two points are computed. This correction value is then added to the angle.
+                                </Typography>
+                            </CardContent>
+                        </Card>
+                    </Grid>
                 </Grid>
-            </Grid>
+            </Container>
         </div>
     );
 }

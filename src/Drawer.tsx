@@ -1,5 +1,16 @@
 import React, {useState} from "react";
-import {AppBar, Button, Drawer, List, ListItem, ListItemIcon, ListItemText, Toolbar, Typography} from "@mui/material";
+import {
+    AppBar,
+    Button,
+    Drawer,
+    Grid,
+    List,
+    ListItem,
+    ListItemIcon,
+    ListItemText,
+    Toolbar,
+    Typography
+} from "@mui/material";
 import {Person, PieChart, PlayArrow, Public, QuestionMark} from "@mui/icons-material";
 import PixiGame from "./pages/PixiGame";
 import {Link} from "react-router-dom";
@@ -16,18 +27,27 @@ export const WebsiteDrawer = ({rightSide}: {
         <React.Fragment>
             <AppBar className="AppBar">
                 <Toolbar>
-                    <Button
-                        color="secondary"
-                        aria-label="Menu" variant="contained"
-                        onKeyDown={PixiGame.cancelSpacebar.bind(this)}
-                        onClick={toggle}
-                    >
-                        <Typography>Home</Typography>
-                    </Button>
-                    <Typography variant="h1" color="inherit" style={{flexGrow: 1}} textAlign="center">
-                        Globular Marauders
-                    </Typography>
-                    {rightSide}
+                    <Grid container columns={{
+                        xs: 6,
+                        lg: 12
+                    }}>
+                        <Grid item xs={6} display="flex">
+                            <Button
+                                color="secondary"
+                                aria-label="Menu" variant="contained"
+                                onKeyDown={PixiGame.cancelSpacebar.bind(this)}
+                                onClick={toggle}
+                            >
+                                <Typography>Home</Typography>
+                            </Button>
+                            <Typography variant="h4" color="inherit" style={{flexGrow: 1}} textAlign="center">
+                                Globular Marauders
+                            </Typography>
+                        </Grid>
+                        <Grid item xs={6} display="flex" flexDirection="row-reverse">
+                            {rightSide}
+                        </Grid>
+                    </Grid>
                 </Toolbar>
             </AppBar>
             <Drawer anchor="left" open={open} onClose={toggle}>
