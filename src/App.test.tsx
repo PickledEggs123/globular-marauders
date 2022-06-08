@@ -1,5 +1,5 @@
 import React from 'react';
-import PixiGame from './PixiGame';
+import PixiGame from './pages/PixiGame';
 import {shallow, ShallowWrapper} from "enzyme";
 import Quaternion from "quaternion";
 import sinon, {SinonSpy} from 'sinon';

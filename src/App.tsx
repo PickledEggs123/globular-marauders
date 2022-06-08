@@ -1,10 +1,10 @@
 import React from "react";
 import {BrowserRouter, Route, Routes} from "react-router-dom";
-import PixiGame from "./PixiGame";
-import {GameModel} from "./GameModel";
-import {PlanetGenerator} from "./PlanetGenerator";
-import {About} from "./About";
-import {Contact} from "./Contact";
+import PixiGame from "./pages/PixiGame";
+import {GameModel} from "./pages/GameModel";
+import {PlanetGenerator} from "./pages/PlanetGenerator";
+import {About} from "./pages/About";
+import {Contact} from "./pages/Contact";
 
 export const App = () => {
     return (

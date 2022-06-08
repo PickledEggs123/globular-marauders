@@ -1,6 +1,6 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import './App.css';
-import {WebsiteDrawer} from "./Drawer";
+import '../App.css';
+import {WebsiteDrawer} from "../Drawer";
 import {Button, Card, CardContent, CardHeader, Grid, Typography} from "@mui/material";
 // @ts-ignore
 import {generatePlanet, generatePlanetGltf} from "@pickledeggs123/globular-marauders-generator/dist/helpers";

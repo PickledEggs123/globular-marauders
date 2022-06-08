@@ -1,6 +1,6 @@
 import React from 'react';
-import './App.css';
-import {WebsiteDrawer} from "./Drawer";
+import '../App.css';
+import {WebsiteDrawer} from "../Drawer";
 import {Card, CardContent, CardHeader, Grid, Typography} from "@mui/material";
 
 export const About = () => {

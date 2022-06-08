@@ -1,7 +1,7 @@
 import React, {useState} from "react";
 import {AppBar, Button, Drawer, List, ListItem, ListItemIcon, ListItemText, Toolbar, Typography} from "@mui/material";
 import {Person, PieChart, PlayArrow, Public, QuestionMark} from "@mui/icons-material";
-import PixiGame from "./PixiGame";
+import PixiGame from "./pages/PixiGame";
 import {Link} from "react-router-dom";
 
 export const WebsiteDrawer = ({rightSide}: {

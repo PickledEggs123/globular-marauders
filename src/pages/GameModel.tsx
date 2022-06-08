@@ -1,6 +1,6 @@
 import React, {useEffect} from 'react';
-import './App.css';
-import {WebsiteDrawer} from "./Drawer";
+import '../App.css';
+import {WebsiteDrawer} from "../Drawer";
 import {Button, Card, CardContent, CardHeader, Grid, Typography} from "@mui/material";
 import {DelaunayGraph} from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
 import Quaternion from "quaternion";
@@ -10,6 +10,12 @@ export const GameModel = () => {
         const canvas = document.getElementById('canvas')! as HTMLCanvasElement;
         const ctx = canvas.getContext('2d')!;
         const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const setWhitePixel = (x: number, y: number) => {
+            image.data[(x + y * image.width) * 4] = 255;
+            image.data[(x + y * image.width) * 4 + 1] = 255;
+            image.data[(x + y * image.width) * 4 + 2] = 255;
+            image.data[(x + y * image.width) * 4 + 3] = 255;
+        };
         for (let x = 0; x < image.width; x++) {
             for (let y = 0; y < image.height; y++) {
                 const coordinate = {
@@ -23,15 +29,9 @@ export const GameModel = () => {
                 };
                 if (distance < 1) {
                     if (Math.abs(polarCoordinate.radius - Math.PI / 2) < 0.01) {
-                        image.data[(x + y * image.width) * 4] = 255;
-                        image.data[(x + y * image.width) * 4 + 1] = 255;
-                        image.data[(x + y * image.width) * 4 + 2] = 255;
-                        image.data[(x + y * image.width) * 4 + 3] = 255;
+                        setWhitePixel(x, y);
                     } else if (Math.abs(polarCoordinate.radius) < 0.01) {
-                        image.data[(x + y * image.width) * 4] = 255;
-                        image.data[(x + y * image.width) * 4 + 1] = 255;
-                        image.data[(x + y * image.width) * 4 + 2] = 255;
-                        image.data[(x + y * image.width) * 4 + 3] = 255;
+                        setWhitePixel(x, y);
                     } else {
                         const p = Quaternion.fromAxisAngle([0, 0, 1], polarCoordinate.angle).mul(Quaternion.fromAxisAngle([0, 1, 0], polarCoordinate.radius));
                         const q = Quaternion.fromBetweenVectors([0, 0, 1], [0, 1, 0]).pow(1 / 3);
@@ -62,10 +62,7 @@ export const GameModel = () => {
                 const x = Math.floor(canvas.width * ((coordinate.x + 1) / 2));
                 const y = Math.floor(canvas.height * ((coordinate.y + 1) / 2));
 
-                image.data[(x + y * image.width) * 4] = 255;
-                image.data[(x + y * image.width) * 4 + 1] = 255;
-                image.data[(x + y * image.width) * 4 + 2] = 255;
-                image.data[(x + y * image.width) * 4 + 3] = 255;
+                setWhitePixel(x, y);
 
                 position = position.mul(positionVelocity);
             }
