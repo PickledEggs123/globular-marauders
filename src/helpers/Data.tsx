@@ -19,66 +19,87 @@ interface IResourceTypeTexturePair {
 }
 
 export const RESOURCE_TYPE_TEXTURE_PAIRS: IResourceTypeTexturePair[] = [{
-    resourceType: EResourceType.RUM,
-    name: "rum",
-    url: "images/rum.svg"
-}, {
-    resourceType: EResourceType.RATION,
+    resourceType: EResourceType.RATION,             // done
     name: "ration",
     url: "images/ration.svg"
 }, {
-    resourceType: EResourceType.IRON,
+    resourceType: EResourceType.IRON,               // done
     name: "iron",
     url: "images/iron.svg"
 }, {
-    resourceType: EResourceType.GUNPOWDER,
+    resourceType: EResourceType.GUNPOWDER,          // done
     name: "gunpowder",
     url: "images/gunpowder.svg"
 }, {
-    resourceType: EResourceType.FIREARM,
+    resourceType: EResourceType.FIREARM,            // done
     name: "firearm",
     url: "images/firearm.svg"
 }, {
-    resourceType: EResourceType.MAHOGANY,
+    resourceType: EResourceType.MAHOGANY,           // done
     name: "mahogany",
     url: "images/mahogany.svg"
 }, {
-    resourceType: EResourceType.FUR,
+    resourceType: EResourceType.FUR,                // done
     name: "fur",
     url: "images/fur.svg"
 }, {
-    resourceType: EResourceType.RUBBER,
+    resourceType: EResourceType.RUBBER,             // done
     name: "rubber",
     url: "images/rubber.svg"
 }, {
-    resourceType: EResourceType.CACAO,
+    resourceType: EResourceType.CACAO,              // done
     name: "cacao",
     url: "images/cacao.svg"
 }, {
-    resourceType: EResourceType.COFFEE,
+    resourceType: EResourceType.COFFEE,             // done
     name: "coffee",
     url: "images/coffee.svg"
 }, {
-    resourceType: EResourceType.RUM,
+    resourceType: EResourceType.RUM,                // done
     name: "rum",
     url: "images/rum.svg"
 }, {
-    resourceType: EResourceType.MOLASSES,
+    resourceType: EResourceType.MOLASSES,           // done
     name: "molasses",
     url: "images/molasses.svg"
 }, {
-    resourceType: EResourceType.COTTON,
+    resourceType: EResourceType.COTTON,             // done
     name: "cotton",
     url: "images/cotton.svg"
 }, {
-    resourceType: EResourceType.FLAX,
+    resourceType: EResourceType.FLAX,               // done
     name: "flax",
     url: "images/flax.svg"
 }, {
-    resourceType: EResourceType.TOBACCO,
+    resourceType: EResourceType.TOBACCO,            // done
     name: "tobacco",
     url: "images/tobacco.svg"
+}, {
+    resourceType: EResourceType.SUGAR_CANE,         // done
+    name: "sugarcane",
+    url: "images/sugarcane.svg"
+}, {
+    resourceType: EResourceType.CLOTHING,           // done
+    name: "clothing",
+    url: "images/clothing.svg"
+}, {
+    resourceType: EResourceType.ROPE,               // done
+    name: "rope",
+    url: "images/rope.svg"
+}, {
+    resourceType: EResourceType.CIGAR,              // done
+    name: "cigar",
+    url: "images/cigar.svg"
+}, {
+    resourceType: EResourceType.FUR_APPAREL,        // done
+    name: "fur_apparel",
+    url: "images/fur_apparel.svg"
+}, {
+    resourceType: EResourceType.FURNITURE,          // done
+    name: "furniture",
+    url: "images/furniture.svg"
 }];
+
 export const DEFAULT_IMAGE: string = "images/no_image.svg";
 
 export const SPACE_BACKGROUND_TEXTURES: string[] = [

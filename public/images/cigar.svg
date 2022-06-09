@@ -1,0 +1,36 @@
+<svg viewBox="-50 -50 100 100" fill="transparent" xmlns="http://www.w3.org/2000/svg">
+    <polygon
+            fill="brown"
+            stroke="maroon"
+            stroke-width="3"
+            points="-45,0 -40,10 40,10 35,0 40,-10 -40,-10"
+    />
+    <line
+            fill="brown"
+            stroke="maroon"
+            stroke-width="3"
+            x1="-20" x2="-40"
+            y1="-10" y2="10"/>
+    />
+    <line
+            fill="brown"
+            stroke="maroon"
+            stroke-width="3"
+            x1="0" x2="-20"
+            y1="-10" y2="10"/>
+    />
+    <line
+            fill="brown"
+            stroke="maroon"
+            stroke-width="3"
+            x1="20" x2="0"
+            y1="-10" y2="10"/>
+    />
+    <line
+            fill="brown"
+            stroke="maroon"
+            stroke-width="3"
+            x1="40" x2="20"
+            y1="-10" y2="10"/>
+    />
+</svg>

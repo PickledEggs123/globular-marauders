@@ -1,0 +1,30 @@
+<svg viewBox="-50 -50 100 100" fill="transparent" xmlns="http://www.w3.org/2000/svg">
+    <g transform="translate(-45,0)">
+        <rect stroke="darkgreen" fill="green" x="0" y="-50" width="10" height="25" stroke-width="3"/>
+        <rect stroke="darkgreen" fill="green" x="0" y="-25" width="10" height="25" stroke-width="3"/>
+        <rect stroke="darkgreen" fill="green" x="0" y="0" width="10" height="25" stroke-width="3"/>
+        <rect stroke="darkgreen" fill="green" x="0" y="25" width="10" height="25" stroke-width="3"/>
+    </g>
+    <g transform="translate(-25,0)">
+        <rect stroke="darkgreen" fill="green" x="0" y="-25" width="10" height="25" stroke-width="3"/>
+        <rect stroke="darkgreen" fill="green" x="0" y="0" width="10" height="25" stroke-width="3"/>
+        <rect stroke="darkgreen" fill="green" x="0" y="25" width="10" height="25" stroke-width="3"/>
+    </g>
+    <g transform="translate(-5,0)">
+        <rect stroke="darkgreen" fill="green" x="0" y="-50" width="10" height="25" stroke-width="3"/>
+        <rect stroke="darkgreen" fill="green" x="0" y="-25" width="10" height="25" stroke-width="3"/>
+        <rect stroke="darkgreen" fill="green" x="0" y="0" width="10" height="25" stroke-width="3"/>
+        <rect stroke="darkgreen" fill="green" x="0" y="25" width="10" height="25" stroke-width="3"/>
+    </g>
+    <g transform="translate(15,0)">
+        <rect stroke="darkgreen" fill="green" x="0" y="-25" width="10" height="25" stroke-width="3"/>
+        <rect stroke="darkgreen" fill="green" x="0" y="0" width="10" height="25" stroke-width="3"/>
+        <rect stroke="darkgreen" fill="green" x="0" y="25" width="10" height="25" stroke-width="3"/>
+    </g>
+    <g transform="translate(35,0)">
+        <rect stroke="darkgreen" fill="green" x="0" y="-50" width="10" height="25" stroke-width="3"/>
+        <rect stroke="darkgreen" fill="green" x="0" y="-25" width="10" height="25" stroke-width="3"/>
+        <rect stroke="darkgreen" fill="green" x="0" y="0" width="10" height="25" stroke-width="3"/>
+        <rect stroke="darkgreen" fill="green" x="0" y="25" width="10" height="25" stroke-width="3"/>
+    </g>
+</svg>
