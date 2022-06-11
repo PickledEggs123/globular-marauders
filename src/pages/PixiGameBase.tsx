@@ -11,6 +11,7 @@ import {
 } from "@pickledeggs123/globular-marauders-game/lib/src/EFaction";
 import {Game, IPlayerData} from "@pickledeggs123/globular-marauders-game/lib/src/Game";
 import * as PIXI from "pixi.js";
+import * as particles from "@pixi/particle-emitter";
 import {ITessellatedTriangle} from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
 import Quaternion from "quaternion";
 import {EResourceType} from "@pickledeggs123/globular-marauders-game/lib/src/Resource";
@@ -37,6 +38,8 @@ import {crateResources} from "../resources/crateResources";
 import {voronoiResources} from "../resources/voronoiResources";
 import {backgroundVoronoiResources} from "../resources/backgroundVoronoiResources";
 import {ShipResources} from "../resources/shipResources";
+import {EaseSegment, SimpleEase} from "@pixi/particle-emitter/lib/ParticleUtils";
+import {RandNumber} from "@pixi/particle-emitter/lib/EmitterConfig";
 
 /**
  * The input parameters of the app.
@@ -57,6 +60,13 @@ export enum EGameMode {
     TUTORIAL,
     SINGLE_PLAYER,
     MULTI_PLAYER
+}
+
+export enum EParticleState {
+    STOP,
+    PLAYING,
+    PLAY,
+    STOPPING,
 }
 
 /**
@@ -136,6 +146,8 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
     // pixi.js renderer
     public abstract application: PIXI.Application;
 
+    public abstract particleContainer: PIXI.Container;
+
     pixiStarResources = starResources();
 
     pixiPlanetResources = planetResources();
@@ -180,6 +192,9 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         id: string,
         mesh: PIXI.Mesh<PIXI.Shader>,
         text: PIXI.Text,
+        trailContainer: PIXI.Container,
+        trail: particles.Emitter,
+        trailState: EParticleState,
         line: PIXI.Graphics,
         cannonBallLeft: PIXI.Graphics,
         cannonBallRight: PIXI.Graphics,
@@ -407,6 +422,97 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         text.style.fill = "white";
         text.style.fontSize = 15;
 
+        const trailContainer = new PIXI.Container();
+        trailContainer.zIndex = -5;
+        const trail = new particles.Emitter(trailContainer, {
+            emit: false,
+            autoUpdate: true,
+            lifetime: {
+                min: 1,
+                max: 3
+            },
+            particlesPerWave: 1,
+            frequency: 0.1,
+            spawnChance: 1,
+            maxParticles: 100,
+            addAtBack: false,
+            pos: {
+                x: 0,
+                y: 0,
+            },
+            behaviors: [
+                {
+                    type: 'alpha',
+                    config: {
+                        alpha: {
+                            list: [
+                                {
+                                    value: 0,
+                                    time: 0
+                                },
+                                {
+                                    value: 0.8,
+                                    time: 0.2
+                                },
+                                {
+                                    value: 0.1,
+                                    time: 1
+                                }
+                            ],
+                        },
+                    }
+                },
+                {
+                    type: 'scale',
+                    config: {
+                        scale: {
+                            list: [
+                                {
+                                    value: 1,
+                                    time: 0
+                                },
+                                {
+                                    value: 0.3,
+                                    time: 1
+                                }
+                            ],
+                        },
+                    }
+                },
+                {
+                    type: 'staticQuaternion',
+                    config: {
+                        ship,
+                        game: this
+                    }
+                },
+                {
+                    type: 'rotationStatic',
+                    config: {
+                        min: 0,
+                        max: 360
+                    }
+                },
+                {
+                    type: 'spawnShape',
+                    config: {
+                        type: 'torus',
+                        data: {
+                            x: 0,
+                            y: 0,
+                            radius: 10
+                        }
+                    }
+                },
+                {
+                    type: 'textureSingle',
+                    config: {
+                        texture: this.sprites.smokeTrail
+                    }
+                }
+            ]
+        });
+
         const line = new PIXI.Graphics();
         line.zIndex = -4;
 
@@ -427,6 +533,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
 
         this.application.stage.addChild(mesh);
         this.application.stage.addChild(text);
+        this.application.stage.addChild(trailContainer);
         this.application.stage.addChild(line);
         this.application.stage.addChild(cannonBallLeft);
         this.application.stage.addChild(cannonBallRight);
@@ -435,6 +542,9 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
             id: ship.id,
             mesh,
             text,
+            trailContainer,
+            trail,
+            trailState: EParticleState.STOP,
             line,
             cannonBallLeft,
             cannonBallRight,

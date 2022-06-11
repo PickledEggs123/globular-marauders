@@ -3,6 +3,7 @@ import '../App.css';
 import Quaternion from "quaternion";
 import SockJS from "sockjs-client";
 import * as PIXI from "pixi.js";
+import * as particles from "@pixi/particle-emitter";
 import {IMediaInstance, PlayOptions, sound} from "@pixi/sound";
 import {EResourceType, ITEM_DATA} from "@pickledeggs123/globular-marauders-game/lib/src/Resource";
 import {
@@ -78,7 +79,7 @@ import {
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import {DEFAULT_IMAGE, EVoronoiMode, RESOURCE_TYPE_TEXTURE_PAIRS, SPACE_BACKGROUND_TEXTURES} from "../helpers/Data";
-import {EGameMode, IPixiGameProps, PixiGameBase} from "./PixiGameBase";
+import {EGameMode, EParticleState, IPixiGameProps, PixiGameBase} from "./PixiGameBase";
 import {DirectionsBoat, MusicNote, MusicOff, People, Public, School, SmartToy, Tv, TvOff} from "@mui/icons-material";
 import {EOrderType} from "@pickledeggs123/globular-marauders-game/lib/src/Order";
 import {EInvasionPhase, Invasion} from "@pickledeggs123/globular-marauders-game/lib/src/Invasion";
@@ -113,6 +114,7 @@ const GetFactionSubheader = (faction: EFaction): string | null => {
 
 export class PixiGame extends PixiGameBase {
     public application: PIXI.Application;
+    public particleContainer: PIXI.Container;
 
     // game loop stuff
     public rotateCameraInterval: any = null;
@@ -216,16 +218,21 @@ export class PixiGame extends PixiGameBase {
 
         // queue images to be loaded
         loader.add("missing", DEFAULT_IMAGE);
+        // load loot items
         for (const resourceType of Object.values(EResourceType)) {
             const item = RESOURCE_TYPE_TEXTURE_PAIRS.find(i => i.resourceType === resourceType);
             if (item) {
                 loader.add(item.name, item.url);
             }
         }
+        // load background textures
         for (const textureUrl of SPACE_BACKGROUND_TEXTURES) {
             const index = SPACE_BACKGROUND_TEXTURES.indexOf(textureUrl);
             loader.add(`space${index}`, textureUrl);
         }
+        // load smoke trail
+        loader.add("smokeTrail", "images/sprites/smokeTrail.svg");
+        // onload handler
         loader.load((loader, resources) => {
             // load images into cache
             for (const resourceType of Object.values(EResourceType)) {
@@ -246,6 +253,7 @@ export class PixiGame extends PixiGameBase {
                     this.sprites[textureName] = item.texture;
                 }
             }
+            this.sprites.smokeTrail = resources.smokeTrail.texture;
         });
     };
 
@@ -443,6 +451,18 @@ export class PixiGame extends PixiGameBase {
         this.setState({gameMode});
     }
 
+    private cameraPosition: Quaternion = Quaternion.ONE;
+    private cameraOrientation: Quaternion = Quaternion.ONE;
+    private lastCameraOrientation: Quaternion = Quaternion.ONE;
+    private cameraCorrectionFactor: number = 0;
+    private cameraPositionVelocityTheta: number = Math.PI / 2;
+    public getCamera() {
+        return {
+            cameraPosition: this.cameraPosition,
+            cameraOrientation: this.cameraOrientation,
+        };
+    }
+
     constructor(props: IPixiGameProps) {
         super(props);
 
@@ -453,31 +473,22 @@ export class PixiGame extends PixiGameBase {
             backgroundColor: 0xff110022,
         });
         this.application.stage.sortableChildren = true;
-        // this.application.stage.mask = new Graphics()
-        //     .beginFill(0xffffff)
-        //     .drawCircle(this.application.stage.width / 2, this.application.stage.height / 2,
-        //         Math.min(this.application.stage.width, this.application.stage.height) / 2)
-        //     .endFill();
+        this.particleContainer = new PIXI.Container();
+        this.particleContainer.zIndex = -150;
+        this.application.stage.addChild(this.particleContainer);
 
         // draw app
         this.game.initializeGame();
-
-        // draw rotating app
-        let cameraPosition: Quaternion = Quaternion.ONE;
-        let cameraOrientation: Quaternion = Quaternion.ONE;
-        let lastCameraOrientation: Quaternion = Quaternion.ONE;
-        let cameraCorrectionFactor: number = 0;
-        let cameraPositionVelocityTheta: number = Math.PI / 2;
 
         this.loadSoundIntoMemory();
         this.loadSpritesIntoMemory();
 
         const handleDrawingOfText = (text: PIXI.Text, position: Quaternion, offset?: {x: number, y: number}) => {
             const textPosition = DelaunayGraph.distanceFormula(
-                cameraPosition.rotateVector([0, 0, 1]),
+                this.cameraPosition.rotateVector([0, 0, 1]),
                 position.rotateVector([0, 0, 1])
-            ) < 0.001 ? [0, 0, 1] as [number, number, number] : cameraOrientation.clone().inverse()
-                .mul(cameraPosition.clone().inverse())
+            ) < 0.001 ? [0, 0, 1] as [number, number, number] : this.cameraOrientation.clone().inverse()
+                .mul(this.cameraPosition.clone().inverse())
                 .mul(position.clone())
                 .rotateVector([0, 0, 1]);
             textPosition[0] = ((-textPosition[0] * this.state.zoom * this.game.worldScale) + 1) / 2;
@@ -507,31 +518,33 @@ export class PixiGame extends PixiGameBase {
             }
             text.anchor.set(0.5);
             text.visible = textPosition[2] > 0 && this.state.zoom * this.game.worldScale >= 6;
-        }
+        };
+        const handleDrawingOfParticles = (text: PIXI.Container, position: Quaternion, offset?: {x: number, y: number}) => {
+        };
 
         const removeExtraRotation = (q: Quaternion): Quaternion => {
             return Quaternion.fromBetweenVectors([0, 0, 1], q.rotateVector([0, 0, 1]));
         };
         const removeExtraOrientation = (q: Quaternion): Quaternion => {
             return Quaternion.fromBetweenVectors([1, 0, 0], q.rotateVector([1, 0, 0]));
-        }
+        };
 
         // draw rotating app
         let pixiTick: number = 0;
         this.application.ticker.add(() => {
             const playerShip = this.getPlayerShip();
-            cameraPosition = removeExtraRotation(playerShip.position);
-            lastCameraOrientation = cameraOrientation;
-            const nextCameraOrientation = removeExtraOrientation(playerShip.orientation.clone().mul(Quaternion.fromAxisAngle([0, 0, 1], -cameraPositionVelocityTheta + Math.PI / 2 - cameraCorrectionFactor)));
-            cameraOrientation = lastCameraOrientation.slerp(nextCameraOrientation)(0.05 * (1 - VoronoiGraph.angularDistanceQuaternion(lastCameraOrientation.clone().inverse().mul(nextCameraOrientation.clone()), 1) / Math.PI));
+            this.cameraPosition = removeExtraRotation(playerShip.position);
+            this.lastCameraOrientation = this.cameraOrientation;
+            const nextCameraOrientation = removeExtraOrientation(playerShip.orientation.clone().mul(Quaternion.fromAxisAngle([0, 0, 1], -this.cameraPositionVelocityTheta + Math.PI / 2 - this.cameraCorrectionFactor)));
+            this.cameraOrientation = this.lastCameraOrientation.slerp(nextCameraOrientation)(0.05 * (1 - VoronoiGraph.angularDistanceQuaternion(this.lastCameraOrientation.clone().inverse().mul(nextCameraOrientation.clone()), 1) / Math.PI));
             pixiTick += 1;
 
             // sync game to Pixi renderer
             // stars
             for (const star of [
-                ...Array.from(this.game.voronoiTerrain.getStars(cameraPosition.rotateVector([0, 0, 1]), 0.5)),
-                ...Array.from(this.game.voronoiTerrain.getStars(cameraPosition.rotateVector([0, 0, 1]), 0.25)),
-                ...Array.from(this.game.voronoiTerrain.getStars(cameraPosition.rotateVector([0, 0, 1]), 0.125))
+                ...Array.from(this.game.voronoiTerrain.getStars(this.cameraPosition.rotateVector([0, 0, 1]), 0.5)),
+                ...Array.from(this.game.voronoiTerrain.getStars(this.cameraPosition.rotateVector([0, 0, 1]), 0.25)),
+                ...Array.from(this.game.voronoiTerrain.getStars(this.cameraPosition.rotateVector([0, 0, 1]), 0.125))
             ]) {
                 const starMesh = this.starMeshes.find(p => p.id === star.id);
                 if (starMesh) {
@@ -539,8 +552,8 @@ export class PixiGame extends PixiGameBase {
                 } else {
                     this.addStar({
                         star,
-                        cameraPosition,
-                        cameraOrientation,
+                        cameraPosition: this.cameraPosition,
+                        cameraOrientation: this.cameraOrientation,
                         tick: pixiTick
                     });
                 }
@@ -550,7 +563,7 @@ export class PixiGame extends PixiGameBase {
             }
             this.starMeshes = this.starMeshes.filter(m => m.tick === pixiTick && !this.clearMeshes);
             // planets
-            for (const planet of Array.from(this.game.voronoiTerrain.getPlanets(cameraPosition.rotateVector([0, 0, 1])))) {
+            for (const planet of Array.from(this.game.voronoiTerrain.getPlanets(this.cameraPosition.rotateVector([0, 0, 1])))) {
                 const planetMesh = this.planetMeshes.find(p => p.id === planet.id);
                 if (planetMesh) {
                     planetMesh.orientation = planetMesh.rotation.clone().mul(planetMesh.orientation.clone());
@@ -562,8 +575,8 @@ export class PixiGame extends PixiGameBase {
                 } else {
                     this.addPlanet({
                         planet,
-                        cameraPosition,
-                        cameraOrientation,
+                        cameraPosition: this.cameraPosition,
+                        cameraOrientation: this.cameraOrientation,
                         tick: pixiTick
                     });
                 }
@@ -585,13 +598,39 @@ export class PixiGame extends PixiGameBase {
                     shipMesh.isPlayer = this.getPlayerShip().id === ship.id;
                     shipMesh.isEnemy = this.findPlayerShip()?.faction?.id !== ship.faction?.id;
                     shipMesh.healthValue = Math.ceil(ship.health / ship.maxHealth * 100);
+
+                    switch (shipMesh.trailState) {
+                        case EParticleState.STOP: {
+                            if ((shipMesh.isPlayer ? this.activeKeys : ship.activeKeys).includes("w")) {
+                                shipMesh.trailState = EParticleState.PLAYING;
+                            }
+                            break;
+                        }
+                        case EParticleState.PLAYING: {
+                            shipMesh.trail.emit = true;
+                            shipMesh.trailState = EParticleState.PLAY;
+                            break;
+                        }
+                        case EParticleState.PLAY: {
+                            if (!(shipMesh.isPlayer ? this.activeKeys : ship.activeKeys).includes("w")) {
+                                shipMesh.trailState = EParticleState.STOPPING;
+                            }
+                            break;
+                        }
+                        case EParticleState.STOPPING: {
+                            shipMesh.trail.emit = false;
+                            shipMesh.trailState = EParticleState.STOP;
+                            break;
+                        }
+                    }
+
                     const currentPositionPolar = convertPositionQuaternionToPositionPolar(ship.position);
                     if (isPositionPolarDifferent(shipMesh.positionPolarNew, currentPositionPolar)) {
                         shipMesh.positionPolarOld = shipMesh.positionPolarNew;
                         shipMesh.positionPolarNew = currentPositionPolar;
                         shipMesh.correctionFactorTheta = -computePositionPolarCorrectionFactorTheta(shipMesh.positionPolarOld, shipMesh.positionPolarNew) + Math.PI / 2;
                         if (ship === this.findPlayerShip()) {
-                            cameraCorrectionFactor = shipMesh.correctionFactorTheta;
+                            this.cameraCorrectionFactor = shipMesh.correctionFactorTheta;
                         }
                     }
                     shipMesh.position = removeExtraRotation(ship.position);
@@ -601,7 +640,7 @@ export class PixiGame extends PixiGameBase {
                     if (positionVelocityPointLength > 0.0001) {
                         shipMesh.positionVelocityTheta = Math.atan2(positionVelocityPoint[1], positionVelocityPoint[0]);
                         if (ship === this.findPlayerShip()) {
-                            cameraPositionVelocityTheta = shipMesh.positionVelocityTheta;
+                            this.cameraPositionVelocityTheta = shipMesh.positionVelocityTheta;
                         }
                     }
                     shipMesh.orientation = ship.orientation.clone().mul(Quaternion.fromAxisAngle([0, 0, 1], -shipMesh.positionVelocityTheta + Math.PI / 2));
@@ -628,8 +667,8 @@ export class PixiGame extends PixiGameBase {
                 } else {
                     this.addShip({
                         ship,
-                        cameraPosition,
-                        cameraOrientation,
+                        cameraPosition: this.cameraPosition,
+                        cameraOrientation: this.cameraOrientation,
                         tick: pixiTick
                     });
                 }
@@ -641,6 +680,9 @@ export class PixiGame extends PixiGameBase {
                 this.application.stage.removeChild(item.cannonBallLeft);
                 this.application.stage.removeChild(item.cannonBallRight);
                 this.application.stage.removeChild(item.health);
+                item.trail.emit = false;
+                item.trail.destroy();
+                this.application.stage.removeChild(item.trailContainer);
                 for (const autoPilotLine of item.autoPilotLines) {
                     this.application.stage.removeChild(autoPilotLine);
                 }
@@ -657,8 +699,8 @@ export class PixiGame extends PixiGameBase {
                 } else {
                     this.addCannonBall({
                         cannonBall,
-                        cameraPosition,
-                        cameraOrientation,
+                        cameraPosition: this.cameraPosition,
+                        cameraOrientation: this.cameraOrientation,
                         tick: pixiTick
                     });
                 }
@@ -677,8 +719,8 @@ export class PixiGame extends PixiGameBase {
                 } else {
                     this.addCrate({
                         crate,
-                        cameraPosition,
-                        cameraOrientation,
+                        cameraPosition: this.cameraPosition,
+                        cameraOrientation: this.cameraOrientation,
                         tick: pixiTick
                     });
                 }
@@ -716,7 +758,7 @@ export class PixiGame extends PixiGameBase {
                     return DelaunayGraph.dotProduct(DelaunayGraph.crossProduct(
                         DelaunayGraph.subtract(vertices[1], vertices[0]),
                         DelaunayGraph.subtract(vertices[2], vertices[0]),
-                    ), cameraPosition.rotateVector([0, 0, 1])) > 0;
+                    ), this.cameraPosition.rotateVector([0, 0, 1])) > 0;
                 });
                 for (const {id, tile} of voronoiDataStuff) {
                     const voronoiMesh = this.voronoiMeshes.find(p => p.id === id);
@@ -726,8 +768,8 @@ export class PixiGame extends PixiGameBase {
                         this.addVoronoi({
                             id,
                             tile,
-                            cameraPosition,
-                            cameraOrientation,
+                            cameraPosition: this.cameraPosition,
+                            cameraOrientation: this.cameraOrientation,
                             tick: pixiTick
                         });
                     }
@@ -786,7 +828,7 @@ export class PixiGame extends PixiGameBase {
                 return DelaunayGraph.dotProduct(DelaunayGraph.crossProduct(
                     DelaunayGraph.subtract(vertices[1], vertices[0]),
                     DelaunayGraph.subtract(vertices[2], vertices[0]),
-                ), cameraPosition.rotateVector([0, 0, 1])) > 0;
+                ), this.cameraPosition.rotateVector([0, 0, 1])) > 0;
             });
             for (const {id, tile, tileUv, textureName} of backgroundVoronoiDataStuff) {
                 const voronoiMesh = this.backgroundVoronoiMeshes.find(p => p.id === id);
@@ -797,8 +839,8 @@ export class PixiGame extends PixiGameBase {
                         id,
                         tile,
                         tileUv,
-                        cameraPosition,
-                        cameraOrientation,
+                        cameraPosition: this.cameraPosition,
+                        cameraOrientation: this.cameraOrientation,
                         tick: pixiTick,
                         textureName
                     });
@@ -813,10 +855,10 @@ export class PixiGame extends PixiGameBase {
 
             const updateMeshIfVisible = (item: {position: Quaternion, mesh: PIXI.Mesh<any>}) => {
                 const shipPoint = DelaunayGraph.distanceFormula(
-                    cameraPosition.rotateVector([0, 0, 1]),
+                    this.cameraPosition.rotateVector([0, 0, 1]),
                     item.position.rotateVector([0, 0, 1])
-                ) < 0.001 ? [0, 0, 1] as [number, number, number] : cameraOrientation.clone().inverse()
-                    .mul(cameraPosition.clone().inverse())
+                ) < 0.001 ? [0, 0, 1] as [number, number, number] : this.cameraOrientation.clone().inverse()
+                    .mul(this.cameraPosition.clone().inverse())
                     .mul(item.position.clone())
                     .rotateVector([0, 0, 1]);
                 item.mesh.visible = shipPoint[2] > 0;
@@ -826,8 +868,8 @@ export class PixiGame extends PixiGameBase {
             // update each star
             for (const item of this.starMeshes) {
                 const shader = item.mesh.shader;
-                shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
-                shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
+                shader.uniforms.uCameraPosition = this.cameraPosition.clone().inverse().toMatrix4();
+                shader.uniforms.uCameraOrientation = this.cameraOrientation.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraScale = this.state.zoom;
                 updateMeshIfVisible(item);
             }
@@ -837,18 +879,18 @@ export class PixiGame extends PixiGameBase {
                 item.orientation = item.orientation.clone().mul(item.rotation.clone());
 
                 const shader = item.mesh.shader;
-                shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
-                shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
+                shader.uniforms.uCameraPosition = this.cameraPosition.clone().inverse().toMatrix4();
+                shader.uniforms.uCameraOrientation = this.cameraOrientation.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraScale = this.state.zoom;
                 shader.uniforms.uOrientation = item.orientation.toMatrix4();
                 updateMeshIfVisible(item);
 
                 if (item.factionColor) {
                     const startPoint = DelaunayGraph.distanceFormula(
-                        cameraPosition.rotateVector([0, 0, 1]),
+                        this.cameraPosition.rotateVector([0, 0, 1]),
                         item.position.rotateVector([0, 0, 1])
-                    ) < 0.0001 ? [0, 0, 1] : cameraOrientation.clone().inverse()
-                        .mul(cameraPosition.clone().inverse())
+                    ) < 0.0001 ? [0, 0, 1] : this.cameraOrientation.clone().inverse()
+                        .mul(this.cameraPosition.clone().inverse())
                         .mul(item.position.clone())
                         .rotateVector([0, 0, 1]);
                     const centerX = ((-startPoint[0] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.width;
@@ -895,10 +937,10 @@ export class PixiGame extends PixiGameBase {
             // update each ship
             for (const item of this.shipMeshes) {
                 const shader = item.mesh.shader;
-                shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
-                shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
-                shader.uniforms.uCameraPositionInv = cameraPosition.clone().toMatrix4();
-                shader.uniforms.uCameraOrientationInv = cameraOrientation.clone().toMatrix4();
+                shader.uniforms.uCameraPosition = this.cameraPosition.clone().inverse().toMatrix4();
+                shader.uniforms.uCameraOrientation = this.cameraOrientation.clone().inverse().toMatrix4();
+                shader.uniforms.uCameraPositionInv = this.cameraPosition.clone().toMatrix4();
+                shader.uniforms.uCameraOrientationInv = this.cameraOrientation.clone().toMatrix4();
                 shader.uniforms.uCorrectionFactorTheta = item.correctionFactorTheta;
                 shader.uniforms.uCameraScale = this.state.zoom;
                 shader.uniforms.uPosition = removeExtraRotation(item.position).toMatrix4();
@@ -907,15 +949,17 @@ export class PixiGame extends PixiGameBase {
 
                 // hide ships on the other side of the world
                 const shipPoint = DelaunayGraph.distanceFormula(
-                    cameraPosition.rotateVector([0, 0, 1]),
+                    this.cameraPosition.rotateVector([0, 0, 1]),
                     item.position.rotateVector([0, 0, 1])
-                ) < 0.001 ? [0, 0, 1] as [number, number, number] : cameraOrientation.clone().inverse()
-                    .mul(cameraPosition.clone().inverse())
+                ) < 0.001 ? [0, 0, 1] as [number, number, number] : this.cameraOrientation.clone().inverse()
+                    .mul(this.cameraPosition.clone().inverse())
                     .mul(item.position.clone())
                     .rotateVector([0, 0, 1]);
                 item.mesh.visible = shipPoint[2] > 0;
 
                 handleDrawingOfText(item.text, item.position);
+
+                handleDrawingOfParticles(item.trailContainer, item.position);
 
                 // draw player dotted line
                 if (item.isPlayer) {
@@ -971,10 +1015,10 @@ export class PixiGame extends PixiGameBase {
                         const worldPoint = item.position.clone().mul(Quaternion.fromBetweenVectors([0, 0, 1], jitterPoint)).rotateVector([0, 0, 1]);
                         const position = Quaternion.fromBetweenVectors([0, 0, 1], worldPoint);
                         const endPoint = DelaunayGraph.distanceFormula(
-                            cameraPosition.rotateVector([0, 0, 1]),
+                            this.cameraPosition.rotateVector([0, 0, 1]),
                             position.rotateVector([0, 0, 1])
-                        ) < 0.001 ? [0, 0, 1] as [number, number, number] : cameraOrientation.clone().inverse()
-                            .mul(cameraPosition.clone().inverse())
+                        ) < 0.001 ? [0, 0, 1] as [number, number, number] : this.cameraOrientation.clone().inverse()
+                            .mul(this.cameraPosition.clone().inverse())
                             .mul(position.clone())
                             .rotateVector([0, 0, 1]);
                         endPoint[2] = 0;
@@ -1022,23 +1066,23 @@ export class PixiGame extends PixiGameBase {
 
                 // draw AutoPilot dotted lines
                 for (let i = 0; i < item.autoPilotLines.length && i < item.autoPilotLinePoints.length; i++) {
-                    const lineStart = i === 0 ? cameraPosition.clone() : Quaternion.fromBetweenVectors([0, 0, 1], item.autoPilotLinePoints[i - 1]);
+                    const lineStart = i === 0 ? this.cameraPosition.clone() : Quaternion.fromBetweenVectors([0, 0, 1], item.autoPilotLinePoints[i - 1]);
                     const lineEnd = Quaternion.fromBetweenVectors([0, 0, 1], item.autoPilotLinePoints[i]);
                     const startPoint = DelaunayGraph.distanceFormula(
-                        cameraPosition.rotateVector([0, 0, 1]),
+                        this.cameraPosition.rotateVector([0, 0, 1]),
                         lineStart.rotateVector([0, 0, 1])
-                    ) < 0.001 ? [0, 0, 1] as [number, number, number] : cameraOrientation.clone().inverse()
-                        .mul(cameraPosition.clone().inverse())
+                    ) < 0.001 ? [0, 0, 1] as [number, number, number] : this.cameraOrientation.clone().inverse()
+                        .mul(this.cameraPosition.clone().inverse())
                         .mul(lineStart)
                         .rotateVector([0, 0, 1]);
                     const lineXS = ((-startPoint[0] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.width;
                     const lineYS = ((-startPoint[1] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.height;
 
                     const endPoint = DelaunayGraph.distanceFormula(
-                        cameraPosition.rotateVector([0, 0, 1]),
+                        this.cameraPosition.rotateVector([0, 0, 1]),
                         lineEnd.rotateVector([0, 0, 1])
-                    ) < 0.001 ? [0, 0, 1] as [number, number, number] : cameraOrientation.clone().inverse()
-                        .mul(cameraPosition.clone().inverse())
+                    ) < 0.001 ? [0, 0, 1] as [number, number, number] : this.cameraOrientation.clone().inverse()
+                        .mul(this.cameraPosition.clone().inverse())
                         .mul(lineEnd)
                         .rotateVector([0, 0, 1]);
                     const lineXE = ((-endPoint[0] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.width;
@@ -1077,10 +1121,10 @@ export class PixiGame extends PixiGameBase {
                 // draw health bar
                 {
                     const startPoint = DelaunayGraph.distanceFormula(
-                        cameraPosition.rotateVector([0, 0, 1]),
+                        this.cameraPosition.rotateVector([0, 0, 1]),
                         item.position.rotateVector([0, 0, 1])
-                    ) < 0.001 ? [0, 0, 1] as [number, number, number] : cameraOrientation.clone().inverse()
-                        .mul(cameraPosition.clone().inverse())
+                    ) < 0.001 ? [0, 0, 1] as [number, number, number] : this.cameraOrientation.clone().inverse()
+                        .mul(this.cameraPosition.clone().inverse())
                         .mul(item.position.clone())
                         .rotateVector([0, 0, 1]);
                     const centerX = ((-startPoint[0] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.width;
@@ -1115,8 +1159,8 @@ export class PixiGame extends PixiGameBase {
                 item.position = item.position.clone().mul(item.positionVelocity.clone().pow(1/60));
 
                 const shader = item.mesh.shader;
-                shader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
-                shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
+                shader.uniforms.uCameraPosition = this.cameraPosition.clone().inverse().toMatrix4();
+                shader.uniforms.uCameraOrientation = this.cameraOrientation.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraScale = this.state.zoom;
                 shader.uniforms.uPosition = removeExtraRotation(item.position).toMatrix4();
                 updateMeshIfVisible(item);
@@ -1127,16 +1171,16 @@ export class PixiGame extends PixiGameBase {
                 item.orientation = item.orientation.clone().mul(item.rotation.clone());
 
                 const meshShader = item.mesh.shader;
-                meshShader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
-                meshShader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
+                meshShader.uniforms.uCameraPosition = this.cameraPosition.clone().inverse().toMatrix4();
+                meshShader.uniforms.uCameraOrientation = this.cameraOrientation.clone().inverse().toMatrix4();
                 meshShader.uniforms.uCameraScale = this.state.zoom;
                 meshShader.uniforms.uPosition = removeExtraRotation(item.position).toMatrix4();
                 meshShader.uniforms.uOrientation = this.convertOrientationToDisplay(item.orientation).toMatrix4();
                 updateMeshIfVisible(item);
 
                 const imageShader = item.image.shader;
-                imageShader.uniforms.uCameraPosition = cameraPosition.clone().inverse().toMatrix4();
-                imageShader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
+                imageShader.uniforms.uCameraPosition = this.cameraPosition.clone().inverse().toMatrix4();
+                imageShader.uniforms.uCameraOrientation = this.cameraOrientation.clone().inverse().toMatrix4();
                 imageShader.uniforms.uCameraScale = this.state.zoom;
                 imageShader.uniforms.uPosition = removeExtraRotation(item.position).toMatrix4();
                 imageShader.uniforms.uOrientation = this.convertOrientationToDisplay(item.orientation).toMatrix4();
@@ -1149,8 +1193,8 @@ export class PixiGame extends PixiGameBase {
             if (this.state.showVoronoi) {
                 for (const item of this.voronoiMeshes) {
                     const shader = item.mesh.shader;
-                    shader.uniforms.uCameraPosition = cameraPosition.clone().toMatrix4();
-                    shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
+                    shader.uniforms.uCameraPosition = this.cameraPosition.clone().toMatrix4();
+                    shader.uniforms.uCameraOrientation = this.cameraOrientation.clone().inverse().toMatrix4();
                     shader.uniforms.uCameraScale = this.state.zoom;
                 }
             }
@@ -1158,8 +1202,8 @@ export class PixiGame extends PixiGameBase {
             // draw background voronoi terrain tiles for background images
             for (const item of this.backgroundVoronoiMeshes) {
                 const shader = item.mesh.shader;
-                shader.uniforms.uCameraPosition = cameraPosition.clone().toMatrix4();
-                shader.uniforms.uCameraOrientation = cameraOrientation.clone().inverse().toMatrix4();
+                shader.uniforms.uCameraPosition = this.cameraPosition.clone().toMatrix4();
+                shader.uniforms.uCameraOrientation = this.cameraOrientation.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraScale = this.state.zoom;
             }
         });
@@ -1190,9 +1234,6 @@ export class PixiGame extends PixiGameBase {
                     if (!this.continuousSounds.has(key)) {
                         const soundItem = sound.find(soundEvent.soundType);
                         if (soundItem && soundItem.isLoaded) {
-                            playOptions.complete = () => {
-                                this.continuousSounds.delete(key);
-                            };
                             const mediaInstance = sound.play(soundEvent.soundType, playOptions) as IMediaInstance;
                             if (!(mediaInstance as any).then) {
                                 this.continuousSounds.set(key, mediaInstance);
