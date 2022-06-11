@@ -428,12 +428,12 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
             emit: false,
             autoUpdate: true,
             lifetime: {
-                min: 1,
-                max: 3
+                min: 3,
+                max: 5
             },
             particlesPerWave: 1,
             frequency: 0.1,
-            spawnChance: 1,
+            spawnChance: 0.8,
             maxParticles: 100,
             addAtBack: false,
             pos: {

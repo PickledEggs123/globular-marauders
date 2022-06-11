@@ -3,7 +3,6 @@ import '../App.css';
 import Quaternion from "quaternion";
 import SockJS from "sockjs-client";
 import * as PIXI from "pixi.js";
-import * as particles from "@pixi/particle-emitter";
 import {IMediaInstance, PlayOptions, sound} from "@pixi/sound";
 import {EResourceType, ITEM_DATA} from "@pickledeggs123/globular-marauders-game/lib/src/Resource";
 import {
@@ -601,7 +600,7 @@ export class PixiGame extends PixiGameBase {
 
                     switch (shipMesh.trailState) {
                         case EParticleState.STOP: {
-                            if ((shipMesh.isPlayer ? this.activeKeys : ship.activeKeys).includes("w")) {
+                            if ((shipMesh.isPlayer && !this.state.autoPilotEnabled ? this.activeKeys : ship.activeKeys).includes("w")) {
                                 shipMesh.trailState = EParticleState.PLAYING;
                             }
                             break;
@@ -612,7 +611,7 @@ export class PixiGame extends PixiGameBase {
                             break;
                         }
                         case EParticleState.PLAY: {
-                            if (!(shipMesh.isPlayer ? this.activeKeys : ship.activeKeys).includes("w")) {
+                            if (!(shipMesh.isPlayer && !this.state.autoPilotEnabled ? this.activeKeys : ship.activeKeys).includes("w")) {
                                 shipMesh.trailState = EParticleState.STOPPING;
                             }
                             break;
@@ -1613,7 +1612,7 @@ export class PixiGame extends PixiGameBase {
         this.handleClientLoop();
         this.forceUpdate();
 
-        this.handleSoundEffects(false);
+        this.handleSoundEffects([EGameMode.TUTORIAL, EGameMode.SINGLE_PLAYER].includes(this.state.gameMode));
     }
 
     /**
