@@ -3,6 +3,7 @@ import '../App.css';
 import Quaternion from "quaternion";
 import SockJS from "sockjs-client";
 import * as PIXI from "pixi.js";
+import * as particles from "@pixi/particle-emitter";
 import {IMediaInstance, PlayOptions, sound} from "@pixi/sound";
 import {EResourceType, ITEM_DATA} from "@pickledeggs123/globular-marauders-game/lib/src/Resource";
 import {
@@ -114,6 +115,7 @@ const GetFactionSubheader = (faction: EFaction): string | null => {
 export class PixiGame extends PixiGameBase {
     public application: PIXI.Application;
     public particleContainer: PIXI.Container;
+    public starField: particles.Emitter | undefined;
 
     // game loop stuff
     public rotateCameraInterval: any = null;
@@ -200,6 +202,104 @@ export class PixiGame extends PixiGameBase {
         return old.clone();
     };
 
+    loadStarField = () => {
+        if (this.starField) {
+            this.starField.destroy();
+        }
+        this.starField = new particles.Emitter(this.particleContainer, {
+            emit: true,
+            autoUpdate: true,
+            lifetime: {
+                min: 30,
+                max: 60,
+            },
+            particlesPerWave: 100,
+            frequency: 1,
+            spawnChance: 1,
+            maxParticles: 100,
+            addAtBack: false,
+            pos: {
+                x: 0,
+                y: 0,
+            },
+            behaviors: [
+                {
+                    type: 'alpha',
+                    config: {
+                        alpha: {
+                            list: [
+                                {
+                                    value: 0,
+                                    time: 0
+                                },
+                                {
+                                    value: 0.8,
+                                    time: 0.1
+                                },
+                                {
+                                    value: 0.8,
+                                    time: 0.9
+                                },
+                                {
+                                    value: 0.1,
+                                    time: 1
+                                }
+                            ],
+                        },
+                    }
+                },
+                {
+                    type: 'scale',
+                    config: {
+                        scale: {
+                            list: [
+                                {
+                                    value: 0.2,
+                                    time: 0
+                                },
+                                {
+                                    value: 0.06,
+                                    time: 1
+                                }
+                            ],
+                        },
+                    }
+                },
+                {
+                    type: 'starFieldQuaternion',
+                    config: {
+                        game: this,
+                    }
+                },
+                {
+                    type: 'rotationStatic',
+                    config: {
+                        min: 0,
+                        max: 360
+                    }
+                },
+                {
+                    type: 'spawnShape',
+                    config: {
+                        type: 'torus',
+                        data: {
+                            x: 0,
+                            y: 0,
+                            radius: 10
+                        }
+                    }
+                },
+                {
+                    type: 'textureSingle',
+                    config: {
+                        texture: this.sprites.starFieldSpeckle
+                    }
+                },
+            ]
+        });
+        this.application.stage.addChild(this.particleContainer);
+    };
+
     loadSoundIntoMemory = () => {
         // load sounds into memory
         sound.add(ESoundType.FIRE, {url: "sounds/FireSFX.m4a", preload: true});
@@ -233,6 +333,7 @@ export class PixiGame extends PixiGameBase {
         loader.add("smokeTrail", "images/sprites/smokeTrail.svg");
         loader.add("cannonBallTrail", "images/sprites/cannonBallTrail.svg");
         loader.add("glowTrail", "images/sprites/glowTrail.svg");
+        loader.add("starFieldSpeckle", "images/sprites/starFieldSpeckle.svg");
         // onload handler
         loader.load((loader, resources) => {
             // load images into cache
@@ -257,6 +358,11 @@ export class PixiGame extends PixiGameBase {
             this.sprites.smokeTrail = resources.smokeTrail.texture;
             this.sprites.cannonBallTrail = resources.cannonBallTrail.texture;
             this.sprites.glowTrail = resources.glowTrail.texture;
+            this.sprites.starFieldSpeckle = resources.starFieldSpeckle.texture;
+
+            setTimeout(() => {
+                this.loadStarField();
+            }, 1000);
         });
     };
 
@@ -271,6 +377,7 @@ export class PixiGame extends PixiGameBase {
                 init: false,
             });
         }
+        this.loadStarField();
         switch (gameMode) {
             case EGameMode.MAIN_MENU: {
                 break;
@@ -477,8 +584,7 @@ export class PixiGame extends PixiGameBase {
         });
         this.application.stage.sortableChildren = true;
         this.particleContainer = new PIXI.Container();
-        this.particleContainer.zIndex = -150;
-        this.application.stage.addChild(this.particleContainer);
+        this.particleContainer.zIndex = -5;
 
         // draw app
         this.game.initializeGame();

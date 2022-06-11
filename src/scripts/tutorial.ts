@@ -109,7 +109,7 @@ export const tutorialScript = function (this: PixiGame, context: ITutorialScript
                 }, [] as Planet[]);
                 const randomColony = dutchColonies[Math.floor(dutchColonies.length * Math.random())];
                 const ship = this.findPlayerShip()!;
-                ship.orders.forEach(o => o.cancelOrder(0));
+                ship.orders.forEach(o => ship.removeOrder(o));
                 const tradeOrder = new Order(this.game, ship, ship.faction!);
                 tradeOrder.orderType = EOrderType.SETTLE;
                 tradeOrder.planetId = randomColony.id;
@@ -537,7 +537,7 @@ export const tutorialScript = function (this: PixiGame, context: ITutorialScript
                     order.orderType = EOrderType.INVADE;
                     order.expireTicks = 10 * 60 * 10;
                     order.planetId = englishHomeWorld.id;
-                    ship.orders.forEach(o => o.cancelOrder(0));
+                    ship.orders.forEach(o => ship.removeOrder(o));
                     ship.orders.push(order);
                 };
                 dutchHomeWorld.spawnEventShip(dutchHomeWorld.moneyAccount!.cash!, EShipType.CUTTER, configureFriendlyShip);

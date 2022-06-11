@@ -606,7 +606,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
                 max: 1
             },
             particlesPerWave: 1,
-            frequency: 0.1,
+            frequency: 0.2,
             spawnChance: 0.8,
             maxParticles: 5,
             addAtBack: false,
@@ -1035,7 +1035,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         return (this.playerId && this.game.playerData.get(this.playerId)) || null;
     }
 
-    protected findPlayerShip(): Ship | null {
+    public findPlayerShip(): Ship | null {
         const player = this.findPlayer();
         if (player) {
             return this.game.ships.get(player.shipId) || null;

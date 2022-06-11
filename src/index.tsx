@@ -6,9 +6,11 @@ import reportWebVitals from './reportWebVitals';
 import * as particles from "@pixi/particle-emitter";
 import {StaticQuaternionParticleBehavior} from "./resources/particles/StaticQuaternionParticleBehavior";
 import {MovementQuaternionParticleBehavior} from "./resources/particles/MovementQuaternionParticleBehavior";
+import {StarFieldQuaternionParticleBehavior} from "./resources/particles/StarFieldQuaternionParticleBehavior";
 
 particles.Emitter.registerBehavior(StaticQuaternionParticleBehavior);
 particles.Emitter.registerBehavior(MovementQuaternionParticleBehavior);
+particles.Emitter.registerBehavior(StarFieldQuaternionParticleBehavior);
 
 ReactDOM.render(
   <React.StrictMode>
