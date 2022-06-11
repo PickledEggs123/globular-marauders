@@ -1,0 +1,11 @@
+<svg viewBox="-50 -50 100 100" fill="transparent" xmlns="http://www.w3.org/2000/svg">
+    <rect
+            fill="lightgrey"
+            stroke="grey"
+            stroke-width="3"
+            x="-15"
+            y="-5"
+            width="30"
+            height="10"
+    />
+</svg>

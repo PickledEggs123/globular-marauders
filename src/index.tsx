@@ -5,8 +5,10 @@ import {App} from './App';
 import reportWebVitals from './reportWebVitals';
 import * as particles from "@pixi/particle-emitter";
 import {StaticQuaternionParticleBehavior} from "./resources/particles/StaticQuaternionParticleBehavior";
+import {MovementQuaternionParticleBehavior} from "./resources/particles/MovementQuaternionParticleBehavior";
 
 particles.Emitter.registerBehavior(StaticQuaternionParticleBehavior);
+particles.Emitter.registerBehavior(MovementQuaternionParticleBehavior);
 
 ReactDOM.render(
   <React.StrictMode>

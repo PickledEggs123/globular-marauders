@@ -38,8 +38,7 @@ import {crateResources} from "../resources/crateResources";
 import {voronoiResources} from "../resources/voronoiResources";
 import {backgroundVoronoiResources} from "../resources/backgroundVoronoiResources";
 import {ShipResources} from "../resources/shipResources";
-import {EaseSegment, SimpleEase} from "@pixi/particle-emitter/lib/ParticleUtils";
-import {RandNumber} from "@pixi/particle-emitter/lib/EmitterConfig";
+import {EMovementQuaternionParticleBehaviorType} from "../resources/particles/MovementQuaternionParticleBehavior";
 
 /**
  * The input parameters of the app.
@@ -217,6 +216,8 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
     cannonBallMeshes: Array<{
         id: string,
         mesh: PIXI.Mesh<PIXI.Shader>,
+        trailContainer: PIXI.Container,
+        trail: particles.Emitter,
         position: Quaternion,
         positionVelocity: Quaternion,
         tick: number
@@ -225,6 +226,8 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         id: string,
         mesh: PIXI.Mesh<PIXI.Shader>,
         image: PIXI.Mesh<PIXI.Shader>,
+        trailContainer: PIXI.Container,
+        trail: particles.Emitter,
         text: PIXI.Text,
         position: Quaternion,
         orientation: Quaternion,
@@ -480,10 +483,12 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
                     }
                 },
                 {
-                    type: 'staticQuaternion',
+                    type: 'movementQuaternion',
                     config: {
                         ship,
-                        game: this
+                        game: this,
+                        movementType: EMovementQuaternionParticleBehaviorType.BACKWARDS,
+                        speed: Game.VELOCITY_STEP / Game.VELOCITY_DRAG / 5
                     }
                 },
                 {
@@ -575,12 +580,13 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         // create mesh
         const ownerFaction = cannonBall.factionId && this.game.factions.get(cannonBall.factionId);
         const factionColor = this.getFactionColor(ownerFaction);
+        const uColor = factionColor != null ? [((factionColor & 0xff0000) >> 16) / 0xff, ((factionColor & 0x00ff00) >> 8) / 0xff, (factionColor & 0x0000ff) / 0xff, 1] : [0.75, 0.75, 0.75, 1];
         const uniforms = {
             uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
             uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
             uCameraScale: this.state.zoom,
             uPosition: position.toMatrix4(),
-            uColor: factionColor != null ? [((factionColor & 0xff0000) >> 16) / 0xff, ((factionColor & 0x00ff00) >> 8) / 0xff, (factionColor & 0x0000ff) / 0xff, 1] : [0.75, 0.75, 0.75, 1],
+            uColor,
             uScale: 5 * PHYSICS_SCALE,
             uWorldScale: this.game.worldScale,
         };
@@ -588,10 +594,133 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         const mesh = new PIXI.Mesh(this.pixiCannonBallResources.cannonBallGeometry, shader);
         mesh.zIndex = -1;
 
+
+
+        const trailContainer = new PIXI.Container();
+        trailContainer.zIndex = -5;
+        const trail = new particles.Emitter(trailContainer, {
+            emit: true,
+            autoUpdate: true,
+            lifetime: {
+                min: 1,
+                max: 1
+            },
+            particlesPerWave: 1,
+            frequency: 0.1,
+            spawnChance: 0.8,
+            maxParticles: 5,
+            addAtBack: false,
+            pos: {
+                x: 0,
+                y: 0,
+            },
+            behaviors: [
+                {
+                    type: 'alpha',
+                    config: {
+                        alpha: {
+                            list: [
+                                {
+                                    value: 0,
+                                    time: 0
+                                },
+                                {
+                                    value: 0.8,
+                                    time: 0.2
+                                },
+                                {
+                                    value: 0.1,
+                                    time: 1
+                                }
+                            ],
+                        },
+                    }
+                },
+                {
+                    type: 'scale',
+                    config: {
+                        scale: {
+                            list: [
+                                {
+                                    value: 1,
+                                    time: 0
+                                },
+                                {
+                                    value: 0.3,
+                                    time: 1
+                                }
+                            ],
+                        },
+                    }
+                },
+                {
+                    type: 'staticQuaternion',
+                    config: {
+                        ship: cannonBall,
+                        game: this,
+                    }
+                },
+                {
+                    type: 'rotationStatic',
+                    config: {
+                        min: 0,
+                        max: 360
+                    }
+                },
+                {
+                    type: 'spawnShape',
+                    config: {
+                        type: 'torus',
+                        data: {
+                            x: 0,
+                            y: 0,
+                            radius: 10
+                        }
+                    }
+                },
+                {
+                    type: 'textureSingle',
+                    config: {
+                        texture: this.sprites.cannonBallTrail
+                    }
+                },
+                {
+                    type: 'color',
+                    config: {
+                        color: {
+                            list: [
+                                {
+                                    time: 0,
+                                    value: {
+                                        r: uColor[0] * 255,
+                                        g: uColor[1] * 255,
+                                        b: uColor[2] * 255,
+                                        a: uColor[3] * 255,
+                                    }
+                                },
+                                {
+                                    time: 1,
+                                    value: {
+                                        r: uColor[0] * 255,
+                                        g: uColor[1] * 255,
+                                        b: uColor[2] * 255,
+                                        a: 0,
+                                    }
+                                }
+                            ]
+                        },
+                    }
+                },
+            ]
+        });
+
         this.application.stage.addChild(mesh);
+        this.application.stage.addChild(trailContainer);
         this.cannonBallMeshes.push({
             id: cannonBall.id,
             mesh,
+            trailContainer,
+            trail,
             position,
             positionVelocity,
             tick,
@@ -643,17 +772,142 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         const image = new PIXI.Mesh(this.pixiCrateResources.crateImageGeometry, imageShader);
         mesh.zIndex = -4;
 
+
+
+        const trailContainer = new PIXI.Container();
+        trailContainer.zIndex = -5;
+        const trail = new particles.Emitter(trailContainer, {
+            emit: true,
+            autoUpdate: true,
+            lifetime: {
+                min: 2,
+                max: 3
+            },
+            particlesPerWave: 3,
+            frequency: 0.1,
+            spawnChance: 0.66,
+            maxParticles: 100,
+            addAtBack: false,
+            pos: {
+                x: 0,
+                y: 0,
+            },
+            behaviors: [
+                {
+                    type: 'alpha',
+                    config: {
+                        alpha: {
+                            list: [
+                                {
+                                    value: 0,
+                                    time: 0
+                                },
+                                {
+                                    value: 0.8,
+                                    time: 0.2
+                                },
+                                {
+                                    value: 0.1,
+                                    time: 1
+                                }
+                            ],
+                        },
+                    }
+                },
+                {
+                    type: 'scale',
+                    config: {
+                        scale: {
+                            list: [
+                                {
+                                    value: 1,
+                                    time: 0
+                                },
+                                {
+                                    value: 0.3,
+                                    time: 1
+                                }
+                            ],
+                        },
+                    }
+                },
+                {
+                    type: 'movementQuaternion',
+                    config: {
+                        ship: crate,
+                        game: this,
+                        movementType: EMovementQuaternionParticleBehaviorType.RANDOM,
+                        speed: Game.VELOCITY_STEP / Game.VELOCITY_DRAG / 10
+                    }
+                },
+                {
+                    type: 'rotationStatic',
+                    config: {
+                        min: 0,
+                        max: 360
+                    }
+                },
+                {
+                    type: 'spawnShape',
+                    config: {
+                        type: 'torus',
+                        data: {
+                            x: 0,
+                            y: 0,
+                            radius: 10
+                        }
+                    }
+                },
+                {
+                    type: 'textureSingle',
+                    config: {
+                        texture: this.sprites.glowTrail
+                    }
+                },
+                {
+                    type: 'color',
+                    config: {
+                        color: {
+                            list: [
+                                {
+                                    time: 0,
+                                    value: {
+                                        r: 51,
+                                        g: 221,
+                                        b: 255,
+                                        a: 255,
+                                    }
+                                },
+                                {
+                                    time: 1,
+                                    value: {
+                                        r: 51,
+                                        g: 221,
+                                        b: 255,
+                                        a: 0,
+                                    }
+                                }
+                            ]
+                        },
+                    }
+                },
+            ]
+        });
+
         const text = new PIXI.Text(resourceType);
         text.style.fill = "white";
         text.style.fontSize = 12;
 
         this.application.stage.addChild(mesh);
         this.application.stage.addChild(image);
+        this.application.stage.addChild(trailContainer);
         this.application.stage.addChild(text);
         this.crateMeshes.push({
             id: crate.id,
             mesh,
             image,
+            trailContainer,
+            trail,
             text,
             position,
             orientation,

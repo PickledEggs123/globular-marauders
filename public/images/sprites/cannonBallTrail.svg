@@ -1,0 +1,11 @@
+<svg viewBox="-50 -50 100 100" fill="transparent" xmlns="http://www.w3.org/2000/svg">
+    <ellipse
+            fill="lightgrey"
+            stroke="grey"
+            stroke-width="3"
+            cx="0"
+            cy="0"
+            rx="20"
+            ry="20"
+    />
+</svg>

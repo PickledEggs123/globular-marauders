@@ -3,7 +3,6 @@ import {ICameraState} from "@pickledeggs123/globular-marauders-game/lib/src/Inte
 import PixiGame from "../../pages/PixiGame";
 import {DelaunayGraph} from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
 import Quaternion from "quaternion";
-import {PHYSICS_SCALE} from "@pickledeggs123/globular-marauders-game/lib/src/ShipType";
 
 export class StaticQuaternionParticleBehavior implements particles.behaviors.IEmitterBehavior {
     public static type: string = "staticQuaternion";

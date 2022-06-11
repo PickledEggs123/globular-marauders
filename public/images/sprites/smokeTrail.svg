@@ -1,16 +1,7 @@
 <svg viewBox="-50 -50 100 100" fill="transparent" xmlns="http://www.w3.org/2000/svg">
     <ellipse
             fill="lightgrey"
-            stroke="#grey"
-            stroke-width="3"
-            cx="0"
-            cy="-10"
-            rx="20"
-            ry="20"
-    />
-    <ellipse
-            fill="lightgrey"
-            stroke="#grey"
+            stroke="grey"
             stroke-width="3"
             cx="15"
             cy="0"
@@ -19,16 +10,16 @@
     />
     <ellipse
             fill="lightgrey"
-            stroke="#grey"
+            stroke="grey"
             stroke-width="3"
-            cx="-15"
-            cy="0"
+            cx="10"
+            cy="20"
             rx="20"
             ry="20"
     />
     <ellipse
             fill="lightgrey"
-            stroke="#grey"
+            stroke="grey"
             stroke-width="3"
             cx="-10"
             cy="20"
@@ -37,10 +28,19 @@
     />
     <ellipse
             fill="lightgrey"
-            stroke="#grey"
+            stroke="grey"
             stroke-width="3"
-            cx="10"
-            cy="20"
+            cx="-15"
+            cy="0"
+            rx="20"
+            ry="20"
+    />
+    <ellipse
+            fill="lightgrey"
+            stroke="grey"
+            stroke-width="3"
+            cx="0"
+            cy="-10"
             rx="20"
             ry="20"
     />

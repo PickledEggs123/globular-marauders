@@ -231,6 +231,8 @@ export class PixiGame extends PixiGameBase {
         }
         // load smoke trail
         loader.add("smokeTrail", "images/sprites/smokeTrail.svg");
+        loader.add("cannonBallTrail", "images/sprites/cannonBallTrail.svg");
+        loader.add("glowTrail", "images/sprites/glowTrail.svg");
         // onload handler
         loader.load((loader, resources) => {
             // load images into cache
@@ -253,6 +255,8 @@ export class PixiGame extends PixiGameBase {
                 }
             }
             this.sprites.smokeTrail = resources.smokeTrail.texture;
+            this.sprites.cannonBallTrail = resources.cannonBallTrail.texture;
+            this.sprites.glowTrail = resources.glowTrail.texture;
         });
     };
 
@@ -706,6 +710,7 @@ export class PixiGame extends PixiGameBase {
             }
             for (const item of this.cannonBallMeshes.filter(m => m.tick !== pixiTick || this.clearMeshes)) {
                 this.application.stage.removeChild(item.mesh);
+                this.application.stage.removeChild(item.trailContainer);
             }
             this.cannonBallMeshes = this.cannonBallMeshes.filter(m => m.tick === pixiTick && !this.clearMeshes);
             // crates
@@ -726,6 +731,7 @@ export class PixiGame extends PixiGameBase {
             }
             for (const item of this.crateMeshes.filter(m => m.tick !== pixiTick || this.clearMeshes)) {
                 this.application.stage.removeChild(item.mesh);
+                this.application.stage.removeChild(item.trailContainer);
                 this.application.stage.removeChild(item.image);
                 this.application.stage.removeChild(item.text);
             }
