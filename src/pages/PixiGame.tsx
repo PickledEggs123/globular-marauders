@@ -10,6 +10,7 @@ import {
     ICameraState,
     ICameraStateWithOriginal,
     IDrawable,
+    IFormResult,
     MIN_DISTANCE
 } from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
 import {Ship,} from "@pickledeggs123/globular-marauders-game/lib/src/Ship";
@@ -94,6 +95,7 @@ import {
     isPositionPolarDifferent
 } from "../helpers/pixiHelpers";
 import {ITutorialScriptContext, tutorialScript} from "../scripts/tutorial";
+import {CardRenderer} from "../forms/CardRenderer";
 
 const GetFactionSubheader = (faction: EFaction): string | null => {
     switch (faction) {
@@ -145,6 +147,9 @@ export class PixiGame extends PixiGameBase {
         results: [],
         message: undefined
     };
+    public forms: IFormResult = {
+        cards: []
+    };
     public shardPortNumber: number | null = null;
     public messages: IMessage[] = [];
 
@@ -195,6 +200,15 @@ export class PixiGame extends PixiGameBase {
                 event,
                 message
             }));
+        }
+    }
+
+    public submitForm(type: string, data: {[key: string]: any}) {
+        if (this.state.gameMode === EGameMode.SINGLE_PLAYER) {
+            this.game.handleFormApiRequestForPlayer(Array.from(this.game.playerData.values())[0], {
+                buttonPath: type,
+                data
+            });
         }
     }
 
@@ -503,6 +517,14 @@ export class PixiGame extends PixiGameBase {
                         return null;
                     }
                 };
+                const sendForms = () => {
+                    const player = tutorialPlayerData;
+                    if (player) {
+                        return this.game.getFormsForPlayer(player);
+                    } else {
+                        return null;
+                    }
+                };
                 this.initialized = true;
 
                 this.setState({
@@ -534,6 +556,7 @@ export class PixiGame extends PixiGameBase {
                     this.handleSpawnFactions(sendSpawnFactions());
                     this.handleSpawnPlanets(sendSpawnPlanets() ?? []);
                     this.handleSpawnLocations(sendSpawnLocations() ?? {results:[], message: undefined});
+                    this.handleForms(sendForms() ?? {cards: []});
                     for (const [, message] of this.game.outgoingMessages) {
                         if (message.messageType === EMessageType.DEATH) {
                             this.setState({
@@ -1435,6 +1458,10 @@ export class PixiGame extends PixiGameBase {
     handleSpawnLocations = (data: ISpawnLocationResult) => {
         this.spawnLocations = data;
     };
+
+    handleForms = (data: IFormResult) => {
+        this.forms = data;
+    }
 
     setupNetworking(autoLogin: boolean) {
         if (this.state.gameMode !== EGameMode.MULTI_PLAYER) {
@@ -2364,6 +2391,24 @@ export class PixiGame extends PixiGameBase {
                                         </Grid>
                                     ) : null
                                 }
+                                <Grid item xs={12} justifyContent="center" alignItems="center">
+                                    <Paper style={{maxHeight: "40vh", maxWidth: "80vw", overflow: "auto", backgroundColor: "none"}}>
+                                        <Grid container spacing={2} columns={{
+                                            xs: 6,
+                                            lg: 12,
+                                        }}>
+                                            {
+                                                this.forms.cards.map(card => {
+                                                    return (
+                                                        <Grid item xs={12} key={card.title} justifyContent="center" alignItems="center">
+                                                            <CardRenderer card={card} submitForm={this.submitForm.bind(this)}/>
+                                                        </Grid>
+                                                    );
+                                                })
+                                            }
+                                        </Grid>
+                                    </Paper>
+                                </Grid>
                                 {
                                     this.state.gameMode === EGameMode.MAIN_MENU ? (
                                         <Grid item xs={12} justifyContent="center" alignItems="center" onWheel={(e) => {e.preventDefault();}}>
