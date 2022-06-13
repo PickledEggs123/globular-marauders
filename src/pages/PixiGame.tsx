@@ -120,7 +120,6 @@ export class PixiGame extends PixiGameBase {
     public starField: particles.Emitter | undefined;
 
     // game loop stuff
-    public rotateCameraInterval: any = null;
     activeKeys: any[] = [];
     private keyDownHandlerInstance: any;
     private keyUpHandlerInstance: any;
@@ -607,7 +606,7 @@ export class PixiGame extends PixiGameBase {
         });
         this.application.stage.sortableChildren = true;
         this.particleContainer = new PIXI.Container();
-        this.particleContainer.zIndex = -5;
+        this.particleContainer.zIndex = -15;
 
         // draw app
         this.game.initializeGame();
@@ -664,11 +663,13 @@ export class PixiGame extends PixiGameBase {
         // draw rotating app
         let pixiTick: number = 0;
         this.application.ticker.add(() => {
+            this.gameLoop.call(this);
+
             const playerShip = this.getPlayerShip();
             this.cameraPosition = removeExtraRotation(playerShip.position);
             this.lastCameraOrientation = this.cameraOrientation;
             const nextCameraOrientation = removeExtraOrientation(playerShip.orientation.clone().mul(Quaternion.fromAxisAngle([0, 0, 1], -this.cameraPositionVelocityTheta + Math.PI / 2 - this.cameraCorrectionFactor)));
-            this.cameraOrientation = this.lastCameraOrientation.slerp(nextCameraOrientation)(0.05 * (1 - VoronoiGraph.angularDistanceQuaternion(this.lastCameraOrientation.clone().inverse().mul(nextCameraOrientation.clone()), 1) / Math.PI));
+            this.cameraOrientation = this.lastCameraOrientation.slerp(nextCameraOrientation)(0.1 * (1 - VoronoiGraph.angularDistanceQuaternion(this.lastCameraOrientation.clone().inverse().mul(nextCameraOrientation.clone()), 1) / Math.PI));
             pixiTick += 1;
 
             // sync game to Pixi renderer
@@ -2039,9 +2040,6 @@ export class PixiGame extends PixiGameBase {
         this.handleResize();
 
         // handle keyboard input
-        if (!this.props.isTestMode) {
-            this.rotateCameraInterval = setInterval(this.gameLoop.bind(this), 30);
-        }
         this.keyDownHandlerInstance = this.handleKeyDown.bind(this);
         this.keyUpHandlerInstance = this.handleKeyUp.bind(this);
         this.mouseWheelHandlerInstance = this.handleMouseWheel.bind(this);
@@ -2057,9 +2055,6 @@ export class PixiGame extends PixiGameBase {
         }
 
         // clean up game stuff
-        if (this.rotateCameraInterval) {
-            clearInterval(this.rotateCameraInterval);
-        }
         document.removeEventListener("keydown", this.keyDownHandlerInstance);
         document.removeEventListener("keyup", this.keyUpHandlerInstance);
         document.removeEventListener("wheel", this.mouseWheelHandlerInstance);

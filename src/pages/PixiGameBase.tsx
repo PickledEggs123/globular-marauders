@@ -436,7 +436,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
             },
             particlesPerWave: 1,
             frequency: 0.1,
-            spawnChance: 0.8,
+            spawnChance: 1,
             maxParticles: 100,
             addAtBack: false,
             pos: {
@@ -602,13 +602,13 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
             emit: true,
             autoUpdate: true,
             lifetime: {
-                min: 1,
-                max: 1
+                min: 0.2,
+                max: 0.2
             },
             particlesPerWave: 1,
-            frequency: 0.2,
+            frequency: 0.0066,
             spawnChance: 0.8,
-            maxParticles: 5,
+            maxParticles: 30,
             addAtBack: false,
             pos: {
                 x: 0,
@@ -621,12 +621,8 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
                         alpha: {
                             list: [
                                 {
-                                    value: 0,
-                                    time: 0
-                                },
-                                {
                                     value: 0.8,
-                                    time: 0.2
+                                    time: 0
                                 },
                                 {
                                     value: 0.1,
@@ -642,7 +638,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
                         scale: {
                             list: [
                                 {
-                                    value: 1,
+                                    value: 0.5,
                                     time: 0
                                 },
                                 {
