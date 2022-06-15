@@ -342,10 +342,10 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         this.planetThumbnails.set(planet.id, planetThumbnail);
 
         const mesh = new PIXI.Mesh(geometry, shader, state);
-        mesh.zIndex = -5;
+        mesh.zIndex = -20;
 
         const faction = new PIXI.Graphics();
-        faction.zIndex = -6;
+        faction.zIndex = -25;
         faction.alpha = 0.75;
 
         const factionRadius = (planet.size * this.game.worldScale + 3) * PHYSICS_SCALE;
@@ -971,7 +971,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         };
         const shader = new PIXI.Shader(this.pixiVoronoiResources.voronoiProgram, uniforms);
         const mesh = new PIXI.Mesh(this.pixiVoronoiResources.getVoronoiGeometry(tile), shader);
-        mesh.zIndex = -20;
+        mesh.zIndex = -28;
 
         this.application.stage.addChild(mesh);
         this.voronoiMeshes.push({

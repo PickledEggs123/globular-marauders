@@ -24,12 +24,17 @@ export interface ITutorialScriptContext {
     sendSpawnLocations: () => ISpawnLocationResult | null;
 }
 
-export const tutorialScript = function (this: PixiGame, context: ITutorialScriptContext) {
+export const tutorialScript = function (this: PixiGame, serverGame: Game, context: ITutorialScriptContext) {
     const {
         tutorialPlayerData,
         sendSpawnPlanets,
         sendSpawnLocations,
     } = context;
+
+    const findPlayerShip = (): Ship | null => {
+        return serverGame.ships.get(tutorialPlayerData.shipId) || null;
+    };
+    
     return (function*(this: PixiGame) {
         const sendMessage = (message: IMessage) => {
             this.game.outgoingMessages.push(["pirateDude", message]);
@@ -96,8 +101,8 @@ export const tutorialScript = function (this: PixiGame, context: ITutorialScript
         };
         const giveTradeMission = (): IterableIterator<void> => {
             return (function*(this: PixiGame) {
-                const dutchFaction = this.game.factions.get(EFaction.DUTCH)!;
-                const dutchHomeWorld = this.game.planets.get(dutchFaction.homeWorldPlanetId)!;
+                const dutchFaction = serverGame.factions.get(EFaction.DUTCH)!;
+                const dutchHomeWorld = serverGame.planets.get(dutchFaction.homeWorldPlanetId)!;
                 const dutchColonies = dutchHomeWorld.county.duchy.kingdom.duchies.reduce((acc: Planet[], d): Planet[] => {
                     acc.push(...d.counties.reduce((acc2: Planet[], c): Planet[] => {
                         if (c.planet && c.planet !== dutchHomeWorld) {
@@ -108,9 +113,9 @@ export const tutorialScript = function (this: PixiGame, context: ITutorialScript
                     return acc;
                 }, [] as Planet[]);
                 const randomColony = dutchColonies[Math.floor(dutchColonies.length * Math.random())];
-                const ship = this.findPlayerShip()!;
+                const ship = findPlayerShip()!;
                 ship.orders.forEach(o => ship.removeOrder(o));
-                const tradeOrder = new Order(this.game, ship, ship.faction!);
+                const tradeOrder = new Order(serverGame, ship, ship.faction!);
                 tradeOrder.orderType = EOrderType.SETTLE;
                 tradeOrder.planetId = randomColony.id;
                 ship.orders.push(tradeOrder);
@@ -121,7 +126,7 @@ export const tutorialScript = function (this: PixiGame, context: ITutorialScript
         const actions: Array<IterableIterator<void>> = [
             // login as tutorial player
             //
-            // pick dutch
+            // pick Dutch
             (function*(this: PixiGame) {
                 const chooseFactionMessage: IChooseFactionMessage = {
                     messageType: EMessageType.CHOOSE_FACTION,
@@ -247,7 +252,7 @@ export const tutorialScript = function (this: PixiGame, context: ITutorialScript
             waitFor(10),
             // stop
             waitForValue(() => {
-                return !!this.findPlayerShip() && VoronoiGraph.angularDistanceQuaternion(this.findPlayerShip()!.positionVelocity, this.game.worldScale) <= Game.VELOCITY_STEP * Math.PI / 2 * 3;
+                return !!findPlayerShip() && VoronoiGraph.angularDistanceQuaternion(findPlayerShip()!.positionVelocity, serverGame.worldScale) <= Game.VELOCITY_STEP * Math.PI / 2 * 3;
             }, () => {}),
             (function*(this: PixiGame) {
                 if (!context.tutorialSoundComplete) {
@@ -294,7 +299,7 @@ export const tutorialScript = function (this: PixiGame, context: ITutorialScript
             waitFor(10),
             // stop
             waitForValue(() => {
-                return !!this.findPlayerShip() && VoronoiGraph.angularDistanceQuaternion(this.findPlayerShip()!.orientationVelocity, 1) < Game.ROTATION_STEP * Math.PI / 2;
+                return !!findPlayerShip() && VoronoiGraph.angularDistanceQuaternion(findPlayerShip()!.orientationVelocity, 1) < Game.ROTATION_STEP * Math.PI / 2;
             }, () => {}),
             (function*(this: PixiGame) {
                 if (!context.tutorialSoundComplete) {
@@ -359,8 +364,8 @@ export const tutorialScript = function (this: PixiGame, context: ITutorialScript
                 yield;
             }).call(this),
             (function*(this: PixiGame) {
-                const englishFaction = this.game.factions.get(EFaction.ENGLISH)!;
-                const englishHomeWorld = this.game.planets.get(englishFaction.homeWorldPlanetId)!;
+                const englishFaction = serverGame.factions.get(EFaction.ENGLISH)!;
+                const englishHomeWorld = serverGame.planets.get(englishFaction.homeWorldPlanetId)!;
                 englishHomeWorld.spawnEventShip(tutorialPlayerData.moneyAccount, EShipType.CUTTER, (ship) => {
                     const playerShip = this.getPlayerShip()!;
                     ship.position = playerShip.position.clone().mul(Quaternion.fromBetweenVectors([0, 0, 1], playerShip.orientation.rotateVector([1, 0, 0])).pow(Game.VELOCITY_STEP * 300));
@@ -368,7 +373,7 @@ export const tutorialScript = function (this: PixiGame, context: ITutorialScript
                         buffType: EAutomatedShipBuffType.DISABLED,
                         expireTicks: 24 * 60 * 60 * 10,
                     };
-                    const order = new Order(this.game, ship, ship.faction!);
+                    const order = new Order(serverGame, ship, ship.faction!);
                     order.orderType = EOrderType.ROAM;
                     order.expireTicks = 24 * 60 * 60 * 10;
                     ship.orders[0] = order;
@@ -384,7 +389,7 @@ export const tutorialScript = function (this: PixiGame, context: ITutorialScript
             }).call(this),
             // destroyed ship
             waitForValue(() => {
-                const englishFaction = this.game.factions.get(EFaction.ENGLISH)!;
+                const englishFaction = serverGame.factions.get(EFaction.ENGLISH)!;
                 return englishFaction.shipIds.length === 0;
             }, () => {}),
             (function*(this: PixiGame) {
@@ -405,7 +410,7 @@ export const tutorialScript = function (this: PixiGame, context: ITutorialScript
             }).call(this),
             // picked up cargo
             waitForValue(() => {
-                return !!this.findPlayerShip()!.cargo[0];
+                return !!findPlayerShip()!.cargo[0];
             }, () => {}),
             (function*(this: PixiGame) {
                 if (!context.tutorialSoundComplete) {
@@ -423,7 +428,7 @@ export const tutorialScript = function (this: PixiGame, context: ITutorialScript
             }).call(this),
             // delivered cargo
             waitForValue(() => {
-                return !this.findPlayerShip()!.cargo[0];
+                return !findPlayerShip()!.cargo[0];
             }, () => {}),
             (function*(this: PixiGame) {
                 if (!context.tutorialSoundComplete) {
@@ -443,7 +448,7 @@ export const tutorialScript = function (this: PixiGame, context: ITutorialScript
             }).call(this),
             giveTradeMission(),
             waitForValue(() => {
-                return !this.findPlayerShip()!.orders.some(o => o.orderType === EOrderType.SETTLE);
+                return !findPlayerShip()!.orders.some(o => o.orderType === EOrderType.SETTLE);
             }, () => {}),
             giveTradeMission(),
             (function*(this: PixiGame) {
@@ -496,11 +501,11 @@ export const tutorialScript = function (this: PixiGame, context: ITutorialScript
                 yield;
             }).call(this),
             waitForValue(() => {
-                return !this.findPlayerShip()!.orders.some(o => o.orderType === EOrderType.SETTLE);
+                return !findPlayerShip()!.orders.some(o => o.orderType === EOrderType.SETTLE);
             }, () => {}),
             giveTradeMission(),
             waitForValue(() => {
-                return !this.findPlayerShip()!.orders.some(o => o.orderType === EOrderType.SETTLE);
+                return !findPlayerShip()!.orders.some(o => o.orderType === EOrderType.SETTLE);
             }, () => {}),
             (function*(this: PixiGame) {
                 if (!context.tutorialSoundComplete) {
@@ -519,21 +524,21 @@ export const tutorialScript = function (this: PixiGame, context: ITutorialScript
                 yield;
             }).call(this),
             (function*(this: PixiGame) {
-                const dutchFaction = this.game.factions.get(EFaction.DUTCH)!;
-                const dutchHomeWorld = this.game.planets.get(dutchFaction.homeWorldPlanetId)!;
+                const dutchFaction = serverGame.factions.get(EFaction.DUTCH)!;
+                const dutchHomeWorld = serverGame.planets.get(dutchFaction.homeWorldPlanetId)!;
 
-                const englishFaction = this.game.factions.get(EFaction.ENGLISH)!;
-                const englishHomeWorld = this.game.planets.get(englishFaction.homeWorldPlanetId)!;
+                const englishFaction = serverGame.factions.get(EFaction.ENGLISH)!;
+                const englishHomeWorld = serverGame.planets.get(englishFaction.homeWorldPlanetId)!;
 
-                context.invasion = new Invasion(this.game, dutchFaction, englishFaction, englishHomeWorld.id);
-                this.game.invasions.set(englishHomeWorld.id, context.invasion!);
+                context.invasion = new Invasion(serverGame, dutchFaction, englishFaction, englishHomeWorld.id);
+                serverGame.invasions.set(englishHomeWorld.id, context.invasion!);
 
                 const configureFriendlyShip = (ship: Ship) => {
                     const playerShip = this.getPlayerShip()!;
                     if (playerShip !== ship) {
                         ship.position = playerShip.position.clone().mul(Quaternion.fromBetweenVectors([0, 0, 1], playerShip.orientation.rotateVector([1, 0, 0])).pow(Game.VELOCITY_STEP * 300));
                     }
-                    const order = new Order(this.game, ship, ship.faction!);
+                    const order = new Order(serverGame, ship, ship.faction!);
                     order.orderType = EOrderType.INVADE;
                     order.expireTicks = 10 * 60 * 10;
                     order.planetId = englishHomeWorld.id;
@@ -546,7 +551,7 @@ export const tutorialScript = function (this: PixiGame, context: ITutorialScript
                 dutchHomeWorld.spawnEventShip(dutchHomeWorld.moneyAccount!.cash!, EShipType.SLOOP, configureFriendlyShip);
                 dutchHomeWorld.spawnEventShip(dutchHomeWorld.moneyAccount!.cash!, EShipType.SLOOP, configureFriendlyShip);
                 dutchHomeWorld.spawnEventShip(dutchHomeWorld.moneyAccount!.cash!, EShipType.CORVETTE, configureFriendlyShip);
-                configureFriendlyShip(this.findPlayerShip()!);
+                configureFriendlyShip(findPlayerShip()!);
 
                 englishHomeWorld.spawnEventShip(englishHomeWorld.moneyAccount!.cash!, EShipType.CUTTER, () => {});
                 englishHomeWorld.spawnEventShip(englishHomeWorld.moneyAccount!.cash!, EShipType.CUTTER, () => {});
