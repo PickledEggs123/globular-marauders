@@ -2472,15 +2472,29 @@ export class PixiGame extends PixiGameBase {
         return (
             <React.Fragment>
                 <svg width={200} height={200} viewBox="-30 -30 260 260" style={{position: "absolute", top: (this.state.height - 200) / 2, bottom: (this.state.height - 200) / 2, left: 0}}>
-                    <circle fill="grey" stroke="white" opacity={0.3} cx={25} cy={25} r={50} onMouseDown={() => this.handleZoomEvent(1, 10)}/>
-                    <circle fill="grey" stroke="white" opacity={0.3} cx={25} cy={175} r={50} onMouseDown={() => this.handleZoomEvent(-1, 10)}/>
-                    <circle fill="grey" stroke="white" opacity={0.3} cx={100} cy={100} r={50} onMouseDown={() => this.handleTouchDown(" ")} onMouseUp={() => this.handleTouchUp(" ")}/>
+                    <circle fill="grey" stroke="white" opacity={0.3} cx={25} cy={25} r={50}
+                            onMouseDown={() => this.handleZoomEvent(1, 10)}
+                            onTouchStart={() => this.handleZoomEvent(1, 10)}/>
+                    <circle fill="grey" stroke="white" opacity={0.3} cx={25} cy={175} r={50}
+                            onMouseDown={() => this.handleZoomEvent(-1, 10)}
+                            onTouchStart={() => this.handleZoomEvent(-1, 10)}/>
+                    <circle fill="grey" stroke="white" opacity={0.3} cx={100} cy={100} r={50}
+                            onMouseDown={() => this.handleTouchDown(" ")} onMouseUp={() => this.handleTouchUp(" ")}
+                            onTouchStart={() => this.handleTouchDown(" ")} onTouchEnd={() => this.handleTouchUp(" ")}/>
                 </svg>
                 <svg width={200} height={200} viewBox="-30 -30 260 260" style={{position: "absolute", top: (this.state.height - 200) / 2, bottom: (this.state.height - 200) / 2, right: 0}}>
-                    <circle fill="grey" stroke="white" opacity={0.3} cx={100} cy={25} r={50} onMouseDown={() => this.handleTouchDown("w")} onMouseUp={() => this.handleTouchUp("w")}/>
-                    <circle fill="grey" stroke="white" opacity={0.3} cx={100} cy={175} r={50} onMouseDown={() => this.handleTouchDown("s")} onMouseUp={() => this.handleTouchUp("s")}/>
-                    <circle fill="grey" stroke="white" opacity={0.3} cx={25} cy={100} r={50} onMouseDown={() => this.handleTouchDown("d")} onMouseUp={() => this.handleTouchUp("d")}/>
-                    <circle fill="grey" stroke="white" opacity={0.3} cx={175} cy={100} r={50} onMouseDown={() => this.handleTouchDown("a")} onMouseUp={() => this.handleTouchUp("a")}/>
+                    <circle fill="grey" stroke="white" opacity={0.3} cx={100} cy={25} r={50}
+                            onMouseDown={() => this.handleTouchDown("w")} onMouseUp={() => this.handleTouchUp("w")}
+                            onTouchStart={() => this.handleTouchDown("w")} onTouchEnd={() => this.handleTouchUp("w")}/>
+                    <circle fill="grey" stroke="white" opacity={0.3} cx={100} cy={175} r={50}
+                            onMouseDown={() => this.handleTouchDown("s")} onMouseUp={() => this.handleTouchUp("s")}
+                            onTouchStart={() => this.handleTouchDown("s")} onTouchEnd={() => this.handleTouchUp("s")}/>
+                    <circle fill="grey" stroke="white" opacity={0.3} cx={25} cy={100} r={50}
+                            onMouseDown={() => this.handleTouchDown("d")} onMouseUp={() => this.handleTouchUp("d")}
+                            onTouchStart={() => this.handleTouchDown("d")} onTouchEnd={() => this.handleTouchUp("d")}/>
+                    <circle fill="grey" stroke="white" opacity={0.3} cx={175} cy={100} r={50}
+                            onMouseDown={() => this.handleTouchDown("a")} onMouseUp={() => this.handleTouchUp("a")}
+                            onTouchStart={() => this.handleTouchDown("a")} onTouchEnd={() => this.handleTouchUp("a")}/>
                 </svg>
             </React.Fragment>
         );
