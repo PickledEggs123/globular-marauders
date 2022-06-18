@@ -1,5 +1,5 @@
 import React, {Fragment} from 'react';
-import '../App.css';
+import '../App.scss';
 import Quaternion from "quaternion";
 import SockJS from "sockjs-client";
 import * as PIXI from "pixi.js";
@@ -1425,16 +1425,18 @@ export class PixiGame extends PixiGameBase {
                             }
                         }
                     }
+                    console.log("SERVER", serverFrame, "SOUND");
                     continuousSoundCheck.add(key);
                     break;
                 }
             }
         }
-        if (serverFrame) {
+        if (!serverFrame) {
             const stoppedContinuousSounds = Array.from(this.continuousSounds.keys()).filter(key => !continuousSoundCheck.has(key));
             for (const key of stoppedContinuousSounds) {
                 const mediaInstance = this.continuousSounds.get(key)!;
                 mediaInstance.stop();
+                console.log("SERVER", serverFrame, "NO SOUND");
                 this.continuousSounds.delete(key);
             }
         }
@@ -1802,7 +1804,7 @@ export class PixiGame extends PixiGameBase {
         this.handleClientLoop();
         this.forceUpdate();
 
-        this.handleSoundEffects([EGameMode.TUTORIAL, EGameMode.SINGLE_PLAYER].includes(this.state.gameMode));
+        this.handleSoundEffects(false);
     }
 
     /**
@@ -1971,21 +1973,54 @@ export class PixiGame extends PixiGameBase {
     }
 
     /**
+     * Send touch key down message to server.
+     * @param key
+     * @private
+     */
+    private handleTouchDown(key: string) {
+        if (!this.activeKeys.includes(key)) {
+            this.activeKeys.push(key);
+        }
+    }
+
+    /**
+     * Send touch key up message to server.
+     * @param event
+     * @private
+     */
+    private handleTouchUp(key: string) {
+        const index = this.activeKeys.findIndex(k => k === key);
+        if (index >= 0) {
+            this.activeKeys.splice(index, 1);
+        }
+    }
+
+    /**
      * Make the mouse wheel change the zoom factor for the game.
      * @param event
      * @private
      */
     private handleMouseWheel(event: WheelEvent) {
-        if (event.deltaY < 0) {
+        this.handleZoomEvent(event.deltaY);
+    }
+
+    /**
+     * Handle the zoom event using any generic calling function, such as touch screen button
+     * @param deltaY
+     * @param strength
+     * @private
+     */
+    private handleZoomEvent(deltaY: number, strength: number = 1) {
+        if (deltaY < 0) {
             this.setState((state) => ({
                 ...state,
-                zoom: Math.min(state.zoom * (((Math.E - 1) / 10) + 1), 32)
+                zoom: Math.min(state.zoom * (((Math.E - 1) / 10 * strength) + 1), 32)
             }));
         }
         else {
             this.setState((state) => ({
                 ...state,
-                zoom: Math.max(state.zoom / (((Math.E - 1) / 10) + 1), 0.25)
+                zoom: Math.max(state.zoom / (((Math.E - 1) / 10 * strength) + 1), 0.25)
             }));
         }
     }
@@ -2353,18 +2388,101 @@ export class PixiGame extends PixiGameBase {
         const minute = timeLeft > 0 ? Math.floor(timeLeft / 10 / 60) : 0;
         const second = timeLeft > 0 ? Math.floor((timeLeft / 10) % 60) : 0;
 
+        const gaugeWidth = this.state.width < 1024 ? this.state.width : this.state.width - 400;
         return (
-            <svg style={{width: this.state.width - 400, height: 100}}>
-                <rect x={0} y={0} width={this.state.width - 400} height={30} stroke="white" fill={invasion.defending.factionColor}/>
-                <rect x={0} y={0} width={progress / maxProgress * (this.state.width - 400)} height={30} stroke="white" fill={invasion.attacking.factionColor}/>
-                <rect x={0} y={30} width={this.state.width - 400} height={30} stroke="white" fill={invasion.attacking.factionColor}/>
-                <rect x={0} y={30} width={progress2 / maxProgress2 * (this.state.width - 400)} height={30} stroke="white" fill={invasion.defending.factionColor}/>
-                <text x={(this.state.width - 400) / 2} y={20} textAnchor="middle" fill="white">{minute}:{second < 10 ? "0" : ""}{second}</text>
-                <text x={(this.state.width - 400) / 2} y={50} textAnchor="middle" fill="white">{invasion.invasionPhase}</text>
+            <svg style={{width: gaugeWidth, height: 100}}>
+                <rect x={0} y={0} width={gaugeWidth} height={30} stroke="white" fill={invasion.defending.factionColor}/>
+                <rect x={0} y={0} width={progress / maxProgress * (gaugeWidth)} height={30} stroke="white" fill={invasion.attacking.factionColor}/>
+                <rect x={0} y={30} width={gaugeWidth} height={30} stroke="white" fill={invasion.attacking.factionColor}/>
+                <rect x={0} y={30} width={progress2 / maxProgress2 * (gaugeWidth)} height={30} stroke="white" fill={invasion.defending.factionColor}/>
+                <text x={(gaugeWidth) / 2} y={20} textAnchor="middle" fill="white">{minute}:{second < 10 ? "0" : ""}{second}</text>
+                <text x={(gaugeWidth) / 2} y={50} textAnchor="middle" fill="white">{invasion.invasionPhase}</text>
                 {
-                    timeLeft < 0 ? <text x={(this.state.width - 400) / 2} y={80} textAnchor="middle" fill="white">Overtime</text> : null
+                    timeLeft < 0 ? <text x={(gaugeWidth) / 2} y={80} textAnchor="middle" fill="white">Overtime</text> : null
                 }
             </svg>
+        );
+    }
+
+    renderGameUiTop(): React.ReactElement | null {
+        const gaugeWidth = this.state.width < 1024 ? this.state.width : this.state.width - 400;
+        return (
+            <React.Fragment>
+                <Card className="TopLeft">
+                </Card>
+                <Card className="TopRight">
+                    <Typography>Distance {Math.ceil(VoronoiGraph.angularDistance(
+                        this.findPlayerShip()?.position.rotateVector([0, 0, 1]) ?? [0, 0, 1],
+                        this.findPlayerShip()?.pathFinding?.points[0] ?? this.findPlayerShip()?.position.rotateVector([0, 0, 1]) ?? [0, 0, 1],
+                        this.game.worldScale
+                    ) * 1000)}</Typography>
+                    <Typography>Mission {(this.findPlayerShip()?.orders[0] ?? null)?.orderType}</Typography>
+                </Card>
+                <div className="Top">
+                    <svg style={{width: gaugeWidth, height: 24}}>
+                        <rect x={0} y={0} width={((this.findPlayerShip()?.health ?? 100) + (this.findPlayerShip()?.repairTicks.reduce((acc, i) => acc + i, 0) ?? 0) ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (gaugeWidth)} height={24} fill="green" stroke="none"/>
+                        <rect x={0} y={0} width={(this.findPlayerShip()?.health ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (gaugeWidth)} height={10} fill="yellow" stroke="none"/>
+                        <rect x={0} y={0} width={((this.findPlayerShip()?.health ?? 100) - (this.findPlayerShip()?.burnTicks.reduce((acc, i) => acc + i, 0) ?? 0) ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (gaugeWidth)} height={24} fill="red" stroke="none"/>
+                        <text x={(gaugeWidth) * (1 / 7)} y={18} fill="white" stroke="none" textAnchor="middle">Damage {(this.playerId && this.game.scoreBoard.damage.find(x => x.playerId === this.playerId)?.damage) ?? 0}</text>
+                        <text x={(gaugeWidth) * (2 / 7)} y={18} fill="white" stroke="none" textAnchor="middle">Loot {(this.playerId && this.game.scoreBoard.loot.find(x => x.playerId === this.playerId)?.count) ?? 0}</text>
+                        <text x={(gaugeWidth) * (3 / 7)} y={18} fill="white" stroke="none" textAnchor="middle">Money {(this.playerId && this.game.scoreBoard.money.find(x => x.playerId === this.playerId)?.amount) ?? 0}</text>
+                        <text x={(gaugeWidth) * (4 / 7)} y={18} fill="white" stroke="none" textAnchor="middle">Land {(this.playerId && this.game.scoreBoard.land.find(x => x.playerId === this.playerId)?.amount) ?? 0}</text>
+                        <text x={(gaugeWidth) * (5 / 7)} y={18} fill="white" stroke="none" textAnchor="middle">Capture {(this.playerId && this.game.scoreBoard.capture.find(x => x.playerId === this.playerId)?.count) ?? 0}</text>
+                        <text x={(gaugeWidth) * (6 / 7)} y={18} fill="white" stroke="none" textAnchor="middle">Bounty {(this.playerId && this.game.scoreBoard.bounty.find(x => x.playerId === this.playerId)?.bountyAmount) ?? 0}</text>
+                    </svg>
+                    {
+                        this.invasionGauge()
+                    }
+                </div>
+            </React.Fragment>
+        );
+    }
+
+    renderGameUiBottom(): React.ReactElement | null {
+        return (
+            <React.Fragment>
+                <Card className="BottomRight">
+                    <Typography>Gold {this.playerId && this.game.playerData.get(this.playerId)?.moneyAccount.currencies.find(f => f.currencyId === "GOLD")?.amount}</Typography>
+                </Card>
+                <Card className="BottomLeft">
+                </Card>
+                <Stack className="Bottom" direction="row" spacing={2} justifyItems="center">
+                    {
+                        new Array(GetShipData(this.findPlayerShip()?.shipType ?? EShipType.CUTTER, this.game.worldScale).cargoSize).fill(0).map((v, i) => {
+                            return (
+                                <Card>
+                                    <CardContent>
+                                        <Badge badgeContent={this.findPlayerShip()?.cargo[i] ? this.findPlayerShip()?.cargo[i].amount : null} color={"primary"}>
+                                            <Avatar variant="rounded" style={{width: 50, height: 50}} srcSet={this.findPlayerShip()?.cargo[i] ? this.renderItemUrl(this.findPlayerShip()?.cargo[i].resourceType ?? EResourceType.CACAO).url : undefined}>
+                                                {null}
+                                            </Avatar>
+                                        </Badge>
+                                        <Typography variant="caption">{this.findPlayerShip()?.cargo[i] ? this.findPlayerShip()?.cargo[i].resourceType : ""}</Typography>
+                                    </CardContent>
+                                </Card>
+                            )
+                        })
+                    }
+                </Stack>
+            </React.Fragment>
+        );
+    }
+
+    renderMobileControls(): React.ReactElement | null {
+        return (
+            <React.Fragment>
+                <svg width={200} height={200} viewBox="-30 -30 260 260" style={{position: "absolute", top: (this.state.height - 200) / 2, bottom: (this.state.height - 200) / 2, left: 0}}>
+                    <circle fill="grey" stroke="white" opacity={0.3} cx={25} cy={25} r={50} onMouseDown={() => this.handleZoomEvent(1, 10)}/>
+                    <circle fill="grey" stroke="white" opacity={0.3} cx={25} cy={175} r={50} onMouseDown={() => this.handleZoomEvent(-1, 10)}/>
+                    <circle fill="grey" stroke="white" opacity={0.3} cx={100} cy={100} r={50} onMouseDown={() => this.handleTouchDown(" ")} onMouseUp={() => this.handleTouchUp(" ")}/>
+                </svg>
+                <svg width={200} height={200} viewBox="-30 -30 260 260" style={{position: "absolute", top: (this.state.height - 200) / 2, bottom: (this.state.height - 200) / 2, right: 0}}>
+                    <circle fill="grey" stroke="white" opacity={0.3} cx={100} cy={25} r={50} onMouseDown={() => this.handleTouchDown("w")} onMouseUp={() => this.handleTouchUp("w")}/>
+                    <circle fill="grey" stroke="white" opacity={0.3} cx={100} cy={175} r={50} onMouseDown={() => this.handleTouchDown("s")} onMouseUp={() => this.handleTouchUp("s")}/>
+                    <circle fill="grey" stroke="white" opacity={0.3} cx={25} cy={100} r={50} onMouseDown={() => this.handleTouchDown("d")} onMouseUp={() => this.handleTouchUp("d")}/>
+                    <circle fill="grey" stroke="white" opacity={0.3} cx={175} cy={100} r={50} onMouseDown={() => this.handleTouchDown("a")} onMouseUp={() => this.handleTouchUp("a")}/>
+                </svg>
+            </React.Fragment>
         );
     }
 
@@ -2410,6 +2528,18 @@ export class PixiGame extends PixiGameBase {
                         <div style={{width: this.state.width, height: this.state.height}} ref={this.showAppBodyRef}/>
                     </div>
                     <div className="AppMainContent">
+                        {
+                            !this.state.showLoginMenu && !this.state.showMainMenu && !this.state.showPlanetMenu && !this.state.showSpawnMenu && this.state.width < 1024 ? (
+                                <div className="MobileGameUi">
+                                    <div style={{position: "absolute", top: 0, left: this.state.marginLeft, bottom: this.state.marginBottom + this.state.height, right: this.state.marginRight}}>
+                                        {this.renderGameUiTop()}
+                                    </div>
+                                    <div style={{position: "absolute", top: this.state.marginTop + this.state.height, left: this.state.marginLeft, bottom: 0, right: this.state.marginRight}}>
+                                        {this.renderGameUiBottom()}
+                                    </div>
+                                </div>
+                            ): null
+                        }
                         <div style={{position: "absolute", top: this.state.marginTop, left: this.state.marginLeft, bottom: this.state.marginBottom, right: this.state.marginRight}}>
                             <Grid container direction="column" justifyContent="center" alignItems="center" spacing={2} xs={12} paddingTop={12}>
                                 {
@@ -2697,69 +2827,21 @@ export class PixiGame extends PixiGameBase {
                                     ) : null
                                 }
                             </Grid>
-                            {
-                                !this.state.showLoginMenu && !this.state.showMainMenu && !this.state.showPlanetMenu && !this.state.showSpawnMenu ? (
-                                    <Fragment>
-                                        <Card className="TopLeft">
-                                            <Typography>{Math.round(this.state.zoom * this.game.worldScale * 100) / 100} Zoom</Typography>
-                                            <Typography>{this.game.scoreBoard.damage.find(p => p.playerId === this.playerId)?.damage ?? 0} Damage</Typography>
-                                            <Typography>{Math.round(100 * Math.atan2((this.findPlayerShip()?.position.rotateVector([0, 0, 1]) ?? [0, 0, 1])[1], (this.findPlayerShip()?.position.rotateVector([0, 0, 1]) ?? [0, 0, 1])[0]) / Math.PI * 180) / 100} Position</Typography>
-                                            <Typography>{Math.round(100 * Math.acos((this.findPlayerShip()?.position.rotateVector([0, 0, 1]) ?? [0, 0, 1])[2]) / Math.PI * 180) / 100} Radius</Typography>
-                                            <Typography>{Math.round(100 * Math.atan2((this.findPlayerShip()?.orientation.rotateVector([1, 0, 0]) ?? [1, 0, 0])[1], (this.findPlayerShip()?.orientation.rotateVector([1, 0, 0]) ?? [1, 0, 0])[0]) / Math.PI * 180) / 100} Orientation</Typography>
-                                        </Card>
-                                        <Card className="TopRight">
-                                            <Typography>Distance {Math.ceil(VoronoiGraph.angularDistance(
-                                                this.findPlayerShip()?.position.rotateVector([0, 0, 1]) ?? [0, 0, 1],
-                                                this.findPlayerShip()?.pathFinding?.points[0] ?? this.findPlayerShip()?.position.rotateVector([0, 0, 1]) ?? [0, 0, 1],
-                                                this.game.worldScale
-                                            ) * 1000)} | {this.findPlayerShip()?.pathFinding?.points.length ?? 0} points</Typography>
-                                            <Typography>Mission {(this.findPlayerShip()?.orders[0] ?? null)?.orderType}</Typography>
-                                        </Card>
-                                        <div className="Top">
-                                            <svg style={{width: this.state.width - 400, height: 24}}>
-                                                <rect x={0} y={0} width={((this.findPlayerShip()?.health ?? 100) + (this.findPlayerShip()?.repairTicks.reduce((acc, i) => acc + i, 0) ?? 0) ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (this.state.width - 400)} height={24} fill="green" stroke="none"/>
-                                                <rect x={0} y={0} width={(this.findPlayerShip()?.health ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (this.state.width - 400)} height={10} fill="yellow" stroke="none"/>
-                                                <rect x={0} y={0} width={((this.findPlayerShip()?.health ?? 100) - (this.findPlayerShip()?.burnTicks.reduce((acc, i) => acc + i, 0) ?? 0) ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (this.state.width - 400)} height={24} fill="red" stroke="none"/>
-                                                <text x={(this.state.width - 400) * (1 / 7)} y={18} fill="white" stroke="none" textAnchor="middle">Damage {(this.playerId && this.game.scoreBoard.damage.find(x => x.playerId === this.playerId)?.damage) ?? 0}</text>
-                                                <text x={(this.state.width - 400) * (2 / 7)} y={18} fill="white" stroke="none" textAnchor="middle">Loot {(this.playerId && this.game.scoreBoard.loot.find(x => x.playerId === this.playerId)?.count) ?? 0}</text>
-                                                <text x={(this.state.width - 400) * (3 / 7)} y={18} fill="white" stroke="none" textAnchor="middle">Money {(this.playerId && this.game.scoreBoard.money.find(x => x.playerId === this.playerId)?.amount) ?? 0}</text>
-                                                <text x={(this.state.width - 400) * (4 / 7)} y={18} fill="white" stroke="none" textAnchor="middle">Land {(this.playerId && this.game.scoreBoard.land.find(x => x.playerId === this.playerId)?.amount) ?? 0}</text>
-                                                <text x={(this.state.width - 400) * (5 / 7)} y={18} fill="white" stroke="none" textAnchor="middle">Capture {(this.playerId && this.game.scoreBoard.capture.find(x => x.playerId === this.playerId)?.count) ?? 0}</text>
-                                                <text x={(this.state.width - 400) * (6 / 7)} y={18} fill="white" stroke="none" textAnchor="middle">Bounty {(this.playerId && this.game.scoreBoard.bounty.find(x => x.playerId === this.playerId)?.bountyAmount) ?? 0}</text>
-                                            </svg>
-                                            {
-                                                this.invasionGauge()
-                                            }
-                                        </div>
-                                        <Card className="BottomRight">
-                                            <Typography>Gold {this.playerId && this.game.playerData.get(this.playerId)?.moneyAccount.currencies.find(f => f.currencyId === "GOLD")?.amount}</Typography>
-                                        </Card>
-                                        <Card className="BottomLeft">
-                                            <Typography>Faction {this.state.faction}</Typography>
-                                            <Typography>Ships {this.state.faction && this.game.factions.get(this.state.faction)?.shipIds.length}</Typography>
-                                            <Typography>Planets {this.state.faction && this.game.factions.get(this.state.faction)?.planetIds.length}</Typography>
-                                        </Card>
-                                        <Stack className="Bottom" direction="row" spacing={2} justifyItems="center">
-                                            {
-                                                new Array(GetShipData(this.findPlayerShip()?.shipType ?? EShipType.CUTTER, this.game.worldScale).cargoSize).fill(0).map((v, i) => {
-                                                    return (
-                                                        <Card>
-                                                            <CardContent>
-                                                                <Badge badgeContent={this.findPlayerShip()?.cargo[i] ? this.findPlayerShip()?.cargo[i].amount : null} color={"primary"}>
-                                                                    <Avatar variant="rounded" style={{width: 50, height: 50}} srcSet={this.findPlayerShip()?.cargo[i] ? this.renderItemUrl(this.findPlayerShip()?.cargo[i].resourceType ?? EResourceType.CACAO).url : undefined}>
-                                                                        {null}
-                                                                    </Avatar>
-                                                                </Badge>
-                                                                <Typography variant="caption">{this.findPlayerShip()?.cargo[i] ? this.findPlayerShip()?.cargo[i].resourceType : ""}</Typography>
-                                                            </CardContent>
-                                                        </Card>
-                                                    )
-                                                })
-                                            }
-                                        </Stack>
-                                    </Fragment>
-                                ) : null
-                            }
+                            <div className="DesktopGameUi">
+                                {
+                                    !this.state.showLoginMenu && !this.state.showMainMenu && !this.state.showPlanetMenu && !this.state.showSpawnMenu && this.state.width >= 1024 ? (
+                                        <React.Fragment>
+                                            {this.renderGameUiTop()}
+                                            {this.renderGameUiBottom()}
+                                        </React.Fragment>
+                                    ) : null
+                                }
+                                {
+                                    !this.state.showLoginMenu && !this.state.showMainMenu && !this.state.showPlanetMenu && !this.state.showSpawnMenu && this.state.width < 1024 ? (
+                                        this.renderMobileControls()
+                                    ) : null
+                                }
+                            </div>
                             <Dialog open={this.state.showScoreboard} onClose={() => this.setState({showScoreboard: false})}>
                                 <DialogTitle title="Scoreboard"/>
                                 <DialogContent>

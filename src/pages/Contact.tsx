@@ -1,5 +1,5 @@
 import React from 'react';
-import '../App.css';
+import '../App.scss';
 import {WebsiteDrawer} from "../Drawer";
 import {Card, CardContent, CardHeader, Container, Grid, Typography} from "@mui/material";
 

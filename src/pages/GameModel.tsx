@@ -1,5 +1,5 @@
 import React, {useEffect} from 'react';
-import '../App.css';
+import '../App.scss';
 import {WebsiteDrawer} from "../Drawer";
 import {Button, Card, CardContent, CardHeader, Container, Grid, Typography} from "@mui/material";
 import {DelaunayGraph} from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
