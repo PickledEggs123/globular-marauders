@@ -18,6 +18,6 @@ RUN rm -rf ./*
 
 COPY --from=builder /app/build .
 COPY --from=builder /app/globular_marauders_nginx.conf /etc/nginx/sites-available
-RUN sudo ln -s /etc/nginx/sites-available/react_app /etc/nginx/sites-enabled
+RUN ln -s /etc/nginx/sites-available/globular_marauders_nginx.conf /etc/nginx/sites-enabled
 
 ENTRYPOINT ["nginx", "-g", "daemon off;"]
