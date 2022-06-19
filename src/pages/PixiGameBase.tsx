@@ -1007,8 +1007,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
     handleResize = () => {
         const width = this.measureAppBodyRef.current ? this.measureAppBodyRef.current.getBoundingClientRect().width : window.innerWidth;
         const height = this.measureAppBodyRef.current ? this.measureAppBodyRef.current.getBoundingClientRect().height : window.innerHeight;
-        const offset = width < 1024 ? 0 : 124;
-        const size = Math.min(width - offset, height - offset);
+        const size = Math.min(width, height);
         const verticalSpace = height - size;
         const horizontalSpace = width - size;
 
