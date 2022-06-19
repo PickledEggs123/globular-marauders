@@ -96,7 +96,6 @@ import {
 } from "../helpers/pixiHelpers";
 import {ITutorialScriptContext, tutorialScript} from "../scripts/tutorial";
 import {CardRenderer} from "../forms/CardRenderer";
-import {Faction} from "@pickledeggs123/globular-marauders-game/lib/src";
 
 const GetFactionSubheader = (faction: EFaction): string | null => {
     switch (faction) {
@@ -153,6 +152,7 @@ export class PixiGame extends PixiGameBase {
     public shardPortNumber: number | null = null;
     public messages: IMessage[] = [];
     public localServerMessages: IMessage[] = [];
+    public singlePlayerFormRequest: Array<{type: string, data: {[key: string]: any}}> = [];
 
     // client loop stuff
     public clientLoopStart: number = performance.now();
@@ -208,8 +208,8 @@ export class PixiGame extends PixiGameBase {
 
     public submitForm(type: string, data: {[key: string]: any}) {
         if (this.state.gameMode === EGameMode.SINGLE_PLAYER) {
-            this.game.handleFormApiRequestForPlayer(Array.from(this.game.playerData.values())[0], {
-                buttonPath: type,
+            this.singlePlayerFormRequest.push({
+                type,
                 data
             });
         }
@@ -551,7 +551,7 @@ export class PixiGame extends PixiGameBase {
                 const sendForms = () => {
                     const player = tutorialPlayerData;
                     if (player) {
-                        return this.game.getFormsForPlayer(player);
+                        return serverGame.getFormsForPlayer(player);
                     } else {
                         return null;
                     }
@@ -611,10 +611,17 @@ export class PixiGame extends PixiGameBase {
                     for (const message of this.localServerMessages) {
                         serverGame.incomingMessages.push(["pirateDude", message]);
                     }
+                    for (const {type, data} of this.singlePlayerFormRequest) {
+                        serverGame.handleFormApiRequestForPlayer(Array.from(serverGame.playerData.values())[0], {
+                            buttonPath: type,
+                            data
+                        });
+                    }
                     for (const [, message] of serverGame.outgoingMessages) {
                         this.handleGenericMessage(message);
                     }
                     this.localServerMessages.splice(0, this.localServerMessages.length);
+                    this.singlePlayerFormRequest.splice(0, this.singlePlayerFormRequest.length);
                 }, 100);
                 break;
             }
@@ -1782,7 +1789,13 @@ export class PixiGame extends PixiGameBase {
             const playerData = (this.playerId && this.game.playerData.get(this.playerId)) || null;
             if (playerData && !playerData.autoPilotEnabled) {
                 if (this.game.ships.has(playerData.shipId)) {
-                    this.game.handleShipLoop(playerData.shipId, () => this.activeKeys, false);
+                    this.game.handleShipLoop(playerData.shipId, () => {
+                        if (playerData && playerData.filterActiveKeys) {
+                            return this.activeKeys.filter(x => playerData && playerData.filterActiveKeys && playerData.filterActiveKeys.includes(x));
+                        } else {
+                            return this.activeKeys;
+                        }
+                    }, false);
                 }
             }
 
