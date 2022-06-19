@@ -17,7 +17,7 @@ WORKDIR /usr/share/nginx/html
 RUN rm -rf ./*
 
 COPY --from=builder /app/build .
-COPY --from=builder /app/globular_marauders_nginx.conf /etc/nginx/sites-available
-RUN ln -s /etc/nginx/sites-available/globular_marauders_nginx.conf /etc/nginx/sites-enabled
+COPY --from=builder /app/react_app_nginx.conf /etc/nginx/conf.d/react_app_nginx.conf
+RUN rm -rf /etc/nginx/conf.d/default.conf
 
 ENTRYPOINT ["nginx", "-g", "daemon off;"]
