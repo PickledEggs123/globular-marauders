@@ -30,11 +30,11 @@ import planetMesh6 from "@pickledeggs123/globular-marauders-generator/meshes/pla
 import planetMesh7 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet7.mesh.json";
 import planetMesh8 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet8.mesh.json";
 import planetMesh9 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet9.mesh.json";
-import {planetResources} from "../resources/planetResources";
-import {starResources} from "../resources/starResources";
+import {PlanetResources} from "../resources/planetResources";
+import {StarResources} from "../resources/starResources";
 import {convertPositionQuaternionToPositionPolar, hexToRgb} from "../helpers/pixiHelpers";
-import {cannonBallResources} from "../resources/cannonBallResources";
-import {crateResources} from "../resources/crateResources";
+import {CannonBallResources} from "../resources/cannonBallResources";
+import {CrateResources} from "../resources/crateResources";
 import {voronoiResources} from "../resources/voronoiResources";
 import {backgroundVoronoiResources} from "../resources/backgroundVoronoiResources";
 import {ShipResources} from "../resources/shipResources";
@@ -147,94 +147,26 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
 
     public abstract particleContainer: PIXI.Container;
 
-    pixiStarResources = starResources();
+    pixiStarResources = new StarResources(this as any);
 
-    pixiPlanetResources = planetResources();
+    pixiPlanetResources = new PlanetResources(this as any);
 
-    pixiShipResources = new ShipResources(this.game);
+    pixiShipResources = new ShipResources(this as any);
 
-    pixiCannonBallResources = cannonBallResources();
+    pixiCannonBallResources = new CannonBallResources(this as any);
 
-    pixiCrateResources = crateResources();
+    pixiCrateResources = new CrateResources(this as any);
 
     pixiVoronoiResources = voronoiResources();
 
     pixiBackgroundVoronoiResources = backgroundVoronoiResources();
 
     clearMeshes: boolean = false;
-    starMeshes: Array<{
-        id: string,
-        mesh: PIXI.Mesh<PIXI.Shader>,
-        position: Quaternion,
-        tick: number
-    }> = [];
-    planetMeshes: Array<{
-        id: string,
-        mesh: PIXI.Mesh<PIXI.Shader>,
-        faction: PIXI.Graphics,
-        factionRadius: number,
-        factionColor: number | null,
-        settlementLevel: number,
-        settlementProgress: number,
-        textName: PIXI.Text,
-        textTitle: PIXI.Text,
-        textResource1: PIXI.Text,
-        textResource2: PIXI.Text,
-        textResource3: PIXI.Text,
-        position: Quaternion,
-        orientation: Quaternion,
-        rotation: Quaternion,
-        tick: number
-    }> = [];
+
     planetThumbnails: Map<string, string> = new Map<string, string>();
-    shipMeshes: Array<{
-        id: string,
-        mesh: PIXI.Mesh<PIXI.Shader>,
-        text: PIXI.Text,
-        trailContainer: PIXI.Container,
-        trail: particles.Emitter,
-        trailState: EParticleState,
-        line: PIXI.Graphics,
-        cannonBallLeft: PIXI.Graphics,
-        cannonBallRight: PIXI.Graphics,
-        autoPilotLines: PIXI.Graphics[],
-        autoPilotLinePoints: [number, number, number][],
-        health: PIXI.Graphics,
-        healthColor: number,
-        healthValue: number,
-        isPlayer: boolean,
-        isEnemy: boolean,
-        position: Quaternion,
-        positionPolarNew: [number, number],
-        positionPolarOld: [number, number],
-        correctionFactorTheta: number,
-        orientation: Quaternion,
-        positionVelocity: Quaternion,
-        positionVelocityTheta: number,
-        tick: number
-    }> = [];
-    cannonBallMeshes: Array<{
-        id: string,
-        mesh: PIXI.Mesh<PIXI.Shader>,
-        trailContainer: PIXI.Container,
-        trail: particles.Emitter,
-        position: Quaternion,
-        positionVelocity: Quaternion,
-        tick: number
-    }> = [];
-    crateMeshes: Array<{
-        id: string,
-        mesh: PIXI.Mesh<PIXI.Shader>,
-        image: PIXI.Mesh<PIXI.Shader>,
-        trailContainer: PIXI.Container,
-        trail: particles.Emitter,
-        text: PIXI.Text,
-        position: Quaternion,
-        orientation: Quaternion,
-        rotation: Quaternion,
-        resourceType: EResourceType,
-        tick: number
-    }> = [];
+
+
+
     sprites: Record<string, PIXI.Texture> = {};
     voronoiMeshes: Array<{
         id: string,
@@ -263,12 +195,12 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
             uScale: 2 * star.size * PHYSICS_SCALE,
             uWorldScale: this.game.worldScale,
         };
-        const shader = new PIXI.Shader(this.pixiStarResources.starProgram, uniforms);
-        const mesh = new PIXI.Mesh(this.pixiStarResources.starGeometry, shader);
+        const shader = new PIXI.Shader(this.pixiStarResources.getResources().starProgram, uniforms);
+        const mesh = new PIXI.Mesh(this.pixiStarResources.getResources().starGeometry, shader);
         mesh.zIndex = -10;
 
         this.application.stage.addChild(mesh);
-        this.starMeshes.push({
+        this.pixiStarResources.getResources().starMeshes.push({
             id: star.id,
             mesh,
             position: star.position.clone(),
@@ -323,10 +255,10 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
             uScale: 10 * planet.size * PHYSICS_SCALE,
             uWorldScale: this.game.worldScale,
         };
-        const shader = new PIXI.Shader(this.pixiPlanetResources.planetProgram, uniforms);
+        const shader = new PIXI.Shader(this.pixiPlanetResources.getResources().planetProgram, uniforms);
         const state = PIXI.State.for2d();
         state.depthTest = true;
-        const [geometry, meshIndex] = this.pixiPlanetResources.getPlanetGeometry();
+        const [geometry, meshIndex] = this.pixiPlanetResources.getResources().getPlanetGeometry();
         const planetThumbnail = [
             planetMesh0,
             planetMesh1,
@@ -375,7 +307,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         this.application.stage.addChild(textResource1);
         this.application.stage.addChild(textResource2);
         this.application.stage.addChild(textResource3);
-        this.planetMeshes.push({
+        this.pixiPlanetResources.getResources().planetMeshes.push({
             id: planet.id,
             mesh,
             faction,
@@ -543,7 +475,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         this.application.stage.addChild(cannonBallLeft);
         this.application.stage.addChild(cannonBallRight);
         this.application.stage.addChild(health);
-        this.shipMeshes.push({
+        this.pixiShipResources.getResources().shipMeshes.push({
             id: ship.id,
             mesh,
             text,
@@ -590,8 +522,8 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
             uScale: 5 * PHYSICS_SCALE,
             uWorldScale: this.game.worldScale,
         };
-        const shader = new PIXI.Shader(this.pixiCannonBallResources.cannonBallProgram, uniforms);
-        const mesh = new PIXI.Mesh(this.pixiCannonBallResources.cannonBallGeometry, shader);
+        const shader = new PIXI.Shader(this.pixiCannonBallResources.getResources().cannonBallProgram, uniforms);
+        const mesh = new PIXI.Mesh(this.pixiCannonBallResources.getResources().cannonBallGeometry, shader);
         mesh.zIndex = -1;
 
 
@@ -712,7 +644,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
 
         this.application.stage.addChild(mesh);
         this.application.stage.addChild(trailContainer);
-        this.cannonBallMeshes.push({
+        this.pixiCannonBallResources.getResources().cannonBallMeshes.push({
             id: cannonBall.id,
             mesh,
             trailContainer,
@@ -749,8 +681,8 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
             uScale: 5 * PHYSICS_SCALE,
             uWorldScale: this.game.worldScale,
         };
-        const meshShader = new PIXI.Shader(this.pixiCrateResources.crateProgram, meshUniforms);
-        const mesh = new PIXI.Mesh(this.pixiCrateResources.crateGeometry, meshShader);
+        const meshShader = new PIXI.Shader(this.pixiCrateResources.getResources().crateProgram, meshUniforms);
+        const mesh = new PIXI.Mesh(this.pixiCrateResources.getResources().crateGeometry, meshShader);
         mesh.zIndex = -4;
 
         // crate texture sprite
@@ -764,8 +696,8 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
             uWorldScale: this.game.worldScale,
             uSampler: this.sprites[resourceType]
         };
-        const imageShader = new PIXI.Shader(this.pixiCrateResources.crateImageProgram, imageUniforms);
-        const image = new PIXI.Mesh(this.pixiCrateResources.crateImageGeometry, imageShader);
+        const imageShader = new PIXI.Shader(this.pixiCrateResources.getResources().crateImageProgram, imageUniforms);
+        const image = new PIXI.Mesh(this.pixiCrateResources.getResources().crateImageGeometry, imageShader);
         mesh.zIndex = -4;
 
 
@@ -898,7 +830,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         this.application.stage.addChild(image);
         this.application.stage.addChild(trailContainer);
         this.application.stage.addChild(text);
-        this.crateMeshes.push({
+        this.pixiCrateResources.getResources().crateMeshes.push({
             id: crate.id,
             mesh,
             image,

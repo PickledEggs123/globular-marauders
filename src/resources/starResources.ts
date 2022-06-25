@@ -1,19 +1,27 @@
 import * as PIXI from "pixi.js";
+import Quaternion from "quaternion";
+import PixiGame from "../pages/PixiGame";
 
-export const starResources = () => {
-    // create geometry
-    const starGeometry = new PIXI.Geometry();
-    starGeometry.addAttribute("aPosition", (new Array(32).fill(0).reduce((acc, v, i) => {
-        acc.push(Math.cos(i * Math.PI * 2 / 32), Math.sin(i * Math.PI * 2 / 32), 0);
-        return acc;
-    }, [0, 0, 0] as number[])), 3);
-    starGeometry.addIndex((new Array(33).fill(0).reduce((acc, v, i) => {
-        acc.push(0, (i % 32) + 1, ((i + 1) % 32) + 1);
-        return acc;
-    }, [] as number[])));
+export class StarResources {
+    game: PixiGame;
+    constructor(game: PixiGame) {
+        this.game = game;
+    }
 
-    // create material
-    const starVertexShader = `
+    private getFreshData() {
+        // create geometry
+        const starGeometry = new PIXI.Geometry();
+        starGeometry.addAttribute("aPosition", (new Array(32).fill(0).reduce((acc, v, i) => {
+            acc.push(Math.cos(i * Math.PI * 2 / 32), Math.sin(i * Math.PI * 2 / 32), 0);
+            return acc;
+        }, [0, 0, 0] as number[])), 3);
+        starGeometry.addIndex((new Array(33).fill(0).reduce((acc, v, i) => {
+            acc.push(0, (i % 32) + 1, ((i + 1) % 32) + 1);
+            return acc;
+        }, [] as number[])));
+
+        // create material
+        const starVertexShader = `
             precision mediump float;
             
             attribute vec3 aPosition;
@@ -39,7 +47,7 @@ export const starResources = () => {
                 gl_Position = pos * vec4(1.0 * uWorldScale, -1.0 * uWorldScale, 0.0625, 1);
             }
         `;
-    const starFragmentShader = `
+        const starFragmentShader = `
             precision mediump float;
             
             uniform vec4 uColor;
@@ -48,10 +56,75 @@ export const starResources = () => {
                 gl_FragColor = uColor;
             }
         `;
-    const starProgram = new PIXI.Program(starVertexShader, starFragmentShader);
+        const starProgram = new PIXI.Program(starVertexShader, starFragmentShader);
 
-    return {
-        starGeometry,
-        starProgram
-    };
-};
+        const starMeshes: Array<{
+            id: string,
+            mesh: PIXI.Mesh<PIXI.Shader>,
+            position: Quaternion,
+            tick: number
+        }> = [];
+
+        return {
+            starGeometry,
+            starProgram,
+            starMeshes
+        };
+    }
+
+    cachedResources: any;
+    public getResources() {
+        if (this.cachedResources) {
+            return this.cachedResources;
+        }
+
+        const {
+            starGeometry,
+            starProgram,
+            starMeshes,
+        } = this.getFreshData();
+
+        const handleSync = (pixiTick: number) => {
+            for (const star of [
+                ...Array.from(this.game.game.voronoiTerrain.getStars(this.game.cameraPosition.rotateVector([0, 0, 1]), 0.5)),
+                ...Array.from(this.game.game.voronoiTerrain.getStars(this.game.cameraPosition.rotateVector([0, 0, 1]), 0.25)),
+                ...Array.from(this.game.game.voronoiTerrain.getStars(this.game.cameraPosition.rotateVector([0, 0, 1]), 0.125))
+            ]) {
+                const starMesh = this.cachedResources.starMeshes.find((p: any) => p.id === star.id);
+                if (starMesh) {
+                    starMesh.tick = pixiTick;
+                } else {
+                    this.game.addStar({
+                        star,
+                        cameraPosition: this.game.cameraPosition,
+                        cameraOrientation: this.game.cameraOrientation,
+                        tick: pixiTick
+                    });
+                }
+            }
+            for (const item of this.cachedResources.starMeshes.filter((m: any) => m.tick !== pixiTick || this.game.clearMeshes)) {
+                this.game.application.stage.removeChild(item.mesh);
+            }
+            this.cachedResources.starMeshes = this.cachedResources.starMeshes.filter((m: any) => m.tick === pixiTick && !this.game.clearMeshes);
+        };
+
+        const handleRender = () => {
+            for (const item of this.cachedResources.starMeshes) {
+                const shader = item.mesh.shader;
+                shader.uniforms.uCameraPosition = this.game.cameraPosition.clone().inverse().toMatrix4();
+                shader.uniforms.uCameraOrientation = this.game.cameraOrientation.clone().inverse().toMatrix4();
+                shader.uniforms.uCameraScale = this.game.state.zoom;
+                this.game.updateMeshIfVisible(item);
+            }
+        };
+
+        this.cachedResources = {
+            starGeometry,
+            starProgram,
+            starMeshes,
+            handleSync,
+            handleRender
+        };
+        return this.cachedResources;
+    }
+}

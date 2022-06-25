@@ -1,16 +1,14 @@
 import React, {Fragment} from 'react';
 import '../App.scss';
 import Quaternion from "quaternion";
-import SockJS from "sockjs-client";
 import * as PIXI from "pixi.js";
 import * as particles from "@pixi/particle-emitter";
-import {IMediaInstance, PlayOptions, sound} from "@pixi/sound";
+import {sound} from "@pixi/sound";
 import {EResourceType, ITEM_DATA} from "@pickledeggs123/globular-marauders-game/lib/src/Resource";
 import {
     ICameraState,
     ICameraStateWithOriginal,
     IDrawable,
-    IFormResult,
     MIN_DISTANCE
 } from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
 import {Ship,} from "@pickledeggs123/globular-marauders-game/lib/src/Ship";
@@ -28,26 +26,16 @@ import {
     VoronoiGraph
 } from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
 import {Planet} from "@pickledeggs123/globular-marauders-game/lib/src/Planet";
-import {DeserializeQuaternion, SerializeQuaternion,} from "@pickledeggs123/globular-marauders-game/lib/src/Item";
 import {
     EMessageType,
-    ESoundEventType,
     ESoundType,
     Game,
     IAutoPilotMessage,
     IChooseFactionMessage,
     IChoosePlanetMessage,
-    IGameInitializationFrame,
-    IGameSyncFrame,
     IJoinMessage,
-    IMessage,
-    IPlayerData,
-    ISpawnFaction,
-    ISpawnLocationResult,
-    ISpawnMessage,
-    ISpawnPlanet
+    ISpawnMessage
 } from "@pickledeggs123/globular-marauders-game/lib/src/Game";
-import {MusicPlayer} from "../MusicPlayer";
 import {
     Avatar,
     Badge,
@@ -80,7 +68,7 @@ import {
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import {DEFAULT_IMAGE, EVoronoiMode, RESOURCE_TYPE_TEXTURE_PAIRS, SPACE_BACKGROUND_TEXTURES} from "../helpers/Data";
-import {EGameMode, EParticleState, IPixiGameProps, PixiGameBase} from "./PixiGameBase";
+import {EGameMode, IPixiGameProps} from "./PixiGameBase";
 import {DirectionsBoat, MusicNote, MusicOff, People, Public, School, SmartToy, Tv, TvOff} from "@mui/icons-material";
 import {EOrderType} from "@pickledeggs123/globular-marauders-game/lib/src/Order";
 import {EInvasionPhase, Invasion} from "@pickledeggs123/globular-marauders-game/lib/src/Invasion";
@@ -89,13 +77,9 @@ import {ReactComponent as Attack} from "../icons/attack.svg";
 import {ReactComponent as WasdImage} from "../icons/wasd.svg";
 import {ReactComponent as MouseImage} from "../icons/mouse.svg";
 import {WebsiteDrawer} from "../Drawer";
-import {
-    computePositionPolarCorrectionFactorTheta,
-    convertPositionQuaternionToPositionPolar,
-    isPositionPolarDifferent
-} from "../helpers/pixiHelpers";
 import {ITutorialScriptContext, tutorialScript} from "../scripts/tutorial";
 import {CardRenderer} from "../forms/CardRenderer";
+import {PixiGameNetworking} from "./PixiGameNetworking";
 
 const GetFactionSubheader = (faction: EFaction): string | null => {
     switch (faction) {
@@ -114,7 +98,7 @@ const GetFactionSubheader = (faction: EFaction): string | null => {
     }
 }
 
-export class PixiGame extends PixiGameBase {
+export class PixiGame extends PixiGameNetworking {
     public application: PIXI.Application;
     public particleContainer: PIXI.Container;
     public starField: particles.Emitter | undefined;
@@ -135,85 +119,7 @@ export class PixiGame extends PixiGameBase {
         voronoi: VoronoiCell
     }> = [];
     public refreshVoronoiDataTick: number = 0;
-    public music: MusicPlayer = new MusicPlayer();
-    public initialized: boolean = false;
     public frameCounter: number = 0;
-    public socket: WebSocket | undefined;
-    public socketEvents: Record<string, (data: any) => void> = {};
-    public spawnFactions: ISpawnFaction[] = [];
-    public spawnPlanets: ISpawnPlanet[] = [];
-    public spawnLocations: ISpawnLocationResult = {
-        results: [],
-        message: undefined
-    };
-    public forms: IFormResult = {
-        cards: []
-    };
-    public shardPortNumber: number | null = null;
-    public messages: IMessage[] = [];
-    public localServerMessages: IMessage[] = [];
-    public singlePlayerFormRequest: Array<{type: string, data: {[key: string]: any}}> = [];
-
-    // client loop stuff
-    public clientLoopStart: number = performance.now();
-    public clientLoopDelta: number = 1000 / 10;
-    public clientLoopDeltaStart: number = performance.now();
-
-    public numNetworkFrames: number = 0;
-
-    public resetClientLoop() {
-        const now = performance.now();
-        const difference = now - this.clientLoopStart;
-        if (difference < 10) {
-            return;
-        }
-        this.clientLoopDelta = difference;
-        this.clientLoopStart = now;
-    }
-
-    public handleClientLoop() {
-        const now = performance.now();
-        const delta = (now - this.clientLoopDeltaStart) / this.clientLoopDelta;
-        this.clientLoopDeltaStart = now;
-
-        const movableArrays: Array<{
-            array: ICameraState[]
-        }> = [{
-            array: Array.from(this.game.ships.values()),
-        }, {
-            array: Array.from(this.game.cannonBalls.values()),
-        }, {
-            array: Array.from(this.game.crates.values()),
-        }];
-
-        for (const {array: movableArray} of movableArrays) {
-            for (const item of movableArray) {
-                item.position = item.position.clone().mul(item.positionVelocity.clone().pow(delta));
-                item.orientation = item.orientation.clone().mul(item.orientationVelocity.clone().pow(delta));
-            }
-        }
-    }
-
-    // networking messages, outgoing
-    public sendMessage(event: string, message: any = undefined) {
-        if (this.socket) {
-            this.socket.send(JSON.stringify({
-                event,
-                message
-            }));
-        } else if ([EGameMode.TUTORIAL, EGameMode.SINGLE_PLAYER].includes(this.state.gameMode) && event === "generic-message") {
-            this.localServerMessages.push(message);
-        }
-    }
-
-    public submitForm(type: string, data: {[key: string]: any}) {
-        if (this.state.gameMode === EGameMode.SINGLE_PLAYER) {
-            this.singlePlayerFormRequest.push({
-                type,
-                data
-            });
-        }
-    }
 
     convertOrientationToDisplay = (old: Quaternion): Quaternion => {
         return old.clone();
@@ -640,17 +546,66 @@ export class PixiGame extends PixiGameBase {
         this.setState({gameMode});
     }
 
-    private cameraPosition: Quaternion = Quaternion.ONE;
-    private cameraOrientation: Quaternion = Quaternion.ONE;
+    cameraPosition: Quaternion = Quaternion.ONE;
+    cameraOrientation: Quaternion = Quaternion.ONE;
     private lastCameraOrientation: Quaternion = Quaternion.ONE;
-    private cameraCorrectionFactor: number = 0;
-    private cameraPositionVelocityTheta: number = Math.PI / 2;
+    cameraCorrectionFactor: number = 0;
+    cameraPositionVelocityTheta: number = Math.PI / 2;
     public getCamera() {
         return {
             cameraPosition: this.cameraPosition,
             cameraOrientation: this.cameraOrientation,
         };
     }
+
+    handleDrawingOfText = (text: PIXI.Text, position: Quaternion, offset?: {x: number, y: number}) => {
+        const textPosition = DelaunayGraph.distanceFormula(
+            this.cameraPosition.rotateVector([0, 0, 1]),
+            position.rotateVector([0, 0, 1])
+        ) < 0.001 ? [0, 0, 1] as [number, number, number] : this.cameraOrientation.clone().inverse()
+            .mul(this.cameraPosition.clone().inverse())
+            .mul(position.clone())
+            .rotateVector([0, 0, 1]);
+        textPosition[0] = ((-textPosition[0] * this.state.zoom * this.game.worldScale) + 1) / 2;
+        textPosition[1] = ((-textPosition[1] * this.state.zoom * this.game.worldScale) + 1) / 2;
+        text.x = textPosition[0] * this.application.renderer.width;
+        text.y = textPosition[1] * this.application.renderer.height;
+        text.y -= 20;
+        const center: [number, number] = [
+            this.application.renderer.width / 2,
+            this.application.renderer.height / 2
+        ];
+        if (offset) {
+            text.x += offset.x;
+            text.y += offset.y;
+        } else {
+            const directionTowardsCenter: [number, number] = [
+                center[0] - text.x,
+                center[1] - text.y
+            ];
+            const directionTowardsCenterLength = Math.sqrt(Math.pow(directionTowardsCenter[0], 2) + Math.pow(directionTowardsCenter[1], 2));
+            const normalizedDirectionTowardsCenter: [number, number] = directionTowardsCenterLength !== 0 ? [
+                directionTowardsCenter[0] / directionTowardsCenterLength,
+                directionTowardsCenter[1] / directionTowardsCenterLength
+            ] : [0, 0];
+            text.x += normalizedDirectionTowardsCenter[0] * 25;
+            text.y += normalizedDirectionTowardsCenter[1] * 25;
+        }
+        text.anchor.set(0.5);
+        text.visible = textPosition[2] > 0 && this.state.zoom * this.game.worldScale >= 6;
+    };
+
+    updateMeshIfVisible = (item: {position: Quaternion, mesh: PIXI.Mesh<any>}) => {
+        const shipPoint = DelaunayGraph.distanceFormula(
+            this.cameraPosition.rotateVector([0, 0, 1]),
+            item.position.rotateVector([0, 0, 1])
+        ) < 0.001 ? [0, 0, 1] as [number, number, number] : this.cameraOrientation.clone().inverse()
+            .mul(this.cameraPosition.clone().inverse())
+            .mul(item.position.clone())
+            .rotateVector([0, 0, 1]);
+        item.mesh.visible = shipPoint[2] > 0;
+        item.mesh.tint = shipPoint[2] > 0 ? 0xaaaaaaaa : 0xffffffff;
+    };
 
     constructor(props: IPixiGameProps) {
         super(props);
@@ -670,45 +625,6 @@ export class PixiGame extends PixiGameBase {
 
         this.loadSoundIntoMemory();
         this.loadSpritesIntoMemory();
-
-        const handleDrawingOfText = (text: PIXI.Text, position: Quaternion, offset?: {x: number, y: number}) => {
-            const textPosition = DelaunayGraph.distanceFormula(
-                this.cameraPosition.rotateVector([0, 0, 1]),
-                position.rotateVector([0, 0, 1])
-            ) < 0.001 ? [0, 0, 1] as [number, number, number] : this.cameraOrientation.clone().inverse()
-                .mul(this.cameraPosition.clone().inverse())
-                .mul(position.clone())
-                .rotateVector([0, 0, 1]);
-            textPosition[0] = ((-textPosition[0] * this.state.zoom * this.game.worldScale) + 1) / 2;
-            textPosition[1] = ((-textPosition[1] * this.state.zoom * this.game.worldScale) + 1) / 2;
-            text.x = textPosition[0] * this.application.renderer.width;
-            text.y = textPosition[1] * this.application.renderer.height;
-            text.y -= 20;
-            const center: [number, number] = [
-                this.application.renderer.width / 2,
-                this.application.renderer.height / 2
-            ];
-            if (offset) {
-                text.x += offset.x;
-                text.y += offset.y;
-            } else {
-                const directionTowardsCenter: [number, number] = [
-                    center[0] - text.x,
-                    center[1] - text.y
-                ];
-                const directionTowardsCenterLength = Math.sqrt(Math.pow(directionTowardsCenter[0], 2) + Math.pow(directionTowardsCenter[1], 2));
-                const normalizedDirectionTowardsCenter: [number, number] = directionTowardsCenterLength !== 0 ? [
-                    directionTowardsCenter[0] / directionTowardsCenterLength,
-                    directionTowardsCenter[1] / directionTowardsCenterLength
-                ] : [0, 0];
-                text.x += normalizedDirectionTowardsCenter[0] * 25;
-                text.y += normalizedDirectionTowardsCenter[1] * 25;
-            }
-            text.anchor.set(0.5);
-            text.visible = textPosition[2] > 0 && this.state.zoom * this.game.worldScale >= 6;
-        };
-        const handleDrawingOfParticles = (text: PIXI.Container, position: Quaternion, offset?: {x: number, y: number}) => {
-        };
 
         const removeExtraRotation = (q: Quaternion): Quaternion => {
             return Quaternion.fromBetweenVectors([0, 0, 1], q.rotateVector([0, 0, 1]));
@@ -730,199 +646,11 @@ export class PixiGame extends PixiGameBase {
             pixiTick += 1;
 
             // sync game to Pixi renderer
-            // stars
-            for (const star of [
-                ...Array.from(this.game.voronoiTerrain.getStars(this.cameraPosition.rotateVector([0, 0, 1]), 0.5)),
-                ...Array.from(this.game.voronoiTerrain.getStars(this.cameraPosition.rotateVector([0, 0, 1]), 0.25)),
-                ...Array.from(this.game.voronoiTerrain.getStars(this.cameraPosition.rotateVector([0, 0, 1]), 0.125))
-            ]) {
-                const starMesh = this.starMeshes.find(p => p.id === star.id);
-                if (starMesh) {
-                    starMesh.tick = pixiTick;
-                } else {
-                    this.addStar({
-                        star,
-                        cameraPosition: this.cameraPosition,
-                        cameraOrientation: this.cameraOrientation,
-                        tick: pixiTick
-                    });
-                }
-            }
-            for (const item of this.starMeshes.filter(m => m.tick !== pixiTick || this.clearMeshes)) {
-                this.application.stage.removeChild(item.mesh);
-            }
-            this.starMeshes = this.starMeshes.filter(m => m.tick === pixiTick && !this.clearMeshes);
-            // planets
-            for (const planet of Array.from(this.game.voronoiTerrain.getPlanets(this.cameraPosition.rotateVector([0, 0, 1])))) {
-                const planetMesh = this.planetMeshes.find(p => p.id === planet.id);
-                if (planetMesh) {
-                    planetMesh.orientation = planetMesh.rotation.clone().mul(planetMesh.orientation.clone());
-                    const ownerFaction = Array.from(this.game.factions.values()).find(faction => faction.planetIds.includes(planet.id));
-                    planetMesh.factionColor = this.getFactionColor(ownerFaction);
-                    planetMesh.settlementLevel = planet.settlementLevel;
-                    planetMesh.settlementProgress = planet.settlementProgress;
-                    planetMesh.tick = pixiTick;
-                } else {
-                    this.addPlanet({
-                        planet,
-                        cameraPosition: this.cameraPosition,
-                        cameraOrientation: this.cameraOrientation,
-                        tick: pixiTick
-                    });
-                }
-            }
-            for (const item of this.planetMeshes.filter(m => m.tick !== pixiTick || this.clearMeshes)) {
-                this.application.stage.removeChild(item.mesh);
-                this.application.stage.removeChild(item.faction);
-                this.application.stage.removeChild(item.textName);
-                this.application.stage.removeChild(item.textTitle);
-                this.application.stage.removeChild(item.textResource1);
-                this.application.stage.removeChild(item.textResource2);
-                this.application.stage.removeChild(item.textResource3);
-            }
-            this.planetMeshes = this.planetMeshes.filter(m => m.tick === pixiTick && !this.clearMeshes);
-            // ships
-            for (const [, ship] of Array.from(this.game.ships)) {
-                const shipMesh = this.shipMeshes.find(s => s.id === ship.id);
-                if (shipMesh) {
-                    shipMesh.isPlayer = this.getPlayerShip().id === ship.id;
-                    shipMesh.isEnemy = this.findPlayerShip()?.faction?.id !== ship.faction?.id;
-                    shipMesh.healthValue = Math.ceil(ship.health / ship.maxHealth * 100);
-
-                    switch (shipMesh.trailState) {
-                        case EParticleState.STOP: {
-                            if ((shipMesh.isPlayer && !this.state.autoPilotEnabled ? this.activeKeys : ship.activeKeys).includes("w")) {
-                                shipMesh.trailState = EParticleState.PLAYING;
-                            }
-                            break;
-                        }
-                        case EParticleState.PLAYING: {
-                            shipMesh.trail.emit = true;
-                            shipMesh.trailState = EParticleState.PLAY;
-                            break;
-                        }
-                        case EParticleState.PLAY: {
-                            if (!(shipMesh.isPlayer && !this.state.autoPilotEnabled ? this.activeKeys : ship.activeKeys).includes("w")) {
-                                shipMesh.trailState = EParticleState.STOPPING;
-                            }
-                            break;
-                        }
-                        case EParticleState.STOPPING: {
-                            shipMesh.trail.emit = false;
-                            shipMesh.trailState = EParticleState.STOP;
-                            break;
-                        }
-                    }
-
-                    const currentPositionPolar = convertPositionQuaternionToPositionPolar(ship.position);
-                    if (isPositionPolarDifferent(shipMesh.positionPolarNew, currentPositionPolar)) {
-                        shipMesh.positionPolarOld = shipMesh.positionPolarNew;
-                        shipMesh.positionPolarNew = currentPositionPolar;
-                        shipMesh.correctionFactorTheta = -computePositionPolarCorrectionFactorTheta(shipMesh.positionPolarOld, shipMesh.positionPolarNew) + Math.PI / 2;
-                        if (ship === this.findPlayerShip()) {
-                            this.cameraCorrectionFactor = shipMesh.correctionFactorTheta;
-                        }
-                    }
-                    shipMesh.position = removeExtraRotation(ship.position);
-                    shipMesh.positionVelocity = removeExtraRotation(ship.positionVelocity);
-                    const positionVelocityPoint = ship.positionVelocity.rotateVector([0, 0, 1]);
-                    const positionVelocityPointLength = Math.sqrt(positionVelocityPoint[0] ** 2 + positionVelocityPoint[1] ** 2);
-                    if (positionVelocityPointLength > 0.0001) {
-                        shipMesh.positionVelocityTheta = Math.atan2(positionVelocityPoint[1], positionVelocityPoint[0]);
-                        if (ship === this.findPlayerShip()) {
-                            this.cameraPositionVelocityTheta = shipMesh.positionVelocityTheta;
-                        }
-                    }
-                    shipMesh.orientation = ship.orientation.clone().mul(Quaternion.fromAxisAngle([0, 0, 1], -shipMesh.positionVelocityTheta + Math.PI / 2));
-                    const playerData = (this.playerId && this.game.playerData.get(this.playerId)) ?? null;
-                    if (ship.pathFinding.points.length > 0 && !(
-                        shipMesh.autoPilotLines.length === ship.pathFinding.points.length &&
-                        ship.pathFinding.points.every(p => shipMesh.autoPilotLinePoints.includes(p)))
-                    ) {
-                        shipMesh.autoPilotLines.forEach((i) => {
-                            this.application.stage.removeChild(i);
-                        });
-                        shipMesh.autoPilotLines.splice(0, shipMesh.autoPilotLines.length);
-                        if (shipMesh.isPlayer && playerData) {
-                            ship.pathFinding.points.forEach(() => {
-                                const autoPilotLine = new PIXI.Graphics();
-                                autoPilotLine.zIndex = -5;
-                                this.application.stage.addChild(autoPilotLine);
-                                shipMesh.autoPilotLines.push(autoPilotLine);
-                            });
-                        }
-                    }
-                    shipMesh.autoPilotLinePoints.splice(0, shipMesh.autoPilotLinePoints.length, ...ship.pathFinding.points);
-                    shipMesh.tick = pixiTick;
-                } else {
-                    this.addShip({
-                        ship,
-                        cameraPosition: this.cameraPosition,
-                        cameraOrientation: this.cameraOrientation,
-                        tick: pixiTick
-                    });
-                }
-            }
-            for (const item of this.shipMeshes.filter(m => m.tick !== pixiTick || this.clearMeshes)) {
-                this.application.stage.removeChild(item.mesh);
-                this.application.stage.removeChild(item.text);
-                this.application.stage.removeChild(item.line);
-                this.application.stage.removeChild(item.cannonBallLeft);
-                this.application.stage.removeChild(item.cannonBallRight);
-                this.application.stage.removeChild(item.health);
-                item.trail.emit = false;
-                item.trail.destroy();
-                this.application.stage.removeChild(item.trailContainer);
-                for (const autoPilotLine of item.autoPilotLines) {
-                    this.application.stage.removeChild(autoPilotLine);
-                }
-                item.autoPilotLines.splice(0, item.autoPilotLines.length);
-            }
-            this.shipMeshes = this.shipMeshes.filter(m => m.tick === pixiTick && !this.clearMeshes);
-            // cannonBalls
-            for (const [, cannonBall] of Array.from(this.game.cannonBalls)) {
-                const cannonBallMesh = this.cannonBallMeshes.find(c => c.id === cannonBall.id);
-                if (cannonBallMesh) {
-                    cannonBallMesh.position = removeExtraRotation(cannonBall.position);
-                    cannonBallMesh.positionVelocity = removeExtraRotation(cannonBall.positionVelocity);
-                    cannonBallMesh.tick = pixiTick;
-                } else {
-                    this.addCannonBall({
-                        cannonBall,
-                        cameraPosition: this.cameraPosition,
-                        cameraOrientation: this.cameraOrientation,
-                        tick: pixiTick
-                    });
-                }
-            }
-            for (const item of this.cannonBallMeshes.filter(m => m.tick !== pixiTick || this.clearMeshes)) {
-                this.application.stage.removeChild(item.mesh);
-                this.application.stage.removeChild(item.trailContainer);
-            }
-            this.cannonBallMeshes = this.cannonBallMeshes.filter(m => m.tick === pixiTick && !this.clearMeshes);
-            // crates
-            for (const [, crate] of Array.from(this.game.crates)) {
-                const createMesh = this.crateMeshes.find(c => c.id === crate.id);
-                if (createMesh) {
-                    createMesh.position = removeExtraRotation(crate.position);
-                    createMesh.orientation = crate.orientation;
-                    createMesh.tick = pixiTick;
-                } else {
-                    this.addCrate({
-                        crate,
-                        cameraPosition: this.cameraPosition,
-                        cameraOrientation: this.cameraOrientation,
-                        tick: pixiTick
-                    });
-                }
-            }
-            for (const item of this.crateMeshes.filter(m => m.tick !== pixiTick || this.clearMeshes)) {
-                this.application.stage.removeChild(item.mesh);
-                this.application.stage.removeChild(item.trailContainer);
-                this.application.stage.removeChild(item.image);
-                this.application.stage.removeChild(item.text);
-            }
-            this.crateMeshes = this.crateMeshes.filter(m => m.tick === pixiTick && !this.clearMeshes);
+            this.pixiStarResources.getResources().handleSync(pixiTick);
+            this.pixiPlanetResources.getResources().handleSync(pixiTick);
+            this.pixiShipResources.getResources().handleSync(pixiTick);
+            this.pixiCannonBallResources.getResources().handleSync(pixiTick);
+            this.pixiCrateResources.getResources().handleSync(pixiTick);
 
             // voronoi tiles
             if (this.state.showVoronoi) {
@@ -1045,341 +773,12 @@ export class PixiGame extends PixiGameBase {
 
             this.clearMeshes = false;
 
-            const updateMeshIfVisible = (item: {position: Quaternion, mesh: PIXI.Mesh<any>}) => {
-                const shipPoint = DelaunayGraph.distanceFormula(
-                    this.cameraPosition.rotateVector([0, 0, 1]),
-                    item.position.rotateVector([0, 0, 1])
-                ) < 0.001 ? [0, 0, 1] as [number, number, number] : this.cameraOrientation.clone().inverse()
-                    .mul(this.cameraPosition.clone().inverse())
-                    .mul(item.position.clone())
-                    .rotateVector([0, 0, 1]);
-                item.mesh.visible = shipPoint[2] > 0;
-                item.mesh.tint = shipPoint[2] > 0 ? 0xaaaaaaaa : 0xffffffff;
-            };
-
-            // update each star
-            for (const item of this.starMeshes) {
-                const shader = item.mesh.shader;
-                shader.uniforms.uCameraPosition = this.cameraPosition.clone().inverse().toMatrix4();
-                shader.uniforms.uCameraOrientation = this.cameraOrientation.clone().inverse().toMatrix4();
-                shader.uniforms.uCameraScale = this.state.zoom;
-                updateMeshIfVisible(item);
-            }
-
-            // update each planet
-            for (const item of this.planetMeshes) {
-                item.orientation = item.orientation.clone().mul(item.rotation.clone());
-
-                const shader = item.mesh.shader;
-                shader.uniforms.uCameraPosition = this.cameraPosition.clone().inverse().toMatrix4();
-                shader.uniforms.uCameraOrientation = this.cameraOrientation.clone().inverse().toMatrix4();
-                shader.uniforms.uCameraScale = this.state.zoom;
-                shader.uniforms.uOrientation = item.orientation.toMatrix4();
-                updateMeshIfVisible(item);
-
-                if (item.factionColor) {
-                    const startPoint = DelaunayGraph.distanceFormula(
-                        this.cameraPosition.rotateVector([0, 0, 1]),
-                        item.position.rotateVector([0, 0, 1])
-                    ) < 0.0001 ? [0, 0, 1] : this.cameraOrientation.clone().inverse()
-                        .mul(this.cameraPosition.clone().inverse())
-                        .mul(item.position.clone())
-                        .rotateVector([0, 0, 1]);
-                    const centerX = ((-startPoint[0] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.width;
-                    const centerY = ((-startPoint[1] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.height;
-                    const settlementProgressSlice = Math.max(0, Math.min(item.settlementProgress, 1)) * Math.PI * 2;
-                    const settlementProgressSlice2 = Math.max(0, Math.min(item.settlementProgress - 1, 1) / 4) * Math.PI * 2;
-                    const radius = item.factionRadius * this.state.zoom * this.game.worldScale * this.application.renderer.width;
-                    const radius2 = (item.factionRadius + 3 * PHYSICS_SCALE) * this.state.zoom * this.game.worldScale * this.application.renderer.width;
-
-                    // inner circle
-                    item.faction.clear();
-                    item.faction.position.set(centerX, centerY);
-                    item.faction.beginFill(item.factionColor);
-                    item.faction.moveTo(0, 0);
-                    item.faction.lineTo(radius, 0);
-                    item.faction.arc(0, 0, radius, 0, settlementProgressSlice);
-                    item.faction.lineTo(0, 0);
-                    item.faction.endFill();
-
-                    // outer circle
-                    item.faction.beginFill(item.factionColor);
-                    item.faction.moveTo(0, 0);
-                    item.faction.lineTo(radius2, 0);
-                    item.faction.arc(0, 0, radius2, 0, settlementProgressSlice2);
-                    item.faction.lineTo(0, 0);
-                    item.faction.endFill();
-
-                    item.faction.visible = startPoint[2] > 0 &&
-                        centerX >= 0 &&
-                        centerX <= this.application.renderer.width &&
-                        centerY >= 0 &&
-                        centerY <= this.application.renderer.height;
-                } else {
-                    item.faction.visible = false;
-                }
-
-                handleDrawingOfText(item.textName, item.position, {x: 0, y: item.factionRadius / PHYSICS_SCALE * 2 + 40 - 160});
-                handleDrawingOfText(item.textTitle, item.position, {x: 0, y: item.factionRadius / PHYSICS_SCALE * 2 + 60 - 160});
-                handleDrawingOfText(item.textResource1, item.position, {x: 0, y: item.factionRadius / PHYSICS_SCALE * 2 + 80 - 160});
-                handleDrawingOfText(item.textResource2, item.position, {x: 0, y: item.factionRadius / PHYSICS_SCALE * 2 + 100 - 160});
-                handleDrawingOfText(item.textResource3, item.position, {x: 0, y: item.factionRadius / PHYSICS_SCALE * 2 + 120 - 160});
-            }
-
-            // update each ship
-            for (const item of this.shipMeshes) {
-                const shader = item.mesh.shader;
-                shader.uniforms.uCameraPosition = this.cameraPosition.clone().inverse().toMatrix4();
-                shader.uniforms.uCameraOrientation = this.cameraOrientation.clone().inverse().toMatrix4();
-                shader.uniforms.uCameraPositionInv = this.cameraPosition.clone().toMatrix4();
-                shader.uniforms.uCameraOrientationInv = this.cameraOrientation.clone().toMatrix4();
-                shader.uniforms.uCorrectionFactorTheta = item.correctionFactorTheta;
-                shader.uniforms.uCameraScale = this.state.zoom;
-                shader.uniforms.uPosition = removeExtraRotation(item.position).toMatrix4();
-                shader.uniforms.uOrientation = this.convertOrientationToDisplay(item.orientation.mul(Quaternion.fromAxisAngle([0, 0, 1], Math.PI))).toMatrix4();
-                updateMeshIfVisible(item);
-
-                // hide ships on the other side of the world
-                const shipPoint = DelaunayGraph.distanceFormula(
-                    this.cameraPosition.rotateVector([0, 0, 1]),
-                    item.position.rotateVector([0, 0, 1])
-                ) < 0.001 ? [0, 0, 1] as [number, number, number] : this.cameraOrientation.clone().inverse()
-                    .mul(this.cameraPosition.clone().inverse())
-                    .mul(item.position.clone())
-                    .rotateVector([0, 0, 1]);
-                item.mesh.visible = shipPoint[2] > 0;
-
-                handleDrawingOfText(item.text, item.position);
-
-                handleDrawingOfParticles(item.trailContainer, item.position);
-
-                // draw player dotted line
-                if (item.isPlayer) {
-                    const lineXS = 1 / 2 * this.application.renderer.width;
-                    const lineYS = 1 / 2 * this.application.renderer.height;
-
-                    // velocity line
-                    {
-                        const endPoint = DelaunayGraph.distanceFormula(
-                            [0, 0, 1],
-                            item.positionVelocity.rotateVector([0, 0, 1])
-                        ) < 0.00001 ? [0, 0, 1] as [number, number, number] :
-                            item.orientation.clone().inverse().mul(Quaternion.fromAxisAngle([0, 0, 1], item.positionVelocityTheta + item.correctionFactorTheta - Math.PI / 2)).rotateVector([0, 1, 0]);
-                        endPoint[2] = 0;
-                        const endPointScaleFactor = 1 / Math.max(Math.abs(endPoint[0]), Math.abs(endPoint[1]));
-                        endPoint[0] *= endPointScaleFactor;
-                        endPoint[1] *= endPointScaleFactor;
-                        const lineXE = ((-endPoint[0] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.width;
-                        const lineYE = ((-endPoint[1] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.height;
-
-                        const dashLength = 5;
-                        const lineDirection = DelaunayGraph.normalize(
-                            DelaunayGraph.subtract(
-                                [lineXE, lineYE, 0],
-                                [lineXS, lineYS, 0]
-                            )
-                        );
-                        const lineLength = DelaunayGraph.distanceFormula(
-                            [lineXE, lineYE, 0],
-                            [lineXS, lineYS, 0]
-                        );
-
-                        // draw line
-                        item.line.clear();
-                        item.line.beginFill(0xff0000ff);
-                        item.line.lineStyle(1, 0xff0000ff);
-                        for (let i = 0; i < lineLength; i += dashLength * 2) {
-                            item.line.moveTo(
-                                lineXS + lineDirection[0] * i,
-                                lineYS + lineDirection[1] * i
-                            );
-                            item.line.lineTo(
-                                lineXS + lineDirection[0] * (i + dashLength),
-                                lineYS + lineDirection[1] * (i + dashLength)
-                            );
-                        }
-                        item.line.endFill();
-                        item.line.visible = true;
-                    }
-                    //  cannonball lines
-                    for (const values of [{jitterPoint: [1, 0, 0] as [number, number, number], property: "cannonBallLeft"}, {jitterPoint: [-1, 0, 0] as [number, number, number], property: "cannonBallRight"}]) {
-                        const jitterPoint = Quaternion.fromAxisAngle([0, 0, 1], -item.mesh.shader.uniforms.uCorrectionFactorTheta).mul(item.orientation.clone()).rotateVector(values.jitterPoint);
-                        const worldPoint = item.position.clone().mul(Quaternion.fromBetweenVectors([0, 0, 1], jitterPoint)).rotateVector([0, 0, 1]);
-                        const position = Quaternion.fromBetweenVectors([0, 0, 1], worldPoint);
-                        const endPoint = DelaunayGraph.distanceFormula(
-                            this.cameraPosition.rotateVector([0, 0, 1]),
-                            position.rotateVector([0, 0, 1])
-                        ) < 0.001 ? [0, 0, 1] as [number, number, number] : this.cameraOrientation.clone().inverse()
-                            .mul(this.cameraPosition.clone().inverse())
-                            .mul(position.clone())
-                            .rotateVector([0, 0, 1]);
-                        endPoint[2] = 0;
-                        const endPointScaleFactor = 1 / Math.max(Math.abs(endPoint[0]), Math.abs(endPoint[1]));
-                        endPoint[0] *= endPointScaleFactor;
-                        endPoint[1] *= endPointScaleFactor;
-                        const lineXE = ((-endPoint[0] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.width;
-                        const lineYE = ((-endPoint[1] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.height;
-
-                        const dashLength = 5;
-                        const lineDirection = DelaunayGraph.normalize(
-                            DelaunayGraph.subtract(
-                                [lineXE, lineYE, 0],
-                                [lineXS, lineYS, 0]
-                            )
-                        );
-                        const lineLength = DelaunayGraph.distanceFormula(
-                            [lineXE, lineYE, 0],
-                            [lineXS, lineYS, 0]
-                        );
-
-                        // draw line
-                        const graphics: PIXI.Graphics = (item as any)[values.property] as PIXI.Graphics;
-                        graphics.clear();
-                        graphics.beginFill(0xffffff88);
-                        graphics.lineStyle(1, 0xffffff88);
-                        for (let i = 0; i < lineLength; i += dashLength * 2) {
-                            graphics.moveTo(
-                                lineXS + lineDirection[0] * i,
-                                lineYS + lineDirection[1] * i
-                            );
-                            graphics.lineTo(
-                                lineXS + lineDirection[0] * (i + dashLength),
-                                lineYS + lineDirection[1] * (i + dashLength)
-                            );
-                        }
-                        graphics.endFill();
-                        graphics.visible = true;
-                    }
-                } else {
-                    item.line.visible = false;
-                    item.cannonBallLeft.visible = false;
-                    item.cannonBallRight.visible = false;
-                }
-
-                // draw AutoPilot dotted lines
-                for (let i = 0; i < item.autoPilotLines.length && i < item.autoPilotLinePoints.length; i++) {
-                    const lineStart = i === 0 ? this.cameraPosition.clone() : Quaternion.fromBetweenVectors([0, 0, 1], item.autoPilotLinePoints[i - 1]);
-                    const lineEnd = Quaternion.fromBetweenVectors([0, 0, 1], item.autoPilotLinePoints[i]);
-                    const startPoint = DelaunayGraph.distanceFormula(
-                        this.cameraPosition.rotateVector([0, 0, 1]),
-                        lineStart.rotateVector([0, 0, 1])
-                    ) < 0.001 ? [0, 0, 1] as [number, number, number] : this.cameraOrientation.clone().inverse()
-                        .mul(this.cameraPosition.clone().inverse())
-                        .mul(lineStart)
-                        .rotateVector([0, 0, 1]);
-                    const lineXS = ((-startPoint[0] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.width;
-                    const lineYS = ((-startPoint[1] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.height;
-
-                    const endPoint = DelaunayGraph.distanceFormula(
-                        this.cameraPosition.rotateVector([0, 0, 1]),
-                        lineEnd.rotateVector([0, 0, 1])
-                    ) < 0.001 ? [0, 0, 1] as [number, number, number] : this.cameraOrientation.clone().inverse()
-                        .mul(this.cameraPosition.clone().inverse())
-                        .mul(lineEnd)
-                        .rotateVector([0, 0, 1]);
-                    const lineXE = ((-endPoint[0] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.width;
-                    const lineYE = ((-endPoint[1] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.height;
-
-                    const dashLength = 5;
-                    const lineDirection = DelaunayGraph.normalize(
-                        DelaunayGraph.subtract(
-                            [lineXE, lineYE, 0],
-                            [lineXS, lineYS, 0]
-                        )
-                    );
-                    const lineLength = DelaunayGraph.distanceFormula(
-                        [lineXE, lineYE, 0],
-                        [lineXS, lineYS, 0]
-                    );
-
-                    // draw line
-                    item.autoPilotLines[i].clear();
-                    item.autoPilotLines[i].beginFill(0xffffff);
-                    item.autoPilotLines[i].lineStyle(1, 0xffffff);
-                    for (let j = 0; j < lineLength; j += dashLength * 3) {
-                        item.autoPilotLines[i].moveTo(
-                            lineXS + lineDirection[0] * j,
-                            lineYS + lineDirection[1] * j
-                        );
-                        item.autoPilotLines[i].lineTo(
-                            lineXS + lineDirection[0] * (j + dashLength),
-                            lineYS + lineDirection[1] * (j + dashLength)
-                        );
-                    }
-                    item.autoPilotLines[i].endFill();
-                    item.autoPilotLines[i].visible = true;
-                }
-
-                // draw health bar
-                {
-                    const startPoint = DelaunayGraph.distanceFormula(
-                        this.cameraPosition.rotateVector([0, 0, 1]),
-                        item.position.rotateVector([0, 0, 1])
-                    ) < 0.001 ? [0, 0, 1] as [number, number, number] : this.cameraOrientation.clone().inverse()
-                        .mul(this.cameraPosition.clone().inverse())
-                        .mul(item.position.clone())
-                        .rotateVector([0, 0, 1]);
-                    const centerX = ((-startPoint[0] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.width;
-                    const centerY = ((-startPoint[1] * this.state.zoom * this.game.worldScale) + 1) / 2 * this.application.renderer.height;
-
-                    const radius = 20 * PHYSICS_SCALE * this.state.zoom * this.game.worldScale * this.application.renderer.width;
-                    const thickness = 3 * PHYSICS_SCALE * this.state.zoom * this.game.worldScale * this.application.renderer.width;
-                    const sliceSize = Math.PI * 2 / 100;
-                    item.health.clear();
-                    item.health.position.set(centerX, centerY);
-                    item.health.lineStyle(thickness, item.healthColor);
-                    item.health.moveTo(
-                        radius,
-                        0
-                    );
-                    for (let i = 1; i <= item.healthValue; i++) {
-                        item.health.lineTo(
-                            Math.cos(i * sliceSize) * radius,
-                            Math.sin(i * sliceSize) * radius
-                        );
-                    }
-                    item.health.visible = startPoint[2] > 0 &&
-                        centerX >= 0 &&
-                        centerX <= this.application.renderer.width &&
-                        centerY >= 0 &&
-                        centerY <= this.application.renderer.height;
-                }
-            }
-
-            // update each cannon ball
-            for (const item of this.cannonBallMeshes) {
-                item.position = item.position.clone().mul(item.positionVelocity.clone().pow(1/60));
-
-                const shader = item.mesh.shader;
-                shader.uniforms.uCameraPosition = this.cameraPosition.clone().inverse().toMatrix4();
-                shader.uniforms.uCameraOrientation = this.cameraOrientation.clone().inverse().toMatrix4();
-                shader.uniforms.uCameraScale = this.state.zoom;
-                shader.uniforms.uPosition = removeExtraRotation(item.position).toMatrix4();
-                updateMeshIfVisible(item);
-            }
-
-            // update each crate
-            for (const item of this.crateMeshes) {
-                item.orientation = item.orientation.clone().mul(item.rotation.clone());
-
-                const meshShader = item.mesh.shader;
-                meshShader.uniforms.uCameraPosition = this.cameraPosition.clone().inverse().toMatrix4();
-                meshShader.uniforms.uCameraOrientation = this.cameraOrientation.clone().inverse().toMatrix4();
-                meshShader.uniforms.uCameraScale = this.state.zoom;
-                meshShader.uniforms.uPosition = removeExtraRotation(item.position).toMatrix4();
-                meshShader.uniforms.uOrientation = this.convertOrientationToDisplay(item.orientation).toMatrix4();
-                updateMeshIfVisible(item);
-
-                const imageShader = item.image.shader;
-                imageShader.uniforms.uCameraPosition = this.cameraPosition.clone().inverse().toMatrix4();
-                imageShader.uniforms.uCameraOrientation = this.cameraOrientation.clone().inverse().toMatrix4();
-                imageShader.uniforms.uCameraScale = this.state.zoom;
-                imageShader.uniforms.uPosition = removeExtraRotation(item.position).toMatrix4();
-                imageShader.uniforms.uOrientation = this.convertOrientationToDisplay(item.orientation).toMatrix4();
-                updateMeshIfVisible({...item, mesh: item.image});
-
-                handleDrawingOfText(item.text, item.position);
-            }
+            // update each render
+            this.pixiStarResources.getResources().handleRender();
+            this.pixiPlanetResources.getResources().handleRender();
+            this.pixiShipResources.getResources().handleRender();
+            this.pixiCannonBallResources.getResources().handleRender();
+            this.pixiCrateResources.getResources().handleRender();
 
             // draw voronoi terrain tiles for political boundaries
             if (this.state.showVoronoi) {
@@ -1399,200 +798,6 @@ export class PixiGame extends PixiGameBase {
                 shader.uniforms.uCameraScale = this.state.zoom;
             }
         });
-    }
-
-    continuousSounds = new Map<string, IMediaInstance>();
-    handleSoundEffects = (serverFrame: boolean) => {
-        // handle sounds
-        const continuousSoundCheck = new Set<string>();
-        for (const soundEvent of this.game.soundEvents) {
-            if (!(soundEvent.shipId === this.findPlayerShip()?.id || soundEvent.soundType === ESoundType.HIT)) {
-                continue;
-            }
-            const playOptions: PlayOptions = {
-                volume: soundEvent.shipId === this.findPlayerShip()?.id ? 1 : 0.09
-            };
-            switch (soundEvent.soundEventType) {
-                case ESoundEventType.ONE_OFF: {
-                    const soundItem = sound.find(soundEvent.soundType);
-                    if (soundItem && soundItem.isLoaded) {
-                        sound.play(soundEvent.soundType, playOptions);
-                    }
-                    break;
-                }
-                case ESoundEventType.CONTINUOUS: {
-                    playOptions.volume! *= 0.25;
-                    const key = `${soundEvent.shipId}-${soundEvent.soundType}`;
-                    if (!this.continuousSounds.has(key)) {
-                        const soundItem = sound.find(soundEvent.soundType);
-                        if (soundItem && soundItem.isLoaded) {
-                            const mediaInstance = sound.play(soundEvent.soundType, playOptions) as IMediaInstance;
-                            if (!(mediaInstance as any).then) {
-                                this.continuousSounds.set(key, mediaInstance);
-                            }
-                        }
-                    }
-                    console.log("SERVER", serverFrame, "SOUND");
-                    continuousSoundCheck.add(key);
-                    break;
-                }
-            }
-        }
-        if (!serverFrame) {
-            const stoppedContinuousSounds = Array.from(this.continuousSounds.keys()).filter(key => !continuousSoundCheck.has(key));
-            for (const key of stoppedContinuousSounds) {
-                const mediaInstance = this.continuousSounds.get(key)!;
-                mediaInstance.stop();
-                console.log("SERVER", serverFrame, "NO SOUND");
-                this.continuousSounds.delete(key);
-            }
-        }
-    }
-
-    handleSendWorld = (data: IGameInitializationFrame) => {
-        this.setState({
-            showSpawnMenu: false,
-            showPlanetMenu: false,
-            showMainMenu: true,
-            showLoginMenu: false,
-        });
-        this.game.applyGameInitializationFrame(data);
-        this.initialized = true;
-        setTimeout(() => {
-            this.sendMessage("init-loop");
-        }, 500);
-    };
-
-    handleSendFrame = (data: IGameSyncFrame) => {
-        this.numNetworkFrames += 1;
-        setTimeout(() => {
-            this.numNetworkFrames -= 1;
-        }, 1000);
-
-        const playerData = (this.playerId && this.game.playerData.get(this.playerId)) ?? null;
-        if (playerData) {
-            const ship = this.game.ships.get(playerData.shipId);
-            const shipData = data.ships.update.find(s => s.id === playerData.shipId);
-            if (ship && shipData && !playerData.autoPilotEnabled) {
-                // cancel server position if the position difference is small
-                if (VoronoiGraph.angularDistance(
-                    ship.position.rotateVector([0, 0, 1]),
-                    DeserializeQuaternion(shipData.position).rotateVector([0, 0, 1]),
-                    this.game.worldScale
-                ) < PHYSICS_SCALE * 100) {
-                    shipData.position = SerializeQuaternion(ship.position);
-                    shipData.positionVelocity = SerializeQuaternion(ship.positionVelocity);
-                    shipData.orientation = SerializeQuaternion(ship.orientation);
-                    shipData.orientationVelocity = SerializeQuaternion(ship.orientationVelocity);
-                    shipData.cannonLoading = ship.cannonLoading;
-                    shipData.cannonCoolDown = ship.cannonCoolDown;
-                    shipData.cannonadeCoolDown = ship.cannonadeCoolDown;
-                }
-            }
-        }
-        this.game.applyGameSyncFrame(data);
-        this.resetClientLoop();
-        this.handleSoundEffects(true);
-    };
-
-    handleSendPlayers = (data: { players: IPlayerData[], playerId: string }) => {
-        this.game.playerData = new Map<string, IPlayerData>();
-        data.players.forEach((d) => {
-            this.game.playerData.set(d.id, d);
-        });
-        this.playerId = data.playerId;
-    };
-
-    handleGenericMessage = (data: IMessage) => {
-        this.messages.push(data);
-    };
-
-    handleSpawnFactions = (data: ISpawnFaction[]) => {
-        this.spawnFactions = data;
-    };
-
-    handleSpawnPlanets = (data: ISpawnPlanet[]) => {
-        this.spawnPlanets = data;
-    };
-
-    handleSpawnLocations = (data: ISpawnLocationResult) => {
-        this.spawnLocations = data;
-    };
-
-    handleForms = (data: IFormResult) => {
-        this.forms = data;
-    }
-
-    setupNetworking(autoLogin: boolean) {
-        if (this.state.gameMode !== EGameMode.MULTI_PLAYER) {
-            return;
-        }
-
-        this.socket = new SockJS(window.location.protocol + "//" + window.location.hostname + ":" + (this.shardPortNumber ?? 4000) + "/game");
-        this.socket.onerror = (err) => {
-            console.log("Failed to connect", err);
-        };
-        this.socket.onmessage = (message) => {
-            let data: {event: string, message: any} | null = null;
-            try {
-                data = JSON.parse(message.data) as {event: string, message: any};
-            } catch {}
-            if (data) {
-                if (data.event === "send-frame") {
-                    // send a message back to stop effects of nagle algorithm
-                    // do not want messages to clump or buffer
-                    // old message delays 100 100 100 300 0 0 100
-                    // this line fixes the bug, so it is 100 100 100 100 100 100 100
-                    // clumpy messages will cause interpolation bugs
-                    this.sendMessage("ack", "ACK");
-                }
-                const matchingHandler = this.socketEvents[data.event];
-                if (matchingHandler) {
-                    matchingHandler(data.message);
-                }
-            }
-        };
-        this.socket.onclose = () => {
-            this.initialized = false;
-            this.music.stop();
-            this.game = new Game();
-            this.clearMeshes = true;
-            this.game.worldScale = 4;
-            this.game.initializeGame();
-            this.setState({
-                showSpawnMenu: false,
-                showPlanetMenu: false,
-                showMainMenu: false,
-                showLoginMenu: true,
-                init: false,
-            });
-            setTimeout(() => {
-                this.setupNetworking.call(this, true);
-            }, 2000);
-        };
-        this.socket.onopen = () => {
-            this.setState({
-                init: true
-            });
-            if (autoLogin) {
-                this.handleLogin.call(this);
-            }
-        };
-        this.socketEvents["shard-port-number"] = ({portNumber, isStandalone}: {portNumber: number, isStandalone: boolean}) => {
-            this.shardPortNumber = portNumber;
-            if (this.socket && !isStandalone) {
-                this.socket.close();
-            }
-        };
-        this.socketEvents["send-world"] = this.handleSendWorld;
-        this.socketEvents["ack-init-loop"] = () => {
-        };
-        this.socketEvents["send-frame"] = this.handleSendFrame;
-        this.socketEvents["send-players"] = this.handleSendPlayers;
-        this.socketEvents["generic-message"] = this.handleGenericMessage;
-        this.socketEvents["send-spawn-factions"] = this.handleSpawnFactions;
-        this.socketEvents["send-spawn-planets"] = this.handleSpawnPlanets;
-        this.socketEvents["send-spawn-locations"] = this.handleSpawnLocations;
     }
 
     /**
@@ -2189,14 +1394,6 @@ export class PixiGame extends PixiGameBase {
 
     private handleUserName(e: React.ChangeEvent<HTMLInputElement>) {
         this.setState({userName: e.target.value});
-    }
-
-    private handleLogin() {
-        this.sendMessage("join-game", {name: this.state.userName});
-        this.sendMessage("get-world");
-        if (this.state.audioEnabled) {
-            this.music.start();
-        }
     }
 
     public selectPlanet(planetId: string) {
