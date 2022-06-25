@@ -15,7 +15,6 @@ import {Ship,} from "@pickledeggs123/globular-marauders-game/lib/src/Ship";
 import {
     EShipType,
     GetShipData,
-    PHYSICS_SCALE,
     SHIP_DATA,
 } from "@pickledeggs123/globular-marauders-game/lib/src/ShipType";
 import {EFaction,} from "@pickledeggs123/globular-marauders-game/lib/src/EFaction";
@@ -363,7 +362,6 @@ export class PixiGame extends PixiGameNetworking {
                     serverGame.outgoingMessages.splice(0, serverGame.outgoingMessages.length);
                     serverGame.handleServerLoop();
 
-                    const faction = (tutorialPlayerData.factionId && serverGame.factions.get(tutorialPlayerData.factionId))! || serverGame.factions.get(EFaction.DUTCH)!;
                     const playerShip = tutorialPlayerData.shipId && serverGame.ships.get(tutorialPlayerData.shipId);
                     let position: [number, number, number] = [0, 0, 1];
                     if (playerShip) {
@@ -412,7 +410,7 @@ export class PixiGame extends PixiGameNetworking {
                 // initialize server game
                 const serverGame = new Game();
                 serverGame.worldScale = 4;
-                serverGame.initializeGame();
+                serverGame.initializeGame(25);
 
 
                 // initialize game
@@ -476,7 +474,6 @@ export class PixiGame extends PixiGameNetworking {
                     serverGame.outgoingMessages.splice(0, serverGame.outgoingMessages.length);
                     serverGame.handleServerLoop();
 
-                    const faction = (tutorialPlayerData.factionId && serverGame.factions.get(tutorialPlayerData.factionId))! || serverGame.factions.get(EFaction.DUTCH)!;
                     const playerShip = tutorialPlayerData.shipId && serverGame.ships.get(tutorialPlayerData.shipId);
                     let position: [number, number, number] = [0, 0, 1];
                     if (playerShip) {
@@ -1203,7 +1200,7 @@ export class PixiGame extends PixiGameNetworking {
 
     /**
      * Send touch key up message to server.
-     * @param event
+     * @param key the key that was pressed
      * @private
      */
     private handleTouchUp(key: string) {
