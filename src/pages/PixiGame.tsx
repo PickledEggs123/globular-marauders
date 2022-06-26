@@ -49,7 +49,7 @@ import {
     DialogContent,
     DialogTitle,
     FormControlLabel,
-    Grid,
+    Grid, IconButton,
     List,
     ListItem,
     ListItemAvatar,
@@ -68,7 +68,19 @@ import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import {DEFAULT_IMAGE, EVoronoiMode, RESOURCE_TYPE_TEXTURE_PAIRS, SPACE_BACKGROUND_TEXTURES} from "../helpers/Data";
 import {EGameMode, IPixiGameProps} from "./PixiGameBase";
-import {DirectionsBoat, MusicNote, MusicOff, People, Public, School, SmartToy, Tv, TvOff} from "@mui/icons-material";
+import {
+    DirectionsBoat,
+    MusicNote,
+    MusicOff,
+    People,
+    Public,
+    School,
+    Settings,
+    SmartToy,
+    Tv,
+    TvOff
+} from "@mui/icons-material";
+import ScoreboardIcon from "@mui/icons-material/Scoreboard";
 import {EOrderType} from "@pickledeggs123/globular-marauders-game/lib/src/Order";
 import {EInvasionPhase, Invasion} from "@pickledeggs123/globular-marauders-game/lib/src/Invasion";
 import {ReactComponent as Pirate} from "../icons/pirate.svg";
@@ -1716,13 +1728,28 @@ export class PixiGame extends PixiGameNetworking {
             <div className="App" style={{width: "100vw", height: "100vh"}}>
                 <WebsiteDrawer rightSide={
                     <React.Fragment>
-                        <Button variant="contained" color="secondary"
-                                onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.handleShowSettings.bind(this)}>Settings</Button>
-                        <Button variant="contained" color="secondary"
-                                onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.handleShowScoreboard.bind(this)}>Scoreboard</Button>
-                        <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.audioEnabled}
-                                                             onKeyDown={PixiGame.cancelSpacebar.bind(this)} onChange={this.handleAudioEnabled.bind(this)} icon={<MusicOff/>} checkedIcon={<MusicNote/>} color="default" />} label="Audio"/>
-                        {
+                        <Tooltip title="Settings">
+                            <IconButton
+                                onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.handleShowSettings.bind(this)}>
+                                <Settings/>
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Scoreboard">
+                            <IconButton
+                                onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.handleShowScoreboard.bind(this)}>
+                                <ScoreboardIcon/>
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Audio">
+                            <Checkbox tabIndex={-1}
+                                      checked={this.state.audioEnabled}
+                                      onKeyDown={PixiGame.cancelSpacebar.bind(this)}
+                                      onChange={this.handleAudioEnabled.bind(this)}
+                                      icon={<MusicOff/>}
+                                      checkedIcon={<MusicNote/>}
+                                      color="default" />
+                        </Tooltip>
+                            {
                             this.state.highlightAutopilotButton ? (
                                 <div style={{
                                     boxShadow: "0 0 0 100vmax rgb(0,0,0,0.3)",

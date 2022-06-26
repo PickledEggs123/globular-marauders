@@ -3,7 +3,7 @@ import {
     AppBar,
     Button,
     Drawer,
-    Grid,
+    Grid, IconButton,
     List,
     ListItem,
     ListItemIcon,
@@ -11,7 +11,7 @@ import {
     Toolbar,
     Typography
 } from "@mui/material";
-import {Person, PieChart, PlayArrow, Public, QuestionMark} from "@mui/icons-material";
+import {Home, Person, PieChart, PlayArrow, Public, QuestionMark} from "@mui/icons-material";
 import PixiGame from "./pages/PixiGame";
 import {Link} from "react-router-dom";
 
@@ -32,14 +32,13 @@ export const WebsiteDrawer = ({rightSide}: {
                         lg: 12
                     }}>
                         <Grid item xs={6} display="flex">
-                            <Button
-                                color="secondary"
-                                aria-label="Menu" variant="contained"
+                            <IconButton
+                                aria-label="Menu"
                                 onKeyDown={PixiGame.cancelSpacebar.bind(this)}
                                 onClick={toggle}
                             >
-                                <Typography>Home</Typography>
-                            </Button>
+                                <Home/>
+                            </IconButton>
                             <Typography variant="h4" color="inherit" style={{flexGrow: 1}} textAlign="center">
                                 Globular Marauders
                             </Typography>
@@ -52,46 +51,36 @@ export const WebsiteDrawer = ({rightSide}: {
             </AppBar>
             <Drawer anchor="left" open={open} onClose={toggle}>
                 <List>
-                    <Link to="/">
-                        <ListItem>
-                            <ListItemIcon>
-                                <PlayArrow/>
-                            </ListItemIcon>
-                            <ListItemText>Play</ListItemText>
-                        </ListItem>
-                    </Link>
-                    <Link to="/game-model">
-                        <ListItem>
-                            <ListItemIcon>
-                                <PieChart/>
-                            </ListItemIcon>
-                            <ListItemText>Game Model</ListItemText>
-                        </ListItem>
-                    </Link>
-                    <Link to="/planet-generator">
-                        <ListItem>
-                            <ListItemIcon>
-                                <Public/>
-                            </ListItemIcon>
-                            <ListItemText>Planet Generator</ListItemText>
-                        </ListItem>
-                    </Link>
-                    <Link to="/about">
-                        <ListItem>
-                            <ListItemIcon>
-                                <QuestionMark/>
-                            </ListItemIcon>
-                            <ListItemText>About</ListItemText>
-                        </ListItem>
-                    </Link>
-                    <Link to="/contact">
-                        <ListItem>
-                            <ListItemIcon>
-                                <Person/>
-                            </ListItemIcon>
-                            <ListItemText>Contact</ListItemText>
-                        </ListItem>
-                    </Link>
+                    {[{
+                        link: "/",
+                        icon: <PlayArrow/>,
+                        text: "Play"
+                    }, {
+                        link: "/game-model",
+                        icon: <PieChart/>,
+                        text: "Game Model"
+                    }, {
+                        link: "/planet-generator",
+                        icon: <Public/>,
+                        text: "Planet Generator"
+                    }, {
+                        link: "/about",
+                        icon: <QuestionMark/>,
+                        text: "About"
+                    }, {
+                        link: "/contact",
+                        icon: <Person/>,
+                        text: "Contact"
+                    }].map(({link, icon, text}) => (
+                        <Link to={link} style={{textDecoration: "none", boxShadow: "none"}}>
+                            <ListItem>
+                                <ListItemIcon>
+                                    {icon}
+                                </ListItemIcon>
+                                <ListItemText><Typography variant="h6">{text}</Typography></ListItemText>
+                            </ListItem>
+                        </Link>
+                    ))}
                 </List>
             </Drawer>
         </React.Fragment>

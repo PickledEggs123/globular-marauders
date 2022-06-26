@@ -36,7 +36,7 @@ export const convertPositionQuaternionToPositionPolar = (q: Quaternion): [number
     return [coordinate.x, coordinate.y];
 };
 export const isPositionPolarDifferent = (a: [number, number], b: [number, number]): boolean => {
-    return Math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2) > 0.001;
+    return Math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2) > 0.0001;
 };
 export const computePositionPolarCorrectionFactorTheta = (a: [number, number], b: [number, number]): number => {
     return Math.atan2(b[1] - a[1], b[0] - a[0]);
