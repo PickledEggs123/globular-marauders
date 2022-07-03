@@ -12,11 +12,7 @@ import {
     MIN_DISTANCE
 } from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
 import {Ship,} from "@pickledeggs123/globular-marauders-game/lib/src/Ship";
-import {
-    EShipType,
-    GetShipData,
-    SHIP_DATA,
-} from "@pickledeggs123/globular-marauders-game/lib/src/ShipType";
+import {EShipType, GetShipData, SHIP_DATA,} from "@pickledeggs123/globular-marauders-game/lib/src/ShipType";
 import {EFaction,} from "@pickledeggs123/globular-marauders-game/lib/src/EFaction";
 import {
     DelaunayGraph,
@@ -49,7 +45,8 @@ import {
     DialogContent,
     DialogTitle,
     FormControlLabel,
-    Grid, IconButton,
+    Grid,
+    IconButton,
     List,
     ListItem,
     ListItemAvatar,
@@ -91,6 +88,13 @@ import {WebsiteDrawer} from "../Drawer";
 import {ITutorialScriptContext, tutorialScript} from "../scripts/tutorial";
 import {CardRenderer} from "../forms/CardRenderer";
 import {PixiGameNetworking} from "./PixiGameNetworking";
+import cutterMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/cutter.mesh.json";
+import sloopMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/sloop.mesh.json";
+import corvetteMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/corvette.mesh.json";
+import brigantineMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/brigantine.mesh.json";
+import brigMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/brig.mesh.json";
+import frigateMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/frigate.mesh.json";
+import galleonMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/galleon.mesh.json";
 
 const GetFactionSubheader = (faction: EFaction): string | null => {
     switch (faction) {
@@ -298,6 +302,16 @@ export class PixiGame extends PixiGameNetworking {
                 this.loadStarField();
             }, 1000);
         });
+    };
+
+    loadShipThumbnails = () => {
+        this.shipThumbnails.set(EShipType.CUTTER, cutterMeshJson.image);
+        this.shipThumbnails.set(EShipType.SLOOP, sloopMeshJson.image);
+        this.shipThumbnails.set(EShipType.CORVETTE, corvetteMeshJson.image);
+        this.shipThumbnails.set(EShipType.BRIGANTINE, brigantineMeshJson.image);
+        this.shipThumbnails.set(EShipType.BRIG, brigMeshJson.image);
+        this.shipThumbnails.set(EShipType.FRIGATE, frigateMeshJson.image);
+        this.shipThumbnails.set(EShipType.GALLEON, galleonMeshJson.image);
     };
 
     handleSwitchGameMode = (gameMode: EGameMode) => {
@@ -634,6 +648,7 @@ export class PixiGame extends PixiGameNetworking {
 
         this.loadSoundIntoMemory();
         this.loadSpritesIntoMemory();
+        this.loadShipThumbnails();
 
         const removeExtraRotation = (q: Quaternion): Quaternion => {
             return Quaternion.fromBetweenVectors([0, 0, 1], q.rotateVector([0, 0, 1]));
@@ -903,65 +918,6 @@ export class PixiGame extends PixiGameNetworking {
      * Render functions used to draw stuff onto the screen. Each stuff has their own render function.
      * ----------------------------------------------------------------------------------------------
      */
-
-    /**
-     * Render a ship into a rectangle, Useful for UI button or game world.
-     * @param planetDrawing
-     * @param size
-     * @private
-     */
-    private renderShip(planetDrawing: IDrawable<Ship>, size: number) {
-        const shipData = GetShipData(planetDrawing.original.shipType, 1);
-        if (!shipData) {
-            throw new Error("Cannot find ship type");
-        }
-        const cannonsLeft = Math.ceil(shipData.cannons.numCannons / 2);
-        const cannonsRight = shipData.cannons.numCannons - cannonsLeft;
-        return (
-            <>
-                <polygon
-                    key={`${planetDrawing.id}-ship-hull`}
-                    points={`${shipData.hull.map(([x, y]) => `${x},${y}`).join(" ")}`}
-                    fill={planetDrawing.color}
-                    stroke="grey"
-                    strokeWidth={0.05 * size * (this.state.zoom * this.game.worldScale)}
-                    style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
-                />
-                {
-                    new Array(cannonsRight).fill(0).map((v, index) => {
-                        const cannonRightSize = (shipData.cannons.startY - shipData.cannons.endY) / cannonsRight;
-                        return (
-                            <polygon
-                                key={`cannon-right-${index}`}
-                                transform={`translate(${-shipData.cannons.rightWall},${shipData.cannons.endY + cannonRightSize * (index + 0.5)})`}
-                                points="5,-2 0,-2 0,2 5,2"
-                                fill="darkgrey"
-                                stroke="grey"
-                                strokeWidth={0.05 * size * (this.state.zoom * this.game.worldScale)}
-                                style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
-                            />
-                        );
-                    })
-                }
-                {
-                    new Array(cannonsLeft).fill(0).map((v, index) => {
-                        const cannonsLeftSize = (shipData.cannons.startY - shipData.cannons.endY) / cannonsLeft;
-                        return (
-                            <polygon
-                                key={`cannon-left-${index}`}
-                                transform={`translate(${-shipData.cannons.leftWall},${shipData.cannons.endY + cannonsLeftSize * (index + 0.5)})`}
-                                points="-5,-2 0,-2 0,2 -5,2"
-                                fill="darkgrey"
-                                stroke="grey"
-                                strokeWidth={0.05 * size * (this.state.zoom * this.game.worldScale)}
-                                style={{opacity: (planetDrawing.rotatedPosition[2] + 1) * 2 * 0.5 + 0.5}}
-                            />
-                        );
-                    })
-                }
-            </>
-        )
-    }
 
     /**
      * Run the game loop. This function is called 10 times a second to simulate a video game.
@@ -2051,14 +2007,7 @@ export class PixiGame extends PixiGameNetworking {
                                                                     <Card>
                                                                         <CardActionArea onClick={this.selectShip.bind(this, f.id, f.shipType)}>
                                                                             <CardContent>
-                                                                                <Avatar variant="rounded" style={{width: 256, height: 256}}>
-                                                                                    <svg width="100" height="100">
-                                                                                        <g transform="translate(50, 50)">
-                                                                                            {
-                                                                                                this.renderShip(this.getShowShipDrawing(f.shipType, f.shipType, this.state.faction), 1)
-                                                                                            }
-                                                                                        </g>
-                                                                                    </svg>
+                                                                                <Avatar variant="rounded" style={{width: 256, height: 256}} alt={f.shipType} srcSet={this.shipThumbnails.get(f.shipType) ?? undefined}>
                                                                                 </Avatar>
                                                                             </CardContent>
                                                                             <CardHeader title={<span>{this.state.planetId === f.id && this.state.spawnShipType === f.shipType ? <CheckBoxIcon/> : <CheckBoxOutlineBlankIcon/>} {f.shipType}</span>} subheader={`(${f.price}) (${f.numShipsAvailable} ships)`}>
@@ -2247,13 +2196,8 @@ export class PixiGame extends PixiGameNetworking {
                                                     <Card key={`show-ship-${ship.shipType}`}>
                                                         <CardHeader title={ship.shipType}/>
                                                         <CardContent>
-                                                            <svg width="100" height="100">
-                                                                <g transform="translate(50, 50)">
-                                                                    {
-                                                                        this.renderShip(this.getShowShipDrawing(ship.shipType, ship.shipType), 1)
-                                                                    }
-                                                                </g>
-                                                            </svg>
+                                                            <Avatar variant="rounded" style={{width: 256, height: 256}} alt={ship.shipType} srcSet={this.shipThumbnails.get(ship.shipType) ?? undefined}>
+                                                            </Avatar>
                                                         </CardContent>
                                                     </Card>
                                                 );

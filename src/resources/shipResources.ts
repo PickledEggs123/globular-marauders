@@ -19,6 +19,23 @@ import Quaternion from "quaternion";
 import {EParticleState} from "../pages/PixiGameBase";
 import PixiGame from "../pages/PixiGame";
 import {DelaunayGraph} from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
+import cutterMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/cutter.mesh.json";
+import sloopMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/sloop.mesh.json";
+import corvetteMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/corvette.mesh.json";
+import brigantineMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/brigantine.mesh.json";
+import brigMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/brig.mesh.json";
+import frigateMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/frigate.mesh.json";
+import galleonMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/galleon.mesh.json";
+import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
+
+const mapShipTypeToMeshJson = new Map<EShipType, IGameMesh>();
+mapShipTypeToMeshJson.set(EShipType.CUTTER, cutterMeshJson);
+mapShipTypeToMeshJson.set(EShipType.SLOOP, sloopMeshJson);
+mapShipTypeToMeshJson.set(EShipType.CORVETTE, corvetteMeshJson);
+mapShipTypeToMeshJson.set(EShipType.BRIGANTINE, brigantineMeshJson);
+mapShipTypeToMeshJson.set(EShipType.BRIG, brigMeshJson);
+mapShipTypeToMeshJson.set(EShipType.FRIGATE, frigateMeshJson);
+mapShipTypeToMeshJson.set(EShipType.GALLEON, galleonMeshJson);
 
 export class ShipResources {
     game: PixiGame;
@@ -81,72 +98,106 @@ export class ShipResources {
                     shipColor = getColor(factionData.factionColor);
                 }
 
-                // draw hull
-                shipGeometryData.position.push.apply(shipGeometryData.position, GetHullPoint([0, 0]));
-                shipGeometryData.color.push.apply(shipGeometryData.color, shipColor);
-                for (let i = 0; i < shipToDraw.hull.length; i++) {
-                    // const a = shipToDraw.hull[i % shipToDraw.hull.length];
-                    const a = [
-                        shipToDraw.hull[i % shipToDraw.hull.length][0],
-                        -shipToDraw.hull[i % shipToDraw.hull.length][1]
-                    ] as [number, number];
-
-                    shipGeometryData.position.push.apply(shipGeometryData.position, GetHullPoint(a));
-                    shipGeometryData.color.push.apply(shipGeometryData.color, shipColor);
-                    shipGeometryData.index.push(
-                        0,
-                        (i % CorvetteHull.length) + 1,
-                        ((i + 1) % CorvetteHull.length) + 1,
-                    );
-                }
-
-                // draw cannons
-                const numCannonPositions = Math.floor(shipToDraw.cannons.numCannons / 2);
-                const cannonSpacing = (shipToDraw.cannons.endY - shipToDraw.cannons.startY) / numCannonPositions;
-                for (let cannonIndex = 0; cannonIndex < shipToDraw.cannons.numCannons; cannonIndex++) {
-                    const position = Math.floor(cannonIndex / 2);
-                    const isLeftSide = Math.floor(cannonIndex % 2) === 0;
-                    const startIndex = shipGeometryData.index.reduce((acc, a) => Math.max(acc, a + 1), 0);
-
-                    if (isLeftSide) {
-                        shipGeometryData.position.push(
-                            shipToDraw.cannons.leftWall, shipToDraw.cannons.startY + (position + 0.25) * cannonSpacing, 1,
-                            shipToDraw.cannons.leftWall, shipToDraw.cannons.startY + (position + 0.75) * cannonSpacing, 1,
-                            shipToDraw.cannons.leftWall + 5 * this.game.game.shipScale, shipToDraw.cannons.startY + (position + 0.75) * cannonSpacing, 1,
-                            shipToDraw.cannons.leftWall + 5 * this.game.game.shipScale, shipToDraw.cannons.startY + (position + 0.25) * cannonSpacing, 1
-                        );
-                        shipGeometryData.color.push(
-                            0.75, 0.75, 0.75,
-                            0.75, 0.75, 0.75,
-                            0.75, 0.75, 0.75,
-                            0.75, 0.75, 0.75,
-                        );
-                    } else {
-                        shipGeometryData.position.push(
-                            shipToDraw.cannons.rightWall - 5 * this.game.game.shipScale, shipToDraw.cannons.startY + (position + 0.25) * cannonSpacing, 1,
-                            shipToDraw.cannons.rightWall - 5 * this.game.game.shipScale, shipToDraw.cannons.startY + (position + 0.75) * cannonSpacing, 1,
-                            shipToDraw.cannons.rightWall, shipToDraw.cannons.startY + (position + 0.75) * cannonSpacing, 1,
-                            shipToDraw.cannons.rightWall, shipToDraw.cannons.startY + (position + 0.25) * cannonSpacing, 1
-                        );
-                        shipGeometryData.color.push(
-                            0.75, 0.75, 0.75,
-                            0.75, 0.75, 0.75,
-                            0.75, 0.75, 0.75,
-                            0.75, 0.75, 0.75,
-                        );
-                    }
-                    shipGeometryData.index.push(
-                        startIndex,
-                        startIndex + 1,
-                        startIndex + 2,
-                        startIndex,
-                        startIndex + 2,
-                        startIndex + 3
-                    );
-                }
+                //
+                // // draw hull
+                // shipGeometryData.position.push.apply(shipGeometryData.position, GetHullPoint([0, 0]));
+                // shipGeometryData.color.push.apply(shipGeometryData.color, shipColor);
+                // for (let i = 0; i < shipToDraw.hull.length; i++) {
+                //     // const a = shipToDraw.hull[i % shipToDraw.hull.length];
+                //     const a = [
+                //         shipToDraw.hull[i % shipToDraw.hull.length][0],
+                //         -shipToDraw.hull[i % shipToDraw.hull.length][1]
+                //     ] as [number, number];
+                //
+                //     shipGeometryData.position.push.apply(shipGeometryData.position, GetHullPoint(a));
+                //     shipGeometryData.color.push.apply(shipGeometryData.color, shipColor);
+                //     shipGeometryData.index.push(
+                //         0,
+                //         (i % CorvetteHull.length) + 1,
+                //         ((i + 1) % CorvetteHull.length) + 1,
+                //     );
+                // }
+                //
+                // // draw cannons
+                // const numCannonPositions = Math.floor(shipToDraw.cannons.numCannons / 2);
+                // const cannonSpacing = (shipToDraw.cannons.endY - shipToDraw.cannons.startY) / numCannonPositions;
+                // for (let cannonIndex = 0; cannonIndex < shipToDraw.cannons.numCannons; cannonIndex++) {
+                //     const position = Math.floor(cannonIndex / 2);
+                //     const isLeftSide = Math.floor(cannonIndex % 2) === 0;
+                //     const startIndex = shipGeometryData.index.reduce((acc, a) => Math.max(acc, a + 1), 0);
+                //
+                //     if (isLeftSide) {
+                //         shipGeometryData.position.push(
+                //             shipToDraw.cannons.leftWall, shipToDraw.cannons.startY + (position + 0.25) * cannonSpacing, 1,
+                //             shipToDraw.cannons.leftWall, shipToDraw.cannons.startY + (position + 0.75) * cannonSpacing, 1,
+                //             shipToDraw.cannons.leftWall + 5 * this.game.game.shipScale, shipToDraw.cannons.startY + (position + 0.75) * cannonSpacing, 1,
+                //             shipToDraw.cannons.leftWall + 5 * this.game.game.shipScale, shipToDraw.cannons.startY + (position + 0.25) * cannonSpacing, 1
+                //         );
+                //         shipGeometryData.color.push(
+                //             0.75, 0.75, 0.75,
+                //             0.75, 0.75, 0.75,
+                //             0.75, 0.75, 0.75,
+                //             0.75, 0.75, 0.75,
+                //         );
+                //     } else {
+                //         shipGeometryData.position.push(
+                //             shipToDraw.cannons.rightWall - 5 * this.game.game.shipScale, shipToDraw.cannons.startY + (position + 0.25) * cannonSpacing, 1,
+                //             shipToDraw.cannons.rightWall - 5 * this.game.game.shipScale, shipToDraw.cannons.startY + (position + 0.75) * cannonSpacing, 1,
+                //             shipToDraw.cannons.rightWall, shipToDraw.cannons.startY + (position + 0.75) * cannonSpacing, 1,
+                //             shipToDraw.cannons.rightWall, shipToDraw.cannons.startY + (position + 0.25) * cannonSpacing, 1
+                //         );
+                //         shipGeometryData.color.push(
+                //             0.75, 0.75, 0.75,
+                //             0.75, 0.75, 0.75,
+                //             0.75, 0.75, 0.75,
+                //             0.75, 0.75, 0.75,
+                //         );
+                //     }
+                //     shipGeometryData.index.push(
+                //         startIndex,
+                //         startIndex + 1,
+                //         startIndex + 2,
+                //         startIndex,
+                //         startIndex + 2,
+                //         startIndex + 3
+                //     );
+                // }
 
                 // flip ship along y axis
                 shipGeometryData.position = shipGeometryData.position.map((v, i) => i % 3 === 2 ? -v : v);
+
+                // insert gltf mesh
+                const gltfData = mapShipTypeToMeshJson.get(shipType);
+                if (gltfData) {
+                    const q = Quaternion.fromBetweenVectors([0, 0, 1], [1, 0, 0]).mul(Quaternion.fromAxisAngle([0, 0, 1], -Math.PI / 2));
+
+                    const startIndex = shipGeometryData.index.reduce((acc, a) => Math.max(acc, a + 1), 0);
+                    const aPosition = gltfData.attributes.find(x => x.id === "aPosition");
+                    const aColor = gltfData.attributes.find(x => x.id === "aColor");
+                    if (aPosition && aColor) {
+                        for (let i = 0; i < aPosition.buffer.length; i += 3) {
+                            const p = [aPosition.buffer[i], aPosition.buffer[i + 1], aPosition.buffer[i + 2]] as [number, number, number];
+                            const p2 = q.rotateVector(p);
+                            for (let i = 0; i < p2.length; i++) {
+                                p2[i] *= 6;
+                            }
+                            shipGeometryData.position.push(...p2);
+                        }
+                        for (let i = 0; i < aColor.buffer.length; i += 3) {
+                            const r = aColor.buffer[i];
+                            const g = aColor.buffer[i + 1];
+                            const b = aColor.buffer[i + 2];
+                            if (r === g && g === b) {
+                                shipGeometryData.color.push(r, g, b);
+                            } else {
+                                shipGeometryData.color.push(...shipColor);
+                            }
+                        }
+                        for (const i of gltfData.index) {
+                            shipGeometryData.index.push(i + startIndex);
+                        }
+                    }
+                }
 
                 // construct geometry
                 shipGeometry.addAttribute("aPosition", shipGeometryData.position, 3);

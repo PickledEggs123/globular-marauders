@@ -76,7 +76,7 @@ export const getSpecialShipProgram = () => {
                     mat4 rotation = cameraRotation2 * objectRotation * orientationDiffRotation;
                     
                     vec4 pos = translation + vec4((rotation * vec4(aPosition, 1.0)).xyz * uScale * uCameraScale / uWorldScale, 1.0);
-                    gl_Position = pos * vec4(1.0 * uWorldScale, -1.0 * uWorldScale, 0.0625, 1);
+                    gl_Position = pos * vec4(1.0 * uWorldScale, -1.0 * uWorldScale, 0.0625, 1) + vec4(0.0, 0.0, -0.5, 0.0);
                 }
             `;
     const fragmentShader = `

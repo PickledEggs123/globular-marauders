@@ -165,6 +165,8 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
 
     planetThumbnails: Map<string, string> = new Map<string, string>();
 
+    shipThumbnails: Map<EShipType, string> = new Map<EShipType, string>();
+
 
 
     sprites: Record<string, PIXI.Texture> = {};
@@ -350,7 +352,9 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
             uWorldScale: this.game.worldScale,
         };
         const shader = new PIXI.Shader(this.pixiShipResources.getResources().shipProgram, uniforms);
-        const mesh = new PIXI.Mesh(this.pixiShipResources.getResources().shipGeometryMap.get(ship.faction?.id ?? EFaction.DUTCH)?.get(ship.shipType) as any, shader);
+        const state = PIXI.State.for2d();
+        state.depthTest = true;
+        const mesh = new PIXI.Mesh(this.pixiShipResources.getResources().shipGeometryMap.get(ship.faction?.id ?? EFaction.DUTCH)?.get(ship.shipType) as any, shader, state);
         mesh.zIndex = -3;
 
         const text = new PIXI.Text(ship.shipType);
