@@ -106,7 +106,7 @@ export class CrateResources {
         crateImageGeometry.addIndex(crateImageGeometryData.index);
 
         // create material
-        const crateProgram = getSpecialShipProgram();
+        const crateProgram = getSpecialShipProgram().color;
 
         // create material
         const crateImageVertexShader = `

@@ -213,11 +213,14 @@ export class ShipResources {
         }
 
         // create material
-        const shipProgram = getSpecialShipProgram();
+        const shipProgram = getSpecialShipProgram().color;
+
+        const shipDepthProgram = getSpecialShipProgram().depth;
 
         const shipMeshes: Array<{
             id: string,
             mesh: PIXI.Mesh<PIXI.Shader>,
+            depthMesh: PIXI.Mesh<PIXI.Shader>,
             text: PIXI.Text,
             trailContainer: PIXI.Container,
             trail: particles.Emitter,
@@ -245,6 +248,7 @@ export class ShipResources {
         return {
             shipGeometryMap,
             shipProgram,
+            shipDepthProgram,
             getColor,
             shipMeshes,
         };
@@ -259,6 +263,7 @@ export class ShipResources {
         const {
             shipGeometryMap,
             shipProgram,
+            shipDepthProgram,
             getColor,
             shipMeshes,
         } = this.getFreshData();
@@ -351,6 +356,7 @@ export class ShipResources {
             }
             for (const item of this.cachedResources.shipMeshes.filter((m: any) => m.tick !== pixiTick || this.game.clearMeshes)) {
                 this.game.application.stage.removeChild(item.mesh);
+                this.game.application.stage.removeChild(item.depthMesh);
                 this.game.application.stage.removeChild(item.text);
                 this.game.application.stage.removeChild(item.line);
                 this.game.application.stage.removeChild(item.cannonBallLeft);
@@ -369,16 +375,24 @@ export class ShipResources {
 
         const handleRender = () => {
             for (const item of this.cachedResources.shipMeshes) {
-                const shader = item.mesh.shader;
-                shader.uniforms.uCameraPosition = this.game.cameraPosition.clone().inverse().toMatrix4();
-                shader.uniforms.uCameraOrientation = this.game.cameraOrientation.clone().inverse().toMatrix4();
-                shader.uniforms.uCameraPositionInv = this.game.cameraPosition.clone().toMatrix4();
-                shader.uniforms.uCameraOrientationInv = this.game.cameraOrientation.clone().toMatrix4();
-                shader.uniforms.uCorrectionFactorTheta = item.correctionFactorTheta;
-                shader.uniforms.uCameraScale = this.game.state.zoom;
-                shader.uniforms.uPosition = removeExtraRotation(item.position).toMatrix4();
-                shader.uniforms.uOrientation = this.game.convertOrientationToDisplay(item.orientation.mul(Quaternion.fromAxisAngle([0, 0, 1], Math.PI))).toMatrix4();
+                const setShader = (shader: PIXI.Shader) => {
+                    shader.uniforms.uCameraPosition = this.game.cameraPosition.clone().inverse().toMatrix4();
+                    shader.uniforms.uCameraOrientation = this.game.cameraOrientation.clone().inverse().toMatrix4();
+                    shader.uniforms.uCameraPositionInv = this.game.cameraPosition.clone().toMatrix4();
+                    shader.uniforms.uCameraOrientationInv = this.game.cameraOrientation.clone().toMatrix4();
+                    shader.uniforms.uCorrectionFactorTheta = item.correctionFactorTheta;
+                    shader.uniforms.uCameraScale = this.game.state.zoom;
+                    shader.uniforms.uPosition = removeExtraRotation(item.position).toMatrix4();
+                    shader.uniforms.uOrientation = this.game.convertOrientationToDisplay(item.orientation.mul(Quaternion.fromAxisAngle([0, 0, 1], Math.PI))).toMatrix4();
+                };
+
+                // handle color
+                setShader(item.mesh.shader);
                 this.game.updateMeshIfVisible(item);
+
+                // handle depth
+                setShader(item.depthMesh.shader);
+                this.game.updateMeshIfVisible({...item, mesh: item.depthMesh});
 
                 // hide ships on the other side of the world
                 const shipPoint = DelaunayGraph.distanceFormula(
@@ -389,6 +403,7 @@ export class ShipResources {
                     .mul(item.position.clone())
                     .rotateVector([0, 0, 1]);
                 item.mesh.visible = shipPoint[2] > 0;
+                item.depthMesh.visible = shipPoint[2] > 0;
 
                 this.game.handleDrawingOfText(item.text, item.position);
 
@@ -589,6 +604,7 @@ export class ShipResources {
         this.cachedResources = {
             shipGeometryMap,
             shipProgram,
+            shipDepthProgram,
             getColor,
             shipMeshes,
             handleSync,

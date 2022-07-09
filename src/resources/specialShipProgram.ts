@@ -21,6 +21,7 @@ export const getSpecialShipProgram = () => {
                 uniform float uCorrectionFactorTheta;
                 
                 varying vec3 vColor;
+                varying vec4 vPosition;
                 
                 void main() {
                     vColor = aColor;
@@ -76,17 +77,40 @@ export const getSpecialShipProgram = () => {
                     mat4 rotation = cameraRotation2 * objectRotation * orientationDiffRotation;
                     
                     vec4 pos = translation + vec4((rotation * vec4(aPosition, 1.0)).xyz * uScale * uCameraScale / uWorldScale, 1.0);
-                    gl_Position = pos * vec4(1.0 * uWorldScale, -1.0 * uWorldScale, 0.0625, 1) + vec4(0.0, 0.0, -0.5, 0.0);
+                    vPosition = pos * vec4(1.0 * uWorldScale, -1.0 * uWorldScale, 0.0625, 1) + vec4(0.0, 0.0, -0.5, 0.0);
+                    gl_Position = vPosition;
                 }
             `;
-    const fragmentShader = `
+    const fragmentColorShader = `
                 precision mediump float;
                 
                 varying vec3 vColor;
+                varying vec4 vPosition;
                 
                 void main() {
                     gl_FragColor = vec4(vColor, 1.0);
                 }
             `;
-    return new PIXI.Program(vertexShader, fragmentShader);
+    const fragmentDepthShader = `
+                precision mediump float;
+                
+                uniform float uCameraScale;
+                
+                varying vec3 vColor;
+                varying vec4 vPosition;
+                
+                void main() {
+                    float z = clamp((-vPosition.z - 0.5) * 256.0 / uCameraScale, 0.0, 1.0);
+                    gl_FragColor = vec4(z, z, z, 1.0);
+                }
+            `;
+
+
+    const color = new PIXI.Program(vertexShader, fragmentColorShader);
+    const depth = new PIXI.Program(vertexShader, fragmentDepthShader);
+
+    return {
+        color,
+        depth,
+    };
 };

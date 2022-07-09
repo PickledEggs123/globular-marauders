@@ -3,6 +3,7 @@ import '../App.scss';
 import Quaternion from "quaternion";
 import * as PIXI from "pixi.js";
 import * as particles from "@pixi/particle-emitter";
+import {Layer} from "@pixi/layers";
 import {sound} from "@pixi/sound";
 import {EResourceType, ITEM_DATA} from "@pickledeggs123/globular-marauders-game/lib/src/Resource";
 import {
@@ -116,6 +117,7 @@ const GetFactionSubheader = (faction: EFaction): string | null => {
 export class PixiGame extends PixiGameNetworking {
     public application: PIXI.Application;
     public particleContainer: PIXI.Container;
+    public depthLayer: Layer;
     public starField: particles.Emitter | undefined;
 
     // game loop stuff
@@ -642,6 +644,8 @@ export class PixiGame extends PixiGameNetworking {
         this.application.stage.sortableChildren = true;
         this.particleContainer = new PIXI.Container();
         this.particleContainer.zIndex = -15;
+        this.depthLayer = new Layer();
+        this.application.stage.addChild(this.depthLayer);
 
         // draw app
         this.game.initializeGame();

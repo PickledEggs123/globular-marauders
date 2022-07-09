@@ -39,6 +39,7 @@ import {voronoiResources} from "../resources/voronoiResources";
 import {backgroundVoronoiResources} from "../resources/backgroundVoronoiResources";
 import {ShipResources} from "../resources/shipResources";
 import {EMovementQuaternionParticleBehaviorType} from "../resources/particles/MovementQuaternionParticleBehavior";
+import {Layer} from "@pixi/layers";
 
 /**
  * The input parameters of the app.
@@ -146,6 +147,8 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
     public abstract application: PIXI.Application;
 
     public abstract particleContainer: PIXI.Container;
+
+    public abstract depthLayer: Layer;
 
     pixiStarResources = new StarResources(this as any);
 
@@ -337,8 +340,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         const orientation: Quaternion = ship.orientation.clone();
         const correctionFactorTheta = 0;
 
-        // create mesh
-        const uniforms = {
+        const getUniforms = () => ({
             uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
             uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
             uCameraPositionInv: cameraPosition.clone().toMatrix4(),
@@ -350,12 +352,23 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
             uOrientation: orientation.toMatrix4(),
             uScale: PHYSICS_SCALE,
             uWorldScale: this.game.worldScale,
-        };
+        });
+
+        // create mesh
+        const uniforms = getUniforms();
         const shader = new PIXI.Shader(this.pixiShipResources.getResources().shipProgram, uniforms);
         const state = PIXI.State.for2d();
         state.depthTest = true;
         const mesh = new PIXI.Mesh(this.pixiShipResources.getResources().shipGeometryMap.get(ship.faction?.id ?? EFaction.DUTCH)?.get(ship.shipType) as any, shader, state);
         mesh.zIndex = -3;
+
+        // create depth mesh
+        const depthUniforms = getUniforms();
+        const depthShader = new PIXI.Shader(this.pixiShipResources.getResources().shipDepthProgram, depthUniforms);
+        const depthState = PIXI.State.for2d();
+        depthState.depthTest = true;
+        const depthMesh = new PIXI.Mesh(this.pixiShipResources.getResources().shipGeometryMap.get(ship.faction?.id ?? EFaction.DUTCH)?.get(ship.shipType) as any, depthShader, depthState);
+        depthMesh.zIndex = -3;
 
         const text = new PIXI.Text(ship.shipType);
         text.style.fill = "white";
@@ -473,6 +486,8 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         const isEnemy = this.findPlayerShip()?.faction?.id !== ship.faction?.id;
 
         this.application.stage.addChild(mesh);
+        depthMesh.parentLayer = this.depthLayer;
+        this.application.stage.addChild(depthMesh);
         this.application.stage.addChild(text);
         this.application.stage.addChild(trailContainer);
         this.application.stage.addChild(line);
@@ -482,6 +497,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         this.pixiShipResources.getResources().shipMeshes.push({
             id: ship.id,
             mesh,
+            depthMesh,
             text,
             trailContainer,
             trail,
