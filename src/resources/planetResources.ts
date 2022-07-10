@@ -83,7 +83,7 @@ export class PlanetResources {
                     mat4 rotation = cameraRotation * uOrientation;
                     
                     vec4 pos = translation + vec4((rotation * vec4(aPosition, 1.0)).xyz * uScale * uCameraScale / uWorldScale, 1.0);
-                    gl_Position = pos * vec4(1.0 * uWorldScale, -1.0 * uWorldScale, 0.0625, 1);
+                    gl_Position = pos * vec4(1.0 * uWorldScale, 1.0 * uWorldScale, 0.0625, 1);
                 }
             `;
         const planetFragmentShader = `
@@ -155,7 +155,7 @@ export class PlanetResources {
                 }
             }
             for (const item of this.cachedResources.planetMeshes.filter((m: any) => m.tick !== pixiTick || this.game.clearMeshes)) {
-                this.game.application.stage.removeChild(item.mesh);
+                this.game.colorLayer.removeChild(item.mesh);
                 this.game.application.stage.removeChild(item.faction);
                 this.game.application.stage.removeChild(item.textName);
                 this.game.application.stage.removeChild(item.textTitle);

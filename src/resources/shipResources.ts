@@ -1,14 +1,12 @@
 import {
     computePositionPolarCorrectionFactorTheta,
     convertPositionQuaternionToPositionPolar,
-    GetHullPoint,
     hexToRgb,
     isPositionPolarDifferent
 } from "../helpers/pixiHelpers";
 import {EFaction} from "@pickledeggs123/globular-marauders-game/lib/src/EFaction";
 import * as PIXI from "pixi.js";
 import {
-    CorvetteHull,
     EShipType,
     GetShipData,
     IShipData, PHYSICS_SCALE
@@ -355,8 +353,8 @@ export class ShipResources {
                 }
             }
             for (const item of this.cachedResources.shipMeshes.filter((m: any) => m.tick !== pixiTick || this.game.clearMeshes)) {
-                this.game.application.stage.removeChild(item.mesh);
-                this.game.application.stage.removeChild(item.depthMesh);
+                this.game.colorLayer.removeChild(item.mesh);
+                this.game.depthLayer.removeChild(item.depthMesh);
                 this.game.application.stage.removeChild(item.text);
                 this.game.application.stage.removeChild(item.line);
                 this.game.application.stage.removeChild(item.cannonBallLeft);

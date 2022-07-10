@@ -3,7 +3,7 @@ import '../App.scss';
 import Quaternion from "quaternion";
 import * as PIXI from "pixi.js";
 import * as particles from "@pixi/particle-emitter";
-import {Layer} from "@pixi/layers";
+import {Group, Layer, Stage} from "@pixi/layers";
 import {sound} from "@pixi/sound";
 import {EResourceType, ITEM_DATA} from "@pickledeggs123/globular-marauders-game/lib/src/Resource";
 import {
@@ -96,6 +96,8 @@ import brigantineMeshJson from "@pickledeggs123/globular-marauders-generator/mes
 import brigMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/brig.mesh.json";
 import frigateMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/frigate.mesh.json";
 import galleonMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/galleon.mesh.json";
+import {DepthOutlineFilter} from "../filters/DepthOutline/DepthOutlineFilter";
+import {Renderer} from "pixi.js";
 
 const GetFactionSubheader = (faction: EFaction): string | null => {
     switch (faction) {
@@ -117,7 +119,10 @@ const GetFactionSubheader = (faction: EFaction): string | null => {
 export class PixiGame extends PixiGameNetworking {
     public application: PIXI.Application;
     public particleContainer: PIXI.Container;
+    public colorLayer: Layer;
     public depthLayer: Layer;
+    public staticStage: Stage;
+    public depthOutlineFilter: DepthOutlineFilter;
     public starField: particles.Emitter | undefined;
 
     // game loop stuff
@@ -639,13 +644,28 @@ export class PixiGame extends PixiGameNetworking {
         this.application = new PIXI.Application({
             width: this.state.width,
             height: this.state.height,
-            backgroundColor: 0xff110022,
+            backgroundColor: 0xff000000,
         });
         this.application.stage.sortableChildren = true;
+
         this.particleContainer = new PIXI.Container();
         this.particleContainer.zIndex = -15;
+
+        // ship color
+        this.staticStage = new Stage();
+        this.colorLayer = new Layer();
+        this.colorLayer.useRenderTexture = true;
+        this.colorLayer.getRenderTexture().framebuffer.addDepthTexture();
+        this.staticStage.addChild(this.colorLayer);
+
+        // ship depth
         this.depthLayer = new Layer();
-        this.application.stage.addChild(this.depthLayer);
+        this.depthLayer.useRenderTexture = true;
+        this.depthLayer.getRenderTexture().framebuffer.addDepthTexture();
+        this.staticStage.addChild(this.depthLayer);
+        this.depthOutlineFilter = new DepthOutlineFilter(this, Math.floor(this.state.width / 2), Math.floor(this.state.height / 2));
+        this.application.stage.filters = [this.depthOutlineFilter];
+        this.application.stage.filterArea = this.application.screen;
 
         // draw app
         this.game.initializeGame();
@@ -825,6 +845,12 @@ export class PixiGame extends PixiGameNetworking {
                 shader.uniforms.uCameraOrientation = this.cameraOrientation.clone().inverse().toMatrix4();
                 shader.uniforms.uCameraScale = this.state.zoom;
             }
+
+            // render ship depth buffer
+            this.application.renderer.render(this.staticStage);
+            this.depthOutlineFilter.width = Math.floor(this.state.width / 2);
+            this.depthOutlineFilter.height = Math.floor(this.state.height / 2);
+            this.depthOutlineFilter.updateDepth();
         });
     }
 

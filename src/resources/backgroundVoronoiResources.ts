@@ -46,8 +46,8 @@ export const backgroundVoronoiResources = () => {
                     0.0,      0.0,     1.0, 0.0,
                     0.0,      0.0,     0.0, 1.0
                 );
-                vec4 pos = cameraRotation * uCameraPosition * vec4(-aPosition * uCameraScale, 1.0);
-                gl_Position = pos * vec4(-1.0 * uWorldScale, 1.0 * uWorldScale, 0.0625, 1);
+                vec4 pos = cameraRotation * uCameraPosition * vec4(aPosition * uCameraScale, 1.0);
+                gl_Position = pos * vec4(1.0 * uWorldScale, 1.0 * uWorldScale, 0.0625, 1);
             }
         `;
     const voronoiFragmentShader = `

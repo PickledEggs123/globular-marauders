@@ -150,7 +150,7 @@ export class CrateResources {
                     mat4 rotation = cameraRotation * objectRotation;
                     
                     vec4 pos = translation + vec4((rotation * vec4(aPosition, 1.0)).xyz * uScale * uCameraScale / uWorldScale, 1.0);
-                    gl_Position = pos * vec4(1.0 * uWorldScale, -1.0 * uWorldScale, 0.0625, 1);
+                    gl_Position = pos * vec4(1.0 * uWorldScale, 1.0 * uWorldScale, 0.0625, 1);
                 }
             `;
         const crateImageFragmentShader = `

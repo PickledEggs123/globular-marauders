@@ -148,6 +148,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
 
     public abstract particleContainer: PIXI.Container;
 
+    public abstract colorLayer: Layer;
     public abstract depthLayer: Layer;
 
     pixiStarResources = new StarResources(this as any);
@@ -305,7 +306,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         textResource3.style.fill = "white";
         textResource3.style.fontSize = 10;
 
-        this.application.stage.addChild(mesh);
+        this.colorLayer.addChild(mesh);
         this.application.stage.addChild(faction);
         this.application.stage.addChild(textName);
         this.application.stage.addChild(textTitle);
@@ -485,9 +486,8 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         const isPlayer = this.getPlayerShip().id === ship.id;
         const isEnemy = this.findPlayerShip()?.faction?.id !== ship.faction?.id;
 
-        this.application.stage.addChild(mesh);
-        depthMesh.parentLayer = this.depthLayer;
-        this.application.stage.addChild(depthMesh);
+        this.colorLayer.addChild(mesh);
+        this.depthLayer.addChild(depthMesh);
         this.application.stage.addChild(text);
         this.application.stage.addChild(trailContainer);
         this.application.stage.addChild(line);
