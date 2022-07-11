@@ -22,6 +22,7 @@ uniform sampler2D uSampler;
 uniform sampler2D uDepthSampler;
 uniform sampler2D uColorSampler;
 uniform vec2 texelSize;
+uniform float uThreshold;
 
 void main(void)
 {
@@ -47,5 +48,5 @@ void main(void)
 
     bool isBackground = color.x == 0.0 && color.y == 0.0 && color.z == 0.0;
 
-    gl_FragColor = isBackground ? oldColor : sum > 1.0 / 32.0 ? mix(color, vec4(0.0, 0.0, 0.0, 1.0), 0.5) : color;
+    gl_FragColor = isBackground ? oldColor : sum > 1.0 / 32.0 * uThreshold ? mix(color, vec4(0.0, 0.0, 0.0, 1.0), 0.5) : color;
 }`;

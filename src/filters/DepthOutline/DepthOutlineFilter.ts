@@ -21,10 +21,11 @@ export class DepthOutlineFilter extends Filter
     constructor(game: PixiGameBase, width: number = 200, height: number = 200)
     {
         super(vertex, fragment);
+        this.game = game;
         this.uniforms.texelSize = new Float32Array(2);
+        this.uniforms.uThreshold = this.game.depthOutlineThreshold ?? 1;
         this.uniforms.uColorSampler = Texture.WHITE;
         this.uniforms.uDepthSampler = Texture.WHITE;
-        this.game = game;
         this.width = width;
         this.height = height;
     }
@@ -34,6 +35,7 @@ export class DepthOutlineFilter extends Filter
      */
     public updateDepth(): void
     {
+        this.uniforms.uThreshold = this.game.depthOutlineThreshold ?? 1;
         this.uniforms.uColorSampler = this.game.colorLayer.getRenderTexture();
         this.uniforms.uDepthSampler = this.game.depthLayer.getRenderTexture();
     }

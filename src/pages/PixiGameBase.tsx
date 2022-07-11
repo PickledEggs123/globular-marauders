@@ -73,7 +73,6 @@ export enum EParticleState {
  * The state of the app.
  */
 export interface IPixiGameState {
-    showShips: boolean;
     showItems: boolean;
     width: number;
     height: number;
@@ -106,7 +105,6 @@ export interface IPixiGameState {
 
 export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixiGameState> {
     state = {
-        showShips: false as boolean,
         showItems: false as boolean,
         width: 800 as number,
         height: 800 as number,
@@ -150,6 +148,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
 
     public abstract colorLayer: Layer;
     public abstract depthLayer: Layer;
+    public depthOutlineThreshold: number = 1;
 
     pixiStarResources = new StarResources(this as any);
 

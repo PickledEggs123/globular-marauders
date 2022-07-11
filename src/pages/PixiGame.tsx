@@ -3,7 +3,7 @@ import '../App.scss';
 import Quaternion from "quaternion";
 import * as PIXI from "pixi.js";
 import * as particles from "@pixi/particle-emitter";
-import {Group, Layer, Stage} from "@pixi/layers";
+import {Layer, Stage} from "@pixi/layers";
 import {sound} from "@pixi/sound";
 import {EResourceType, ITEM_DATA} from "@pickledeggs123/globular-marauders-game/lib/src/Resource";
 import {
@@ -67,7 +67,7 @@ import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import {DEFAULT_IMAGE, EVoronoiMode, RESOURCE_TYPE_TEXTURE_PAIRS, SPACE_BACKGROUND_TEXTURES} from "../helpers/Data";
 import {EGameMode, IPixiGameProps} from "./PixiGameBase";
 import {
-    DirectionsBoat,
+    Sailing,
     MusicNote,
     MusicOff,
     People,
@@ -97,7 +97,6 @@ import brigMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/sh
 import frigateMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/frigate.mesh.json";
 import galleonMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/galleon.mesh.json";
 import {DepthOutlineFilter} from "../filters/DepthOutline/DepthOutlineFilter";
-import {Renderer} from "pixi.js";
 
 const GetFactionSubheader = (faction: EFaction): string | null => {
     switch (faction) {
@@ -1055,18 +1054,6 @@ export class PixiGame extends PixiGameNetworking {
     }
 
     /**
-     * Show different type of ships in the screen above the game. Used for debugging the appearance of each ship
-     * without buying the ship in game.
-     * @private
-     */
-    private handleShowShips(e: React.ChangeEvent<HTMLInputElement>) {
-        this.setState({
-            ...this.state,
-            showShips: e.target.checked,
-        });
-    }
-
-    /**
      * Show different items in the screen above the game. Used for debugging the appearance of each item without buying
      * the item in game.
      * @private
@@ -1911,7 +1898,7 @@ export class PixiGame extends PixiGameNetworking {
                                                                             </Tooltip>
                                                                             <Tooltip title="Ships in play">
                                                                                 <Badge badgeContent={f.numShips} color={"primary"}>
-                                                                                    <DirectionsBoat/>
+                                                                                    <Sailing/>
                                                                                 </Badge>
                                                                             </Tooltip>
                                                                             <Tooltip title="Invasion events">
@@ -1973,7 +1960,7 @@ export class PixiGame extends PixiGameNetworking {
                                                                             </Tooltip>
                                                                             <Tooltip title="Traders">
                                                                                 <Badge badgeContent={f.numTraders} color={"primary"}>
-                                                                                    <DirectionsBoat/>
+                                                                                    <Sailing/>
                                                                                 </Badge>
                                                                             </Tooltip>
                                                                             <Tooltip title="Pirates">
@@ -2189,10 +2176,6 @@ export class PixiGame extends PixiGameNetworking {
                                 <DialogContent>
                                     <Grid container spacing={2}>
                                         <Grid item>
-                                            <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.showShips}
-                                                                                 onKeyDown={PixiGame.cancelSpacebar.bind(this)} onChange={this.handleShowShips.bind(this)}/>} label="Show Ships"/>
-                                        </Grid>
-                                        <Grid item>
                                             <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.showItems}
                                                                                  onKeyDown={PixiGame.cancelSpacebar.bind(this)} onChange={this.handleShowItems.bind(this)}/>} label="Show Items"/>
                                         </Grid>
@@ -2214,26 +2197,6 @@ export class PixiGame extends PixiGameNetworking {
                                             </RadioGroup>
                                         </Grid>
                                     </Grid>
-                                </DialogContent>
-                            </Dialog>
-                            <Dialog open={this.state.showShips} onClose={() => this.setState({showShips: false})}>
-                                <DialogTitle title="Ships"/>
-                                <DialogContent>
-                                    {
-                                        this.state.showShips && (
-                                            SHIP_DATA.map(ship => {
-                                                return (
-                                                    <Card key={`show-ship-${ship.shipType}`}>
-                                                        <CardHeader title={ship.shipType}/>
-                                                        <CardContent>
-                                                            <Avatar variant="rounded" style={{width: 256, height: 256}} alt={ship.shipType} srcSet={this.shipThumbnails.get(ship.shipType) ?? undefined}>
-                                                            </Avatar>
-                                                        </CardContent>
-                                                    </Card>
-                                                );
-                                            })
-                                        )
-                                    }
                                 </DialogContent>
                             </Dialog>
                             <Dialog open={this.state.showItems} onClose={() => this.setState({showItems: false})}>

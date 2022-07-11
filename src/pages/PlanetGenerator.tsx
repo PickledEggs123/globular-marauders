@@ -62,6 +62,9 @@ export const PlanetGenerator = () => {
         app.stage.addChild(mesh);
     }, [context]);
     useEffect(() => {
+        if (context.app) {
+            context.app.destroy(true);
+        }
         context.app = new PIXI.Application({ width : 256, height: 256 });
         ref.current!.appendChild(context.app.view);
         context.app!.ticker.add(() => {
