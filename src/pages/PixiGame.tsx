@@ -97,6 +97,8 @@ import brigMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/sh
 import frigateMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/frigate.mesh.json";
 import galleonMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/galleon.mesh.json";
 import {DepthOutlineFilter} from "../filters/DepthOutline/DepthOutlineFilter";
+import {RenderMobileGameUiTop} from "./RenderMobileGameUiTop";
+import {RenderMobileGameUiBottom} from "./RenderMobileGameUiBottom";
 
 const GetFactionSubheader = (faction: EFaction): string | null => {
     switch (faction) {
@@ -1580,7 +1582,7 @@ export class PixiGame extends PixiGameNetworking {
         const minute = timeLeft > 0 ? Math.floor(timeLeft / 10 / 60) : 0;
         const second = timeLeft > 0 ? Math.floor((timeLeft / 10) % 60) : 0;
 
-        const gaugeWidth = this.state.width < 1024 ? this.state.width : this.state.width - 400;
+        const gaugeWidth = this.state.width < 768 ? this.state.width : this.state.width - 400;
         return (
             <svg style={{width: gaugeWidth, height: 100}}>
                 <rect x={0} y={0} width={gaugeWidth} height={30} stroke="white" fill={invasion.defending.factionColor}/>
@@ -1597,7 +1599,7 @@ export class PixiGame extends PixiGameNetworking {
     }
 
     renderGameUiTop(): React.ReactElement | null {
-        const gaugeWidth = this.state.width < 1024 ? this.state.width : this.state.width - 400;
+        const gaugeWidth = this.state.width < 768 ? this.state.width : this.state.width - 400;
         return (
             <React.Fragment>
                 <Card className="TopLeft">
@@ -1611,16 +1613,16 @@ export class PixiGame extends PixiGameNetworking {
                     <Typography>Mission {(this.findPlayerShip()?.orders[0] ?? null)?.orderType}</Typography>
                 </Card>
                 <div className="Top">
-                    <svg style={{width: gaugeWidth, height: 24}}>
-                        <rect x={0} y={0} width={((this.findPlayerShip()?.health ?? 100) + (this.findPlayerShip()?.repairTicks.reduce((acc, i) => acc + i, 0) ?? 0) ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (gaugeWidth)} height={24} fill="green" stroke="none"/>
-                        <rect x={0} y={0} width={(this.findPlayerShip()?.health ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (gaugeWidth)} height={10} fill="yellow" stroke="none"/>
-                        <rect x={0} y={0} width={((this.findPlayerShip()?.health ?? 100) - (this.findPlayerShip()?.burnTicks.reduce((acc, i) => acc + i, 0) ?? 0) ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (gaugeWidth)} height={24} fill="red" stroke="none"/>
-                        <text x={(gaugeWidth) * (1 / 7)} y={18} fill="white" stroke="none" textAnchor="middle">Damage {(this.playerId && this.game.scoreBoard.damage.find(x => x.playerId === this.playerId)?.damage) ?? 0}</text>
-                        <text x={(gaugeWidth) * (2 / 7)} y={18} fill="white" stroke="none" textAnchor="middle">Loot {(this.playerId && this.game.scoreBoard.loot.find(x => x.playerId === this.playerId)?.count) ?? 0}</text>
-                        <text x={(gaugeWidth) * (3 / 7)} y={18} fill="white" stroke="none" textAnchor="middle">Money {(this.playerId && this.game.scoreBoard.money.find(x => x.playerId === this.playerId)?.amount) ?? 0}</text>
-                        <text x={(gaugeWidth) * (4 / 7)} y={18} fill="white" stroke="none" textAnchor="middle">Land {(this.playerId && this.game.scoreBoard.land.find(x => x.playerId === this.playerId)?.amount) ?? 0}</text>
-                        <text x={(gaugeWidth) * (5 / 7)} y={18} fill="white" stroke="none" textAnchor="middle">Capture {(this.playerId && this.game.scoreBoard.capture.find(x => x.playerId === this.playerId)?.count) ?? 0}</text>
-                        <text x={(gaugeWidth) * (6 / 7)} y={18} fill="white" stroke="none" textAnchor="middle">Bounty {(this.playerId && this.game.scoreBoard.bounty.find(x => x.playerId === this.playerId)?.bountyAmount) ?? 0}</text>
+                    <svg style={{width: gaugeWidth, height: 44}}>
+                        <rect x={0} y={0} width={((this.findPlayerShip()?.health ?? 100) + (this.findPlayerShip()?.repairTicks.reduce((acc, i) => acc + i, 0) ?? 0) ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (gaugeWidth)} height={44} fill="green" stroke="none"/>
+                        <rect x={0} y={0} width={(this.findPlayerShip()?.health ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (gaugeWidth)} height={44} fill="yellow" stroke="none"/>
+                        <rect x={0} y={0} width={((this.findPlayerShip()?.health ?? 100) - (this.findPlayerShip()?.burnTicks.reduce((acc, i) => acc + i, 0) ?? 0) ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (gaugeWidth)} height={44} fill="red" stroke="none"/>
+                        <text x={(gaugeWidth) * (1 / 4)} y={18} fill="white" stroke="none" textAnchor="middle">Damage {(this.playerId && this.game.scoreBoard.damage.find(x => x.playerId === this.playerId)?.damage) ?? 0}</text>
+                        <text x={(gaugeWidth) * (2 / 4)} y={18} fill="white" stroke="none" textAnchor="middle">Loot {(this.playerId && this.game.scoreBoard.loot.find(x => x.playerId === this.playerId)?.count) ?? 0}</text>
+                        <text x={(gaugeWidth) * (3 / 4)} y={18} fill="white" stroke="none" textAnchor="middle">Money {(this.playerId && this.game.scoreBoard.money.find(x => x.playerId === this.playerId)?.amount) ?? 0}</text>
+                        <text x={(gaugeWidth) * (1 / 4)} y={38} fill="white" stroke="none" textAnchor="middle">Land {(this.playerId && this.game.scoreBoard.land.find(x => x.playerId === this.playerId)?.amount) ?? 0}</text>
+                        <text x={(gaugeWidth) * (2 / 4)} y={38} fill="white" stroke="none" textAnchor="middle">Capture {(this.playerId && this.game.scoreBoard.capture.find(x => x.playerId === this.playerId)?.count) ?? 0}</text>
+                        <text x={(gaugeWidth) * (3 / 4)} y={38} fill="white" stroke="none" textAnchor="middle">Bounty {(this.playerId && this.game.scoreBoard.bounty.find(x => x.playerId === this.playerId)?.bountyAmount) ?? 0}</text>
                     </svg>
                     {
                         this.invasionGauge()
@@ -1634,7 +1636,6 @@ export class PixiGame extends PixiGameNetworking {
         return (
             <React.Fragment>
                 <Card className="BottomRight">
-                    <Typography>Gold {this.playerId && this.game.playerData.get(this.playerId)?.moneyAccount.currencies.find(f => f.currencyId === "GOLD")?.amount}</Typography>
                 </Card>
                 <Card className="BottomLeft">
                 </Card>
@@ -1645,7 +1646,7 @@ export class PixiGame extends PixiGameNetworking {
                                 <Card>
                                     <CardContent>
                                         <Badge badgeContent={this.findPlayerShip()?.cargo[i] ? this.findPlayerShip()?.cargo[i].amount : null} color={"primary"}>
-                                            <Avatar variant="rounded" style={{width: 50, height: 50}} srcSet={this.findPlayerShip()?.cargo[i] ? this.renderItemUrl(this.findPlayerShip()?.cargo[i].resourceType ?? EResourceType.CACAO).url : undefined}>
+                                            <Avatar variant="rounded" style={{width: 50, height: 50}} srcSet={this.findPlayerShip()?.cargo[i] ? this.renderItemUrl(this.findPlayerShip()?.cargo[i].resourceType ?? EResourceType.CACAO).url : this.renderItemUrl("UNKNOWN" as any).url}>
                                                 {null}
                                             </Avatar>
                                         </Badge>
@@ -1750,13 +1751,29 @@ export class PixiGame extends PixiGameNetworking {
                     </div>
                     <div className="AppMainContent">
                         {
-                            !this.state.showLoginMenu && !this.state.showMainMenu && !this.state.showPlanetMenu && !this.state.showSpawnMenu && this.state.width < 1024 ? (
+                            !this.state.showLoginMenu && !this.state.showMainMenu && !this.state.showPlanetMenu && !this.state.showSpawnMenu && this.state.width < 768 ? (
                                 <div className="MobileGameUi">
                                     <div style={{position: "absolute", top: 0, left: this.state.marginLeft, bottom: this.state.marginBottom + this.state.height, right: this.state.marginRight}}>
+                                        <RenderMobileGameUiTop width={this.state.width} bannerTopHeight={this.state.bannerTopHeight}/>
                                         {this.renderGameUiTop()}
                                     </div>
                                     <div style={{position: "absolute", top: this.state.marginTop + this.state.height, left: this.state.marginLeft, bottom: 0, right: this.state.marginRight}}>
+                                        <RenderMobileGameUiBottom width={this.state.width} bannerBottomHeight={this.state.bannerBottomHeight}/>
                                         {this.renderGameUiBottom()}
+                                        <Grid container spacing={2} columns={{
+                                            xs: 6,
+                                            lg: 12,
+                                        }}>
+                                            {
+                                                this.forms.cards.map(card => {
+                                                    return (
+                                                        <Grid item xs={12} key={card.title} justifyContent="center" alignItems="center">
+                                                            <CardRenderer card={card} submitForm={this.submitForm.bind(this)}/>
+                                                        </Grid>
+                                                    );
+                                                })
+                                            }
+                                        </Grid>
                                     </div>
                                 </div>
                             ): null
@@ -1787,24 +1804,28 @@ export class PixiGame extends PixiGameNetworking {
                                         </Grid>
                                     ) : null
                                 }
-                                <Grid item xs={12} justifyContent="center" alignItems="center">
-                                    <Paper style={{maxHeight: "40vh", maxWidth: "80vw", overflow: "auto", backgroundColor: "none"}}>
-                                        <Grid container spacing={2} columns={{
-                                            xs: 6,
-                                            lg: 12,
-                                        }}>
-                                            {
-                                                this.forms.cards.map(card => {
-                                                    return (
-                                                        <Grid item xs={12} key={card.title} justifyContent="center" alignItems="center">
-                                                            <CardRenderer card={card} submitForm={this.submitForm.bind(this)}/>
-                                                        </Grid>
-                                                    );
-                                                })
-                                            }
+                                {
+                                    this.state.width >= 768 ? (
+                                        <Grid item xs={12} justifyContent="center" alignItems="center">
+                                            <Paper style={{maxHeight: "40vh", maxWidth: "80vw", overflow: "auto", backgroundColor: "none"}}>
+                                                <Grid container spacing={2} columns={{
+                                                    xs: 6,
+                                                    lg: 12,
+                                                }}>
+                                                    {
+                                                        this.forms.cards.map(card => {
+                                                            return (
+                                                                <Grid item xs={12} key={card.title} justifyContent="center" alignItems="center">
+                                                                    <CardRenderer card={card} submitForm={this.submitForm.bind(this)}/>
+                                                                </Grid>
+                                                            );
+                                                        })
+                                                    }
+                                                </Grid>
+                                            </Paper>
                                         </Grid>
-                                    </Paper>
-                                </Grid>
+                                    ) : null
+                                }
                                 {
                                     this.state.gameMode === EGameMode.MAIN_MENU ? (
                                         <Grid item xs={12} justifyContent="center" alignItems="center" onWheel={(e) => {e.preventDefault();}}>
@@ -2043,7 +2064,7 @@ export class PixiGame extends PixiGameNetworking {
                             </Grid>
                             <div className="DesktopGameUi">
                                 {
-                                    !this.state.showLoginMenu && !this.state.showMainMenu && !this.state.showPlanetMenu && !this.state.showSpawnMenu && this.state.width >= 1024 ? (
+                                    !this.state.showLoginMenu && !this.state.showMainMenu && !this.state.showPlanetMenu && !this.state.showSpawnMenu && this.state.width >= 768 ? (
                                         <React.Fragment>
                                             {this.renderGameUiTop()}
                                             {this.renderGameUiBottom()}
@@ -2051,7 +2072,7 @@ export class PixiGame extends PixiGameNetworking {
                                     ) : null
                                 }
                                 {
-                                    !this.state.showLoginMenu && !this.state.showMainMenu && !this.state.showPlanetMenu && !this.state.showSpawnMenu && this.state.width < 1024 ? (
+                                    !this.state.showLoginMenu && !this.state.showMainMenu && !this.state.showPlanetMenu && !this.state.showSpawnMenu && this.state.width < 768 ? (
                                         this.renderMobileControls()
                                     ) : null
                                 }

@@ -80,6 +80,10 @@ export interface IPixiGameState {
     marginBottom: number;
     marginLeft: number;
     marginRight: number;
+    bannerTopHeight: number;
+    bannerBottomHeight: number;
+    bannerLeft: number;
+    bannerRight: number;
     zoom: number;
     showVoronoi: boolean;
     voronoiMode: EVoronoiMode;
@@ -112,6 +116,10 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         marginBottom: 0 as number,
         marginLeft: 0 as number,
         marginRight: 0 as number,
+        bannerTopHeight: 0 as number,
+        bannerBottomHeight: 0 as number,
+        bannerLeft: 0 as number,
+        bannerRight: 0 as number,
         zoom: 4 as number,
         showVoronoi: false as boolean,
         voronoiMode: EVoronoiMode.KINGDOM as EVoronoiMode,
@@ -961,6 +969,10 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         const size = Math.min(width, height);
         const verticalSpace = height - size;
         const horizontalSpace = width - size;
+        const bannerTopHeight = verticalSpace / 2;
+        const bannerBottomHeight = verticalSpace / 2;
+        const bannerLeft = horizontalSpace / 2;
+        const bannerRight = horizontalSpace / 2;
 
         this.setState({
             marginTop: verticalSpace / 2,
@@ -969,6 +981,10 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
             marginRight: horizontalSpace / 2,
             width: size,
             height: size,
+            bannerTopHeight,
+            bannerBottomHeight,
+            bannerLeft,
+            bannerRight,
         });
     };
 
