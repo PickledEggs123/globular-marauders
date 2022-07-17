@@ -969,48 +969,50 @@ export class PixiGame extends PixiGameNetworking {
             return;
         }
 
-        if (this.frameCounter++ % 3 === 0) {
-            // handle server replies
-            while (true) {
-                const message = this.messages.shift();
-                if (message) {
-                    // has a message, process the message
-                    if (message.messageType === EMessageType.DEATH) {
-                        this.setState({
-                            showSpawnMenu: true
-                        });
-                    }
-                } else {
-                    // no more messages, end message processing
-                    break;
-                }
-            }
+        this.game.soundEvents.splice(0, this.game.soundEvents.length);
 
-            // perform client side movement
-            const playerData = (this.playerId && this.game.playerData.get(this.playerId)) || null;
-            if (playerData && !playerData.autoPilotEnabled) {
-                if (this.game.ships.has(playerData.shipId)) {
-                    this.game.handleShipLoop(playerData.shipId, () => {
-                        if (playerData && playerData.filterActiveKeys) {
-                            return this.activeKeys.filter(x => playerData && playerData.filterActiveKeys && playerData.filterActiveKeys.includes(x));
-                        } else {
-                            return this.activeKeys;
-                        }
-                    }, false);
+        // handle server replies
+        while (true) {
+            const message = this.messages.shift();
+            if (message) {
+                // has a message, process the message
+                if (message.messageType === EMessageType.DEATH) {
+                    this.setState({
+                        showSpawnMenu: true
+                    });
                 }
+            } else {
+                // no more messages, end message processing
+                break;
             }
+        }
 
-            // move client side data to server
-            while (true) {
-                const message = this.game.outgoingMessages.shift();
-                if (message) {
-                    const [playerId, m] = message;
-                    if (playerId === this.playerId) {
-                        this.sendMessage("generic-message", m);
+        // perform client side movement
+        const now = performance.now();
+        const delta = (now - this.clientLoopDeltaStart) / this.clientLoopDelta;
+        const playerData = (this.playerId && this.game.playerData.get(this.playerId)) || null;
+        if (playerData && !playerData.autoPilotEnabled) {
+            if (this.game.ships.has(playerData.shipId)) {
+                this.game.handleShipLoop(playerData.shipId, () => {
+                    if (playerData && playerData.filterActiveKeys) {
+                        return this.activeKeys.filter(x => playerData && playerData.filterActiveKeys && playerData.filterActiveKeys.includes(x));
+                    } else {
+                        return this.activeKeys;
                     }
-                } else {
-                    break;
+                }, false, delta);
+            }
+        }
+
+        // move client side data to server
+        while (true) {
+            const message = this.game.outgoingMessages.shift();
+            if (message) {
+                const [playerId, m] = message;
+                if (playerId === this.playerId) {
+                    this.sendMessage("generic-message", m);
                 }
+            } else {
+                break;
             }
         }
 
@@ -2072,7 +2074,7 @@ export class PixiGame extends PixiGameNetworking {
                                     ) : null
                                 }
                                 {
-                                    !this.state.showLoginMenu && !this.state.showMainMenu && !this.state.showPlanetMenu && !this.state.showSpawnMenu && this.state.width < 768 ? (
+                                    this.state.gameMode !== EGameMode.MAIN_MENU && !this.state.showLoginMenu && !this.state.showMainMenu && !this.state.showPlanetMenu && !this.state.showSpawnMenu && this.state.width < 768 ? (
                                         this.renderMobileControls()
                                     ) : null
                                 }

@@ -109,7 +109,6 @@ export abstract class PixiGameNetworking extends PixiGameBase {
                             }
                         }
                     }
-                    console.log("SERVER", serverFrame, "SOUND");
                     continuousSoundCheck.add(key);
                     break;
                 }
@@ -120,7 +119,6 @@ export abstract class PixiGameNetworking extends PixiGameBase {
             for (const key of stoppedContinuousSounds) {
                 const mediaInstance = this.continuousSounds.get(key)!;
                 mediaInstance.stop();
-                console.log("SERVER", serverFrame, "NO SOUND");
                 this.continuousSounds.delete(key);
             }
         }
@@ -167,7 +165,16 @@ export abstract class PixiGameNetworking extends PixiGameBase {
                 }
             }
         }
+        const playerShipSoundEvents = this.game.soundEvents.filter(i => {
+            const playerData = this.playerId && this.game.playerData.get(this.playerId);
+            if (!playerData) {
+                return false;
+            }
+
+            return !!playerData.shipId && !!i.shipId && playerData.shipId === i.shipId;
+        });
         this.game.applyGameSyncFrame(data);
+        this.game.soundEvents.push(...playerShipSoundEvents);
         this.resetClientLoop();
         this.handleSoundEffects(true);
     };
