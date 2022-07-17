@@ -233,7 +233,10 @@ export const ShipWiki = () => {
         <div className="App">
             <WebsiteDrawer rightSide={null}/>
             <Container>
-                <Grid container xs={12} spacing={2}>
+                <Grid container spacing={2} columns={{
+                    xs: 4,
+                    lg: 12
+                }}>
                     <Grid item xs={12}>
                         <Card>
                             <CardHeader title={`${selectedShipType} Render`}>
