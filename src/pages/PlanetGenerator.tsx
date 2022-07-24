@@ -110,10 +110,13 @@ export const PlanetGenerator = () => {
         <div className="App">
             <WebsiteDrawer rightSide={null}/>
             <Container>
+                <Typography variant="h3">
+                    Procedural Planet Generator
+                </Typography>
                 <Grid container xs={12} spacing={2}>
                     <Grid item xs={12}>
                         <Card>
-                            <CardHeader>Planet Generator</CardHeader>
+                            <CardHeader title="Planet Generator" subheader="Create unique random planets"></CardHeader>
                             <CardContent>
                                 <div ref={ref}>
                                 </div>

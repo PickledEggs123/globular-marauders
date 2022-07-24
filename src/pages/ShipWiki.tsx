@@ -233,13 +233,16 @@ export const ShipWiki = () => {
         <div className="App">
             <WebsiteDrawer rightSide={null}/>
             <Container>
+                <Typography variant="h3">
+                    3D Ship Meshes
+                </Typography>
                 <Grid container spacing={2} columns={{
                     xs: 4,
                     lg: 12
                 }}>
                     <Grid item xs={12}>
                         <Card>
-                            <CardHeader title={`${selectedShipType} Render`}>
+                            <CardHeader title={`${selectedShipType} Render`} subheader="Preview and Download a Ship">
                             </CardHeader>
                             <CardContent>
                                 <div ref={ref}>
@@ -250,6 +253,11 @@ export const ShipWiki = () => {
                                 </Typography>
                             </CardContent>
                         </Card>
+                    </Grid>
+                    <Grid item xs={12}>
+                        <Typography variant="h3">
+                            Available Ships
+                        </Typography>
                     </Grid>
                     {
                         Object.values(EShipType).map(shipType => {

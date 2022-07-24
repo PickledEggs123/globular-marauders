@@ -8,26 +8,37 @@ export const About = () => {
         <div className="App">
             <WebsiteDrawer rightSide={null}/>
             <Container>
+                <Typography variant="h3">
+                    About the Game
+                </Typography>
                 <Grid container xs={12} spacing={2}>
                     <Grid item xs={12}>
                         <Card>
-                            <CardHeader title="Space Pirates">
+                            <CardHeader title="Space Pirates" subheader="Asteroid style movement but you fire side ways">
                             </CardHeader>
                             <CardContent>
                                 <Typography variant="body1">
-                                    A mix mash of a bunch of crazy ideas to be formed into a game because crazy ideas will make creating
-                                    a game much more fun. The game must be spherical because spherical is hard. There must be
+                                    A mix-mash of a bunch of crazy ideas to be formed into a game because crazy ideas might make
+                                    an interesting game much more fun. The game must be spherical because spherical geometry is hard. There must be
                                     space like physics which means moving forward will cause you to drift forward forever. Rotating
                                     will only rotate you in one spot while you continue drifting in the same direction. It's faster
-                                    to turn around backwards and accelerate than it is to break. The final part is you can only
-                                    shoot cannon balls side ways with the exception of cannonades which can fire forward or backwards.
+                                    to turn around backwards and accelerate than it is to brake and slow down. The final part is you can only
+                                    shoot cannon balls side ways with the exception of automatic cannonades which can fire in any direction.
+                                </Typography>
+                                <br/>
+                                <Typography variant="body1">
+                                    The weird firing side ways while moving forward mechanic allows lots of fly by attacks. The large amount
+                                    of health on each ship also means most of the damage is pointless. This is fixed by the order/mission system
+                                    which forces players to meet in certain areas to earn money. If you want a bigger ship with more damage, you
+                                    have to figure out how to attack people while touching a planet (trade), attack people and pick up their cargo (pirate),
+                                    or attack people and capture the planet (invader).
                                 </Typography>
                             </CardContent>
                         </Card>
                     </Grid>
                     <Grid item xs={12}>
                         <Card>
-                            <CardHeader title="Wizards TBD">
+                            <CardHeader title="Wizards TBD" subheader="Must replace bland colonial pirate theme with magic">
                             </CardHeader>
                             <CardContent>
                                 <Typography variant="body1">
@@ -43,12 +54,18 @@ export const About = () => {
                                     create a magic system which applies different buffs and curses to your ship, friendly ships, and enemy ships.
                                     This might make the game system more interesting if you can dash forward by 100 units 3 times within 30 seconds.
                                 </Typography>
+                                <br/>
+                                <Typography variant="body1">
+                                    Another possibility is a MOBA style attack system with rectangles and circles that you must line up to deal damage.
+                                    This will allow a small ship to deal large amounts of damage on a larger ship by lining up it's attack. That would
+                                    be a good magic system. Different spells can have different attack patterns.
+                                </Typography>
                             </CardContent>
                         </Card>
                     </Grid>
                     <Grid item xs={12}>
                         <Card>
-                            <CardHeader title="Math">
+                            <CardHeader title="Math" subheader="This is a math resume project, look at the spherical math!">
                             </CardHeader>
                             <CardContent>
                                 <Typography variant="body1">
@@ -71,7 +88,7 @@ export const About = () => {
                     </Grid>
                     <Grid item xs={12}>
                         <Card>
-                            <CardHeader title="Known Bugs">
+                            <CardHeader title="Known Bugs" subheader="The final math bug before this is perfect">
                             </CardHeader>
                             <CardContent>
                                 <Typography variant="body1">

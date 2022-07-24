@@ -77,10 +77,13 @@ export const GameModel = () => {
         <div className="App">
             <WebsiteDrawer rightSide={null}/>
             <Container>
+                <Typography variant="h3">
+                    The Math of the Game
+                </Typography>
                 <Grid container xs={12} spacing={2}>
                     <Grid item xs={12}>
                         <Card>
-                            <CardHeader>Straight Lines along a sphere</CardHeader>
+                            <CardHeader title="Straight Lines Along a Sphere" subheader="Flatten a pizza pie onto a beach ball"></CardHeader>
                             <CardContent>
                                 <canvas id="canvas" width={256} height={256}></canvas>
                                 <br/>
