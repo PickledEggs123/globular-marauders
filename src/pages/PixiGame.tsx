@@ -322,7 +322,7 @@ export class PixiGame extends PixiGameNetworking {
         this.shipThumbnails.set(EShipType.GALLEON, galleonMeshJson.image);
     };
 
-    handleSwitchGameMode = (gameMode: EGameMode) => {
+    handleSwitchGameMode = async (gameMode: EGameMode): Promise<void> => {
         if (this.state.gameMode === EGameMode.MULTI_PLAYER && gameMode !== EGameMode.MULTI_PLAYER && this.socket) {
             this.socket.close();
             this.setState({
@@ -333,6 +333,11 @@ export class PixiGame extends PixiGameNetworking {
                 init: false,
             });
         }
+        await new Promise<void>((resolve) => {
+            this.setState({gameMode}, () => {
+                resolve();
+            });
+        });
         this.loadStarField();
         switch (gameMode) {
             case EGameMode.MAIN_MENU: {
@@ -574,7 +579,6 @@ export class PixiGame extends PixiGameNetworking {
                 this.setupNetworking.call(this, false);
             }
         }
-        this.setState({gameMode});
     }
 
     cameraPosition: Quaternion = Quaternion.ONE;
@@ -1847,7 +1851,7 @@ export class PixiGame extends PixiGameNetworking {
                                                             </ListItemAvatar>
                                                             <ListItemText>Single Player</ListItemText>
                                                         </ListItem>
-                                                        <ListItem disabled={true}>
+                                                        <ListItem onClick={this.handleSwitchGameMode.bind(this, EGameMode.MULTI_PLAYER)}>
                                                             <ListItemAvatar>
                                                                 <People/>
                                                             </ListItemAvatar>
@@ -1873,7 +1877,7 @@ export class PixiGame extends PixiGameNetworking {
                                                                         onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.handleLogin.bind(this)}>Login</Button>
                                                             </Fragment>
                                                         ) : (
-                                                            <Typography>Connecting to server...</Typography>
+                                                            <Typography>{this.state.matchMakerFailMessage || "Connecting to server..."}</Typography>
                                                         )
                                                     }
                                                 </CardContent>

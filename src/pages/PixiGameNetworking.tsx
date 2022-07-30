@@ -19,6 +19,8 @@ import {DeserializeQuaternion, SerializeQuaternion} from "@pickledeggs123/globul
 import {PHYSICS_SCALE} from "@pickledeggs123/globular-marauders-game/lib/src/ShipType";
 import SockJS from "sockjs-client";
 
+const matchMakerService = "https://globular-marauders-matchmaker-eapfro3bmq-uc.a.run.app";
+
 export abstract class PixiGameNetworking extends PixiGameBase {
     public music: MusicPlayer = new MusicPlayer();
     public initialized: boolean = false;
@@ -33,6 +35,8 @@ export abstract class PixiGameNetworking extends PixiGameBase {
     public forms: IFormResult = {
         cards: []
     };
+    public hitMatchMaker: boolean = false;
+    public shardIpAddress: string | null = null;
     public shardPortNumber: number | null = null;
     public messages: IMessage[] = [];
     public localServerMessages: IMessage[] = [];
@@ -233,8 +237,30 @@ export abstract class PixiGameNetworking extends PixiGameBase {
         if (this.state.gameMode !== EGameMode.MULTI_PLAYER) {
             return;
         }
+        if (!this.hitMatchMaker) {
+            fetch(matchMakerService).then((res) => {
+                return res.json();
+            }).then((data) => {
+                if (data.success) {
+                    this.shardIpAddress = data.ip;
+                    this.shardPortNumber = data.port;
+                    this.hitMatchMaker = true;
+                    this.setupNetworking(false);
+                    return
+                } else {
+                    this.setState({
+                        matchMakerFailMessage: "The match maker has failed to find a game server.",
+                    });
+                }
+            }).catch(() => {
+                this.setState({
+                    matchMakerFailMessage: "The match maker has failed to find a game server.",
+                });
+            });
+            return;
+        }
 
-        this.socket = new SockJS(window.location.protocol + "//" + window.location.hostname + ":" + (this.shardPortNumber ?? 4000) + "/game");
+        this.socket = new SockJS("http://" + this.shardIpAddress + ":" + (this.shardPortNumber ?? 4000) + "/game");
         this.socket.onerror = (err) => {
             console.log("Failed to connect", err);
         };
@@ -289,7 +315,9 @@ export abstract class PixiGameNetworking extends PixiGameBase {
                                                       portNumber,
                                                       isStandalone
                                                   }: { portNumber: number, isStandalone: boolean }) => {
-            this.shardPortNumber = portNumber;
+            if (this.shardPortNumber === null) {
+                this.shardPortNumber = portNumber;
+            }
             if (this.socket && !isStandalone) {
                 this.socket.close();
             }

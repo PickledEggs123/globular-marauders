@@ -105,6 +105,7 @@ export interface IPixiGameState {
     keyboardImageClass: string | undefined;
     mouseImageClass: string | undefined;
     highlightAutopilotButton: boolean;
+    matchMakerFailMessage: string | undefined;
 }
 
 export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixiGameState> {
@@ -141,6 +142,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         keyboardImageClass: undefined,
         mouseImageClass: undefined,
         highlightAutopilotButton: false as boolean,
+        matchMakerFailMessage: undefined as string | undefined,
     };
     public game: Game = new Game();
     public playerId: string | null = null;
