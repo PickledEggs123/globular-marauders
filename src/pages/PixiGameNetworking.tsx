@@ -247,7 +247,7 @@ export abstract class PixiGameNetworking extends PixiGameBase {
                     this.hitMatchMaker = true;
                     setTimeout(() => {
                         this.setupNetworking(false);
-                    });
+                    }, 10);
                     return
                 } else {
                     this.setState({
@@ -263,7 +263,7 @@ export abstract class PixiGameNetworking extends PixiGameBase {
             return;
         }
 
-        this.socket = new SockJS("http://" + this.shardIpAddress + ":" + (this.shardPortNumber ?? 4000) + "/game");
+        this.socket = new SockJS(window.location.protocol + "//" + this.shardIpAddress + ":" + (this.shardPortNumber ?? 4000) + "/game");
         this.socket.onerror = (err) => {
             console.log("Failed to connect", err);
         };
