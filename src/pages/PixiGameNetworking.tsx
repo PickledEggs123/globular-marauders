@@ -245,14 +245,17 @@ export abstract class PixiGameNetworking extends PixiGameBase {
                     this.shardIpAddress = data.ip;
                     this.shardPortNumber = data.port;
                     this.hitMatchMaker = true;
-                    this.setupNetworking(false);
+                    setTimeout(() => {
+                        this.setupNetworking(false);
+                    });
                     return
                 } else {
                     this.setState({
                         matchMakerFailMessage: "The match maker has failed to find a game server.",
                     });
                 }
-            }).catch(() => {
+            }).catch((err) => {
+                console.error(err);
                 this.setState({
                     matchMakerFailMessage: "The match maker has failed to find a game server.",
                 });
