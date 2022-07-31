@@ -38,6 +38,7 @@ export abstract class PixiGameNetworking extends PixiGameBase {
     public hitMatchMaker: boolean = false;
     public shardIpAddress: string | null = null;
     public shardHostname: string | null = null;
+    public shardPathname: string | null = null;
     public shardPortNumber: number | null = null;
     public messages: IMessage[] = [];
     public localServerMessages: IMessage[] = [];
@@ -246,6 +247,7 @@ export abstract class PixiGameNetworking extends PixiGameBase {
                     this.shardIpAddress = data.ip;
                     this.shardPortNumber = data.port;
                     this.shardHostname = data.hostname;
+                    this.shardPathname = data.pathname;
                     this.hitMatchMaker = true;
                     setTimeout(() => {
                         this.setupNetworking(false);
@@ -265,7 +267,7 @@ export abstract class PixiGameNetworking extends PixiGameBase {
             return;
         }
 
-        this.socket = new SockJS(((this.shardHostname ? "https:" : null) ?? window.location.protocol) + "//" + (this.shardHostname ?? this.shardIpAddress) + ":" + (this.shardHostname ? 443 : (this.shardPortNumber ?? 4000)) + "/game");
+        this.socket = new SockJS(((this.shardHostname ? "https:" : null) ?? window.location.protocol) + "//" + (this.shardHostname ?? this.shardIpAddress) + ":" + (this.shardHostname ? 443 : (this.shardPortNumber ?? 4000)) + (this.shardPathname ?? "") + "/game");
         this.socket.onerror = (err) => {
             console.log("Failed to connect", err);
         };
