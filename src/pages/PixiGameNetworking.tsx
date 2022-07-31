@@ -338,6 +338,7 @@ export abstract class PixiGameNetworking extends PixiGameBase {
         this.socketEvents["send-spawn-factions"] = this.handleSpawnFactions;
         this.socketEvents["send-spawn-planets"] = this.handleSpawnPlanets;
         this.socketEvents["send-spawn-locations"] = this.handleSpawnLocations;
+        this.socketEvents["send-forms"] = this.handleForms;
     }
 
     protected handleLogin() {
