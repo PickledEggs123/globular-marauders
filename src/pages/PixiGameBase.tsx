@@ -159,6 +159,8 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
     public abstract colorLayer: Layer;
     public abstract depthLayer: Layer;
     public depthOutlineThreshold: number = 1;
+    public abstract projectileColorLayer: Layer;
+    public abstract textColorLayer: Layer;
 
     pixiStarResources = new StarResources(this as any);
 
@@ -317,11 +319,11 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
 
         this.colorLayer.addChild(mesh);
         this.application.stage.addChild(faction);
-        this.application.stage.addChild(textName);
-        this.application.stage.addChild(textTitle);
-        this.application.stage.addChild(textResource1);
-        this.application.stage.addChild(textResource2);
-        this.application.stage.addChild(textResource3);
+        this.textColorLayer.addChild(textName);
+        this.textColorLayer.addChild(textTitle);
+        this.textColorLayer.addChild(textResource1);
+        this.textColorLayer.addChild(textResource2);
+        this.textColorLayer.addChild(textResource3);
         this.pixiPlanetResources.getResources().planetMeshes.push({
             id: planet.id,
             mesh,
@@ -497,8 +499,8 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
 
         this.colorLayer.addChild(mesh);
         this.depthLayer.addChild(depthMesh);
-        this.application.stage.addChild(text);
-        this.application.stage.addChild(trailContainer);
+        this.textColorLayer.addChild(text);
+        this.projectileColorLayer.addChild(trailContainer);
         this.application.stage.addChild(line);
         this.application.stage.addChild(cannonBallLeft);
         this.application.stage.addChild(cannonBallRight);
@@ -671,8 +673,8 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
             ]
         });
 
-        this.application.stage.addChild(mesh);
-        this.application.stage.addChild(trailContainer);
+        this.projectileColorLayer.addChild(mesh);
+        this.projectileColorLayer.addChild(trailContainer);
         this.pixiCannonBallResources.getResources().cannonBallMeshes.push({
             id: cannonBall.id,
             mesh,
@@ -855,10 +857,10 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         text.style.fill = "white";
         text.style.fontSize = 12;
 
-        this.application.stage.addChild(mesh);
-        this.application.stage.addChild(image);
-        this.application.stage.addChild(trailContainer);
-        this.application.stage.addChild(text);
+        this.projectileColorLayer.addChild(mesh);
+        this.projectileColorLayer.addChild(image);
+        this.projectileColorLayer.addChild(trailContainer);
+        this.textColorLayer.addChild(text);
         this.pixiCrateResources.getResources().crateMeshes.push({
             id: crate.id,
             mesh,

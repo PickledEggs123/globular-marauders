@@ -157,11 +157,11 @@ export class PlanetResources {
             for (const item of this.cachedResources.planetMeshes.filter((m: any) => m.tick !== pixiTick || this.game.clearMeshes)) {
                 this.game.colorLayer.removeChild(item.mesh);
                 this.game.application.stage.removeChild(item.faction);
-                this.game.application.stage.removeChild(item.textName);
-                this.game.application.stage.removeChild(item.textTitle);
-                this.game.application.stage.removeChild(item.textResource1);
-                this.game.application.stage.removeChild(item.textResource2);
-                this.game.application.stage.removeChild(item.textResource3);
+                this.game.textColorLayer.removeChild(item.textName);
+                this.game.textColorLayer.removeChild(item.textTitle);
+                this.game.textColorLayer.removeChild(item.textResource1);
+                this.game.textColorLayer.removeChild(item.textResource2);
+                this.game.textColorLayer.removeChild(item.textResource3);
             }
             this.cachedResources.planetMeshes = this.cachedResources.planetMeshes.filter((m: any) => m.tick === pixiTick && !this.game.clearMeshes);
         };

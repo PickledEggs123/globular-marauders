@@ -224,10 +224,10 @@ export class CrateResources {
                 }
             }
             for (const item of this.cachedResources.crateMeshes.filter((m: any) => m.tick !== pixiTick || this.game.clearMeshes)) {
-                this.game.application.stage.removeChild(item.mesh);
-                this.game.application.stage.removeChild(item.trailContainer);
-                this.game.application.stage.removeChild(item.image);
-                this.game.application.stage.removeChild(item.text);
+                this.game.projectileColorLayer.removeChild(item.mesh);
+                this.game.projectileColorLayer.removeChild(item.trailContainer);
+                this.game.projectileColorLayer.removeChild(item.image);
+                this.game.textColorLayer.removeChild(item.text);
             }
             this.cachedResources.crateMeshes = this.cachedResources.crateMeshes.filter((m: any) => m.tick === pixiTick && !this.game.clearMeshes);
         };

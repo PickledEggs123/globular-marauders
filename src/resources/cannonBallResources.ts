@@ -109,8 +109,8 @@ export class CannonBallResources {
                 }
             }
             for (const item of this.cachedResources.cannonBallMeshes.filter((m: any) => m.tick !== pixiTick || this.game.clearMeshes)) {
-                this.game.application.stage.removeChild(item.mesh);
-                this.game.application.stage.removeChild(item.trailContainer);
+                this.game.projectileColorLayer.removeChild(item.mesh);
+                this.game.projectileColorLayer.removeChild(item.trailContainer);
             }
             this.cachedResources.cannonBallMeshes = this.cachedResources.cannonBallMeshes.filter((m: any) => m.tick === pixiTick && !this.game.clearMeshes);
         };

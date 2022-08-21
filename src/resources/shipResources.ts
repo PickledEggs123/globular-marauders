@@ -355,14 +355,14 @@ export class ShipResources {
             for (const item of this.cachedResources.shipMeshes.filter((m: any) => m.tick !== pixiTick || this.game.clearMeshes)) {
                 this.game.colorLayer.removeChild(item.mesh);
                 this.game.depthLayer.removeChild(item.depthMesh);
-                this.game.application.stage.removeChild(item.text);
+                this.game.textColorLayer.removeChild(item.text);
                 this.game.application.stage.removeChild(item.line);
                 this.game.application.stage.removeChild(item.cannonBallLeft);
                 this.game.application.stage.removeChild(item.cannonBallRight);
                 this.game.application.stage.removeChild(item.health);
                 item.trail.emit = false;
                 item.trail.destroy();
-                this.game.application.stage.removeChild(item.trailContainer);
+                this.game.projectileColorLayer.removeChild(item.trailContainer);
                 for (const autoPilotLine of item.autoPilotLines) {
                     this.game.application.stage.removeChild(autoPilotLine);
                 }

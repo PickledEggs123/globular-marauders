@@ -99,6 +99,7 @@ import galleonMeshJson from "@pickledeggs123/globular-marauders-generator/meshes
 import {DepthOutlineFilter} from "../filters/DepthOutline/DepthOutlineFilter";
 import {RenderMobileGameUiTop} from "./RenderMobileGameUiTop";
 import {RenderMobileGameUiBottom} from "./RenderMobileGameUiBottom";
+import {LayerCompositeFilter} from "../filters/LayerComposite/LayerCompositeFilter";
 
 const GetFactionSubheader = (faction: EFaction): string | null => {
     switch (faction) {
@@ -122,8 +123,12 @@ export class PixiGame extends PixiGameNetworking {
     public particleContainer: PIXI.Container;
     public colorLayer: Layer;
     public depthLayer: Layer;
+    public projectileColorLayer: Layer;
+    public textColorLayer: Layer;
     public staticStage: Stage;
     public depthOutlineFilter: DepthOutlineFilter;
+    public projectileFilter: LayerCompositeFilter;
+    public textFilter: LayerCompositeFilter;
     public starField: particles.Emitter | undefined;
 
     // game loop stuff
@@ -662,6 +667,12 @@ export class PixiGame extends PixiGameNetworking {
         this.colorLayer.useRenderTexture = true;
         this.colorLayer.getRenderTexture().framebuffer.addDepthTexture();
         this.staticStage.addChild(this.colorLayer);
+        this.projectileColorLayer = new Layer();
+        this.projectileColorLayer.useRenderTexture = true;
+        this.staticStage.addChild(this.projectileColorLayer);
+        this.textColorLayer = new Layer();
+        this.textColorLayer.useRenderTexture = true;
+        this.staticStage.addChild(this.textColorLayer);
 
         // ship depth
         this.depthLayer = new Layer();
@@ -669,7 +680,9 @@ export class PixiGame extends PixiGameNetworking {
         this.depthLayer.getRenderTexture().framebuffer.addDepthTexture();
         this.staticStage.addChild(this.depthLayer);
         this.depthOutlineFilter = new DepthOutlineFilter(this, Math.floor(this.state.width / 2), Math.floor(this.state.height / 2));
-        this.application.stage.filters = [this.depthOutlineFilter];
+        this.projectileFilter = new LayerCompositeFilter(this, "projectileColorLayer");
+        this.textFilter = new LayerCompositeFilter(this, "textColorLayer");
+        this.application.stage.filters = [this.depthOutlineFilter, this.projectileFilter, this.textFilter];
         this.application.stage.filterArea = this.application.screen;
 
         // draw app
@@ -856,6 +869,12 @@ export class PixiGame extends PixiGameNetworking {
             this.depthOutlineFilter.width = Math.floor(this.state.width / 2);
             this.depthOutlineFilter.height = Math.floor(this.state.height / 2);
             this.depthOutlineFilter.updateDepth();
+            this.projectileFilter.width = Math.floor(this.state.width / 2);
+            this.projectileFilter.height = Math.floor(this.state.height / 2);
+            this.projectileFilter.updateDepth();
+            this.textFilter.width = Math.floor(this.state.width / 2);
+            this.textFilter.height = Math.floor(this.state.height / 2);
+            this.textFilter.updateDepth();
         });
     }
 
