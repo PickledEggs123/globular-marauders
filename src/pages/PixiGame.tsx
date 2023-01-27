@@ -100,6 +100,7 @@ import {DepthOutlineFilter} from "../filters/DepthOutline/DepthOutlineFilter";
 import {RenderMobileGameUiTop} from "./RenderMobileGameUiTop";
 import {RenderMobileGameUiBottom} from "./RenderMobileGameUiBottom";
 import {LayerCompositeFilter} from "../filters/LayerComposite/LayerCompositeFilter";
+import {ISetupScriptContext, setupScript} from "../scripts/setup";
 
 const GetFactionSubheader = (faction: EFaction): string | null => {
     switch (faction) {
@@ -504,7 +505,12 @@ export class PixiGame extends PixiGameNetworking {
                         return null;
                     }
                 };
+
+                const context: ISetupScriptContext = {
+                    playerData: tutorialPlayerData,
+                };
                 this.initialized = true;
+                serverGame.scriptEvents.push(setupScript.call(this, serverGame, context));
 
                 this.setState({
                     showSpawnMenu: false,
@@ -1868,13 +1874,7 @@ export class PixiGame extends PixiGameNetworking {
                                                             <ListItemAvatar>
                                                                 <SmartToy/>
                                                             </ListItemAvatar>
-                                                            <ListItemText>Single Player</ListItemText>
-                                                        </ListItem>
-                                                        <ListItem onClick={this.handleSwitchGameMode.bind(this, EGameMode.MULTI_PLAYER)}>
-                                                            <ListItemAvatar>
-                                                                <People/>
-                                                            </ListItemAvatar>
-                                                            <ListItemText>Multiplayer</ListItemText>
+                                                            <ListItemText>Play Game</ListItemText>
                                                         </ListItem>
                                                     </List>
                                                 </CardContent>

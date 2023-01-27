@@ -22,22 +22,57 @@ export const hexToRgb = (hex: string): [number, number, number, number] => {
     ];
 };
 
+// a combined polar mapping using both poles to compute the correction factor theta
+export interface IPositionPolarData {
+    north: [number, number];
+    south: [number, number];
+}
+
 // compute polar position of position
-export const convertPositionQuaternionToPositionPolar = (q: Quaternion): [number, number] => {
-    const point = q.rotateVector([0, 0, 1]);
-    const polarCoordinate = {
-        angle: Math.atan2(point[1], point[0]),
-        radius: Math.acos(point[2])
+export const convertPositionQuaternionToPositionPolar = (q: Quaternion): IPositionPolarData => {
+    const pointNorth = q.rotateVector([0, 0, 1]);
+    const polarCoordinateNorth = {
+        angle: Math.atan2(pointNorth[1], pointNorth[0]),
+        radius: Math.acos(pointNorth[2]),
     };
-    const coordinate = {
-        x: Math.cos(polarCoordinate.angle) * polarCoordinate.radius / Math.PI,
-        y: Math.sin(polarCoordinate.angle) * polarCoordinate.radius / Math.PI
+    const pointSouth = q.rotateVector([0, 0, -1]);
+    const polarCoordinateSouth = {
+        radius: Math.acos(pointSouth[2]),
     };
-    return [coordinate.x, coordinate.y];
+    // generate north polar mapping
+    const coordinateNorth = {
+        x: Math.cos(polarCoordinateNorth.angle) * polarCoordinateNorth.radius / Math.PI,
+        y: Math.sin(polarCoordinateNorth.angle) * polarCoordinateNorth.radius / Math.PI
+    };
+    // generate south polar mapping
+    const coordinateSouth = {
+        x: Math.cos(polarCoordinateNorth.angle) * polarCoordinateSouth.radius / Math.PI,
+        y: Math.sin(polarCoordinateNorth.angle) * polarCoordinateSouth.radius / Math.PI
+    };
+    return {
+        north: [coordinateNorth.x, coordinateNorth.y],
+        south: [coordinateSouth.x, coordinateSouth.y]
+    };
 };
-export const isPositionPolarDifferent = (a: [number, number], b: [number, number]): boolean => {
-    return Math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2) > 0.0001;
+export const isPositionPolarDifferent = (a: IPositionPolarData, b: IPositionPolarData): boolean => {
+    // pick north mapping or south mapping
+    const magnitudeNorth = Math.sqrt((a.north[0] ** 2) + (a.north[1] ** 2));
+    if (magnitudeNorth < 0.8) {
+        // return north mapping value
+        return Math.sqrt((b.north[0] - a.north[0]) ** 2 + (b.north[1] - a.north[1]) ** 2) > 0.01;
+    } else {
+        // return south mapping value
+        return Math.sqrt((b.south[0] - a.south[0]) ** 2 + (b.south[1] - a.south[1]) ** 2) > 0.01;
+    }
 };
-export const computePositionPolarCorrectionFactorTheta = (a: [number, number], b: [number, number]): number => {
-    return Math.atan2(b[1] - a[1], b[0] - a[0]);
+export const computePositionPolarCorrectionFactorTheta = (a: IPositionPolarData, b: IPositionPolarData): number => {
+    // pick north mapping or south mapping
+    const magnitudeNorth = Math.sqrt((a.north[0] ** 2) + (a.north[1] ** 2));
+    if (magnitudeNorth < 0.8) {
+        // return north mapping value
+        return Math.atan2(b.north[1] - a.north[1], b.north[0] - a.north[0]);
+    } else {
+        // return south mapping value
+        return Math.atan2(b.south[1] - a.south[1], b.south[0] - a.south[0]) + Math.PI;
+    }
 };

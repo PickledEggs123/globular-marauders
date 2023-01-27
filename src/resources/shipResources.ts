@@ -1,7 +1,7 @@
 import {
     computePositionPolarCorrectionFactorTheta,
     convertPositionQuaternionToPositionPolar,
-    hexToRgb,
+    hexToRgb, IPositionPolarData,
     isPositionPolarDifferent
 } from "../helpers/pixiHelpers";
 import {EFaction} from "@pickledeggs123/globular-marauders-game/lib/src/EFaction";
@@ -234,8 +234,8 @@ export class ShipResources {
             isPlayer: boolean,
             isEnemy: boolean,
             position: Quaternion,
-            positionPolarNew: [number, number],
-            positionPolarOld: [number, number],
+            positionPolarNew: IPositionPolarData,
+            positionPolarOld: IPositionPolarData,
             correctionFactorTheta: number,
             orientation: Quaternion,
             positionVelocity: Quaternion,
