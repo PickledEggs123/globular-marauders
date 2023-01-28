@@ -1,7 +1,6 @@
 import React, {useState} from "react";
 import {
     AppBar,
-    Button,
     Drawer,
     Grid, IconButton,
     List,
@@ -11,7 +10,7 @@ import {
     Toolbar,
     Typography
 } from "@mui/material";
-import {Home, Person, PieChart, PlayArrow, Public, QuestionMark, Sailing} from "@mui/icons-material";
+import {Menu, MenuOpen, Person, PieChart, PlayArrow, Public, QuestionMark, Sailing} from "@mui/icons-material";
 import PixiGame from "./pages/PixiGame";
 import {Link} from "react-router-dom";
 
@@ -37,7 +36,7 @@ export const WebsiteDrawer = ({rightSide}: {
                                 onKeyDown={PixiGame.cancelSpacebar.bind(this)}
                                 onClick={toggle}
                             >
-                                <Home/>
+                                {open ? <MenuOpen/> : <Menu/>}
                             </IconButton>
                             <Typography variant="h4" color="inherit" style={{flexGrow: 1}} textAlign="center">
                                 Globular Marauders
