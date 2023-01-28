@@ -13,10 +13,14 @@ interface IThetaTableData {
     deltaSouth: number;
     theta2: number;
     delta2: number;
+    rotationOffset: number;
+    rotationDelta: number;
 }
 
 export const GameModel = () => {
     const [thetaTable, setThetaTable] = useState<IThetaTableData[]>([]);
+
+    const numPoints = 40;
 
     const drawGraph = () => {
         const getPoints = () => {
@@ -26,8 +30,8 @@ export const GameModel = () => {
             let position = new Quaternion(0, Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1);
             position = position.normalize();
             const randomAngle = Math.random() * Math.PI * 2;
-            const positionVelocity = Quaternion.fromBetweenVectors([0, 0, 1], [Math.cos(randomAngle), Math.sin(randomAngle), 0]).pow(1 / 10);
-            for (let step = 0; step < 40; step++) {
+            const positionVelocity = Quaternion.fromBetweenVectors([0, 0, 1], [Math.cos(randomAngle), Math.sin(randomAngle), 0]).pow(1 / (numPoints / 4));
+            for (let step = 0; step < numPoints; step++) {
                 const point = position.rotateVector([0, 0, 1]);
                 const polarCoordinateNorth = {
                     angle: Math.atan2(point[1], point[0]),
@@ -41,8 +45,8 @@ export const GameModel = () => {
                     y: Math.sin(polarCoordinateNorth.angle) * polarCoordinateNorth.radius / Math.PI
                 };
                 const coordinateSouth = {
-                    x: -Math.cos(polarCoordinateNorth.angle) * polarCoordinateSouth.radius / Math.PI,
-                    y: -Math.sin(polarCoordinateNorth.angle) * polarCoordinateSouth.radius / Math.PI
+                    x: Math.cos(polarCoordinateNorth.angle) * polarCoordinateSouth.radius / Math.PI,
+                    y: Math.sin(polarCoordinateNorth.angle) * polarCoordinateSouth.radius / Math.PI
                 }
                 pointsNorth.push(coordinateNorth);
                 pointsSouth.push(coordinateSouth);
@@ -103,11 +107,20 @@ export const GameModel = () => {
             }
 
             // draw data
-            for (const coordinate of points) {
+            for (let c = 0; c < points.length - 4; c++) {
+                const coordinate = points[c];
+
                 const x = Math.floor(canvas.width * ((coordinate.x + 1) / 2));
                 const y = Math.floor(canvas.height * ((coordinate.y + 1) / 2));
 
                 setWhitePixel(x, y);
+                if (coordinate === points[0]) {
+                    for (let i = -1; i <= 1 && (x + i) >= 0 && (x + i) < canvas.width; i++) {
+                        for (let j = -1; j <= 1 && (y + j) >= 0 && (y + j) < canvas.height; j++) {
+                            setWhitePixel(x + i, y + j);
+                        }
+                    }
+                }
             }
             ctx.putImageData(image, 0, 0, 0, 0, image.width, image.height);
         };
@@ -115,41 +128,54 @@ export const GameModel = () => {
         drawCanvas("canvasSouth", points.pointsSouth);
 
         // compute theta table
-        const r2d = (x: number) => x / Math.PI * 180;
-        const d2r = (x: number) => x / 180 * Math.PI;
-        const thetaValues: IThetaTableData[] = [];
-        for (let i = 0; i < points.pointsNorth.length; i++) {
-            const aN = points.pointsNorth[i];
-            const bN = points.pointsNorth[(i + 1) % points.pointsNorth.length];
-            const aS = points.pointsSouth[i];
-            const bS = points.pointsSouth[(i + 1) % points.pointsSouth.length];
-            const thetaN = Math.atan2(bN.y - aN.y, bN.x - aN.x);
-            const thetaS = VoronoiGraph.angularDistance([1, 0, 0], Quaternion.fromAxisAngle([0, 0, 1], Math.atan2(bS.y - aS.y, bS.x - aS.x)).rotateVector([1, 0, 0]), 1);
-            const thetaNorth = r2d(thetaN);
-            const thetaSouth = r2d(thetaS);
-            const theta2 = Math.sqrt(aN.x ** 2 + aN.y ** 2) < 0.5 ? thetaNorth : thetaSouth;
-            thetaValues.push({
-                thetaNorth,
-                deltaNorth: 0,
-                thetaSouth,
-                deltaSouth: 0,
-                theta2,
-                delta2: 0,
-                southPoleDistance: 0
-            });
-        }
-        for (let i = 0; i < points.pointsSouth.length; i++) {
-            const a = points.pointsSouth[i];
-            const t = thetaValues[i];
-            t.southPoleDistance = Math.sqrt(a.x ** 2 + a.y ** 2);
-        }
-        for (let i = 0; i < thetaValues.length; i++) {
-            const a = thetaValues[i];
-            const b = thetaValues[(i + 1) % thetaValues.length];
-            a.deltaNorth = r2d(VoronoiGraph.angularDistance(Quaternion.fromAxisAngle([0, 0, 1], d2r(b.thetaNorth)).rotateVector([1, 0, 0]), Quaternion.fromAxisAngle([0, 0, 1], d2r(a.thetaNorth)).rotateVector([1, 0, 0]), 1));
-            a.deltaSouth = r2d(VoronoiGraph.angularDistance(Quaternion.fromAxisAngle([0, 0, 1], d2r(b.thetaSouth)).rotateVector([1, 0, 0]), Quaternion.fromAxisAngle([0, 0, 1], d2r(a.thetaSouth)).rotateVector([1, 0, 0]), 1));
-            a.delta2 = r2d(VoronoiGraph.angularDistance(Quaternion.fromAxisAngle([0, 0, 1], d2r(b.theta2)).rotateVector([1, 0, 0]), Quaternion.fromAxisAngle([0, 0, 1], d2r(a.theta2)).rotateVector([1, 0, 0]), 1));
-        }
+        const getThetaTable = (data: {pointsNorth: Array<{x: number, y: number}>, pointsSouth: Array<{x: number, y: number}>}) => {
+            const r2d = (x: number) => x / Math.PI * 180;
+            const d2r = (x: number) => x / 180 * Math.PI;
+            const dataValues: IThetaTableData[] = [];
+            for (let i = 0; i < data.pointsNorth.length; i++) {
+                const aN = data.pointsNorth[i];
+                const bN = data.pointsNorth[(i + 1) % data.pointsNorth.length];
+                const aS = data.pointsSouth[i];
+                const bS = data.pointsSouth[(i + 1) % data.pointsSouth.length];
+                const thetaN = Math.atan2(bN.y - aN.y, bN.x - aN.x);
+                const thetaS = VoronoiGraph.angularDistance([1, 0, 0], Quaternion.fromAxisAngle([0, 0, 1], Math.atan2(bS.y - aS.y, bS.x - aS.x)).rotateVector([1, 0, 0]), 1);
+                const thetaNorth = r2d(thetaN);
+                const thetaSouth = r2d(thetaS);
+                const rotationOffset = r2d(Math.atan2(aN.y, aN.x));
+                const theta2 = thetaNorth;
+                dataValues.push({
+                    thetaNorth,
+                    deltaNorth: 0,
+                    thetaSouth,
+                    deltaSouth: 0,
+                    theta2,
+                    delta2: 0,
+                    southPoleDistance: 0,
+                    rotationOffset,
+                    rotationDelta: 0
+                });
+            }
+            for (let i = 0; i < data.pointsSouth.length; i++) {
+                const a = data.pointsSouth[i];
+                const t = dataValues[i];
+                t.southPoleDistance = Math.sqrt(a.x ** 2 + a.y ** 2);
+            }
+            const getValue = (k: keyof IThetaTableData, a: IThetaTableData, b: IThetaTableData) => {
+                return r2d(VoronoiGraph.angularDistance(Quaternion.fromAxisAngle([0, 0, 1], d2r(b[k])).rotateVector([1, 0, 0]), Quaternion.fromAxisAngle([0, 0, 1], d2r(a[k])).rotateVector([1, 0, 0]), 1)) *
+                    Math.sign(DelaunayGraph.crossProduct(Quaternion.fromAxisAngle([0, 0, 1], d2r(a[k])).rotateVector([1, 0, 0]), Quaternion.fromAxisAngle([0, 0, 1], d2r(b[k])).rotateVector([1, 0, 0]))[2]);
+            };
+            for (let i = 0; i < dataValues.length; i++) {
+                const a = dataValues[i];
+                const b = dataValues[(i + 1) % dataValues.length];
+                a.deltaNorth = getValue("thetaNorth", a, b);
+                a.deltaSouth = getValue("thetaSouth", a, b);
+                a.rotationDelta = getValue("rotationOffset", a, b);
+
+                // try to compress the rotation to negate its effect using spring equation
+            }
+            return dataValues;
+        };
+        const thetaValues = getThetaTable(points);
         setThetaTable(thetaValues);
     };
     useEffect(() => {
@@ -170,37 +196,61 @@ export const GameModel = () => {
                             <CardContent>
                                 <Grid container xs={12} spacing={2}>
                                     <Grid item xs={12} md={6}>
-                                        <Typography variant="h6">North Polar Chart</Typography>
-                                        <canvas id="canvasNorth" width={256} height={256}></canvas>
+                                        <Card>
+                                            <CardHeader title="North Polar Chart">
+                                            </CardHeader>
+                                            <CardContent>
+                                                <canvas id="canvasNorth" width={256} height={256}></canvas>
+                                                <br/>
+                                                <Typography variant="caption">Big dot is the start of the path.</Typography>
+                                            </CardContent>
+                                        </Card>
                                     </Grid>
                                     <Grid item xs={12} md={6}>
-                                        <Typography variant="h6">South Polar Chart</Typography>
-                                        <canvas id="canvasSouth" width={256} height={256}></canvas>
+                                        <Card>
+                                            <CardHeader title="South Polar Chart">
+                                            </CardHeader>
+                                            <CardContent>
+                                                <canvas id="canvasSouth" width={256} height={256}></canvas>
+                                                <br/>
+                                                <Typography variant="caption">Big dot is the start of the path.</Typography>
+                                            </CardContent>
+                                        </Card>
                                     </Grid>
-                                    <Grid item xs={12} md={6}>
-                                        <Typography variant="h6">Theta Correction Chart</Typography>
-                                        <table>
-                                            <tr>
-                                                <th>Step</th>
-                                                <th>South Pole Distance</th>
-                                                <th>Theta Correction v1</th>
-                                                <th>Theta Change v1</th>
-                                                <th>Theta Correction v2</th>
-                                                <th>Theta Change v2</th>
-                                            </tr>
-                                            {
-                                                thetaTable.map(({thetaNorth, deltaNorth, southPoleDistance, theta2, delta2}, i) => (
-                                                    <tr style={{color: delta2 > 360 / 20 ? "red" : undefined, fontWeight: southPoleDistance < 0.1 ? "bold" : undefined}}>
-                                                        <td>{i}</td>
-                                                        <td>{southPoleDistance}</td>
-                                                        <td>{thetaNorth}</td>
-                                                        <td>{deltaNorth}</td>
-                                                        <td>{theta2}</td>
-                                                        <td>{delta2}</td>
+                                    <Grid item xs={12} md={6} style={{maxHeight: 500, overflowY: "scroll"}}>
+                                        <Card>
+                                            <CardHeader title="Theta Correction Chart">
+                                            </CardHeader>
+                                            <CardContent>
+                                                <table>
+                                                    <tr>
+                                                        <th>Step</th>
+                                                        <th>South Pole</th>
+                                                        <th>Theta v1</th>
+                                                        <th>TD v1</th>
+                                                        <th>RO</th>
+                                                        <th>RD</th>
+                                                        <th>Theta v2</th>
+                                                        <th>TD v2</th>
                                                     </tr>
-                                                ))
-                                            }
-                                        </table>
+                                                    {
+                                                        thetaTable.map(({thetaNorth, deltaNorth, southPoleDistance, rotationOffset, rotationDelta, theta2, delta2}, i) => (
+                                                            <tr style={{fontWeight: southPoleDistance < 0.2 ? "bold" : southPoleDistance > 0.5 ? "100" : "500"}}>
+                                                                <td>{i}</td>
+                                                                <td>{southPoleDistance.toFixed(3)}</td>
+                                                                <td>{thetaNorth.toFixed(3)}</td>
+                                                                <td style={{color: Math.abs(deltaNorth) > 360 / (numPoints / 2) ? "red" : undefined}}>{deltaNorth.toFixed(3)}</td>
+                                                                <td>{rotationOffset.toFixed(3)}</td>
+                                                                <td style={{color: Math.abs(rotationDelta) > 360 / (numPoints / 2) ? "red" : undefined}}>{rotationDelta.toFixed(3)}</td>
+                                                                <td>{theta2.toFixed(3)}</td>
+                                                                <td style={{color: Math.abs(delta2) > 360 / (numPoints / 2) ? "red" : undefined}}>{delta2.toFixed(3)}</td>
+                                                            </tr>
+                                                        ))
+                                                    }
+                                                </table>
+                                                <Typography variant="caption">Bold is near the south pole which is problematic. Red is problematic data which causes positive or negative rotation. Depending on the clockwise or counter-clockwise movement around the pole, you drift left (clockwise) or right (counter-clockwise).</Typography>
+                                            </CardContent>
+                                        </Card>
                                     </Grid>
                                 </Grid>
                                 <Button onClick={() => {
@@ -224,6 +274,7 @@ export const GameModel = () => {
                                     the rotation bug, this would require storing two positions. The two positions are projected onto this pizza pie chart and
                                     the angle between the two points are computed. This correction value is then added to the angle.
                                 </Typography>
+                                <br/>
                                 <Typography variant="body1">
                                     Added the Theta Correction Chart to experiment with multiple polar charts to make the transition
                                     between hemispheres more smooth. The original code had an error where when you moved near

@@ -53,10 +53,14 @@ export const convertPositionQuaternionToPositionPolar = (q: Quaternion): IPositi
         south: [coordinateSouth.x, coordinateSouth.y]
     };
 };
+const useNorthCoordinates = (a: IPositionPolarData) => {
+    const magnitudeNorth = Math.sqrt((a.north[0] ** 2) + (a.north[1] ** 2));
+    return magnitudeNorth < 0.5 || true;
+};
 export const isPositionPolarDifferent = (a: IPositionPolarData, b: IPositionPolarData): boolean => {
     // pick north mapping or south mapping
-    const magnitudeNorth = Math.sqrt((a.north[0] ** 2) + (a.north[1] ** 2));
-    if (magnitudeNorth < 0.5) {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    if (useNorthCoordinates(a)) {
         // return north mapping value
         return Math.sqrt((b.north[0] - a.north[0]) ** 2 + (b.north[1] - a.north[1]) ** 2) > 0.01;
     } else {
@@ -66,8 +70,8 @@ export const isPositionPolarDifferent = (a: IPositionPolarData, b: IPositionPola
 };
 export const computePositionPolarCorrectionFactorTheta = (a: IPositionPolarData, b: IPositionPolarData): number => {
     // pick north mapping or south mapping
-    const magnitudeNorth = Math.sqrt((a.north[0] ** 2) + (a.north[1] ** 2));
-    if (magnitudeNorth < 0.5) {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    if (useNorthCoordinates(a)) {
         // return north mapping value
         return Math.atan2(b.north[1] - a.north[1], b.north[0] - a.north[0]);
     } else {
