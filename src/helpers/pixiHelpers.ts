@@ -47,7 +47,7 @@ export const convertPositionQuaternionToPositionPolar = (q: Quaternion): IPositi
 };
 const useNorthCoordinates = (a: IPositionPolarData) => {
     const magnitudeNorth = Math.sqrt((a.north[0] ** 2) + (a.north[1] ** 2));
-    return magnitudeNorth < 0.8
+    return magnitudeNorth < 0.8 || true;
 };
 export const isPositionPolarDifferent = (a: IPositionPolarData, b: IPositionPolarData): boolean => {
     // pick north mapping or south mapping
@@ -60,7 +60,7 @@ export const isPositionPolarDifferent = (a: IPositionPolarData, b: IPositionPola
         return Math.abs(b.rotationOffset - a.rotationOffset) > Math.PI / 40;
     }
 };
-export const computePositionPolarCorrectionFactorTheta = (a: IPositionPolarData, b: IPositionPolarData, cameraPosition: Quaternion): number => {
+export const computePositionPolarCorrectionFactorTheta = (a: IPositionPolarData, b: IPositionPolarData): number => {
     // pick north mapping or south mapping
     // eslint-disable-next-line react-hooks/rules-of-hooks
     if (useNorthCoordinates(a)) {
@@ -68,8 +68,6 @@ export const computePositionPolarCorrectionFactorTheta = (a: IPositionPolarData,
         return Math.atan2(b.north[1] - a.north[1], b.north[0] - a.north[0]);
     } else {
         // return south mapping value
-        const cameraPositionPoint = cameraPosition.rotateVector([0, 0, 1]);
-        const cameraRotationOffset = Math.atan2(cameraPositionPoint[1], cameraPositionPoint[0]);
-        return 2 * (b.rotationOffset - cameraRotationOffset) - Math.PI / 2;
+        return Math.atan2(b.north[1] - a.north[1], b.north[0] - a.north[0]);
     }
 };
