@@ -307,7 +307,7 @@ export class ShipResources {
                     if (isPositionPolarDifferent(shipMesh.positionPolarNew, currentPositionPolar)) {
                         shipMesh.positionPolarOld = shipMesh.positionPolarNew;
                         shipMesh.positionPolarNew = currentPositionPolar;
-                        shipMesh.correctionFactorTheta = -computePositionPolarCorrectionFactorTheta(shipMesh.positionPolarOld, shipMesh.positionPolarNew) + Math.PI / 2;
+                        shipMesh.correctionFactorTheta = -computePositionPolarCorrectionFactorTheta(shipMesh.positionPolarOld, shipMesh.positionPolarNew, this.game.cameraPosition) + Math.PI / 2;
                         if (ship === this.game.findPlayerShip()) {
                             this.game.cameraCorrectionFactor = shipMesh.correctionFactorTheta;
                         }

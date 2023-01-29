@@ -11,8 +11,6 @@ interface IThetaTableData {
     southPoleDistance: number;
     thetaSouth: number;
     deltaSouth: number;
-    theta2: number;
-    delta2: number;
     rotationOffset: number;
     rotationDelta: number;
 }
@@ -142,14 +140,11 @@ export const GameModel = () => {
                 const thetaNorth = r2d(thetaN);
                 const thetaSouth = r2d(thetaS);
                 const rotationOffset = r2d(Math.atan2(aN.y, aN.x));
-                const theta2 = thetaNorth;
                 dataValues.push({
                     thetaNorth,
                     deltaNorth: 0,
                     thetaSouth,
                     deltaSouth: 0,
-                    theta2,
-                    delta2: 0,
                     southPoleDistance: 0,
                     rotationOffset,
                     rotationDelta: 0
@@ -170,8 +165,6 @@ export const GameModel = () => {
                 a.deltaNorth = getValue("thetaNorth", a, b);
                 a.deltaSouth = getValue("thetaSouth", a, b);
                 a.rotationDelta = getValue("rotationOffset", a, b);
-
-                // try to compress the rotation to negate its effect using spring equation
             }
             return dataValues;
         };
@@ -230,11 +223,9 @@ export const GameModel = () => {
                                                         <th>TD v1</th>
                                                         <th>RO</th>
                                                         <th>RD</th>
-                                                        <th>Theta v2</th>
-                                                        <th>TD v2</th>
                                                     </tr>
                                                     {
-                                                        thetaTable.map(({thetaNorth, deltaNorth, southPoleDistance, rotationOffset, rotationDelta, theta2, delta2}, i) => (
+                                                        thetaTable.map(({thetaNorth, deltaNorth, southPoleDistance, rotationOffset, rotationDelta}, i) => (
                                                             <tr style={{fontWeight: southPoleDistance < 0.2 ? "bold" : southPoleDistance > 0.5 ? "100" : "500"}}>
                                                                 <td>{i}</td>
                                                                 <td>{southPoleDistance.toFixed(3)}</td>
@@ -242,8 +233,6 @@ export const GameModel = () => {
                                                                 <td style={{color: Math.abs(deltaNorth) > 360 / (numPoints / 2) ? "red" : undefined}}>{deltaNorth.toFixed(3)}</td>
                                                                 <td>{rotationOffset.toFixed(3)}</td>
                                                                 <td style={{color: Math.abs(rotationDelta) > 360 / (numPoints / 2) ? "red" : undefined}}>{rotationDelta.toFixed(3)}</td>
-                                                                <td>{theta2.toFixed(3)}</td>
-                                                                <td style={{color: Math.abs(delta2) > 360 / (numPoints / 2) ? "red" : undefined}}>{delta2.toFixed(3)}</td>
                                                             </tr>
                                                         ))
                                                     }
