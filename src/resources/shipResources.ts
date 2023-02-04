@@ -85,9 +85,10 @@ export class ShipResources {
                 }
 
                 const shipGeometry = new PIXI.Geometry();
-                const shipGeometryData: { position: number[], color: number[], index: number[] } = {
+                const shipGeometryData: { position: number[], color: number[], normal: number[], index: number[] } = {
                     position: [],
                     color: [],
+                    normal: [],
                     index: []
                 };
                 let shipColor = [1, 1, 1];
@@ -172,7 +173,8 @@ export class ShipResources {
                     const startIndex = shipGeometryData.index.reduce((acc, a) => Math.max(acc, a + 1), 0);
                     const aPosition = gltfData.attributes.find(x => x.id === "aPosition");
                     const aColor = gltfData.attributes.find(x => x.id === "aColor");
-                    if (aPosition && aColor) {
+                    const aNormal = gltfData.attributes.find(x => x.id === "aNormal");
+                    if (aPosition && aColor && aNormal) {
                         for (let i = 0; i < aPosition.buffer.length; i += 3) {
                             const p = [aPosition.buffer[i], aPosition.buffer[i + 1], aPosition.buffer[i + 2]] as [number, number, number];
                             const p2 = q.rotateVector(p);
@@ -180,6 +182,10 @@ export class ShipResources {
                                 p2[i] *= 6;
                             }
                             shipGeometryData.position.push(...p2);
+                        }
+                        for (let i = 0; i < aNormal.buffer.length; i += 3) {
+                            const p = [aNormal.buffer[i], aNormal.buffer[i + 1], aNormal.buffer[i + 2]] as [number, number, number];
+                            shipGeometryData.normal.push(...p);
                         }
                         for (let i = 0; i < aColor.buffer.length; i += 3) {
                             const r = aColor.buffer[i];
@@ -200,6 +206,7 @@ export class ShipResources {
                 // construct geometry
                 shipGeometry.addAttribute("aPosition", shipGeometryData.position, 3);
                 shipGeometry.addAttribute("aColor", shipGeometryData.color, 3);
+                shipGeometry.addAttribute("aNormal", shipGeometryData.normal, 3);
                 shipGeometry.addIndex(shipGeometryData.index);
 
                 // add to map

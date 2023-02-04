@@ -54,7 +54,7 @@ export const isPositionPolarDifferent = (a: IPositionPolarData, b: IPositionPola
     // eslint-disable-next-line react-hooks/rules-of-hooks
     if (useNorthCoordinates(a)) {
         // return north mapping value
-        return Math.sqrt((b.north[0] - a.north[0]) ** 2 + (b.north[1] - a.north[1]) ** 2) > 0.01;
+        return Math.sqrt((b.north[0] - a.north[0]) ** 2 + (b.north[1] - a.north[1]) ** 2) > 0.0001;
     } else {
         // return south mapping value
         return Math.abs(b.rotationOffset - a.rotationOffset) > Math.PI / 40;

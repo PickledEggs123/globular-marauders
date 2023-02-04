@@ -7,6 +7,7 @@ export const getSpecialShipProgram = () => {
                 
                 attribute vec3 aPosition;
                 attribute vec3 aColor;
+                attribute vec3 aNormal;
                 
                 uniform mat4 uCameraPosition;
                 uniform mat4 uCameraOrientation;
@@ -22,9 +23,11 @@ export const getSpecialShipProgram = () => {
                 
                 varying vec3 vColor;
                 varying vec4 vPosition;
+                varying vec3 vNormal;
                 
                 void main() {
                     vColor = aColor;
+                    vNormal = aNormal;
                     
                     // the camera orientation
                     vec4 cameraOrientationPoint = uCameraOrientation * vec4(1.0, 0.0, 0.0, 0.0);
@@ -86,9 +89,10 @@ export const getSpecialShipProgram = () => {
                 
                 varying vec3 vColor;
                 varying vec4 vPosition;
+                varying vec3 vNormal;
                 
                 void main() {
-                    gl_FragColor = vec4(vColor, 1.0);
+                    gl_FragColor = vec4(vColor * (0.3 + 0.7 * max(0.0, dot(vec3(0.0, 1.0, 0.0), vNormal))), 1.0);
                 }
             `;
     const fragmentDepthShader = `
@@ -98,6 +102,7 @@ export const getSpecialShipProgram = () => {
                 
                 varying vec3 vColor;
                 varying vec4 vPosition;
+                varying vec3 vNormal;
                 
                 void main() {
                     float z = clamp((-vPosition.z - 0.5) * 256.0 / uCameraScale, 0.0, 1.0);

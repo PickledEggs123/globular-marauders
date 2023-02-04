@@ -1695,30 +1695,30 @@ export class PixiGame extends PixiGameNetworking {
     renderMobileControls(): React.ReactElement | null {
         return (
             <React.Fragment>
-                <svg width={200} height={200} viewBox="-30 -30 260 260" style={{position: "absolute", top: (this.state.height - 200) / 2, bottom: (this.state.height - 200) / 2, left: 0, userSelect: "none"}}>
+                <svg width={200} height={200} viewBox="-30 -30 260 260" style={{position: "absolute", top: (this.state.height - 200) / 2, bottom: (this.state.height - 200) / 2, left: 0}} className="text-selection-none">
                     <circle fill="grey" stroke="white" opacity={0.3} cx={25} cy={25} r={50}
                             onMouseDown={() => this.handleZoomEvent(1, 10)}
-                            onTouchStart={() => this.handleZoomEvent(1, 10)} style={{userSelect: "none"}}/>
+                            onTouchStart={() => this.handleZoomEvent(1, 10)} className="text-selection-none"/>
                     <circle fill="grey" stroke="white" opacity={0.3} cx={25} cy={175} r={50}
                             onMouseDown={() => this.handleZoomEvent(-1, 10)}
-                            onTouchStart={() => this.handleZoomEvent(-1, 10)} style={{userSelect: "none"}}/>
+                            onTouchStart={() => this.handleZoomEvent(-1, 10)} className="text-selection-none"/>
                     <circle fill="grey" stroke="white" opacity={0.3} cx={100} cy={100} r={50}
                             onMouseDown={() => this.handleTouchDown(" ")} onMouseUp={() => this.handleTouchUp(" ")}
-                            onTouchStart={() => this.handleTouchDown(" ")} onTouchEnd={() => this.handleTouchUp(" ")} style={{userSelect: "none"}}/>
+                            onTouchStart={() => this.handleTouchDown(" ")} onTouchEnd={() => this.handleTouchUp(" ")} className="text-selection-none"/>
                 </svg>
-                <svg width={200} height={200} viewBox="-30 -30 260 260" style={{position: "absolute", top: (this.state.height - 200) / 2, bottom: (this.state.height - 200) / 2, right: 0, userSelect: "none"}}>
+                <svg width={200} height={200} viewBox="-30 -30 260 260" style={{position: "absolute", top: (this.state.height - 200) / 2, bottom: (this.state.height - 200) / 2, right: 0}} className="text-selection-none">
                     <circle fill="grey" stroke="white" opacity={0.3} cx={100} cy={25} r={50}
                             onMouseDown={() => this.handleTouchDown("w")} onMouseUp={() => this.handleTouchUp("w")}
-                            onTouchStart={() => this.handleTouchDown("w")} onTouchEnd={() => this.handleTouchUp("w")} style={{userSelect: "none"}}/>
+                            onTouchStart={() => this.handleTouchDown("w")} onTouchEnd={() => this.handleTouchUp("w")} className="text-selection-none"/>
                     <circle fill="grey" stroke="white" opacity={0.3} cx={100} cy={175} r={50}
                             onMouseDown={() => this.handleTouchDown("s")} onMouseUp={() => this.handleTouchUp("s")}
-                            onTouchStart={() => this.handleTouchDown("s")} onTouchEnd={() => this.handleTouchUp("s")} style={{userSelect: "none"}}/>
+                            onTouchStart={() => this.handleTouchDown("s")} onTouchEnd={() => this.handleTouchUp("s")} className="text-selection-none"/>
                     <circle fill="grey" stroke="white" opacity={0.3} cx={25} cy={100} r={50}
                             onMouseDown={() => this.handleTouchDown("d")} onMouseUp={() => this.handleTouchUp("d")}
-                            onTouchStart={() => this.handleTouchDown("d")} onTouchEnd={() => this.handleTouchUp("d")} style={{userSelect: "none"}}/>
+                            onTouchStart={() => this.handleTouchDown("d")} onTouchEnd={() => this.handleTouchUp("d")} className="text-selection-none"/>
                     <circle fill="grey" stroke="white" opacity={0.3} cx={175} cy={100} r={50}
                             onMouseDown={() => this.handleTouchDown("a")} onMouseUp={() => this.handleTouchUp("a")}
-                            onTouchStart={() => this.handleTouchDown("a")} onTouchEnd={() => this.handleTouchUp("a")} style={{userSelect: "none"}}/>
+                            onTouchStart={() => this.handleTouchDown("a")} onTouchEnd={() => this.handleTouchUp("a")} className="text-selection-none"/>
                 </svg>
             </React.Fragment>
         );
@@ -1906,7 +1906,7 @@ export class PixiGame extends PixiGameNetworking {
                                 }
                                 {
                                     this.state.showMainMenu ? (
-                                        <Grid item xs={12} justifyContent="center" alignItems="center" style={{marginTop: "20vh"}}>
+                                        <Grid item xs={12} justifyContent="center" alignItems="center">
                                             <Grid container>
                                                 <Grid item xs={12}>
                                                 </Grid>
@@ -1967,7 +1967,7 @@ export class PixiGame extends PixiGameNetworking {
                                 }
                                 {
                                     this.state.showPlanetMenu ? (
-                                        <Grid item xs={12} justifyContent="center" alignItems="center" style={{marginTop: "20vh"}}>
+                                        <Grid item xs={12} justifyContent="center" alignItems="center">
                                             <Grid container>
                                                 <Grid item xs={12}>
                                                     <Button fullWidth variant="contained"
@@ -2036,7 +2036,7 @@ export class PixiGame extends PixiGameNetworking {
                                 }
                                 {
                                     this.state.showSpawnMenu ? (
-                                        <Grid item xs={12} justifyContent="center" alignItems="center" style={{marginTop: "20vh"}}>
+                                        <Grid item xs={12} justifyContent="center" alignItems="center">
                                             <Grid container>
                                                 <Grid item xs={12}>
                                                     <Button fullWidth variant="contained"

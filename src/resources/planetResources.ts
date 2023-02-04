@@ -55,6 +55,7 @@ export class PlanetResources {
                 
                 attribute vec3 aPosition;
                 attribute vec3 aColor;
+                attribute vec3 aNormal;
                 
                 uniform mat4 uCameraPosition;
                 uniform mat4 uCameraOrientation;
@@ -65,6 +66,8 @@ export class PlanetResources {
                 uniform float uWorldScale;
                 
                 varying vec3 vColor;
+                varying vec3 vNormal;
+                varying vec3 vLightPos;
                 
                 void main() {
                     vColor = aColor;
@@ -84,15 +87,19 @@ export class PlanetResources {
                     
                     vec4 pos = translation + vec4((rotation * vec4(aPosition, 1.0)).xyz * uScale * uCameraScale / uWorldScale, 1.0);
                     gl_Position = pos * vec4(1.0 * uWorldScale, 1.0 * uWorldScale, 0.0625, 1);
+                    vNormal = (rotation * vec4(aNormal, 1.0)).xyz;
+                    vLightPos = normalize(vec4(0.0, 0.0, -0.5, 0.0) - translation).xyz;
                 }
             `;
         const planetFragmentShader = `
                 precision mediump float;
                 
                 varying vec3 vColor;
+                varying vec3 vNormal;
+                varying vec3 vLightPos;
                 
                 void main() {
-                    gl_FragColor = vec4(vColor, 1.0);
+                    gl_FragColor = vec4(vColor * (0.3 + 0.7 * max(0.0, dot(vLightPos, vNormal))), 1.0);
                 }
             `;
         const planetProgram = new PIXI.Program(planetVertexShader, planetFragmentShader);

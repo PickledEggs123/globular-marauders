@@ -27,24 +27,28 @@ export const PlanetGenerator = () => {
 
             attribute vec3 aPosition;
             attribute vec3 aColor;
+            attribute vec3 aNormal;
             
             uniform mat4 uRotation;
 
             varying vec3 vColor;
+            varying vec3 vNormal;
 
             void main() {
                 vColor = aColor;
 
                 gl_Position = uRotation * vec4(aPosition, 1.0);
+                vNormal = (uRotation * vec4(aNormal, 1.0)).xyz;
             }
         `;
         const planetFragmentShader = `
             precision mediump float;
 
             varying vec3 vColor;
+            varying vec3 vNormal;
 
             void main() {
-                gl_FragColor = vec4(vColor, 1.0);
+                gl_FragColor = vec4(vColor * (0.3 + 0.7 * max(0.0, dot(vec3(0.0, 0.0, -1.0), vNormal))), 1.0);
             }
         `;
         const planetProgram = new PIXI.Program(planetVertexShader, planetFragmentShader);

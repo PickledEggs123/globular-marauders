@@ -79,11 +79,13 @@ export const ShipWiki = () => {
 
             attribute vec3 aPosition;
             attribute vec3 aColor;
+            attribute vec3 aNormal;
             
             uniform mat4 uRotation;
 
             varying vec3 vColor;
             varying vec4 vPosition;
+            varying vec3 vNormal;
 
             void main() {
                 vColor = aColor;
@@ -91,6 +93,7 @@ export const ShipWiki = () => {
                 float scale = 0.025;
                 vPosition = uRotation * vec4(aPosition, 1.0) * vec4(-scale, -scale, -scale, 1.0);
                 gl_Position = vPosition;
+                vNormal = (uRotation * vec4(aNormal, 1.0)).xyz;
             }
         `;
         const fragmentShader = `
@@ -98,9 +101,10 @@ export const ShipWiki = () => {
 
             varying vec3 vColor;
             varying vec4 vPosition;
+            varying vec3 vNormal;
 
             void main() {
-                gl_FragColor = vec4(vColor, 1.0);;
+                gl_FragColor = vec4(vColor * (0.3 + 0.7 * max(0.0, dot(vec3(0.0, 0.0, 1.0), vNormal))), 1.0);
             }
         `;
         const program = new PIXI.Program(vertexShader, fragmentShader);
@@ -112,7 +116,7 @@ export const ShipWiki = () => {
             varying vec4 vPosition;
 
             void main() {
-                float z = clamp(((vPosition.z * 40.0) + 1.0) / 2.0, 0.0, 1.0);
+                float z = 1.0;
                 gl_FragColor = vec4(z, z, z, 1.0);
             }
         `;

@@ -15,7 +15,7 @@ export class CrateResources {
     private static getFreshData() {
         // generate crates
         const crateGeometry = new PIXI.Geometry();
-        const crateGeometryData: { position: number[], color: number[], index: number[] } = {
+        const crateGeometryData: { position: number[], color: number[], normal: number[], index: number[] } = {
             position: [
                 ...GetHullPoint([0, 0]),
                 ...GetHullPoint([0.1, 0.1]),
@@ -58,6 +58,27 @@ export class CrateResources {
                 0.5, 0.5, 0.3,
                 0.5, 0.5, 0.3,
             ],
+            normal: [
+                0.0, 1.0, 0.0,
+                0.0, 1.0, 0.0,
+                0.0, 1.0, 0.0,
+                0.0, 1.0, 0.0,
+                0.0, 1.0, 0.0,
+                0.0, 1.0, 0.0,
+                0.0, 1.0, 0.0,
+                0.0, 1.0, 0.0,
+                0.0, 1.0, 0.0,
+                0.0, 1.0, 0.0,
+                0.0, 1.0, 0.0,
+                0.0, 1.0, 0.0,
+
+                0.0, 1.0, 0.0,
+                0.0, 1.0, 0.0,
+                0.0, 1.0, 0.0,
+                0.0, 1.0, 0.0,
+                0.0, 1.0, 0.0,
+                0.0, 1.0, 0.0
+            ],
             index: [
                 0, 1, 2,
                 1, 2, 3,
@@ -79,6 +100,7 @@ export class CrateResources {
         };
         crateGeometry.addAttribute("aPosition", crateGeometryData.position, 3);
         crateGeometry.addAttribute("aColor", crateGeometryData.color, 3);
+        crateGeometry.addAttribute("aNormal", crateGeometryData.normal, 3);
         crateGeometry.addIndex(crateGeometryData.index);
 
         // create crate image geometry
