@@ -8,6 +8,10 @@ export class MusicPlayer {
     synthPart: Tone.Sequence | null = null;
 
     public start() {
+        // already playing do nothing
+        if (this.synthPart)
+            return;
+
         this.startTone().catch(err => {
             console.log("FAILED TO START MUSIC", err);
         });

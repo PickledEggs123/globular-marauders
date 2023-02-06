@@ -5,10 +5,10 @@ export const RenderMobileGameUiBottom = (props: {bannerBottomHeight: number, wid
     const svgRef = useRef<SVGSVGElement | null>(null);
 
     useEffect(() => {
-        svgRef.current?.setAttribute("viewBox", `0 0 1000 ${props.bannerBottomHeight * 2}`);
+        svgRef.current?.setAttribute("viewBox", `0 0 1000 ${Math.min(1000, props.bannerBottomHeight * 2)}`);
     }, [svgRef.current, props.bannerBottomHeight, props.width]);
 
     return (
-        <MobileGameUiBottomSvg ref={svgRef} width={props.width} height={props.bannerBottomHeight} style={{position: "absolute", zIndex: -10}}/>
+        <MobileGameUiBottomSvg ref={svgRef} width={props.width} height={props.bannerBottomHeight} style={{position: "absolute", zIndex: 0}}/>
     );
 };

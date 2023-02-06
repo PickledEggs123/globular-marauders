@@ -31,4 +31,5 @@
         <line x1="160" x2="140" y1="6" y2="954" stroke="black"/>
         <line x1="210" x2="190" y1="6" y2="954" stroke="black"/>
     </g>
+    <rect x="460" y="-1000" width="80" height="3000" stroke="black" fill="tan"/>
 </svg>

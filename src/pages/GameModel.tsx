@@ -1,7 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import '../App.scss';
 import {WebsiteDrawer} from "../Drawer";
-import {Button, Card, CardContent, CardHeader, Container, Grid, Typography} from "@mui/material";
+import {Paper, Button, Card, CardContent, CardHeader, Container, Grid, Typography} from "@mui/material";
 import {DelaunayGraph, VoronoiGraph} from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
 import Quaternion from "quaternion";
 
@@ -176,7 +176,7 @@ export const GameModel = () => {
     }, []);
     
     return (
-        <div className="App">
+        <Paper style={{width: "100vw", minHeight: "100vh", height: "fit-content", display: "flex", flexDirection: "column"}}>
             <WebsiteDrawer rightSide={null}/>
             <Container>
                 <Typography variant="h3">
@@ -277,6 +277,6 @@ export const GameModel = () => {
                     </Grid>
                 </Grid>
             </Container>
-        </div>
+        </Paper>
     );
 }

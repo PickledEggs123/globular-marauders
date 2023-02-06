@@ -13,7 +13,7 @@ import {
     MIN_DISTANCE
 } from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
 import {Ship,} from "@pickledeggs123/globular-marauders-game/lib/src/Ship";
-import {EShipType, GetShipData, SHIP_DATA,} from "@pickledeggs123/globular-marauders-game/lib/src/ShipType";
+import {EShipType, GetShipData,} from "@pickledeggs123/globular-marauders-game/lib/src/ShipType";
 import {EFaction,} from "@pickledeggs123/globular-marauders-game/lib/src/EFaction";
 import {
     DelaunayGraph,
@@ -449,6 +449,9 @@ export class PixiGame extends PixiGameNetworking {
                     this.localServerMessages.splice(0, this.localServerMessages.length);
                 }, 100);
 
+                if (this.state.audioEnabled) {
+                    this.music.stop();
+                }
                 break;
             }
             case EGameMode.SINGLE_PLAYER: {
@@ -576,6 +579,10 @@ export class PixiGame extends PixiGameNetworking {
                     this.localServerMessages.splice(0, this.localServerMessages.length);
                     this.singlePlayerFormRequest.splice(0, this.singlePlayerFormRequest.length);
                 }, 100);
+
+                if (this.state.audioEnabled) {
+                    this.music.start();
+                }
                 break;
             }
             case EGameMode.MULTI_PLAYER: {
@@ -1730,7 +1737,7 @@ export class PixiGame extends PixiGameNetworking {
         }
 
         return (
-            <div className="App" style={{width: "100vw", height: "100vh"}}>
+            <Paper style={{width: "100vw", minHeight: "100vh", height: "fit-content", display: "flex", flexDirection: "column"}}>
                 <WebsiteDrawer rightSide={
                     <React.Fragment>
                         <Tooltip title="Settings">
@@ -2269,7 +2276,7 @@ export class PixiGame extends PixiGameNetworking {
                         </div>
                     </div>
                 </div>
-            </div>
+            </Paper>
         );
     }
 }

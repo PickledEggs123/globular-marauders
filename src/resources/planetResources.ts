@@ -99,7 +99,7 @@ export class PlanetResources {
                 varying vec3 vLightPos;
                 
                 void main() {
-                    gl_FragColor = vec4(vColor * (0.3 + 0.7 * max(0.0, dot(vLightPos, vNormal))), 1.0);
+                    gl_FragColor = vec4(vColor * (0.3 + 0.7 * max(0.0, pow(dot(vLightPos, vNormal), 3.0))), 1.0);
                 }
             `;
         const planetProgram = new PIXI.Program(planetVertexShader, planetFragmentShader);

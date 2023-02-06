@@ -1,11 +1,11 @@
 import React from 'react';
 import '../App.scss';
 import {WebsiteDrawer} from "../Drawer";
-import {Card, CardContent, CardHeader, Container, Grid, Typography} from "@mui/material";
+import {Paper, Card, CardContent, CardHeader, Container, Grid, Typography} from "@mui/material";
 
 export const Contact = () => {
     return (
-        <div className="App">
+        <Paper style={{width: "100vw", minHeight: "100vh", height: "fit-content", display: "flex", flexDirection: "column"}}>
             <WebsiteDrawer rightSide={null}/>
             <Container>
                 <Typography variant="h3">
@@ -27,6 +27,6 @@ export const Contact = () => {
                     </Grid>
                 </Grid>
             </Container>
-        </div>
+        </Paper>
     );
 }

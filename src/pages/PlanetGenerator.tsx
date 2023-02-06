@@ -1,7 +1,7 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import '../App.scss';
 import {WebsiteDrawer} from "../Drawer";
-import {Button, Card, CardContent, CardHeader, Container, Grid, Typography} from "@mui/material";
+import {Paper, Button, Card, CardContent, CardHeader, Container, Grid, Typography} from "@mui/material";
 // @ts-ignore
 import {generatePlanet, generatePlanetGltf} from "@pickledeggs123/globular-marauders-generator/dist/helpers";
 import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
@@ -48,7 +48,7 @@ export const PlanetGenerator = () => {
             varying vec3 vNormal;
 
             void main() {
-                gl_FragColor = vec4(vColor * (0.3 + 0.7 * max(0.0, dot(vec3(0.0, 0.0, -1.0), vNormal))), 1.0);
+                gl_FragColor = vec4(vColor * (0.3 + 0.7 * max(0.0, pow(dot(vec3(0.0, 0.0, -1.0), vNormal), 3.0))), 1.0);
             }
         `;
         const planetProgram = new PIXI.Program(planetVertexShader, planetFragmentShader);
@@ -111,7 +111,7 @@ export const PlanetGenerator = () => {
     };
     
     return (
-        <div className="App">
+        <Paper style={{width: "100vw", minHeight: "100vh", height: "fit-content", display: "flex", flexDirection: "column"}}>
             <WebsiteDrawer rightSide={null}/>
             <Container>
                 <Typography variant="h3">
@@ -150,6 +150,6 @@ export const PlanetGenerator = () => {
                     </Grid>
                 </Grid>
             </Container>
-        </div>
+        </Paper>
     );
 }

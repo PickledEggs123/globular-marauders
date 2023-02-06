@@ -125,4 +125,6 @@
             <rect x="1201" y="1" width="598" height="48" stroke="black" fill="tan"/>
         </g>
     </g>
+    <rect x="460" y="-1000" width="80" height="1500" stroke="black" fill="tan"/>
+    <rect x="420" y="480" width="160" height="80" stroke="black" fill="tan"/>
 </svg>
