@@ -1245,12 +1245,25 @@ export class PixiGame extends PixiGameNetworking {
     }
 
     /**
+     * Last stored date for when the touch screen zoom event was triggered.
+     * @private
+     */
+    private lastZoomTrigger: Date | null = null;
+
+    /**
      * Handle the zoom event using any generic calling function, such as touch screen button
      * @param deltaY
      * @param strength
      * @private
      */
     private handleZoomEvent(deltaY: number, strength: number = 1) {
+        // check for too fast zoom event from mobile
+        if (this.lastZoomTrigger != null && +new Date() - +this.lastZoomTrigger! < 250) {
+            return;
+        }
+        this.lastZoomTrigger = new Date();
+
+        // do zoom event
         if (deltaY < 0) {
             this.setState((state) => ({
                 ...state,
