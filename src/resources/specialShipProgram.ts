@@ -82,8 +82,8 @@ export const getSpecialShipProgram = () => {
                     vec4 pos = translation + vec4((rotation * vec4(aPosition, 1.0)).xyz * uScale * uCameraScale / uWorldScale, 1.0);
                     vPosition = pos * vec4(1.0 * uWorldScale, 1.0 * uWorldScale, 0.0625, 1) + vec4(0.0, 0.0, -0.5, 0.0);
                     gl_Position = vPosition;
-                    vNormal = aNormal;
-                    vLightPos = vec3(0.0, 1.0, 0.0);
+                    vNormal = (rotation * vec4(aNormal, 1.0)).xyz;
+                    vLightPos = normalize(vec4(0.0, 0.0, -0.5, 0.0) - translation * uCameraScale / uWorldScale).xyz;
                 }
             `;
     const fragmentColorShader = `

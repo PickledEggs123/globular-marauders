@@ -185,7 +185,8 @@ export class ShipResources {
                         }
                         for (let i = 0; i < aNormal.buffer.length; i += 3) {
                             const p = [aNormal.buffer[i], aNormal.buffer[i + 1], aNormal.buffer[i + 2]] as [number, number, number];
-                            shipGeometryData.normal.push(...p);
+                            const p2 = q.rotateVector(p);
+                            shipGeometryData.normal.push(...p2);
                         }
                         for (let i = 0; i < aColor.buffer.length; i += 3) {
                             const r = aColor.buffer[i];
