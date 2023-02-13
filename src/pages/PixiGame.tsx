@@ -14,7 +14,7 @@ import {
 } from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
 import {Ship,} from "@pickledeggs123/globular-marauders-game/lib/src/Ship";
 import {EShipType, GetShipData,} from "@pickledeggs123/globular-marauders-game/lib/src/ShipType";
-import {EFaction,} from "@pickledeggs123/globular-marauders-game/lib/src/EFaction";
+import {EFaction, GameFactionData,} from "@pickledeggs123/globular-marauders-game/lib/src/EFaction";
 import {
     DelaunayGraph,
     ITessellatedTriangle,
@@ -103,20 +103,7 @@ import {LayerCompositeFilter} from "../filters/LayerComposite/LayerCompositeFilt
 import {ISetupScriptContext, setupScript} from "../scripts/setup";
 
 const GetFactionSubheader = (faction: EFaction): string | null => {
-    switch (faction) {
-        case EFaction.DUTCH:
-            return "Think of the economy! We have the cheapest and most ships medium ships.";
-        case EFaction.ENGLISH:
-            return "Maximum firepower! We have the most cannons per gold piece.";
-        case EFaction.FRENCH:
-            return "Be agile! We accelerate and rotate the fastest."
-        case EFaction.PORTUGUESE:
-            return "Full speed ahead! We have the fastest small ships. Great for trading long distances.";
-        case EFaction.SPANISH:
-            return "All of the gold! We have the largest ship which stores gold coins.";
-        default:
-            return null;
-    }
+    return GameFactionData.find(x => x.id === faction)?.description ?? null;
 }
 
 export class PixiGame extends PixiGameNetworking {
@@ -1936,7 +1923,7 @@ export class PixiGame extends PixiGameNetworking {
                                                                     <Card>
                                                                         <CardActionArea onClick={this.selectFaction.bind(this, faction.id)}>
                                                                             <CardContent>
-                                                                                <Avatar variant="rounded" style={{width: 256, height: 256, backgroundColor: faction.factionColor}}>{faction.id}</Avatar>
+                                                                                <Avatar variant="rounded" style={{width: 256, height: 256, backgroundColor: faction.factionColor}}>{GameFactionData.find(x => x.id === faction.id)?.name ?? faction.id}</Avatar>
                                                                             </CardContent>
                                                                             <CardHeader title={<span>{this.state.faction === faction.id ? <CheckBoxIcon/> : <CheckBoxOutlineBlankIcon/>} {faction.id}</span>} subheader={GetFactionSubheader(faction.id)}>
                                                                             </CardHeader>

@@ -101,7 +101,7 @@ export const tutorialScript = function (this: PixiGame, serverGame: Game, contex
         };
         const giveTradeMission = (): IterableIterator<void> => {
             return (function*(this: PixiGame) {
-                const dutchFaction = serverGame.factions.get(EFaction.DUTCH)!;
+                const dutchFaction = serverGame.factions.get(EFaction.DWARVEN)!;
                 const dutchHomeWorld = serverGame.planets.get(dutchFaction.homeWorldPlanetId)!;
                 const dutchColonies = dutchHomeWorld.county.duchy.kingdom.duchies.reduce((acc: Planet[], d): Planet[] => {
                     acc.push(...d.counties.reduce((acc2: Planet[], c): Planet[] => {
@@ -130,7 +130,7 @@ export const tutorialScript = function (this: PixiGame, serverGame: Game, contex
             (function*(this: PixiGame) {
                 const chooseFactionMessage: IChooseFactionMessage = {
                     messageType: EMessageType.CHOOSE_FACTION,
-                    factionId: EFaction.DUTCH,
+                    factionId: EFaction.DWARVEN,
                 };
                 sendMessage(chooseFactionMessage);
                 yield;
@@ -364,7 +364,7 @@ export const tutorialScript = function (this: PixiGame, serverGame: Game, contex
                 yield;
             }).call(this),
             (function*(this: PixiGame) {
-                const englishFaction = serverGame.factions.get(EFaction.ENGLISH)!;
+                const englishFaction = serverGame.factions.get(EFaction.ELVEN)!;
                 const englishHomeWorld = serverGame.planets.get(englishFaction.homeWorldPlanetId)!;
                 englishHomeWorld.spawnEventShip(tutorialPlayerData.moneyAccount, EShipType.CUTTER, (ship) => {
                     const playerShip = this.getPlayerShip()!;
@@ -389,7 +389,7 @@ export const tutorialScript = function (this: PixiGame, serverGame: Game, contex
             }).call(this),
             // destroyed ship
             waitForValue(() => {
-                const englishFaction = serverGame.factions.get(EFaction.ENGLISH)!;
+                const englishFaction = serverGame.factions.get(EFaction.ELVEN)!;
                 return englishFaction.shipIds.length === 0;
             }, () => {}),
             (function*(this: PixiGame) {
@@ -524,10 +524,10 @@ export const tutorialScript = function (this: PixiGame, serverGame: Game, contex
                 yield;
             }).call(this),
             (function*(this: PixiGame) {
-                const dutchFaction = serverGame.factions.get(EFaction.DUTCH)!;
+                const dutchFaction = serverGame.factions.get(EFaction.DWARVEN)!;
                 const dutchHomeWorld = serverGame.planets.get(dutchFaction.homeWorldPlanetId)!;
 
-                const englishFaction = serverGame.factions.get(EFaction.ENGLISH)!;
+                const englishFaction = serverGame.factions.get(EFaction.ELVEN)!;
                 const englishHomeWorld = serverGame.planets.get(englishFaction.homeWorldPlanetId)!;
 
                 context.invasion = new Invasion(serverGame, dutchFaction, englishFaction, englishHomeWorld.id);

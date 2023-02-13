@@ -371,7 +371,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         const shader = new PIXI.Shader(this.pixiShipResources.getResources().shipProgram, uniforms);
         const state = PIXI.State.for2d();
         state.depthTest = true;
-        const mesh = new PIXI.Mesh(this.pixiShipResources.getResources().shipGeometryMap.get(ship.faction?.id ?? EFaction.DUTCH)?.get(ship.shipType) as any, shader, state);
+        const mesh = new PIXI.Mesh(this.pixiShipResources.getResources().shipGeometryMap.get(ship.faction?.id ?? EFaction.DWARVEN)?.get(ship.shipType) as any, shader, state);
         mesh.zIndex = -3;
 
         // create depth mesh
@@ -379,7 +379,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         const depthShader = new PIXI.Shader(this.pixiShipResources.getResources().shipDepthProgram, depthUniforms);
         const depthState = PIXI.State.for2d();
         depthState.depthTest = true;
-        const depthMesh = new PIXI.Mesh(this.pixiShipResources.getResources().shipGeometryMap.get(ship.faction?.id ?? EFaction.DUTCH)?.get(ship.shipType) as any, depthShader, depthState);
+        const depthMesh = new PIXI.Mesh(this.pixiShipResources.getResources().shipGeometryMap.get(ship.faction?.id ?? EFaction.DWARVEN)?.get(ship.shipType) as any, depthShader, depthState);
         depthMesh.zIndex = -3;
 
         const text = new PIXI.Text(ship.shipType);
