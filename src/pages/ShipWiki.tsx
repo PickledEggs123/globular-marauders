@@ -105,7 +105,7 @@ export const ShipWiki = () => {
             varying vec3 vNormal;
 
             void main() {
-                gl_FragColor = vec4(vColor * (0.3 + 0.7 * max(0.0, pow(dot(vec3(0.0, 0.0, 1.0), vNormal), 3.0))), 1.0);
+                gl_FragColor = vec4(vColor * (0.3 + 0.7 * max(0.0, pow(dot(vec3(0.0, 0.0, 1.0), vNormal), 1.0))), 1.0);
             }
         `;
         const program = new PIXI.Program(vertexShader, fragmentShader);

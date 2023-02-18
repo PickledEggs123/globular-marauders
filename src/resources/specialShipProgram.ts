@@ -83,7 +83,7 @@ export const getSpecialShipProgram = () => {
                     vPosition = pos * vec4(1.0 * uWorldScale, 1.0 * uWorldScale, 0.0625, 1) + vec4(0.0, 0.0, -0.5, 0.0);
                     gl_Position = vPosition;
                     vNormal = (rotation * vec4(aNormal, 1.0)).xyz;
-                    vLightPos = normalize(vec4(0.0, 0.0, -0.5, 0.0) - translation * uCameraScale / uWorldScale).xyz;
+                    vLightPos = normalize(vec4(0.0, 0.0, -0.1, 0.0) - translation * uCameraScale / uWorldScale).xyz;
                 }
             `;
     const fragmentColorShader = `
@@ -95,7 +95,7 @@ export const getSpecialShipProgram = () => {
                 varying vec3 vLightPos;
                 
                 void main() {
-                    gl_FragColor = vec4(vColor * (0.3 + 0.7 * max(0.0, pow(dot(vLightPos, vNormal), 3.0))), 1.0);
+                    gl_FragColor = vec4(vColor * (0.3 + 0.7 * max(0.0, pow(dot(vLightPos, vNormal), 1.0))), 1.0);
                 }
             `;
     const fragmentDepthShader = `
