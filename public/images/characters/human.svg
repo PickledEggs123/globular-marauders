@@ -1,0 +1,29 @@
+<svg viewBox="-50 -50 100 100" fill="transparent" xmlns="http://www.w3.org/2000/svg">
+    <polygon
+            fill="tan"
+            stroke="brown"
+            stroke-width="3"
+            points="-25,15 -25,-20 25,-20 25,15"
+    />
+    <polygon
+            fill="tan"
+            stroke="brown"
+            stroke-width="3"
+            points="-15,50 -15,-20 15,-20 15,50"
+    />
+    <polygon
+            fill="red"
+            stroke="maroon"
+            stroke-width="3"
+            points="-15,15 -15,-20 15,-20 15,15"
+    />
+    <ellipse
+    fill="tan"
+    stroke="brown"
+    stroke-width="3"
+    cx="0"
+    cy="-35"
+    rx="15"
+    ry="15"
+    />
+</svg>

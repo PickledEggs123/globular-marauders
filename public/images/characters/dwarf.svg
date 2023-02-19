@@ -1,0 +1,35 @@
+<svg viewBox="-50 -50 100 100" fill="transparent" xmlns="http://www.w3.org/2000/svg">
+    <polygon
+            fill="orange"
+            stroke="darkorange"
+            stroke-width="3"
+            points="-30,30 -30,0 30,0 30,30"
+    />
+    <polygon
+            fill="orange"
+            stroke="darkorange"
+            stroke-width="3"
+            points="-20,50 -20,0 20,0 20,50"
+    />
+    <polygon
+            fill="yellow"
+            stroke="goldenrod"
+            stroke-width="3"
+            points="-20,30 -20,0 20,0 20,30"
+    />
+    <ellipse
+    fill="tan"
+    stroke="darkorange"
+    stroke-width="3"
+    cx="0"
+    cy="-10"
+    rx="20"
+    ry="20"
+    />
+    <polygon
+            fill="red"
+            stroke="darkred"
+            stroke-width="3"
+            points="-15,0 -5,20 5,20 15,0"
+    />
+</svg>

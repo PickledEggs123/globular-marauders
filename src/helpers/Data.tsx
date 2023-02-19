@@ -2,6 +2,7 @@
  * Which mode the app is in.
  */
 import {EResourceType} from "@pickledeggs123/globular-marauders-game/lib/src/Resource";
+import {ERaceData} from "@pickledeggs123/globular-marauders-game/lib/src/EFaction";
 
 export enum EVoronoiMode {
     KINGDOM = "KINGDOM",
@@ -98,6 +99,49 @@ export const RESOURCE_TYPE_TEXTURE_PAIRS: IResourceTypeTexturePair[] = [{
     resourceType: EResourceType.FURNITURE,          // done
     name: "furniture",
     url: "images/furniture.svg"
+}];
+
+/**
+ * An object which contains a texture match for a resource type.
+ */
+interface ICharacterTypeTexturePair {
+    characterRace: ERaceData | null;
+    name: string;
+    url: string;
+}
+
+export const CHARACTER_TYPE_TEXTURE_PAIRS: ICharacterTypeTexturePair[] = [{
+    characterRace: ERaceData.DWARF,
+    name: "dwarf",
+    url: "images/characters/dwarf.svg"
+}, {
+    characterRace: ERaceData.ELF,
+    name: "dwarf",
+    url: "images/characters/elf.svg"
+}, {
+    characterRace: ERaceData.HALF_ELF,
+    name: "dwarf",
+    url: "images/characters/elf.svg"
+}, {
+    characterRace: ERaceData.HUMAN,
+    name: "dwarf",
+    url: "images/characters/human.svg"
+}, {
+    characterRace: ERaceData.HALFLING,
+    name: "dwarf",
+    url: "images/characters/halfling.svg"
+}, {
+    characterRace: ERaceData.GOBLIN,
+    name: "dwarf",
+    url: "images/characters/goblin.svg"
+}, {
+    characterRace: ERaceData.HOBGOBLIN,
+    name: "dwarf",
+    url: "images/characters/hobgoblin.svg"
+}, {
+    characterRace: ERaceData.BUGBEAR,
+    name: "dwarf",
+    url: "images/characters/bugbear.svg"
 }];
 
 export const DEFAULT_IMAGE: string = "images/no_image.svg";

@@ -14,7 +14,12 @@ import {
 } from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
 import {Ship,} from "@pickledeggs123/globular-marauders-game/lib/src/Ship";
 import {EShipType, GetShipData,} from "@pickledeggs123/globular-marauders-game/lib/src/ShipType";
-import {EFaction, GameFactionData,} from "@pickledeggs123/globular-marauders-game/lib/src/EFaction";
+import {
+    EClassData,
+    EFaction,
+    ERaceData,
+    GameFactionData,
+} from "@pickledeggs123/globular-marauders-game/lib/src/EFaction";
 import {
     DelaunayGraph,
     ITessellatedTriangle,
@@ -34,7 +39,7 @@ import {
 } from "@pickledeggs123/globular-marauders-game/lib/src/Game";
 import {
     Avatar,
-    Badge,
+    Badge, Box,
     Button,
     Card,
     CardActionArea,
@@ -64,20 +69,15 @@ import {
 } from "@mui/material";
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
-import {DEFAULT_IMAGE, EVoronoiMode, RESOURCE_TYPE_TEXTURE_PAIRS, SPACE_BACKGROUND_TEXTURES} from "../helpers/Data";
-import {EGameMode, IPixiGameProps} from "./PixiGameBase";
 import {
-    Sailing,
-    MusicNote,
-    MusicOff,
-    People,
-    Public,
-    School,
-    Settings,
-    SmartToy,
-    Tv,
-    TvOff
-} from "@mui/icons-material";
+    CHARACTER_TYPE_TEXTURE_PAIRS,
+    DEFAULT_IMAGE,
+    EVoronoiMode,
+    RESOURCE_TYPE_TEXTURE_PAIRS,
+    SPACE_BACKGROUND_TEXTURES
+} from "../helpers/Data";
+import {EGameMode, IPixiGameProps} from "./PixiGameBase";
+import {MusicNote, MusicOff, Public, Sailing, School, Settings, SmartToy, Tv, TvOff} from "@mui/icons-material";
 import ScoreboardIcon from "@mui/icons-material/Scoreboard";
 import {EOrderType} from "@pickledeggs123/globular-marauders-game/lib/src/Order";
 import {EInvasionPhase, Invasion} from "@pickledeggs123/globular-marauders-game/lib/src/Invasion";
@@ -101,6 +101,7 @@ import {RenderMobileGameUiTop} from "./RenderMobileGameUiTop";
 import {RenderMobileGameUiBottom} from "./RenderMobileGameUiBottom";
 import {LayerCompositeFilter} from "../filters/LayerComposite/LayerCompositeFilter";
 import {ISetupScriptContext, setupScript} from "../scripts/setup";
+import {Character, EDamageType} from '@pickledeggs123/globular-marauders-game/lib/src/Character';
 
 const GetFactionSubheader = (faction: EFaction): string | null => {
     return GameFactionData.find(x => x.id === faction)?.description ?? null;
@@ -1560,6 +1561,15 @@ export class PixiGame extends PixiGameNetworking {
         }
     }
 
+    renderCharacterUrl(characterRace: ERaceData) {
+        const item = CHARACTER_TYPE_TEXTURE_PAIRS.find(i => i.characterRace === characterRace);
+        if (item) {
+            return {url: item.url, name: item.name};
+        } else {
+            return {url: DEFAULT_IMAGE, name: "missing"};
+        }
+    }
+
     renderItem(resourceType: EResourceType) {
         const data = this.renderItemUrl(resourceType);
         return <img src={data.url} width={100} height={100} alt={data.name}/>;
@@ -1667,19 +1677,86 @@ export class PixiGame extends PixiGameNetworking {
                 </Card>
                 <Stack className="Bottom" direction="row" spacing={2} justifyItems="center">
                     {
+                        new Array(this.findPlayerShip()?.characters.length ?? 0).fill(0).map((v, i) => {
+                            const character = this.findPlayerShip()?.characters[i] as Character;
+                            const characterData = character.getClassData();
+                            const damageType = character.getCharacterDamageType();
+                            let badgeContent: string = "";
+                            switch (damageType) {
+                                case EDamageType.MAGIC: {
+                                    badgeContent = "Magic";
+                                    break;
+                                }
+                                case EDamageType.RANGE: {
+                                    badgeContent = "Range";
+                                    break;
+                                }
+                                case EDamageType.STEALTH: {
+                                    badgeContent = "Stealth";
+                                    break;
+                                }
+                                case EDamageType.NORMAL: {
+                                    badgeContent = "Melee";
+                                    break;
+                                }
+                            }
+                            let caption: string = "";
+                            switch (characterData?.id ?? EClassData.FIGHTER) {
+                                case EClassData.CLERIC: {
+                                    caption = "Cleric";
+                                    break;
+                                }
+                                case EClassData.MAGE: {
+                                    caption = "Mage";
+                                    break;
+                                }
+                                case EClassData.FIGHTER: {
+                                    caption = "Fighter";
+                                    break;
+                                }
+                                case EClassData.PALADIN: {
+                                    caption = "Paladin";
+                                    break;
+                                }
+                                case EClassData.RANGER: {
+                                    caption = "Ranger";
+                                    break;
+                                }
+                                case EClassData.THIEF: {
+                                    caption = "Thief";
+                                    break;
+                                }
+                            }
+                            return (
+                                <Card key={`character-${i}`}>
+                                    <CardContent>
+                                        <Badge badgeContent={badgeContent} color={"primary"}>
+                                            <Avatar variant="rounded" style={{width: 50, height: 50}} srcSet={this.renderCharacterUrl(character.characterRace).url}>
+                                                {null}
+                                            </Avatar>
+                                        </Badge>
+                                        <br />
+                                        <Typography variant="caption" fontSize={12}>{caption}</Typography>
+                                    </CardContent>
+                                </Card>
+                            );
+                        })
+                    }
+                    {
                         new Array(GetShipData(this.findPlayerShip()?.shipType ?? EShipType.CUTTER, this.game.worldScale).cargoSize).fill(0).map((v, i) => {
                             return (
-                                <Card>
+                                <Card key={`cargo-${i}`}>
                                     <CardContent>
                                         <Badge badgeContent={this.findPlayerShip()?.cargo[i] ? this.findPlayerShip()?.cargo[i].amount : null} color={"primary"}>
                                             <Avatar variant="rounded" style={{width: 50, height: 50}} srcSet={this.findPlayerShip()?.cargo[i] ? this.renderItemUrl(this.findPlayerShip()?.cargo[i].resourceType ?? EResourceType.CACAO).url : this.renderItemUrl("UNKNOWN" as any).url}>
                                                 {null}
                                             </Avatar>
                                         </Badge>
-                                        <Typography variant="caption">{this.findPlayerShip()?.cargo[i] ? this.findPlayerShip()?.cargo[i].resourceType : ""}</Typography>
+                                        <br />
+                                        <Typography variant="caption" fontSize={12}>{this.findPlayerShip()?.cargo[i] ? this.findPlayerShip()?.cargo[i].resourceType : ""}</Typography>
                                     </CardContent>
                                 </Card>
-                            )
+                            );
                         })
                     }
                 </Stack>
@@ -1907,53 +1984,48 @@ export class PixiGame extends PixiGameNetworking {
                                                             onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.goToPlanetMenu.bind(this)}>Next</Button>
                                                 </Grid>
                                             </Grid>
-                                            <Paper style={{maxHeight: "40vh", maxWidth: "80vw", overflow: "auto", backgroundColor: "none"}}>
-                                                <Grid container spacing={2} columns={{
-                                                    xs: 6,
-                                                    lg: 12,
-                                                }}>
-                                                    {
-                                                        this.spawnFactions.map((f, _, arr) => {
-                                                            const faction = this.game.factions.get(f.factionId);
-                                                            if (!faction) {
-                                                                return null;
-                                                            }
-                                                            return (
-                                                                <Grid item xs={12} lg={arr.length >= 2 ? 6 : 12}>
-                                                                    <Card>
-                                                                        <CardActionArea onClick={this.selectFaction.bind(this, faction.id)}>
-                                                                            <CardContent>
-                                                                                <Avatar variant="rounded" style={{width: 256, height: 256, backgroundColor: faction.factionColor}}>{GameFactionData.find(x => x.id === faction.id)?.name ?? faction.id}</Avatar>
-                                                                            </CardContent>
-                                                                            <CardHeader title={<span>{this.state.faction === faction.id ? <CheckBoxIcon/> : <CheckBoxOutlineBlankIcon/>} {faction.id}</span>} subheader={GetFactionSubheader(faction.id)}>
-                                                                            </CardHeader>
-                                                                        </CardActionArea>
-                                                                        <CardActions>
-                                                                            <Tooltip title="Planets owned">
-                                                                                <Badge badgeContent={f.numPlanets} color={"primary"}>
-                                                                                    <Public/>
-                                                                                </Badge>
-                                                                            </Tooltip>
-                                                                            <Tooltip title="Ships in play">
-                                                                                <Badge badgeContent={f.numShips} color={"primary"}>
-                                                                                    <Sailing/>
-                                                                                </Badge>
-                                                                            </Tooltip>
-                                                                            <Tooltip title="Invasion events">
-                                                                                <Badge badgeContent={f.numInvasions} color={"primary"}>
-                                                                                    <SvgIcon>
-                                                                                        <Attack/>
-                                                                                    </SvgIcon>
-                                                                                </Badge>
-                                                                            </Tooltip>
-                                                                        </CardActions>
-                                                                    </Card>
-                                                                </Grid>
-                                                            );
-                                                        })
-                                                    }
-                                                </Grid>
-                                            </Paper>
+                                            <Box style={{display: "flex", flexWrap: "wrap", maxHeight: "40vh", maxWidth: "80vw", overflow: "auto", backgroundColor: "none"}}>
+                                                {
+                                                    this.spawnFactions.map((f, _, arr) => {
+                                                        const faction = this.game.factions.get(f.factionId);
+                                                        if (!faction) {
+                                                            return null;
+                                                        }
+                                                        return (
+                                                            <Card style={{minWidth: 192, maxWidth: 256}}>
+                                                                <CardActionArea onClick={this.selectFaction.bind(this, faction.id)}>
+                                                                    <CardContent>
+                                                                        <Avatar variant="rounded" style={{width: 128, height: 128}} alt={GameFactionData.find(x => x.id === faction.id)?.name ?? faction.id} srcSet={this.renderCharacterUrl(GameFactionData.find(x => x.id === faction.id)?.races[0].id ?? ERaceData.HUMAN).url}>
+                                                                            {null}
+                                                                        </Avatar>
+                                                                    </CardContent>
+                                                                    <CardHeader title={<span>{this.state.faction === faction.id ? <CheckBoxIcon/> : <CheckBoxOutlineBlankIcon/>} {faction.id}</span>} subheader={GetFactionSubheader(faction.id)}>
+                                                                    </CardHeader>
+                                                                </CardActionArea>
+                                                                <CardActions>
+                                                                    <Tooltip title="Planets owned">
+                                                                        <Badge badgeContent={f.numPlanets} color={"primary"}>
+                                                                            <Public/>
+                                                                        </Badge>
+                                                                    </Tooltip>
+                                                                    <Tooltip title="Ships in play">
+                                                                        <Badge badgeContent={f.numShips} color={"primary"}>
+                                                                            <Sailing/>
+                                                                        </Badge>
+                                                                    </Tooltip>
+                                                                    <Tooltip title="Invasion events">
+                                                                        <Badge badgeContent={f.numInvasions} color={"primary"}>
+                                                                            <SvgIcon>
+                                                                                <Attack/>
+                                                                            </SvgIcon>
+                                                                        </Badge>
+                                                                    </Tooltip>
+                                                                </CardActions>
+                                                            </Card>
+                                                        );
+                                                    })
+                                                }
+                                            </Box>
                                         </Grid>
                                     ) : null
                                 }
@@ -1970,59 +2042,52 @@ export class PixiGame extends PixiGameNetworking {
                                                             onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.goToSpawnMenu.bind(this)}>Next</Button>
                                                 </Grid>
                                             </Grid>
-                                            <Paper style={{maxHeight: "40vh", maxWidth: "80vw", overflow: "auto", backgroundColor: "none"}}>
-                                                <Grid container spacing={2} columns={{
-                                                    xs: 6,
-                                                    lg: 12,
-                                                }}>
-                                                    {
-                                                        this.spawnPlanets.map((f, i, arr) => {
-                                                            const planet = this.game.planets.get(f.planetId);
-                                                            const planetName = planet?.name ?? f.planetId;
-                                                            return (
-                                                                <Grid item xs={12} lg={arr.length >= 2 ? 6 : 12}>
-                                                                    <Card>
-                                                                        <CardActionArea onClick={this.selectPlanet.bind(this, f.planetId)}>
-                                                                            <CardContent>
-                                                                                <Avatar variant="rounded" style={{width: 256, height: 256}} alt={planetName} srcSet={this.planetThumbnails.get(f.planetId) ?? undefined}>
-                                                                                </Avatar>
-                                                                            </CardContent>
-                                                                            <CardHeader title={<span>{this.state.planetId === f.planetId ? <CheckBoxIcon/> : <CheckBoxOutlineBlankIcon/>} {planetName}</span>} subheader={`(${f.numShipsAvailable} ships)`}>
-                                                                            </CardHeader>
-                                                                        </CardActionArea>
-                                                                        <CardActions>
-                                                                            <Tooltip title="Settlers">
-                                                                                <Badge badgeContent={f.numSettlers} color={"primary"}>
-                                                                                    <Public/>
-                                                                                </Badge>
-                                                                            </Tooltip>
-                                                                            <Tooltip title="Traders">
-                                                                                <Badge badgeContent={f.numTraders} color={"primary"}>
-                                                                                    <Sailing/>
-                                                                                </Badge>
-                                                                            </Tooltip>
-                                                                            <Tooltip title="Pirates">
-                                                                                <Badge badgeContent={f.numPirates} color={"primary"}>
-                                                                                    <SvgIcon>
-                                                                                        <Pirate/>
-                                                                                    </SvgIcon>
-                                                                                </Badge>
-                                                                            </Tooltip>
-                                                                            <Tooltip title="Invaders">
-                                                                                <Badge badgeContent={f.numInvaders} color={"primary"}>
-                                                                                    <SvgIcon>
-                                                                                        <Attack/>
-                                                                                    </SvgIcon>
-                                                                                </Badge>
-                                                                            </Tooltip>
-                                                                        </CardActions>
-                                                                    </Card>
-                                                                </Grid>
-                                                            );
-                                                        })
-                                                    }
-                                                </Grid>
-                                            </Paper>
+                                            <Box style={{display: "flex", flexWrap: "wrap", maxHeight: "40vh", maxWidth: "80vw", overflow: "auto", backgroundColor: "none"}}>
+                                                {
+                                                    this.spawnPlanets.map((f, i, arr) => {
+                                                        const planet = this.game.planets.get(f.planetId);
+                                                        const planetName = planet?.name ?? f.planetId;
+                                                        return (
+                                                            <Card style={{minWidth: 192, maxWidth: 256}}>
+                                                                <CardActionArea onClick={this.selectPlanet.bind(this, f.planetId)}>
+                                                                    <CardContent>
+                                                                        <Avatar variant="rounded" style={{width: 128, height: 128}} alt={planetName} srcSet={this.planetThumbnails.get(f.planetId) ?? undefined}>
+                                                                        </Avatar>
+                                                                    </CardContent>
+                                                                    <CardHeader title={<span>{this.state.planetId === f.planetId ? <CheckBoxIcon/> : <CheckBoxOutlineBlankIcon/>} {planetName}</span>} subheader={`(${f.numShipsAvailable} ships)`}>
+                                                                    </CardHeader>
+                                                                </CardActionArea>
+                                                                <CardActions>
+                                                                    <Tooltip title="Settlers">
+                                                                        <Badge badgeContent={f.numSettlers} color={"primary"}>
+                                                                            <Public/>
+                                                                        </Badge>
+                                                                    </Tooltip>
+                                                                    <Tooltip title="Traders">
+                                                                        <Badge badgeContent={f.numTraders} color={"primary"}>
+                                                                            <Sailing/>
+                                                                        </Badge>
+                                                                    </Tooltip>
+                                                                    <Tooltip title="Pirates">
+                                                                        <Badge badgeContent={f.numPirates} color={"primary"}>
+                                                                            <SvgIcon>
+                                                                                <Pirate/>
+                                                                            </SvgIcon>
+                                                                        </Badge>
+                                                                    </Tooltip>
+                                                                    <Tooltip title="Invaders">
+                                                                        <Badge badgeContent={f.numInvaders} color={"primary"}>
+                                                                            <SvgIcon>
+                                                                                <Attack/>
+                                                                            </SvgIcon>
+                                                                        </Badge>
+                                                                    </Tooltip>
+                                                                </CardActions>
+                                                            </Card>
+                                                        );
+                                                    })
+                                                }
+                                            </Box>
                                         </Grid>
                                     ) : null
                                 }
@@ -2039,42 +2104,33 @@ export class PixiGame extends PixiGameNetworking {
                                                             onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.spawnShip.bind(this)}>Next</Button>
                                                 </Grid>
                                             </Grid>
-                                            <Paper style={{maxHeight: "40vh", maxWidth: "80vw", overflow: "auto", backgroundColor: "none"}}>
-                                                <Grid container spacing={2} columns={{
-                                                    xs: 6,
-                                                    lg: 12,
-                                                }}>
-                                                    {
-                                                        this.spawnLocations.message ? (
-                                                            <Grid item xs={12}>
-                                                                <Card>
+                                            <Box style={{display: "flex", flexWrap: "wrap", maxHeight: "40vh", maxWidth: "80vw", overflow: "auto", backgroundColor: "none"}}>
+                                                {
+                                                    this.spawnLocations.message ? (
+                                                        <Card style={{minWidth: 192, maxWidth: 256}}>
+                                                            <CardContent>
+                                                                <Typography>{this.spawnLocations.message}</Typography>
+                                                            </CardContent>
+                                                        </Card>
+                                                    ) : null
+                                                }
+                                                {
+                                                    this.spawnLocations.results.map((f, i, arr) => {
+                                                        return (
+                                                            <Card style={{minWidth: 192, maxWidth: 256}}>
+                                                                <CardActionArea onClick={this.selectShip.bind(this, f.id, f.shipType)}>
                                                                     <CardContent>
-                                                                        <Typography>{this.spawnLocations.message}</Typography>
+                                                                        <Avatar variant="rounded" style={{width: 128, height: 128}} alt={f.shipType} srcSet={this.shipThumbnails.get(f.shipType) ?? undefined}>
+                                                                        </Avatar>
                                                                     </CardContent>
-                                                                </Card>
-                                                            </Grid>
-                                                        ) : null
-                                                    }
-                                                    {
-                                                        this.spawnLocations.results.map((f, i, arr) => {
-                                                            return (
-                                                                <Grid item xs={12} lg={arr.length >= 2 ? 6 : 12}>
-                                                                    <Card>
-                                                                        <CardActionArea onClick={this.selectShip.bind(this, f.id, f.shipType)}>
-                                                                            <CardContent>
-                                                                                <Avatar variant="rounded" style={{width: 256, height: 256}} alt={f.shipType} srcSet={this.shipThumbnails.get(f.shipType) ?? undefined}>
-                                                                                </Avatar>
-                                                                            </CardContent>
-                                                                            <CardHeader title={<span>{this.state.planetId === f.id && this.state.spawnShipType === f.shipType ? <CheckBoxIcon/> : <CheckBoxOutlineBlankIcon/>} {f.shipType}</span>} subheader={`(${f.price}) (${f.numShipsAvailable} ships)`}>
-                                                                            </CardHeader>
-                                                                        </CardActionArea>
-                                                                    </Card>
-                                                                </Grid>
-                                                            );
-                                                        })
-                                                    }
-                                                </Grid>
-                                            </Paper>
+                                                                    <CardHeader title={<span>{this.state.planetId === f.id && this.state.spawnShipType === f.shipType ? <CheckBoxIcon/> : <CheckBoxOutlineBlankIcon/>} {f.shipType}</span>} subheader={`(${f.price}) (${f.numShipsAvailable} ships)`}>
+                                                                    </CardHeader>
+                                                                </CardActionArea>
+                                                            </Card>
+                                                        );
+                                                    })
+                                                }
+                                            </Box>
                                         </Grid>
                                     ) : null
                                 }
