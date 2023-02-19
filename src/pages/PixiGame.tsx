@@ -7,8 +7,9 @@ import {Layer, Stage} from "@pixi/layers";
 import {sound} from "@pixi/sound";
 import {EResourceType, ITEM_DATA} from "@pickledeggs123/globular-marauders-game/lib/src/Resource";
 import {
+    EDamageType,
     ICameraState,
-    ICameraStateWithOriginal,
+    ICameraStateWithOriginal, ICharacterSelectionItem,
     IDrawable,
     MIN_DISTANCE
 } from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
@@ -18,7 +19,7 @@ import {
     EClassData,
     EFaction,
     ERaceData,
-    GameFactionData,
+    GameFactionData, IClassData,
 } from "@pickledeggs123/globular-marauders-game/lib/src/EFaction";
 import {
     DelaunayGraph,
@@ -31,7 +32,7 @@ import {
     EMessageType,
     ESoundType,
     Game,
-    IAutoPilotMessage,
+    IAutoPilotMessage, IChooseCrewSelectionMessage,
     IChooseFactionMessage,
     IChoosePlanetMessage,
     IJoinMessage,
@@ -77,7 +78,20 @@ import {
     SPACE_BACKGROUND_TEXTURES
 } from "../helpers/Data";
 import {EGameMode, IPixiGameProps} from "./PixiGameBase";
-import {MusicNote, MusicOff, Public, Sailing, School, Settings, SmartToy, Tv, TvOff} from "@mui/icons-material";
+import {
+    Add,
+    MusicNote,
+    MusicOff,
+    People,
+    Public,
+    Remove,
+    Sailing,
+    School,
+    Settings,
+    SmartToy,
+    Tv,
+    TvOff
+} from "@mui/icons-material";
 import ScoreboardIcon from "@mui/icons-material/Scoreboard";
 import {EOrderType} from "@pickledeggs123/globular-marauders-game/lib/src/Order";
 import {EInvasionPhase, Invasion} from "@pickledeggs123/globular-marauders-game/lib/src/Invasion";
@@ -101,7 +115,7 @@ import {RenderMobileGameUiTop} from "./RenderMobileGameUiTop";
 import {RenderMobileGameUiBottom} from "./RenderMobileGameUiBottom";
 import {LayerCompositeFilter} from "../filters/LayerComposite/LayerCompositeFilter";
 import {ISetupScriptContext, setupScript} from "../scripts/setup";
-import {Character, EDamageType} from '@pickledeggs123/globular-marauders-game/lib/src/Character';
+import {Character, CharacterSelection} from "@pickledeggs123/globular-marauders-game/lib/src/Character";
 
 const GetFactionSubheader = (faction: EFaction): string | null => {
     return GameFactionData.find(x => x.id === faction)?.description ?? null;
@@ -1094,6 +1108,17 @@ export class PixiGame extends PixiGameNetworking {
     }
 
     /**
+     * Show different settings to change the appearance of the game.
+     * @private
+     */
+    private handleShowCharacterSelection() {
+        this.setState((s) => ({
+            ...s,
+            showCharacterSelection: !s.showCharacterSelection,
+        }));
+    }
+
+    /**
      * Show a voronoi map in game. Used for debugging the marking of land between each planet. Voronoi mode is used
      * to display political information such as the boundaries of each kingdom.
      * @private
@@ -1380,6 +1405,19 @@ export class PixiGame extends PixiGameNetworking {
             faction,
             planetId: null
         });
+    }
+
+    public sendCharacterSelection(characterSelection: ICharacterSelectionItem[]) {
+        const message: IChooseCrewSelectionMessage = {
+            messageType: EMessageType.CHOOSE_CREW_SELECTION,
+            characterSelection
+        };
+        if (this.socket) {
+            this.sendMessage("generic-message", message);
+        }
+        if (this.state.gameMode === EGameMode.SINGLE_PLAYER || this.state.gameMode === EGameMode.TUTORIAL) {
+            this.localServerMessages.push(message);
+        }
     }
 
     public goToPlanetMenu() {
@@ -1675,7 +1713,7 @@ export class PixiGame extends PixiGameNetworking {
                 </Card>
                 <Card className="BottomLeft">
                 </Card>
-                <Stack className="Bottom" direction="row" spacing={2} justifyItems="center">
+                <Box className="Bottom" style={{display: "flex", flexWrap: "wrap", maxWidth: "50vw"}}>
                     {
                         new Array(this.findPlayerShip()?.characters.length ?? 0).fill(0).map((v, i) => {
                             const character = this.findPlayerShip()?.characters[i] as Character;
@@ -1728,7 +1766,7 @@ export class PixiGame extends PixiGameNetworking {
                                 }
                             }
                             return (
-                                <Card key={`character-${i}`}>
+                                <Card key={`character-${i}`} style={{maxWidth: "fit-content"}}>
                                     <CardContent>
                                         <Badge badgeContent={badgeContent} color={"primary"}>
                                             <Avatar variant="rounded" style={{width: 50, height: 50}} srcSet={this.renderCharacterUrl(character.characterRace).url}>
@@ -1745,7 +1783,7 @@ export class PixiGame extends PixiGameNetworking {
                     {
                         new Array(GetShipData(this.findPlayerShip()?.shipType ?? EShipType.CUTTER, this.game.worldScale).cargoSize).fill(0).map((v, i) => {
                             return (
-                                <Card key={`cargo-${i}`}>
+                                <Card key={`cargo-${i}`} style={{maxWidth: "fit-content"}}>
                                     <CardContent>
                                         <Badge badgeContent={this.findPlayerShip()?.cargo[i] ? this.findPlayerShip()?.cargo[i].amount : null} color={"primary"}>
                                             <Avatar variant="rounded" style={{width: 50, height: 50}} srcSet={this.findPlayerShip()?.cargo[i] ? this.renderItemUrl(this.findPlayerShip()?.cargo[i].resourceType ?? EResourceType.CACAO).url : this.renderItemUrl("UNKNOWN" as any).url}>
@@ -1759,7 +1797,7 @@ export class PixiGame extends PixiGameNetworking {
                             );
                         })
                     }
-                </Stack>
+                </Box>
             </React.Fragment>
         );
     }
@@ -1790,6 +1828,75 @@ export class PixiGame extends PixiGameNetworking {
                             onTouchStart={() => this.handleTouchDown("a")} onTouchEnd={() => this.handleTouchUp("a")} className="text-selection-none"/>
                 </svg>
             </React.Fragment>
+        );
+    }
+
+    renderCharacterSelection() {
+        const playerData = this.playerId && this.game.playerData.get(this.playerId);
+        if (!playerData) {
+            return (
+                <Typography variant="h6">Could not find player data</Typography>
+            );
+        }
+
+        const selectionData = playerData.defaultCharacterSelection;
+        if (!selectionData) {
+            return (
+                <Typography variant="h6">Could not find selection data</Typography>
+            );
+        }
+
+        const classData = GameFactionData.find(x => x.id === this.state.faction)?.races.reduce((acc, r) => {
+            return [...acc, ...r.classes.reduce((acc2, c) => {
+                const item: ICharacterSelectionItem = {
+                    faction: this.state.faction!,
+                    characterRace: r.id,
+                    characterClass: c.id,
+                    amount: selectionData.find(i => i.faction === this.state.faction! && i.characterRace === r.id && i.characterClass === c.id)?.amount ?? 0
+                };
+                console.log(item);
+                return [...acc2, item];
+            }, [] as ICharacterSelectionItem[])];
+        }, [] as ICharacterSelectionItem[]) ?? [] as ICharacterSelectionItem[];
+        const characterSelection = CharacterSelection.deserialize(classData, {items: selectionData});
+        const renderGridItem = (v: ICharacterSelectionItem, i: number) => {
+            const name = GameFactionData.find(x => x.id === v.faction)?.races.find(x => x.id === v.characterRace)?.classes.find(x => x.id === v.characterClass)?.name ?? "N/A";
+            return (
+                <Card style={{width: "fit-content"}}>
+                    <CardHeader title={name}></CardHeader>
+                    <CardContent>
+                        <Box style={{display: "flex", flexDirection: "row", width: "fit-content"}}>
+                            <Tooltip title="Decrement">
+                                <IconButton
+                                    onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={() => {
+                                    characterSelection.removeCharacterClass(v.faction, v.characterRace, v.characterClass);
+                                    this.sendCharacterSelection(characterSelection.serialize().items);
+                                }}>
+                                    <Remove/>
+                                </IconButton>
+                            </Tooltip>
+                            <Typography variant="h6">{v.amount}</Typography>
+                            <Tooltip title="Increment">
+                                <IconButton
+                                    onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={() => {
+                                    characterSelection.addCharacterClass(v.faction, v.characterRace, v.characterClass);
+                                    this.sendCharacterSelection(characterSelection.serialize().items);
+                                }}>
+                                    <Add/>
+                                </IconButton>
+                            </Tooltip>
+                        </Box>
+                    </CardContent>
+                </Card>
+            );
+        };
+
+        return (
+            <Box style={{display: "flex", flexWrap: "wrap"}}>
+                {
+                    characterSelection.items.map((v, i) => renderGridItem(v, i))
+                }
+            </Box>
         );
     }
 
@@ -1843,6 +1950,13 @@ export class PixiGame extends PixiGameNetworking {
                                                                      onKeyDown={PixiGame.cancelSpacebar.bind(this)} onChange={this.handleAutoPilotEnabled.bind(this)} icon={<TvOff/>} checkedIcon={<Tv/>} color="default" />} label="AutoPilot"/>
                             )
                         }
+                        <Tooltip title="Character Selection">
+                            <IconButton
+                                disabled={!this.state.faction}
+                                onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.handleShowCharacterSelection.bind(this)}>
+                                <People/>
+                            </IconButton>
+                        </Tooltip>
                     </React.Fragment>
                 }/>
                 <div className="AppMain" ref={this.measureAppBodyRef}>
@@ -1980,7 +2094,7 @@ export class PixiGame extends PixiGameNetworking {
                                                 <Grid item xs={12}>
                                                 </Grid>
                                                 <Grid item xs={12}>
-                                                    <Button fullWidth variant="contained"
+                                                    <Button fullWidth variant="contained" disabled={!this.spawnFactions.length}
                                                             onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.goToPlanetMenu.bind(this)}>Next</Button>
                                                 </Grid>
                                             </Grid>
@@ -2038,7 +2152,7 @@ export class PixiGame extends PixiGameNetworking {
                                                             onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.returnToFactionMenu.bind(this)}>Back</Button>
                                                 </Grid>
                                                 <Grid item xs={12}>
-                                                    <Button fullWidth variant="contained"
+                                                    <Button fullWidth variant="contained" disabled={!this.spawnPlanets.length}
                                                             onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.goToSpawnMenu.bind(this)}>Next</Button>
                                                 </Grid>
                                             </Grid>
@@ -2100,7 +2214,7 @@ export class PixiGame extends PixiGameNetworking {
                                                             onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.returnToPlanetMenu.bind(this)}>Back</Button>
                                                 </Grid>
                                                 <Grid item xs={12}>
-                                                    <Button fullWidth variant="contained"
+                                                    <Button fullWidth variant="contained" disabled={!this.spawnLocations.results.length}
                                                             onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.spawnShip.bind(this)}>Next</Button>
                                                 </Grid>
                                             </Grid>
@@ -2291,6 +2405,12 @@ export class PixiGame extends PixiGameNetworking {
                                             </RadioGroup>
                                         </Grid>
                                     </Grid>
+                                </DialogContent>
+                            </Dialog>
+                            <Dialog open={!!(this.state.showCharacterSelection && this.state.faction)} onClose={() => this.setState({showCharacterSelection: false})}>
+                                <DialogTitle title="Character Selection"/>
+                                <DialogContent>
+                                    {this.renderCharacterSelection()}
                                 </DialogContent>
                             </Dialog>
                             <Dialog open={this.state.showItems} onClose={() => this.setState({showItems: false})}>

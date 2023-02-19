@@ -92,6 +92,7 @@ export interface IPixiGameState {
     init: boolean;
     showScoreboard: boolean;
     showSettings: boolean;
+    showCharacterSelection: boolean;
     showLoginMenu: boolean;
     showMainMenu: boolean;
     showPlanetMenu: boolean;
@@ -132,6 +133,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         init: false as boolean,
         showScoreboard: false as boolean,
         showSettings: false as boolean,
+        showCharacterSelection: false as boolean,
         showLoginMenu: false as boolean,
         showMainMenu: false as boolean,
         showPlanetMenu: false as boolean,
