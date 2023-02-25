@@ -1713,31 +1713,12 @@ export class PixiGame extends PixiGameNetworking {
                 </Card>
                 <Card className="BottomLeft">
                 </Card>
-                <Box className="Bottom" style={{display: "flex", flexWrap: "wrap", maxWidth: "50vw"}}>
+                <Box className="Bottom" style={{display: "flex", flexWrap: "wrap"}}>
                     {
                         new Array(this.findPlayerShip()?.characters.length ?? 0).fill(0).map((v, i) => {
                             const character = this.findPlayerShip()?.characters[i] as Character;
                             const characterData = character.getClassData();
-                            const damageType = character.getCharacterDamageType();
-                            let badgeContent: string = "";
-                            switch (damageType) {
-                                case EDamageType.MAGIC: {
-                                    badgeContent = "Magic";
-                                    break;
-                                }
-                                case EDamageType.RANGE: {
-                                    badgeContent = "Range";
-                                    break;
-                                }
-                                case EDamageType.STEALTH: {
-                                    badgeContent = "Stealth";
-                                    break;
-                                }
-                                case EDamageType.NORMAL: {
-                                    badgeContent = "Melee";
-                                    break;
-                                }
-                            }
+                            const badgeContent = character.hp;
                             let caption: string = "";
                             switch (characterData?.id ?? EClassData.FIGHTER) {
                                 case EClassData.CLERIC: {
@@ -1768,7 +1749,7 @@ export class PixiGame extends PixiGameNetworking {
                             return (
                                 <Card key={`character-${i}`} style={{maxWidth: "fit-content"}}>
                                     <CardContent>
-                                        <Badge badgeContent={badgeContent} color={"primary"}>
+                                        <Badge badgeContent={badgeContent} color={badgeContent > 9 ? "success" : badgeContent > 0 ? "warning" : "error"}>
                                             <Avatar variant="rounded" style={{width: 50, height: 50}} srcSet={this.renderCharacterUrl(character.characterRace).url}>
                                                 {null}
                                             </Avatar>
@@ -1854,7 +1835,6 @@ export class PixiGame extends PixiGameNetworking {
                     characterClass: c.id,
                     amount: selectionData.find(i => i.faction === this.state.faction! && i.characterRace === r.id && i.characterClass === c.id)?.amount ?? 0
                 };
-                console.log(item);
                 return [...acc2, item];
             }, [] as ICharacterSelectionItem[])];
         }, [] as ICharacterSelectionItem[]) ?? [] as ICharacterSelectionItem[];
