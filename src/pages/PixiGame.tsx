@@ -1706,78 +1706,91 @@ export class PixiGame extends PixiGameNetworking {
         );
     }
 
+    renderCharacterInUi(ship: Ship, v: number, i: number) {
+        const character = ship?.characters[i] as Character;
+        const characterData = character.getClassData();
+        const badgeContent = character.hp;
+        let caption: string = "";
+        switch (characterData?.id ?? EClassData.FIGHTER) {
+            case EClassData.CLERIC: {
+                caption = "Cleric";
+                break;
+            }
+            case EClassData.MAGE: {
+                caption = "Mage";
+                break;
+            }
+            case EClassData.FIGHTER: {
+                caption = "Fighter";
+                break;
+            }
+            case EClassData.PALADIN: {
+                caption = "Paladin";
+                break;
+            }
+            case EClassData.RANGER: {
+                caption = "Ranger";
+                break;
+            }
+            case EClassData.THIEF: {
+                caption = "Thief";
+                break;
+            }
+        }
+        return (
+            <Card key={`character-${i}`} style={{maxWidth: "fit-content"}}>
+                <CardContent>
+                    <Badge badgeContent={badgeContent} color={badgeContent > 9 ? "success" : badgeContent > 0 ? "warning" : "error"}>
+                        <Avatar variant="rounded" style={{width: 50, height: 50}} srcSet={this.renderCharacterUrl(character.characterRace).url}>
+                            {null}
+                        </Avatar>
+                    </Badge>
+                    <br />
+                    <Typography variant="caption" fontSize={12}>{caption}</Typography>
+                </CardContent>
+            </Card>
+        );
+    }
+
     renderGameUiBottom(): React.ReactElement | null {
+        const playerShip = this.findPlayerShip();
+        const characterBattle = playerShip && Array.from(this.game.characterBattles.values()).find(x => x.ships.includes(playerShip!));
+        const otherShip = characterBattle?.ships.filter(x => x.faction !== playerShip?.faction)[0];
         return (
             <React.Fragment>
                 <Card className="BottomRight">
                 </Card>
                 <Card className="BottomLeft">
                 </Card>
-                <Box className="Bottom" style={{display: "flex", flexWrap: "wrap"}}>
-                    {
-                        new Array(this.findPlayerShip()?.characters.length ?? 0).fill(0).map((v, i) => {
-                            const character = this.findPlayerShip()?.characters[i] as Character;
-                            const characterData = character.getClassData();
-                            const badgeContent = character.hp;
-                            let caption: string = "";
-                            switch (characterData?.id ?? EClassData.FIGHTER) {
-                                case EClassData.CLERIC: {
-                                    caption = "Cleric";
-                                    break;
-                                }
-                                case EClassData.MAGE: {
-                                    caption = "Mage";
-                                    break;
-                                }
-                                case EClassData.FIGHTER: {
-                                    caption = "Fighter";
-                                    break;
-                                }
-                                case EClassData.PALADIN: {
-                                    caption = "Paladin";
-                                    break;
-                                }
-                                case EClassData.RANGER: {
-                                    caption = "Ranger";
-                                    break;
-                                }
-                                case EClassData.THIEF: {
-                                    caption = "Thief";
-                                    break;
-                                }
-                            }
-                            return (
-                                <Card key={`character-${i}`} style={{maxWidth: "fit-content"}}>
-                                    <CardContent>
-                                        <Badge badgeContent={badgeContent} color={badgeContent > 9 ? "success" : badgeContent > 0 ? "warning" : "error"}>
-                                            <Avatar variant="rounded" style={{width: 50, height: 50}} srcSet={this.renderCharacterUrl(character.characterRace).url}>
-                                                {null}
-                                            </Avatar>
-                                        </Badge>
-                                        <br />
-                                        <Typography variant="caption" fontSize={12}>{caption}</Typography>
-                                    </CardContent>
-                                </Card>
-                            );
-                        })
-                    }
-                    {
-                        new Array(GetShipData(this.findPlayerShip()?.shipType ?? EShipType.CUTTER, this.game.worldScale).cargoSize).fill(0).map((v, i) => {
-                            return (
-                                <Card key={`cargo-${i}`} style={{maxWidth: "fit-content"}}>
-                                    <CardContent>
-                                        <Badge badgeContent={this.findPlayerShip()?.cargo[i] ? this.findPlayerShip()?.cargo[i].amount : null} color={"primary"}>
-                                            <Avatar variant="rounded" style={{width: 50, height: 50}} srcSet={this.findPlayerShip()?.cargo[i] ? this.renderItemUrl(this.findPlayerShip()?.cargo[i].resourceType ?? EResourceType.CACAO).url : this.renderItemUrl("UNKNOWN" as any).url}>
-                                                {null}
-                                            </Avatar>
-                                        </Badge>
-                                        <br />
-                                        <Typography variant="caption" fontSize={12}>{this.findPlayerShip()?.cargo[i] ? this.findPlayerShip()?.cargo[i].resourceType : ""}</Typography>
-                                    </CardContent>
-                                </Card>
-                            );
-                        })
-                    }
+                <Box className="Bottom" style={{display: "flex", flexWrap: "wrap", flexDirection: "column"}}>
+                    <Box style={{display: "flex", flexWrap: "wrap", visibility: otherShip ? "visible" : "hidden"}}>
+                        <Typography variant="h1">Enemies</Typography>
+                        {
+                            new Array(otherShip?.characters.length ?? 0).fill(0).map((v, i) => this.renderCharacterInUi(otherShip!, v, i))
+                        }
+                    </Box>
+                    <Box style={{display: "flex", flexWrap: "wrap"}}>
+                        {
+                            new Array(playerShip?.characters.length ?? 0).fill(0).map((v, i) => this.renderCharacterInUi(playerShip!, v, i))
+                        }
+                        {
+                            new Array(GetShipData(playerShip?.shipType ?? EShipType.CUTTER, this.game.worldScale).cargoSize).fill(0).map((v, i) => {
+                                return (
+                                    <Card key={`cargo-${i}`} style={{maxWidth: "fit-content"}}>
+                                        <CardContent>
+                                            <Badge badgeContent={playerShip?.cargo[i] ? playerShip?.cargo[i].amount : null} color={"primary"}>
+                                                <Avatar variant="rounded" style={{width: 50, height: 50}} srcSet={playerShip?.cargo[i] ? this.renderItemUrl(playerShip?.cargo[i].resourceType ?? EResourceType.CACAO).url : this.renderItemUrl("UNKNOWN" as any).url}>
+                                                    {null}
+                                                </Avatar>
+                                            </Badge>
+                                            <br />
+                                            <Typography variant="caption" fontSize={12}>{playerShip?.cargo[i] ? playerShip?.cargo[i].resourceType : ""}</Typography>
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })
+                        }
+                    </Box>
                 </Box>
             </React.Fragment>
         );
