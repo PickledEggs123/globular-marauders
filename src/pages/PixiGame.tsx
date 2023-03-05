@@ -738,7 +738,8 @@ export class PixiGame extends PixiGameNetworking {
 
             // update mouseQ
             if (this.mouseMoveEvent) {
-                this.mouseQ = this.findMouseQuaternion(this.mouseMoveEvent);
+                this.mouseQ = this.findMouseQuaternion(this.mouseMoveEvent, true);
+                this.mouseQ2 = this.findMouseQuaternion(this.mouseMoveEvent, false);
             }
 
             // sync mouse text
@@ -1945,7 +1946,7 @@ export class PixiGame extends PixiGameNetworking {
         );
     }
 
-    findMouseQuaternion(event: React.MouseEvent) {
+    findMouseQuaternion(event: React.MouseEvent, flipX: boolean) {
         // get element coordinates
         const node = this.application.view as HTMLElement;
         const bounds = node.getBoundingClientRect();
@@ -1960,7 +1961,9 @@ export class PixiGame extends PixiGameNetworking {
                 ((y / size) - 0.5) * 2 / this.state.zoom / this.game.worldScale,
                 0
             ];
-            clickScreenPoint[0] *= -1;
+            if (flipX) {
+                clickScreenPoint[0] *= -1;
+            }
             clickScreenPoint[1] *= -1;
             clickScreenPoint[2] = Math.sqrt(1 - Math.pow(clickScreenPoint[0], 2) - Math.pow(clickScreenPoint[1], 2));
 
@@ -1970,10 +1973,15 @@ export class PixiGame extends PixiGameNetworking {
             // compute sphere position
             const clickQuaternion = Quaternion.fromBetweenVectors([0, 0, 1], clickScreenPoint);
             const ship = this.getPlayerShip();
-            return ship.position.clone()
-                .mul(Quaternion.fromAxisAngle([0, 0, 1], this.cameraCorrectionFactor))
-                .mul(ship.orientation.clone())
-                .mul(clickQuaternion);
+            if (flipX) {
+                return ship.position.clone()
+                    .mul(ship.orientation.clone())
+                    .mul(clickQuaternion);
+            } else {
+                return ship.position.clone()
+                    .mul(ship.orientation.clone())
+                    .mul(clickQuaternion);
+            }
         }
 
         return this.getPlayerShip().position;
@@ -1984,34 +1992,37 @@ export class PixiGame extends PixiGameNetworking {
             spellItems: []
         });
 
-        const playerShip = this.findPlayerShip();
-        if (!playerShip) {
-            return;
-        }
-
         if (spellItem.hasDirection) {
             // launch a fireball at something
             this.isDrawMouseText = true;
-            setTimeout(() => {
-                if (this.mouseQ) {
-                    const item = new ShipActionItem(spellItem.actionType, this.mouseQ.clone().inverse());
-                    playerShip.actionItems.push(item);
-                }
-                this.isDrawMouseText = false;
-            }, 2000);
+            this.spellItemQueue = spellItem;
         } else {
+            const playerShip = this.findPlayerShip();
+            if (!playerShip) {
+                return;
+            }
+
             // apply self spell immediately
             const item = new ShipActionItem(spellItem.actionType, playerShip.position.clone());
             playerShip.actionItems.push(item);
         }
     }
 
+    spellItemQueue: ISpellData | null = null;
     isDrawMouseText: boolean = false;
     mouseQ: Quaternion = this.getPlayerShip().position;
+    mouseQ2: Quaternion = this.getPlayerShip().position;
     mouseText: PIXI.Text | null = null;
     mouseMoveEvent: React.MouseEvent | null = null;
     public downDrawTextAtMouse(e: React.MouseEvent) {
+        const playerShip = this.findPlayerShip();
+
         this.isDrawMouseText = true;
+        if (this.spellItemQueue && this.mouseQ2 && playerShip) {
+            const item = new ShipActionItem(this.spellItemQueue.actionType, this.mouseQ2.clone());
+            playerShip.actionItems.push(item);
+            this.spellItemQueue = null;
+        }
     }
     public moveDrawTextAtMouse(e: React.MouseEvent) {
         this.mouseMoveEvent = e;

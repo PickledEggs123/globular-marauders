@@ -700,9 +700,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         const positionVelocity: Quaternion = spellBall.positionVelocity.clone();
 
         // create mesh
-        const ownerFaction = spellBall.factionId && this.game.factions.get(spellBall.factionId);
-        const factionColor = this.getFactionColor(ownerFaction);
-        const uColor = factionColor != null ? [((factionColor & 0xff0000) >> 16) / 0xff, ((factionColor & 0x00ff00) >> 8) / 0xff, (factionColor & 0x0000ff) / 0xff, 1] : [0.75, 0.75, 0.75, 1];
+        const uColor = spellBall.shipBuffs.length === 0 ? [1, 1, 1, 1] : [1, 0.75, 0.8, 1];
         const uniforms = {
             uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
             uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
