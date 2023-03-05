@@ -7,7 +7,7 @@ import {
     PHYSICS_SCALE,
 } from "@pickledeggs123/globular-marauders-game/lib/src/ShipType";
 import {
-    EFaction,
+    EFaction, ISpellData,
 } from "@pickledeggs123/globular-marauders-game/lib/src/EFaction";
 import {Game, IPlayerData} from "@pickledeggs123/globular-marauders-game/lib/src/Game";
 import * as PIXI from "pixi.js";
@@ -17,7 +17,7 @@ import Quaternion from "quaternion";
 import {EResourceType} from "@pickledeggs123/globular-marauders-game/lib/src/Resource";
 import {Faction, Star} from "@pickledeggs123/globular-marauders-game/lib/src";
 import {Planet} from "@pickledeggs123/globular-marauders-game/lib/src/Planet";
-import {CannonBall, Crate} from "@pickledeggs123/globular-marauders-game/lib/src/Item";
+import {CannonBall, Crate, SpellBall} from "@pickledeggs123/globular-marauders-game/lib/src/Item";
 import {ICameraState} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
 import React from "react";
 import planetMesh0 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet0.mesh.json";
@@ -40,6 +40,7 @@ import {backgroundVoronoiResources} from "../resources/backgroundVoronoiResource
 import {ShipResources} from "../resources/shipResources";
 import {EMovementQuaternionParticleBehaviorType} from "../resources/particles/MovementQuaternionParticleBehavior";
 import {Layer} from "@pixi/layers";
+import {SpellBallResources} from "../resources/spellBallResources";
 
 /**
  * The input parameters of the app.
@@ -93,6 +94,7 @@ export interface IPixiGameState {
     showScoreboard: boolean;
     showSettings: boolean;
     showCharacterSelection: boolean;
+    spellItems: ISpellData[];
     showLoginMenu: boolean;
     showMainMenu: boolean;
     showPlanetMenu: boolean;
@@ -134,6 +136,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         showScoreboard: false as boolean,
         showSettings: false as boolean,
         showCharacterSelection: false as boolean,
+        spellItems: [] as ISpellData[],
         showLoginMenu: false as boolean,
         showMainMenu: false as boolean,
         showPlanetMenu: false as boolean,
@@ -171,6 +174,8 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
     pixiShipResources = new ShipResources(this as any);
 
     pixiCannonBallResources = new CannonBallResources(this as any);
+
+    pixiSpellBallResources = new SpellBallResources(this as any);
 
     pixiCrateResources = new CrateResources(this as any);
 
@@ -679,6 +684,158 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         this.projectileColorLayer.addChild(trailContainer);
         this.pixiCannonBallResources.getResources().cannonBallMeshes.push({
             id: cannonBall.id,
+            mesh,
+            trailContainer,
+            trail,
+            position,
+            positionVelocity,
+            tick,
+        });
+    };
+
+    addSpellBall = ({spellBall, cameraPosition, cameraOrientation, tick}: {
+        spellBall: SpellBall, cameraPosition: Quaternion, cameraOrientation: Quaternion, tick: number
+    }) => {
+        const position: Quaternion = spellBall.position.clone();
+        const positionVelocity: Quaternion = spellBall.positionVelocity.clone();
+
+        // create mesh
+        const ownerFaction = spellBall.factionId && this.game.factions.get(spellBall.factionId);
+        const factionColor = this.getFactionColor(ownerFaction);
+        const uColor = factionColor != null ? [((factionColor & 0xff0000) >> 16) / 0xff, ((factionColor & 0x00ff00) >> 8) / 0xff, (factionColor & 0x0000ff) / 0xff, 1] : [0.75, 0.75, 0.75, 1];
+        const uniforms = {
+            uCameraPosition: cameraPosition.clone().inverse().toMatrix4(),
+            uCameraOrientation: cameraOrientation.clone().inverse().toMatrix4(),
+            uCameraScale: this.state.zoom,
+            uPosition: position.toMatrix4(),
+            uColor,
+            uScale: 5 * PHYSICS_SCALE,
+            uWorldScale: this.game.worldScale,
+        };
+        const shader = new PIXI.Shader(this.pixiSpellBallResources.getResources().spellBallProgram, uniforms);
+        const mesh = new PIXI.Mesh(this.pixiSpellBallResources.getResources().spellBallGeometry, shader);
+        mesh.zIndex = -1;
+
+
+
+        const trailContainer = new PIXI.Container();
+        trailContainer.zIndex = -5;
+        const trail = new particles.Emitter(trailContainer, {
+            emit: true,
+            autoUpdate: true,
+            lifetime: {
+                min: 0.2,
+                max: 0.2
+            },
+            particlesPerWave: 1,
+            frequency: 0.0066,
+            spawnChance: 0.8,
+            maxParticles: 30,
+            addAtBack: false,
+            pos: {
+                x: 0,
+                y: 0,
+            },
+            behaviors: [
+                {
+                    type: 'alpha',
+                    config: {
+                        alpha: {
+                            list: [
+                                {
+                                    value: 0.8,
+                                    time: 0
+                                },
+                                {
+                                    value: 0.1,
+                                    time: 1
+                                }
+                            ],
+                        },
+                    }
+                },
+                {
+                    type: 'scale',
+                    config: {
+                        scale: {
+                            list: [
+                                {
+                                    value: 0.5,
+                                    time: 0
+                                },
+                                {
+                                    value: 0.3,
+                                    time: 1
+                                }
+                            ],
+                        },
+                    }
+                },
+                {
+                    type: 'staticQuaternion',
+                    config: {
+                        ship: spellBall,
+                        game: this,
+                    }
+                },
+                {
+                    type: 'rotationStatic',
+                    config: {
+                        min: 0,
+                        max: 360
+                    }
+                },
+                {
+                    type: 'spawnShape',
+                    config: {
+                        type: 'torus',
+                        data: {
+                            x: 0,
+                            y: 0,
+                            radius: 10
+                        }
+                    }
+                },
+                {
+                    type: 'textureSingle',
+                    config: {
+                        texture: this.sprites.spellBallTrail
+                    }
+                },
+                {
+                    type: 'color',
+                    config: {
+                        color: {
+                            list: [
+                                {
+                                    time: 0,
+                                    value: {
+                                        r: uColor[0] * 255,
+                                        g: uColor[1] * 255,
+                                        b: uColor[2] * 255,
+                                        a: uColor[3] * 255,
+                                    }
+                                },
+                                {
+                                    time: 1,
+                                    value: {
+                                        r: uColor[0] * 255,
+                                        g: uColor[1] * 255,
+                                        b: uColor[2] * 255,
+                                        a: 0,
+                                    }
+                                }
+                            ]
+                        },
+                    }
+                },
+            ]
+        });
+
+        this.projectileColorLayer.addChild(mesh);
+        this.projectileColorLayer.addChild(trailContainer);
+        this.pixiSpellBallResources.getResources().spellBallMeshes.push({
+            id: spellBall.id,
             mesh,
             trailContainer,
             trail,

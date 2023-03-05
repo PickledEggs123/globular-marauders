@@ -7,19 +7,21 @@ import {Layer, Stage} from "@pixi/layers";
 import {sound} from "@pixi/sound";
 import {EResourceType, ITEM_DATA} from "@pickledeggs123/globular-marauders-game/lib/src/Resource";
 import {
-    EDamageType,
     ICameraState,
-    ICameraStateWithOriginal, ICharacterSelectionItem,
+    ICameraStateWithOriginal,
+    ICharacterSelectionItem,
     IDrawable,
     MIN_DISTANCE
 } from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
-import {Ship,} from "@pickledeggs123/globular-marauders-game/lib/src/Ship";
+import {EShipActionItemType, Ship, ShipActionItem,} from "@pickledeggs123/globular-marauders-game/lib/src/Ship";
 import {EShipType, GetShipData,} from "@pickledeggs123/globular-marauders-game/lib/src/ShipType";
 import {
     EClassData,
     EFaction,
     ERaceData,
-    GameFactionData, IClassData,
+    GameFactionData,
+    GetSpellData,
+    ISpellData,
 } from "@pickledeggs123/globular-marauders-game/lib/src/EFaction";
 import {
     DelaunayGraph,
@@ -32,7 +34,8 @@ import {
     EMessageType,
     ESoundType,
     Game,
-    IAutoPilotMessage, IChooseCrewSelectionMessage,
+    IAutoPilotMessage,
+    IChooseCrewSelectionMessage,
     IChooseFactionMessage,
     IChoosePlanetMessage,
     IJoinMessage,
@@ -40,7 +43,8 @@ import {
 } from "@pickledeggs123/globular-marauders-game/lib/src/Game";
 import {
     Avatar,
-    Badge, Box,
+    Badge,
+    Box,
     Button,
     Card,
     CardActionArea,
@@ -62,7 +66,6 @@ import {
     Popper,
     Radio,
     RadioGroup,
-    Stack,
     SvgIcon,
     TextField,
     Tooltip,
@@ -116,6 +119,7 @@ import {RenderMobileGameUiBottom} from "./RenderMobileGameUiBottom";
 import {LayerCompositeFilter} from "../filters/LayerComposite/LayerCompositeFilter";
 import {ISetupScriptContext, setupScript} from "../scripts/setup";
 import {Character, CharacterSelection} from "@pickledeggs123/globular-marauders-game/lib/src/Character";
+import {computePositionPolarCorrectionFactorTheta} from "../helpers/pixiHelpers";
 
 const GetFactionSubheader = (faction: EFaction): string | null => {
     return GameFactionData.find(x => x.id === faction)?.description ?? null;
@@ -139,6 +143,10 @@ export class PixiGame extends PixiGameNetworking {
     private keyDownHandlerInstance: any;
     private keyUpHandlerInstance: any;
     private mouseWheelHandlerInstance: any;
+
+    private mouseDownHandlerInstance: any;
+    private mouseUpHandlerInstance: any;
+    private mouseMoveHandlerInstance: any;
 
     // game data stuff
     public voronoiData: Array<{
@@ -286,6 +294,7 @@ export class PixiGame extends PixiGameNetworking {
         // load smoke trail
         loader.add("smokeTrail", "images/sprites/smokeTrail.svg");
         loader.add("cannonBallTrail", "images/sprites/cannonBallTrail.svg");
+        loader.add("spellBallTrail", "images/sprites/cannonBallTrail.svg");
         loader.add("glowTrail", "images/sprites/glowTrail.svg");
         loader.add("starFieldSpeckle", "images/sprites/starFieldSpeckle.svg");
         // onload handler
@@ -311,6 +320,7 @@ export class PixiGame extends PixiGameNetworking {
             }
             this.sprites.smokeTrail = resources.smokeTrail.texture;
             this.sprites.cannonBallTrail = resources.cannonBallTrail.texture;
+            this.sprites.spellBallTrail = resources.spellBallTrail.texture;
             this.sprites.glowTrail = resources.glowTrail.texture;
             this.sprites.starFieldSpeckle = resources.starFieldSpeckle.texture;
 
@@ -613,7 +623,7 @@ export class PixiGame extends PixiGameNetworking {
         };
     }
 
-    handleDrawingOfText = (text: PIXI.Text, position: Quaternion, offset?: {x: number, y: number}) => {
+    handleDrawingOfText = (text: PIXI.Text, position: Quaternion, offset?: {x: number, y: number}, alwaysVisible: boolean = false) => {
         const textPosition = DelaunayGraph.distanceFormula(
             this.cameraPosition.rotateVector([0, 0, 1]),
             position.rotateVector([0, 0, 1])
@@ -647,7 +657,7 @@ export class PixiGame extends PixiGameNetworking {
             text.y += normalizedDirectionTowardsCenter[1] * 25;
         }
         text.anchor.set(0.5);
-        text.visible = textPosition[2] > 0 && this.state.zoom * this.game.worldScale >= 6;
+        text.visible = (textPosition[2] > 0 && this.state.zoom * this.game.worldScale >= 6) || alwaysVisible;
     };
 
     updateMeshIfVisible = (item: {position: Quaternion, mesh: PIXI.Mesh<any>}) => {
@@ -726,11 +736,32 @@ export class PixiGame extends PixiGameNetworking {
             this.cameraOrientation = this.lastCameraOrientation.slerp(nextCameraOrientation)(0.1 * (1 - VoronoiGraph.angularDistanceQuaternion(this.lastCameraOrientation.clone().inverse().mul(nextCameraOrientation.clone()), 1) / Math.PI));
             pixiTick += 1;
 
+            // update mouseQ
+            if (this.mouseMoveEvent) {
+                this.mouseQ = this.findMouseQuaternion(this.mouseMoveEvent);
+            }
+
+            // sync mouse text
+            if (this.isDrawMouseText && this.mouseQ && !this.mouseText) {
+                const mouseText = new PIXI.Text("Fire");
+                mouseText.style.fill = "white";
+                mouseText.style.fontSize = 15;
+                this.textColorLayer.addChild(mouseText);
+                this.mouseText = mouseText;
+            } else if (!this.isDrawMouseText && this.mouseText) {
+                this.textColorLayer.removeChild(this.mouseText);
+                this.mouseText = null;
+            }
+            if (this.isDrawMouseText && this.mouseQ && this.mouseText) {
+                this.handleDrawingOfText(this.mouseText, this.mouseQ, undefined, true);
+            }
+
             // sync game to Pixi renderer
             this.pixiStarResources.getResources().handleSync(pixiTick);
             this.pixiPlanetResources.getResources().handleSync(pixiTick);
             this.pixiShipResources.getResources().handleSync(pixiTick);
             this.pixiCannonBallResources.getResources().handleSync(pixiTick);
+            this.pixiSpellBallResources.getResources().handleSync(pixiTick);
             this.pixiCrateResources.getResources().handleSync(pixiTick);
 
             // voronoi tiles
@@ -859,6 +890,7 @@ export class PixiGame extends PixiGameNetworking {
             this.pixiPlanetResources.getResources().handleRender();
             this.pixiShipResources.getResources().handleRender();
             this.pixiCannonBallResources.getResources().handleRender();
+            this.pixiSpellBallResources.getResources().handleRender();
             this.pixiCrateResources.getResources().handleRender();
 
             // draw voronoi terrain tiles for political boundaries
@@ -1385,6 +1417,14 @@ export class PixiGame extends PixiGameNetworking {
         document.addEventListener("keydown", this.keyDownHandlerInstance);
         document.addEventListener("keyup", this.keyUpHandlerInstance);
         document.addEventListener("wheel", this.mouseWheelHandlerInstance);
+
+        // handle mouse input
+        this.mouseDownHandlerInstance = this.downDrawTextAtMouse.bind(this);
+        this.mouseUpHandlerInstance = this.upDrawTextAtMouse.bind(this);
+        this.mouseMoveHandlerInstance = this.moveDrawTextAtMouse.bind(this);
+        document.addEventListener("mousedown", this.mouseDownHandlerInstance);
+        document.addEventListener("mouseup", this.mouseUpHandlerInstance);
+        document.addEventListener("mousemove", this.mouseMoveHandlerInstance);
     }
 
     componentWillUnmount() {
@@ -1397,6 +1437,9 @@ export class PixiGame extends PixiGameNetworking {
         document.removeEventListener("keydown", this.keyDownHandlerInstance);
         document.removeEventListener("keyup", this.keyUpHandlerInstance);
         document.removeEventListener("wheel", this.mouseWheelHandlerInstance);
+        document.removeEventListener("mousedown", this.mouseDownHandlerInstance);
+        document.removeEventListener("mouseup", this.mouseUpHandlerInstance);
+        document.removeEventListener("mousemove", this.mouseMoveHandlerInstance);
         this.music.stop();
     }
 
@@ -1706,12 +1749,13 @@ export class PixiGame extends PixiGameNetworking {
         );
     }
 
-    renderCharacterInUi(ship: Ship, v: number, i: number) {
+    renderCharacterInUi(ship: Ship, v: number, i: number, ownShip: boolean) {
         const character = ship?.characters[i] as Character;
         const characterData = character.getClassData();
         const badgeContent = character.hp;
         let caption: string = "";
-        switch (characterData?.id ?? EClassData.FIGHTER) {
+        const characterClass = characterData?.id ?? EClassData.FIGHTER;
+        switch (characterClass) {
             case EClassData.CLERIC: {
                 caption = "Cleric";
                 break;
@@ -1737,8 +1781,16 @@ export class PixiGame extends PixiGameNetworking {
                 break;
             }
         }
+
+        const openMagicMenu = ownShip ? () => {
+            const spellItems = GetSpellData(characterClass);
+            this.setState({
+                spellItems
+            });
+        } : undefined;
+
         return (
-            <Card key={`character-${i}`} style={{maxWidth: "fit-content"}}>
+            <Card key={`character-${i}`} style={{maxWidth: "fit-content"}} onClick={openMagicMenu}>
                 <CardContent>
                     <Badge badgeContent={badgeContent} color={badgeContent > 9 ? "success" : badgeContent > 0 ? "warning" : "error"}>
                         <Avatar variant="rounded" style={{width: 50, height: 50}} srcSet={this.renderCharacterUrl(character.characterRace).url}>
@@ -1764,14 +1816,14 @@ export class PixiGame extends PixiGameNetworking {
                 </Card>
                 <Box className="Bottom" style={{display: "flex", flexWrap: "wrap", flexDirection: "column"}}>
                     <Box style={{display: "flex", flexWrap: "wrap", visibility: otherShip ? "visible" : "hidden"}}>
-                        <Typography variant="h1">Enemies</Typography>
+                        <Typography variant="h1" color="white">Enemies</Typography>
                         {
-                            new Array(otherShip?.characters.length ?? 0).fill(0).map((v, i) => this.renderCharacterInUi(otherShip!, v, i))
+                            new Array(otherShip?.characters.length ?? 0).fill(0).map((v, i) => this.renderCharacterInUi(otherShip!, v, i, false))
                         }
                     </Box>
                     <Box style={{display: "flex", flexWrap: "wrap"}}>
                         {
-                            new Array(playerShip?.characters.length ?? 0).fill(0).map((v, i) => this.renderCharacterInUi(playerShip!, v, i))
+                            new Array(playerShip?.characters.length ?? 0).fill(0).map((v, i) => this.renderCharacterInUi(playerShip!, v, i, true))
                         }
                         {
                             new Array(GetShipData(playerShip?.shipType ?? EShipType.CUTTER, this.game.worldScale).cargoSize).fill(0).map((v, i) => {
@@ -1891,6 +1943,81 @@ export class PixiGame extends PixiGameNetworking {
                 }
             </Box>
         );
+    }
+
+    findMouseQuaternion(event: React.MouseEvent) {
+        // get element coordinates
+        const node = this.application.view as HTMLElement;
+        const bounds = node.getBoundingClientRect();
+        const x = event.clientX - bounds.left;
+        const y = event.clientY - bounds.top;
+
+        // if inside bounds of the play area
+        const size = Math.min(this.state.width, this.state.height);
+        if (x >= 0 && x <= size && y >= 0 && y <= size) {
+            const clickScreenPoint: [number, number, number] = [
+                ((x / size) - 0.5) * 2 / this.state.zoom / this.game.worldScale,
+                ((y / size) - 0.5) * 2 / this.state.zoom / this.game.worldScale,
+                0
+            ];
+            clickScreenPoint[0] *= -1;
+            clickScreenPoint[1] *= -1;
+            clickScreenPoint[2] = Math.sqrt(1 - Math.pow(clickScreenPoint[0], 2) - Math.pow(clickScreenPoint[1], 2));
+
+            if (isNaN(clickScreenPoint[2]))
+                return this.getPlayerShip().position;
+
+            // compute sphere position
+            const clickQuaternion = Quaternion.fromBetweenVectors([0, 0, 1], clickScreenPoint);
+            const ship = this.getPlayerShip();
+            return ship.position.clone()
+                .mul(Quaternion.fromAxisAngle([0, 0, 1], this.cameraCorrectionFactor))
+                .mul(ship.orientation.clone())
+                .mul(clickQuaternion);
+        }
+
+        return this.getPlayerShip().position;
+    }
+
+    public performSpell(spellItem: ISpellData) {
+        this.setState({
+            spellItems: []
+        });
+
+        const playerShip = this.findPlayerShip();
+        if (!playerShip) {
+            return;
+        }
+
+        if (spellItem.hasDirection) {
+            // launch a fireball at something
+            this.isDrawMouseText = true;
+            setTimeout(() => {
+                if (this.mouseQ) {
+                    const item = new ShipActionItem(spellItem.actionType, this.mouseQ.clone().inverse());
+                    playerShip.actionItems.push(item);
+                }
+                this.isDrawMouseText = false;
+            }, 2000);
+        } else {
+            // apply self spell immediately
+            const item = new ShipActionItem(spellItem.actionType, playerShip.position.clone());
+            playerShip.actionItems.push(item);
+        }
+    }
+
+    isDrawMouseText: boolean = false;
+    mouseQ: Quaternion = this.getPlayerShip().position;
+    mouseText: PIXI.Text | null = null;
+    mouseMoveEvent: React.MouseEvent | null = null;
+    public downDrawTextAtMouse(e: React.MouseEvent) {
+        this.isDrawMouseText = true;
+    }
+    public moveDrawTextAtMouse(e: React.MouseEvent) {
+        this.mouseMoveEvent = e;
+    }
+    public upDrawTextAtMouse(e: React.MouseEvent) {
+        this.isDrawMouseText = false;
     }
 
     render() {
@@ -2404,6 +2531,23 @@ export class PixiGame extends PixiGameNetworking {
                                 <DialogTitle title="Character Selection"/>
                                 <DialogContent>
                                     {this.renderCharacterSelection()}
+                                </DialogContent>
+                            </Dialog>
+                            <Dialog open={this.state.spellItems.length > 0} onClose={() => this.setState({spellItems: []})}>
+                                <DialogTitle title="Character Selection"/>
+                                <DialogContent>
+                                    {
+                                        this.state.spellItems.map(spellItem => {
+                                            return (
+                                                <Card key={spellItem.id} onClick={this.performSpell.bind(this, spellItem)} style={{width: 196}}>
+                                                    <CardHeader title={spellItem.name}/>
+                                                    <CardContent>
+                                                        <Typography>{spellItem.description}</Typography>
+                                                    </CardContent>
+                                                </Card>
+                                            );
+                                        })
+                                    }
                                 </DialogContent>
                             </Dialog>
                             <Dialog open={this.state.showItems} onClose={() => this.setState({showItems: false})}>
