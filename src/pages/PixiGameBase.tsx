@@ -531,6 +531,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
             isPlayer,
             isEnemy,
             position,
+            positionPolarFuture: convertPositionQuaternionToPositionPolar(position),
             positionPolarNew: convertPositionQuaternionToPositionPolar(position),
             positionPolarOld: convertPositionQuaternionToPositionPolar(position),
             correctionFactorTheta: 0,

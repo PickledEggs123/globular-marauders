@@ -16,7 +16,7 @@ import * as particles from "@pixi/particle-emitter";
 import Quaternion from "quaternion";
 import {EParticleState} from "../pages/PixiGameBase";
 import PixiGame from "../pages/PixiGame";
-import {DelaunayGraph} from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
+import {DelaunayGraph, VoronoiGraph} from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
 import cutterMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/cutter.mesh.json";
 import sloopMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/sloop.mesh.json";
 import corvetteMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/corvette.mesh.json";
@@ -242,6 +242,7 @@ export class ShipResources {
             isPlayer: boolean,
             isEnemy: boolean,
             position: Quaternion,
+            positionPolarFuture: IPositionPolarData,
             positionPolarNew: IPositionPolarData,
             positionPolarOld: IPositionPolarData,
             correctionFactorTheta: number,
@@ -312,10 +313,16 @@ export class ShipResources {
                     }
 
                     const currentPositionPolar = convertPositionQuaternionToPositionPolar(ship.position);
+                    const futurePositionPolar = convertPositionQuaternionToPositionPolar(ship.position.clone().mul(ship.positionVelocity.clone().pow(1)));
                     if (isPositionPolarDifferent(shipMesh.positionPolarNew, currentPositionPolar)) {
-                        shipMesh.positionPolarOld = shipMesh.positionPolarNew;
-                        shipMesh.positionPolarNew = currentPositionPolar;
-                        shipMesh.correctionFactorTheta = -computePositionPolarCorrectionFactorTheta(shipMesh.positionPolarOld, shipMesh.positionPolarNew) + Math.PI / 2;
+                        if (isPositionPolarDifferent(shipMesh.positionPolarNew, currentPositionPolar)) {
+                            shipMesh.positionPolarOld = shipMesh.positionPolarNew;
+                            shipMesh.positionPolarNew = currentPositionPolar;
+                        }
+                        shipMesh.positionPolarFuture = futurePositionPolar;
+                        const a = -computePositionPolarCorrectionFactorTheta(shipMesh.positionPolarOld, shipMesh.positionPolarNew) + Math.PI / 2;
+                        const b = -computePositionPolarCorrectionFactorTheta(shipMesh.positionPolarNew, shipMesh.positionPolarFuture) + Math.PI / 2;
+                        shipMesh.correctionFactorTheta = VoronoiGraph.angularDistanceQuaternion(Quaternion.fromAxisAngle([0, 0, 1], a).pow(1 / 2).mul(Quaternion.fromAxisAngle([0, 0, 1], b).pow(1 / 2)), 1);
                         if (ship === this.game.findPlayerShip()) {
                             this.game.cameraCorrectionFactor = shipMesh.correctionFactorTheta;
                         }
