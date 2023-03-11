@@ -4,11 +4,11 @@ WORKDIR /app
 
 COPY . .
 
-RUN echo "always-auth=true" > ~/.npmrc
-RUN echo "//npm.pkg.github.com/:_authToken=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" >> ~/.npmrc
+#RUN echo "always-auth=true" > ~/.npmrc
+#RUN echo "//npm.pkg.github.com/:_authToken=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" >> ~/.npmrc
 RUN npm install
 RUN npm run build
-RUN rm -f ~/.npmrc
+#RUN rm -f ~/.npmrc
 
 FROM nginx:alpine
 
