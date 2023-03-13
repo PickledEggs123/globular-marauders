@@ -5,7 +5,7 @@ WORKDIR /app
 COPY . .
 
 RUN echo "always-auth=true" > ~/.npmrc
-RUN echo $"//npm.pkg.github.com/:_authToken="$_GITHUB_ACCESS_TOKEN$" >> ~/.npmrc"
+RUN echo "//npm.pkg.github.com/:_authToken=${_GITHUB_ACCESS_TOKEN} >> ~/.npmrc"
 RUN npm install
 RUN npm run build
 RUN rm -f ~/.npmrc
