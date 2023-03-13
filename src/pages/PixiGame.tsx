@@ -82,7 +82,7 @@ import {
 } from "../helpers/Data";
 import {EGameMode, IPixiGameProps} from "./PixiGameBase";
 import {
-    Add,
+    Add, AutoFixNormal, AutoFixOff,
     MusicNote,
     MusicOff,
     People,
@@ -119,7 +119,6 @@ import {RenderMobileGameUiBottom} from "./RenderMobileGameUiBottom";
 import {LayerCompositeFilter} from "../filters/LayerComposite/LayerCompositeFilter";
 import {ISetupScriptContext, setupScript} from "../scripts/setup";
 import {Character, CharacterSelection} from "@pickledeggs123/globular-marauders-game/lib/src/Character";
-import {computePositionPolarCorrectionFactorTheta} from "../helpers/pixiHelpers";
 
 const GetFactionSubheader = (faction: EFaction): string | null => {
     return GameFactionData.find(x => x.id === faction)?.description ?? null;
@@ -1782,16 +1781,16 @@ export class PixiGame extends PixiGameNetworking {
             }
         }
 
-        const openMagicMenu = ownShip ? () => {
-            const spellItems = GetSpellData(characterClass);
+        const spellItems = GetSpellData(characterClass);
+        const openMagicMenu = ownShip && spellItems.length ? () => {
             this.setState({
                 spellItems
             });
         } : undefined;
 
         return (
-            <Card key={`character-${i}`} style={{maxWidth: "fit-content"}} onClick={openMagicMenu}>
-                <CardContent>
+            <Card key={`character-${i}`} style={{maxWidth: "max-content"}}>
+                <CardActionArea onClick={openMagicMenu} style={{padding: 16}}>
                     <Badge badgeContent={badgeContent} color={badgeContent > 9 ? "success" : badgeContent > 0 ? "warning" : "error"}>
                         <Avatar variant="rounded" style={{width: 50, height: 50}} srcSet={this.renderCharacterUrl(character.characterRace).url}>
                             {null}
@@ -1799,7 +1798,19 @@ export class PixiGame extends PixiGameNetworking {
                     </Badge>
                     <br />
                     <Typography variant="caption" fontSize={12}>{caption}</Typography>
-                </CardContent>
+                    <CardActions>
+                        {
+                            spellItems.length ? (
+                                <Tooltip title={"Has Magic"}>
+                                    <AutoFixNormal/>
+                                </Tooltip>
+                            ) :
+                                <Tooltip title={"No Magic"}>
+                                    <AutoFixOff/>
+                                </Tooltip>
+                        }
+                    </CardActions>
+                </CardActionArea>
             </Card>
         );
     }

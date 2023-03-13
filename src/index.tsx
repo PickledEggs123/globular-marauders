@@ -7,6 +7,7 @@ import * as particles from "@pixi/particle-emitter";
 import {StaticQuaternionParticleBehavior} from "./resources/particles/StaticQuaternionParticleBehavior";
 import {MovementQuaternionParticleBehavior} from "./resources/particles/MovementQuaternionParticleBehavior";
 import {StarFieldQuaternionParticleBehavior} from "./resources/particles/StarFieldQuaternionParticleBehavior";
+import {BrowserRouter} from "react-router-dom";
 
 particles.Emitter.registerBehavior(StaticQuaternionParticleBehavior);
 particles.Emitter.registerBehavior(MovementQuaternionParticleBehavior);
@@ -14,7 +15,9 @@ particles.Emitter.registerBehavior(StarFieldQuaternionParticleBehavior);
 
 ReactDOM.render(
   <React.StrictMode>
-      <App/>
+      <BrowserRouter>
+          <App/>
+      </BrowserRouter>
   </React.StrictMode>,
   document.getElementById('root')
 );

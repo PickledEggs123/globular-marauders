@@ -44,17 +44,15 @@ theme = responsiveFontSizes(theme, {
 export const App = () => {
     return (
         <ThemeProvider theme={theme}>
-            <BrowserRouter>
-                <Routes>
-                    <Route path="/" element={<PixiGame />}/>
-                    <Route path="/game-model" element={<GameModel />}/>
-                    <Route path="/planet-generator" element={<PlanetGenerator />}/>
-                    <Route path="/ship-wiki" element={<ShipWiki />}/>
-                    <Route path="/about" element={<About />}/>
-                    <Route path="/contact" element={<Contact />}/>
-                    <Route index element={<PixiGame />}/>
-                </Routes>
-            </BrowserRouter>
+            <Routes>
+                <Route path="/" element={<PixiGame />}/>
+                <Route path="/game-model" element={<GameModel />}/>
+                <Route path="/planet-generator" element={<PlanetGenerator />}/>
+                <Route path="/ship-wiki" element={<ShipWiki />}/>
+                <Route path="/about" element={<About />}/>
+                <Route path="/contact" element={<Contact />}/>
+                <Route index element={<PixiGame />}/>
+            </Routes>
         </ThemeProvider>
     );
 };
