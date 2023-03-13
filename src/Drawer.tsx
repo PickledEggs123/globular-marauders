@@ -10,7 +10,7 @@ import {
     Toolbar,
     Typography
 } from "@mui/material";
-import {Menu, MenuOpen, Person, PieChart, PlayArrow, Public, QuestionMark, Sailing} from "@mui/icons-material";
+import {Menu, MenuOpen, People, Person, PieChart, PlayArrow, Public, QuestionMark, Sailing} from "@mui/icons-material";
 import PixiGame from "./pages/PixiGame";
 import {Link} from "react-router-dom";
 
@@ -65,7 +65,11 @@ export const WebsiteDrawer = ({rightSide}: {
                     }, {
                         link: "/ship-wiki",
                         icon: <Sailing/>,
-                        text: "ShipWiki"
+                        text: "Ship Wiki"
+                    }, {
+                        link: "/character-wiki",
+                        icon: <People/>,
+                        text: "Character Wiki"
                     }, {
                         link: "/about",
                         icon: <QuestionMark/>,

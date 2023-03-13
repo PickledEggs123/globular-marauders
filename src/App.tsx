@@ -1,5 +1,5 @@
 import React from "react";
-import {BrowserRouter, Route, Routes} from "react-router-dom";
+import {Route, Routes} from "react-router-dom";
 import {ThemeProvider, createTheme, responsiveFontSizes, ThemeOptions} from "@mui/material/styles";
 import PixiGame from "./pages/PixiGame";
 import {GameModel} from "./pages/GameModel";
@@ -7,6 +7,7 @@ import {PlanetGenerator} from "./pages/PlanetGenerator";
 import {About} from "./pages/About";
 import {Contact} from "./pages/Contact";
 import {ShipWiki} from "./pages/ShipWiki";
+import {CharacterWiki} from "./pages/CharacterWiki";
 
 const themeOptions: ThemeOptions = {
     palette: {
@@ -49,6 +50,7 @@ export const App = () => {
                 <Route path="/game-model" element={<GameModel />}/>
                 <Route path="/planet-generator" element={<PlanetGenerator />}/>
                 <Route path="/ship-wiki" element={<ShipWiki />}/>
+                <Route path="/character-wiki" element={<CharacterWiki />}/>
                 <Route path="/about" element={<About />}/>
                 <Route path="/contact" element={<Contact />}/>
                 <Route index element={<PixiGame />}/>

@@ -7,6 +7,7 @@ export const AppRoutes = () => (
         <Route path="/game-model"/>
         <Route path="/planet-generator"/>
         <Route path="/ship-wiki"/>
+        <Route path="/character-wiki"/>
         <Route path="/about"/>
         <Route path="/contact"/>
         <Route index/>
