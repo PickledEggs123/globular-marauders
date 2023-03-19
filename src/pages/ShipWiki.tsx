@@ -180,6 +180,10 @@ export const ShipWiki = () => {
 
     }, [context, selectedShipType]);
     useEffect(() => {
+        // @ts-ignore
+        if (global.use_ssr) {
+            return;
+        }
         if (context.app) {
             context.app.destroy(true);
         }
@@ -211,6 +215,10 @@ export const ShipWiki = () => {
         const buffer = await generatePlanetGltf(data);
 
         const downloadURL = function(data: any, fileName: string) {
+            // @ts-ignore
+            if (global.use_ssr) {
+                return;
+            }
             let a;
             a = document.createElement('a');
             a.href = data;

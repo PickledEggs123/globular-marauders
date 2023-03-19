@@ -66,6 +66,10 @@ export const PlanetGenerator = () => {
         app.stage.addChild(mesh);
     }, [context]);
     useEffect(() => {
+        // @ts-ignore
+        if (global.use_ssr) {
+            return;
+        }
         if (context.app) {
             context.app.destroy(true);
         }
@@ -87,6 +91,10 @@ export const PlanetGenerator = () => {
         const buffer = await generatePlanetGltf(data);
 
         const downloadURL = function(data: any, fileName: string) {
+            // @ts-ignore
+            if (global.use_ssr) {
+                return;
+            }
             let a;
             a = document.createElement('a');
             a.href = data;

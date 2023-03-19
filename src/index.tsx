@@ -8,16 +8,29 @@ import {StaticQuaternionParticleBehavior} from "./resources/particles/StaticQuat
 import {MovementQuaternionParticleBehavior} from "./resources/particles/MovementQuaternionParticleBehavior";
 import {StarFieldQuaternionParticleBehavior} from "./resources/particles/StarFieldQuaternionParticleBehavior";
 import {BrowserRouter} from "react-router-dom";
+import {CacheProvider} from "@emotion/react";
+import createCache from "@emotion/cache";
+import {CssBaseline} from "@mui/material";
+import {theme} from "./theme";
+import {ThemeProvider} from "@mui/material/styles";
 
 particles.Emitter.registerBehavior(StaticQuaternionParticleBehavior);
 particles.Emitter.registerBehavior(MovementQuaternionParticleBehavior);
 particles.Emitter.registerBehavior(StarFieldQuaternionParticleBehavior);
 
+const key = 'css';
+const cache = createCache({key});
+
 ReactDOM.render(
   <React.StrictMode>
-      <BrowserRouter>
-          <App/>
-      </BrowserRouter>
+      <CacheProvider value={cache}>
+          <ThemeProvider theme={theme}>
+              <CssBaseline/>
+              <BrowserRouter>
+                  <App/>
+              </BrowserRouter>
+          </ThemeProvider>
+      </CacheProvider>
   </React.StrictMode>,
   document.getElementById('root')
 );

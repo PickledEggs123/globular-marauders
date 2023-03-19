@@ -61,6 +61,10 @@ export const GameModel = () => {
         const points = getPoints();
 
         const drawCanvas = (id: string, points: Array<{x: number, y: number}>) => {
+            // @ts-ignore
+            if (global.use_ssr) {
+                return;
+            }
             const canvas = document.getElementById(id)! as HTMLCanvasElement;
             const ctx = canvas.getContext('2d')!;
             const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -172,6 +176,10 @@ export const GameModel = () => {
         setThetaTable(thetaValues);
     };
     useEffect(() => {
+        // @ts-ignore
+        if (global.use_ssr) {
+            return;
+        }
         drawGraph();
     }, []);
     

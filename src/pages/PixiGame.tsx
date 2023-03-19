@@ -119,6 +119,7 @@ import {RenderMobileGameUiBottom} from "./RenderMobileGameUiBottom";
 import {LayerCompositeFilter} from "../filters/LayerComposite/LayerCompositeFilter";
 import {ISetupScriptContext, setupScript} from "../scripts/setup";
 import {Character, CharacterSelection} from "@pickledeggs123/globular-marauders-game/lib/src/Character";
+import {Resource, Texture} from "pixi.js";
 
 const GetFactionSubheader = (faction: EFaction): string | null => {
     return GameFactionData.find(x => x.id === faction)?.description ?? null;
@@ -304,9 +305,9 @@ export class PixiGame extends PixiGameNetworking {
                 const textureName = resourceTypeTextureItem ? resourceTypeTextureItem.name : "missing";
                 const item = resources[textureName];
                 if (item) {
-                    this.sprites[resourceType] = item.texture;
+                    this.sprites[resourceType] = item.texture as Texture<Resource>;
                 } else {
-                    this.sprites[resourceType] = resources.missing.texture;
+                    this.sprites[resourceType] = resources.missing.texture as Texture<Resource>;
                 }
             }
             for (const textureUrl of SPACE_BACKGROUND_TEXTURES) {
@@ -314,14 +315,14 @@ export class PixiGame extends PixiGameNetworking {
                 const textureName = `space${index}`;
                 const item = resources[textureName];
                 if (item) {
-                    this.sprites[textureName] = item.texture;
+                    this.sprites[textureName] = item.texture as Texture<Resource>;
                 }
             }
-            this.sprites.smokeTrail = resources.smokeTrail.texture;
-            this.sprites.cannonBallTrail = resources.cannonBallTrail.texture;
-            this.sprites.spellBallTrail = resources.spellBallTrail.texture;
-            this.sprites.glowTrail = resources.glowTrail.texture;
-            this.sprites.starFieldSpeckle = resources.starFieldSpeckle.texture;
+            this.sprites.smokeTrail = resources.smokeTrail.texture as Texture<Resource>;
+            this.sprites.cannonBallTrail = resources.cannonBallTrail.texture as Texture<Resource>;
+            this.sprites.spellBallTrail = resources.spellBallTrail.texture as Texture<Resource>;
+            this.sprites.glowTrail = resources.glowTrail.texture as Texture<Resource>;
+            this.sprites.starFieldSpeckle = resources.starFieldSpeckle.texture as Texture<Resource>;
 
             setTimeout(() => {
                 this.loadStarField();
@@ -673,6 +674,21 @@ export class PixiGame extends PixiGameNetworking {
 
     constructor(props: IPixiGameProps) {
         super(props);
+
+        // @ts-ignore
+        if (global.use_ssr) {
+            this.application = {} as any;
+            this.particleContainer = {} as any;
+            this.colorLayer = {} as any;
+            this.depthLayer = {} as any;
+            this.projectileColorLayer = {} as any;
+            this.textColorLayer = {} as any;
+            this.staticStage = {} as any;
+            this.depthOutlineFilter = {} as any;
+            this.projectileFilter = {} as any;
+            this.textFilter = {} as any;
+            return;
+        }
 
         // setup rendering
         this.application = new PIXI.Application({
@@ -1401,6 +1417,10 @@ export class PixiGame extends PixiGameNetworking {
      * Perform the initialization of the game.
      */
     componentDidMount() {
+        // @ts-ignore
+        if (global.use_ssr) {
+            return;
+        }
         // add renderer
         if (this.showAppBodyRef.current) {
             this.showAppBodyRef.current.appendChild(this.application.view);
@@ -1427,6 +1447,10 @@ export class PixiGame extends PixiGameNetworking {
     }
 
     componentWillUnmount() {
+        // @ts-ignore
+        if (global.use_ssr) {
+            return;
+        }
         // clean up renderer
         if (this.showAppBodyRef.current) {
             this.showAppBodyRef.current.removeChild(this.application.view);
