@@ -1,8 +1,14 @@
 import {
-    EMessageType, Game, IAutoPilotMessage,
+    EMessageType,
+    Game,
+    IAutoPilotMessage,
     IChooseFactionMessage,
     IChoosePlanetMessage,
-    IMessage, IPlayerData, ISpawnLocationResult, ISpawnMessage, ISpawnPlanet
+    IMessage,
+    IPlayerData,
+    ISpawnLocationResult,
+    ISpawnMessage,
+    ISpawnPlanet
 } from "@pickledeggs123/globular-marauders-game/lib/src/Game";
 import {EShipType} from "@pickledeggs123/globular-marauders-game/lib/src/ShipType";
 import {Sound} from "@pixi/sound";
@@ -16,6 +22,7 @@ import {EAutomatedShipBuffType, IAutomatedShipBuff} from "@pickledeggs123/globul
 import {EResourceType} from "@pickledeggs123/globular-marauders-game/lib/src/Resource";
 import {Ship} from "@pickledeggs123/globular-marauders-game/lib/src/Ship";
 import PixiGame from "../pages/PixiGame";
+import {ShipyardDock} from "@pickledeggs123/globular-marauders-game/lib/src/Building";
 
 export interface ITutorialScriptContext {
     tutorialPlayerData: IPlayerData;
@@ -543,19 +550,37 @@ export const tutorialScript = function (this: PixiGame, serverGame: Game, contex
                     order.expireTicks = 10 * 60 * 10;
                     order.planetId = englishHomeWorld.id;
                     ship.orders.forEach(o => ship.removeOrder(o));
+                    ship.pathFinding.points.splice(0, ship.pathFinding.points.length, englishHomeWorld.position.rotateVector([0, 0, 1]));
+                    order.stage = 2;
                     ship.orders.push(order);
                 };
-                dutchHomeWorld.spawnEventShip(dutchHomeWorld.moneyAccount!.cash!, EShipType.CUTTER, configureFriendlyShip);
-                dutchHomeWorld.spawnEventShip(dutchHomeWorld.moneyAccount!.cash!, EShipType.CUTTER, configureFriendlyShip);
-                dutchHomeWorld.spawnEventShip(dutchHomeWorld.moneyAccount!.cash!, EShipType.CUTTER, configureFriendlyShip);
-                dutchHomeWorld.spawnEventShip(dutchHomeWorld.moneyAccount!.cash!, EShipType.SLOOP, configureFriendlyShip);
-                dutchHomeWorld.spawnEventShip(dutchHomeWorld.moneyAccount!.cash!, EShipType.SLOOP, configureFriendlyShip);
-                dutchHomeWorld.spawnEventShip(dutchHomeWorld.moneyAccount!.cash!, EShipType.CORVETTE, configureFriendlyShip);
+                const configureEnemeyShip = (ship: Ship) => {
+                    const order = new Order(serverGame, ship, ship.faction!);
+                    order.orderType = EOrderType.ROAM;
+                    order.expireTicks = 15 * 10;
+                    order.planetId = dutchHomeWorld.id;
+                    ship.orders.forEach(o => ship.removeOrder(o));
+                    ship.pathFinding.points.splice(0, ship.pathFinding.points.length);
+                    ship.orders.push.apply(ship.orders, new Array(40).fill(0).map((v, i): Order => Order.deserialize(serverGame, ship, order.serialize())));
+                };
+                const spawnInstantShip = (world: Planet, shipType: EShipType, callback: (ship: Ship) => void) => {
+                    const shipyardDock = new ShipyardDock(world.instance, world, world.shipyard)
+                    world.shipyard.docks.push(shipyardDock);
+                    shipyardDock.beginBuildingOfShip(shipType);
+                    shipyardDock.progress = shipyardDock.shipCost;
+                    world.spawnEventShip(world.moneyAccount!.cash!, shipType, callback);
+                };
+                spawnInstantShip(dutchHomeWorld, EShipType.CUTTER, configureFriendlyShip);
+                spawnInstantShip(dutchHomeWorld, EShipType.CUTTER, configureFriendlyShip);
+                spawnInstantShip(dutchHomeWorld, EShipType.CUTTER, configureFriendlyShip);
+                spawnInstantShip(dutchHomeWorld, EShipType.SLOOP, configureFriendlyShip);
+                spawnInstantShip(dutchHomeWorld, EShipType.SLOOP, configureFriendlyShip);
+                spawnInstantShip(dutchHomeWorld, EShipType.CORVETTE, configureFriendlyShip);
                 configureFriendlyShip(findPlayerShip()!);
 
-                englishHomeWorld.spawnEventShip(englishHomeWorld.moneyAccount!.cash!, EShipType.CUTTER, () => {});
-                englishHomeWorld.spawnEventShip(englishHomeWorld.moneyAccount!.cash!, EShipType.CUTTER, () => {});
-                englishHomeWorld.spawnEventShip(englishHomeWorld.moneyAccount!.cash!, EShipType.SLOOP, () => {});
+                spawnInstantShip(englishHomeWorld, EShipType.CUTTER, configureEnemeyShip);
+                spawnInstantShip(englishHomeWorld, EShipType.CUTTER, configureEnemeyShip);
+                spawnInstantShip(englishHomeWorld, EShipType.SLOOP, configureEnemeyShip);
                 yield;
             }).call(this),
             // destroyed ship
