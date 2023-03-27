@@ -278,25 +278,65 @@ export class PixiGame extends PixiGameNetworking {
         const loader = new PIXI.Loader();
 
         // queue images to be loaded
-        loader.add("missing", DEFAULT_IMAGE);
+        loader.add("missing", DEFAULT_IMAGE, {
+            metadata: {
+                width: 128,
+                height: 128,
+            },
+        });
         // load loot items
         for (const resourceType of Object.values(EResourceType)) {
             const item = RESOURCE_TYPE_TEXTURE_PAIRS.find(i => i.resourceType === resourceType);
             if (item) {
-                loader.add(item.name, item.url);
+                loader.add(item.name, item.url, {
+                    metadata: {
+                        width: 128,
+                        height: 128,
+                    },
+                });
             }
         }
         // load background textures
         for (const textureUrl of SPACE_BACKGROUND_TEXTURES) {
             const index = SPACE_BACKGROUND_TEXTURES.indexOf(textureUrl);
-            loader.add(`space${index}`, textureUrl);
+            loader.add(`space${index}`, textureUrl, {
+                metadata: {
+                    width: 512,
+                    height: 512,
+                },
+            });
         }
         // load smoke trail
-        loader.add("smokeTrail", "images/sprites/smokeTrail.svg");
-        loader.add("cannonBallTrail", "images/sprites/cannonBallTrail.svg");
-        loader.add("spellBallTrail", "images/sprites/cannonBallTrail.svg");
-        loader.add("glowTrail", "images/sprites/glowTrail.svg");
-        loader.add("starFieldSpeckle", "images/sprites/starFieldSpeckle.svg");
+        loader.add("smokeTrail", "images/sprites/smokeTrail.svg", {
+            metadata: {
+                width: 128,
+                height: 128,
+            },
+        });
+        loader.add("cannonBallTrail", "images/sprites/cannonBallTrail.svg", {
+            metadata: {
+                width: 128,
+                height: 128,
+            },
+        });
+        loader.add("spellBallTrail", "images/sprites/cannonBallTrail.svg", {
+            metadata: {
+                width: 128,
+                height: 128,
+            },
+        });
+        loader.add("glowTrail", "images/sprites/glowTrail.svg", {
+            metadata: {
+                width: 128,
+                height: 128,
+            },
+        });
+        loader.add("starFieldSpeckle", "images/sprites/starFieldSpeckle.svg", {
+            metadata: {
+                width: 128,
+                height: 128,
+            },
+        });
         // onload handler
         loader.load((loader, resources) => {
             // load images into cache
