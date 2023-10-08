@@ -223,7 +223,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         const mesh = new PIXI.Mesh(this.pixiStarResources.getResources().starGeometry, shader);
         mesh.zIndex = -10;
 
-        this.application.stage.addChild(mesh);
+        this.application.stage.addChild(mesh as unknown as any);
         this.pixiStarResources.getResources().starMeshes.push({
             id: star.id,
             mesh,
@@ -324,13 +324,13 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         textResource3.style.fill = "white";
         textResource3.style.fontSize = 10;
 
-        this.colorLayer.addChild(mesh);
-        this.application.stage.addChild(faction);
-        this.textColorLayer.addChild(textName);
-        this.textColorLayer.addChild(textTitle);
-        this.textColorLayer.addChild(textResource1);
-        this.textColorLayer.addChild(textResource2);
-        this.textColorLayer.addChild(textResource3);
+        this.colorLayer.addChild(mesh as unknown as any);
+        this.application.stage.addChild(faction as unknown as any);
+        this.textColorLayer.addChild(textName as unknown as any);
+        this.textColorLayer.addChild(textTitle as unknown as any);
+        this.textColorLayer.addChild(textResource1 as unknown as any);
+        this.textColorLayer.addChild(textResource2 as unknown as any);
+        this.textColorLayer.addChild(textResource3 as unknown as any);
         this.pixiPlanetResources.getResources().planetMeshes.push({
             id: planet.id,
             mesh,
@@ -395,7 +395,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
 
         const trailContainer = new PIXI.Container();
         trailContainer.zIndex = -5;
-        const trail = new particles.Emitter(trailContainer, {
+        const trail = new particles.Emitter(trailContainer as unknown as any, {
             emit: false,
             autoUpdate: true,
             lifetime: {
@@ -499,19 +499,19 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         health.zIndex = -4;
         health.alpha = 0.5;
 
-        const healthColor = this.pixiShipResources.getResources().getColor(ship.faction?.factionColor ?? ship.color).slice(0, 3).reduce((acc: number, v: number, i: number) => acc | (Math.floor(v * 255) << (2 - i) * 8), 0xff000000);
+        const healthColor = this.pixiShipResources.getResources().getColor(ship.faction?.factionColor ?? ship.color).slice(0, 3).reduce((acc: number, v: number, i: number) => acc | (Math.floor(v * 255) << (2 - i) * 8), 0x000000);
 
         const isPlayer = this.getPlayerShip().id === ship.id;
         const isEnemy = this.findPlayerShip()?.faction?.id !== ship.faction?.id;
 
-        this.colorLayer.addChild(mesh);
-        this.depthLayer.addChild(depthMesh);
-        this.textColorLayer.addChild(text);
-        this.projectileColorLayer.addChild(trailContainer);
-        this.application.stage.addChild(line);
-        this.application.stage.addChild(cannonBallLeft);
-        this.application.stage.addChild(cannonBallRight);
-        this.application.stage.addChild(health);
+        this.colorLayer.addChild(mesh as unknown as any);
+        this.depthLayer.addChild(depthMesh as unknown as any);
+        this.textColorLayer.addChild(text as unknown as any);
+        this.projectileColorLayer.addChild(trailContainer as unknown as any);
+        this.application.stage.addChild(line as unknown as any);
+        this.application.stage.addChild(cannonBallLeft as unknown as any);
+        this.application.stage.addChild(cannonBallRight as unknown as any);
+        this.application.stage.addChild(health as unknown as any);
         this.pixiShipResources.getResources().shipMeshes.push({
             id: ship.id,
             mesh,
@@ -569,7 +569,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
 
         const trailContainer = new PIXI.Container();
         trailContainer.zIndex = -5;
-        const trail = new particles.Emitter(trailContainer, {
+        const trail = new particles.Emitter(trailContainer as unknown as any, {
             emit: true,
             autoUpdate: true,
             lifetime: {
@@ -681,8 +681,8 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
             ]
         });
 
-        this.projectileColorLayer.addChild(mesh);
-        this.projectileColorLayer.addChild(trailContainer);
+        this.projectileColorLayer.addChild(mesh as unknown as any);
+        this.projectileColorLayer.addChild(trailContainer as unknown as any);
         this.pixiCannonBallResources.getResources().cannonBallMeshes.push({
             id: cannonBall.id,
             mesh,
@@ -719,7 +719,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
 
         const trailContainer = new PIXI.Container();
         trailContainer.zIndex = -5;
-        const trail = new particles.Emitter(trailContainer, {
+        const trail = new particles.Emitter(trailContainer as unknown as any, {
             emit: true,
             autoUpdate: true,
             lifetime: {
@@ -831,8 +831,8 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
             ]
         });
 
-        this.projectileColorLayer.addChild(mesh);
-        this.projectileColorLayer.addChild(trailContainer);
+        this.projectileColorLayer.addChild(mesh as unknown as any);
+        this.projectileColorLayer.addChild(trailContainer as unknown as any);
         this.pixiSpellBallResources.getResources().spellBallMeshes.push({
             id: spellBall.id,
             mesh,
@@ -893,7 +893,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
 
         const trailContainer = new PIXI.Container();
         trailContainer.zIndex = -5;
-        const trail = new particles.Emitter(trailContainer, {
+        const trail = new particles.Emitter(trailContainer as unknown as any, {
             emit: true,
             autoUpdate: true,
             lifetime: {
@@ -1015,10 +1015,10 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         text.style.fill = "white";
         text.style.fontSize = 12;
 
-        this.projectileColorLayer.addChild(mesh);
-        this.projectileColorLayer.addChild(image);
-        this.projectileColorLayer.addChild(trailContainer);
-        this.textColorLayer.addChild(text);
+        this.projectileColorLayer.addChild(mesh as unknown as any);
+        this.projectileColorLayer.addChild(image as unknown as any);
+        this.projectileColorLayer.addChild(trailContainer as unknown as any);
+        this.textColorLayer.addChild(text as unknown as any);
         this.pixiCrateResources.getResources().crateMeshes.push({
             id: crate.id,
             mesh,
@@ -1094,7 +1094,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         const mesh = new PIXI.Mesh(this.pixiVoronoiResources.getVoronoiGeometry(tile), shader);
         mesh.zIndex = -28;
 
-        this.application.stage.addChild(mesh);
+        this.application.stage.addChild(mesh as unknown as any);
         this.voronoiMeshes.push({
             id,
             mesh,
@@ -1117,7 +1117,7 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         const mesh = new PIXI.Mesh(this.pixiBackgroundVoronoiResources.getVoronoiGeometry(tile, tileUv), shader);
         mesh.zIndex = -30;
 
-        this.application.stage.addChild(mesh);
+        this.application.stage.addChild(mesh as unknown as any);
         this.backgroundVoronoiMeshes.push({
             id,
             mesh,

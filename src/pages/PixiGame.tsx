@@ -13,7 +13,7 @@ import {
     IDrawable,
     MIN_DISTANCE
 } from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
-import {EShipActionItemType, Ship, ShipActionItem,} from "@pickledeggs123/globular-marauders-game/lib/src/Ship";
+import {Ship, ShipActionItem,} from "@pickledeggs123/globular-marauders-game/lib/src/Ship";
 import {EShipType, GetShipData,} from "@pickledeggs123/globular-marauders-game/lib/src/ShipType";
 import {
     EClassData,
@@ -119,7 +119,8 @@ import {RenderMobileGameUiBottom} from "./RenderMobileGameUiBottom";
 import {LayerCompositeFilter} from "../filters/LayerComposite/LayerCompositeFilter";
 import {ISetupScriptContext, setupScript} from "../scripts/setup";
 import {Character, CharacterSelection} from "@pickledeggs123/globular-marauders-game/lib/src/Character";
-import {Resource, Texture} from "pixi.js";
+import {Assets, Resource, Texture} from "pixi.js";
+import loader from "ts-loader";
 
 const GetFactionSubheader = (faction: EFaction): string | null => {
     return GameFactionData.find(x => x.id === faction)?.description ?? null;
@@ -168,7 +169,7 @@ export class PixiGame extends PixiGameNetworking {
         if (this.starField) {
             this.starField.destroy();
         }
-        this.starField = new particles.Emitter(this.particleContainer, {
+        this.starField = new particles.Emitter(this.particleContainer as unknown as any, {
             emit: true,
             autoUpdate: true,
             lifetime: {
@@ -259,7 +260,7 @@ export class PixiGame extends PixiGameNetworking {
                 },
             ]
         });
-        this.application.stage.addChild(this.particleContainer);
+        this.application.stage.addChild(this.particleContainer as unknown as any);
     };
 
     loadSoundIntoMemory = () => {
@@ -273,101 +274,60 @@ export class PixiGame extends PixiGameNetworking {
         sound.add(ESoundType.LOOT, {url: "sounds/LootSFX.m4a", preload: true});
     };
 
-    loadSpritesIntoMemory = () => {
+    loadSpritesIntoMemory = async () => {
         // load sprites into memory
-        const loader = new PIXI.Loader();
+        const resources: { [key: string]: any } = {};
 
         // queue images to be loaded
-        loader.add("missing", DEFAULT_IMAGE, {
-            metadata: {
-                width: 128,
-                height: 128,
-            },
-        });
+        resources["missing"] = await PIXI.Assets.load(DEFAULT_IMAGE);
         // load loot items
         for (const resourceType of Object.values(EResourceType)) {
             const item = RESOURCE_TYPE_TEXTURE_PAIRS.find(i => i.resourceType === resourceType);
             if (item) {
-                loader.add(item.name, item.url, {
-                    metadata: {
-                        width: 128,
-                        height: 128,
-                    },
-                });
+                resources[item.name] = await PIXI.Assets.load(item.url);
             }
         }
         // load background textures
         for (const textureUrl of SPACE_BACKGROUND_TEXTURES) {
             const index = SPACE_BACKGROUND_TEXTURES.indexOf(textureUrl);
-            loader.add(`space${index}`, textureUrl, {
-                metadata: {
-                    width: 512,
-                    height: 512,
-                },
-            });
+            resources[`space${index}`] = await PIXI.Assets.load(textureUrl);
         }
         // load smoke trail
-        loader.add("smokeTrail", "images/sprites/smokeTrail.svg", {
-            metadata: {
-                width: 128,
-                height: 128,
-            },
-        });
-        loader.add("cannonBallTrail", "images/sprites/cannonBallTrail.svg", {
-            metadata: {
-                width: 128,
-                height: 128,
-            },
-        });
-        loader.add("spellBallTrail", "images/sprites/cannonBallTrail.svg", {
-            metadata: {
-                width: 128,
-                height: 128,
-            },
-        });
-        loader.add("glowTrail", "images/sprites/glowTrail.svg", {
-            metadata: {
-                width: 128,
-                height: 128,
-            },
-        });
-        loader.add("starFieldSpeckle", "images/sprites/starFieldSpeckle.svg", {
-            metadata: {
-                width: 128,
-                height: 128,
-            },
-        });
-        // onload handler
-        loader.load((loader, resources) => {
-            // load images into cache
-            for (const resourceType of Object.values(EResourceType)) {
-                const resourceTypeTextureItem = RESOURCE_TYPE_TEXTURE_PAIRS.find(i => i.resourceType === resourceType);
-                const textureName = resourceTypeTextureItem ? resourceTypeTextureItem.name : "missing";
-                const item = resources[textureName];
-                if (item) {
-                    this.sprites[resourceType] = item.texture as Texture<Resource>;
-                } else {
-                    this.sprites[resourceType] = resources.missing.texture as Texture<Resource>;
-                }
-            }
-            for (const textureUrl of SPACE_BACKGROUND_TEXTURES) {
-                const index = SPACE_BACKGROUND_TEXTURES.indexOf(textureUrl);
-                const textureName = `space${index}`;
-                const item = resources[textureName];
-                if (item) {
-                    this.sprites[textureName] = item.texture as Texture<Resource>;
-                }
-            }
-            this.sprites.smokeTrail = resources.smokeTrail.texture as Texture<Resource>;
-            this.sprites.cannonBallTrail = resources.cannonBallTrail.texture as Texture<Resource>;
-            this.sprites.spellBallTrail = resources.spellBallTrail.texture as Texture<Resource>;
-            this.sprites.glowTrail = resources.glowTrail.texture as Texture<Resource>;
-            this.sprites.starFieldSpeckle = resources.starFieldSpeckle.texture as Texture<Resource>;
+        resources["smokeTrail"] = await PIXI.Assets.load("images/sprites/smokeTrail.svg");
+        resources["cannonBallTrail"] = await PIXI.Assets.load("images/sprites/cannonBallTrail.svg");
+        resources["spellBallTrail"] = await PIXI.Assets.load("images/sprites/cannonBallTrail.svg");
+        resources["glowTrail"] = await PIXI.Assets.load("images/sprites/glowTrail.svg");
+        resources["starFieldSpeckle"] = await PIXI.Assets.load("images/sprites/starFieldSpeckle.svg");
 
-            setTimeout(() => {
-                this.loadStarField();
-            }, 1000);
-        });
+        // onload handler
+        // load images into cache
+        for (const resourceType of Object.values(EResourceType)) {
+            const resourceTypeTextureItem = RESOURCE_TYPE_TEXTURE_PAIRS.find(i => i.resourceType === resourceType);
+            const textureName = resourceTypeTextureItem ? resourceTypeTextureItem.name : "missing";
+            const item = resources[textureName];
+            if (item) {
+                this.sprites[resourceType] = item as Texture<Resource>;
+            } else {
+                this.sprites[resourceType] = resources.missing as Texture<Resource>;
+            }
+        }
+        for (const textureUrl of SPACE_BACKGROUND_TEXTURES) {
+            const index = SPACE_BACKGROUND_TEXTURES.indexOf(textureUrl);
+            const textureName = `space${index}`;
+            const item = resources[textureName];
+            if (item) {
+                this.sprites[textureName] = item as Texture<Resource>;
+            }
+        }
+        this.sprites.smokeTrail = resources.smokeTrail as Texture<Resource>;
+        this.sprites.cannonBallTrail = resources.cannonBallTrail as Texture<Resource>;
+        this.sprites.spellBallTrail = resources.spellBallTrail as Texture<Resource>;
+        this.sprites.glowTrail = resources.glowTrail as Texture<Resource>;
+        this.sprites.starFieldSpeckle = resources.starFieldSpeckle as Texture<Resource>;
+
+        setTimeout(() => {
+            this.loadStarField();
+        }, 1000);
     };
 
     loadShipThumbnails = () => {
@@ -709,7 +669,7 @@ export class PixiGame extends PixiGameNetworking {
             .mul(item.position.clone())
             .rotateVector([0, 0, 1]);
         item.mesh.visible = shipPoint[2] > 0;
-        item.mesh.tint = shipPoint[2] > 0 ? 0xaaaaaaaa : 0xffffffff;
+        item.mesh.tint = shipPoint[2] > 0 ? 0xaaaaaa : 0xffffff;
     };
 
     constructor(props: IPixiGameProps) {
@@ -734,7 +694,7 @@ export class PixiGame extends PixiGameNetworking {
         this.application = new PIXI.Application({
             width: this.state.width,
             height: this.state.height,
-            backgroundColor: 0xff000000,
+            backgroundColor: 0x000000,
         });
         this.application.stage.sortableChildren = true;
 
@@ -746,94 +706,165 @@ export class PixiGame extends PixiGameNetworking {
         this.colorLayer = new Layer();
         this.colorLayer.useRenderTexture = true;
         this.colorLayer.getRenderTexture().framebuffer.addDepthTexture();
-        this.staticStage.addChild(this.colorLayer);
+        this.staticStage.addChild(this.colorLayer as unknown as any);
         this.projectileColorLayer = new Layer();
         this.projectileColorLayer.useRenderTexture = true;
-        this.staticStage.addChild(this.projectileColorLayer);
+        this.staticStage.addChild(this.projectileColorLayer as unknown as any);
         this.textColorLayer = new Layer();
         this.textColorLayer.useRenderTexture = true;
-        this.staticStage.addChild(this.textColorLayer);
+        this.staticStage.addChild(this.textColorLayer as unknown as any);
 
         // ship depth
         this.depthLayer = new Layer();
         this.depthLayer.useRenderTexture = true;
         this.depthLayer.getRenderTexture().framebuffer.addDepthTexture();
-        this.staticStage.addChild(this.depthLayer);
+        this.staticStage.addChild(this.depthLayer as unknown as any);
         this.depthOutlineFilter = new DepthOutlineFilter(this, Math.floor(this.state.width / 2), Math.floor(this.state.height / 2));
         this.projectileFilter = new LayerCompositeFilter(this, "projectileColorLayer");
         this.textFilter = new LayerCompositeFilter(this, "textColorLayer");
-        this.application.stage.filters = [this.depthOutlineFilter, this.projectileFilter, this.textFilter];
+        this.application.stage.filters = [this.depthOutlineFilter as unknown as any, this.projectileFilter as unknown as any, this.textFilter as unknown as any];
         this.application.stage.filterArea = this.application.screen;
 
         // draw app
         this.game.initializeGame();
 
-        this.loadSoundIntoMemory();
-        this.loadSpritesIntoMemory();
-        this.loadShipThumbnails();
+        const gameLoader = async () => {
+            this.loadSoundIntoMemory();
+            await this.loadSpritesIntoMemory();
+            this.loadShipThumbnails();
 
-        const removeExtraRotation = (q: Quaternion): Quaternion => {
-            return Quaternion.fromBetweenVectors([0, 0, 1], q.rotateVector([0, 0, 1]));
-        };
-        const removeExtraOrientation = (q: Quaternion): Quaternion => {
-            return Quaternion.fromBetweenVectors([1, 0, 0], q.rotateVector([1, 0, 0]));
-        };
+            const removeExtraRotation = (q: Quaternion): Quaternion => {
+                return Quaternion.fromBetweenVectors([0, 0, 1], q.rotateVector([0, 0, 1]));
+            };
+            const removeExtraOrientation = (q: Quaternion): Quaternion => {
+                return Quaternion.fromBetweenVectors([1, 0, 0], q.rotateVector([1, 0, 0]));
+            };
 
-        // draw rotating app
-        let pixiTick: number = 0;
-        this.application.ticker.add(() => {
-            this.gameLoop.call(this);
+            // draw rotating app
+            let pixiTick: number = 0;
+            this.application.ticker.add(() => {
+                this.gameLoop.call(this);
 
-            const playerShip = this.getPlayerShip();
-            this.cameraPosition = removeExtraRotation(playerShip.position);
-            this.lastCameraOrientation = this.cameraOrientation;
-            const nextCameraOrientation = removeExtraOrientation(playerShip.orientation.clone().mul(Quaternion.fromAxisAngle([0, 0, 1], -this.cameraPositionVelocityTheta + Math.PI / 2 - this.cameraCorrectionFactor)));
-            this.cameraOrientation = this.lastCameraOrientation.slerp(nextCameraOrientation)(0.1 * (1 - VoronoiGraph.angularDistanceQuaternion(this.lastCameraOrientation.clone().inverse().mul(nextCameraOrientation.clone()), 1) / Math.PI));
-            pixiTick += 1;
+                const playerShip = this.getPlayerShip();
+                this.cameraPosition = removeExtraRotation(playerShip.position);
+                this.lastCameraOrientation = this.cameraOrientation;
+                const nextCameraOrientation = removeExtraOrientation(playerShip.orientation.clone().mul(Quaternion.fromAxisAngle([0, 0, 1], -this.cameraPositionVelocityTheta + Math.PI / 2 - this.cameraCorrectionFactor)));
+                this.cameraOrientation = this.lastCameraOrientation.slerp(nextCameraOrientation)(0.1 * (1 - VoronoiGraph.angularDistanceQuaternion(this.lastCameraOrientation.clone().inverse().mul(nextCameraOrientation.clone()), 1) / Math.PI));
+                pixiTick += 1;
 
-            // update mouseQ
-            if (this.mouseMoveEvent) {
-                this.mouseQ = this.findMouseQuaternion(this.mouseMoveEvent, false);
-            }
+                // update mouseQ
+                if (this.mouseMoveEvent) {
+                    this.mouseQ = this.findMouseQuaternion(this.mouseMoveEvent, false);
+                }
 
-            // sync mouse text
-            if (this.isDrawMouseText && this.mouseQ && !this.mouseText) {
-                const mouseText = new PIXI.Text("Fire");
-                mouseText.style.fill = "white";
-                mouseText.style.fontSize = 15;
-                this.textColorLayer.addChild(mouseText);
-                this.mouseText = mouseText;
-            } else if (!this.isDrawMouseText && this.mouseText) {
-                this.textColorLayer.removeChild(this.mouseText);
-                this.mouseText = null;
-            }
-            if (this.isDrawMouseText && this.mouseQ && this.mouseText) {
-                this.handleDrawingOfText(this.mouseText, this.mouseQ, {x: 0, y: 20}, true);
-            }
+                // sync mouse text
+                if (this.isDrawMouseText && this.mouseQ && !this.mouseText) {
+                    const mouseText = new PIXI.Text("Fire");
+                    mouseText.style.fill = "white";
+                    mouseText.style.fontSize = 15;
+                    this.textColorLayer.addChild(mouseText as unknown as any);
+                    this.mouseText = mouseText;
+                } else if (!this.isDrawMouseText && this.mouseText) {
+                    this.textColorLayer.removeChild(this.mouseText as unknown as any);
+                    this.mouseText = null;
+                }
+                if (this.isDrawMouseText && this.mouseQ && this.mouseText) {
+                    this.handleDrawingOfText(this.mouseText, this.mouseQ, {x: 0, y: 20}, true);
+                }
 
-            // sync game to Pixi renderer
-            this.pixiStarResources.getResources().handleSync(pixiTick);
-            this.pixiPlanetResources.getResources().handleSync(pixiTick);
-            this.pixiShipResources.getResources().handleSync(pixiTick);
-            this.pixiCannonBallResources.getResources().handleSync(pixiTick);
-            this.pixiSpellBallResources.getResources().handleSync(pixiTick);
-            this.pixiCrateResources.getResources().handleSync(pixiTick);
+                // sync game to Pixi renderer
+                this.pixiStarResources.getResources().handleSync(pixiTick);
+                this.pixiPlanetResources.getResources().handleSync(pixiTick);
+                this.pixiShipResources.getResources().handleSync(pixiTick);
+                this.pixiCannonBallResources.getResources().handleSync(pixiTick);
+                this.pixiSpellBallResources.getResources().handleSync(pixiTick);
+                this.pixiCrateResources.getResources().handleSync(pixiTick);
 
-            // voronoi tiles
-            if (this.state.showVoronoi) {
-                const voronoiDataStuff = this.voronoiData.reduce((acc, {id, voronoi}) => {
+                // voronoi tiles
+                if (this.state.showVoronoi) {
+                    const voronoiDataStuff = this.voronoiData.reduce((acc, {id, voronoi}) => {
+                        const tiles = this.game.getDelaunayTileTessellation(
+                            Quaternion.fromBetweenVectors([0, 0, 1], voronoi.centroid),
+                            voronoi.vertices.map(v => Quaternion.fromBetweenVectors([0, 0, 1], v)),
+                            this.state.voronoiMode === EVoronoiMode.KINGDOM ? 3 :
+                                this.state.voronoiMode === EVoronoiMode.DUCHY ? 2 : 1
+                        );
+                        acc.push(...Array.from(tiles).map((tile, index) => ({
+                            id: `${id}-${index}`,
+                            tile
+                        })));
+                        return acc;
+                    }, [] as Array<{id: string, tile: ITessellatedTriangle}>).filter(({tile}) => {
+                        const vertices = tile.vertices.map(v => {
+                            const item = v.rotateVector([0, 0, 1]);
+                            return [
+                                item[0],
+                                item[1],
+                                item[2]
+                            ] as [number, number, number];
+                        });
+                        return DelaunayGraph.dotProduct(DelaunayGraph.crossProduct(
+                            DelaunayGraph.subtract(vertices[1], vertices[0]),
+                            DelaunayGraph.subtract(vertices[2], vertices[0]),
+                        ), this.cameraPosition.rotateVector([0, 0, 1])) > 0;
+                    });
+                    for (const {id, tile} of voronoiDataStuff) {
+                        const voronoiMesh = this.voronoiMeshes.find(p => p.id === id);
+                        if (voronoiMesh) {
+                            voronoiMesh.tick = pixiTick;
+                        } else {
+                            this.addVoronoi({
+                                id,
+                                tile,
+                                cameraPosition: this.cameraPosition,
+                                cameraOrientation: this.cameraOrientation,
+                                tick: pixiTick
+                            });
+                        }
+                    }
+                }
+                for (const item of this.voronoiMeshes.filter(m => m.tick !== pixiTick || this.clearMeshes)) {
+                    this.application.stage.removeChild(item.mesh as unknown as any);
+                }
+                this.voronoiMeshes = this.voronoiMeshes.filter(m => m.tick === pixiTick && !this.clearMeshes);
+
+                // background voronoi tiles
+                const backgroundVoronoiDataStuff = this.backgroundVoronoiData.reduce((acc, {id, voronoi}) => {
+                    const qCentroid = Quaternion.fromBetweenVectors([0, 0, 1], voronoi.centroid);
+                    const qVertices = voronoi.vertices.map(v => Quaternion.fromBetweenVectors([0, 0, 1], v));
+                    const pCentroidVertices = qVertices.map(v => v.rotateVector([0, 0, 1])).map((v): [number, number, number] => [v[0], v[1], 0]);
+                    const iLongestCentroidVerticesSegmentIndex = pCentroidVertices.map((_, i, arr): [number, number] => [i, DelaunayGraph.distanceFormula(arr[i % arr.length], arr[(i + 1) % arr.length])]).sort((a, b) => b[1] - a[1])[0][0];
+                    const pLongestCentroidVerticesSegmentOrigin = pCentroidVertices[iLongestCentroidVerticesSegmentIndex];
+                    const pLongestCentroidVerticesSegmentAxisPoint = DelaunayGraph.subtract(pCentroidVertices[(iLongestCentroidVerticesSegmentIndex + 1) % pCentroidVertices.length], pLongestCentroidVerticesSegmentOrigin);
+                    const fLongestCentroidVerticesSegmentRotationAngle = Math.atan2(pLongestCentroidVerticesSegmentAxisPoint[1], pLongestCentroidVerticesSegmentAxisPoint[0]);
+                    const qLongestCentroidVerticesSegmentRotation = Quaternion.fromAxisAngle([0, 0, 1], -fLongestCentroidVerticesSegmentRotationAngle);
+                    const pRotatedCentroidVertices = pCentroidVertices.map(p => Quaternion.fromBetweenVectors([0, 0, 1], p).mul(qLongestCentroidVerticesSegmentRotation.clone()).rotateVector([0, 0, 1]));
+                    const bounds = {
+                        minX: pRotatedCentroidVertices.reduce((acc, v) => Math.min(acc, v[0]), 1),
+                        maxX: pRotatedCentroidVertices.reduce((acc, v) => Math.max(acc, v[0]), -1),
+                        minY: pRotatedCentroidVertices.reduce((acc, v) => Math.min(acc, v[1]), 1),
+                        maxY: pRotatedCentroidVertices.reduce((acc, v) => Math.max(acc, v[1]), -1),
+                    };
                     const tiles = this.game.getDelaunayTileTessellation(
-                        Quaternion.fromBetweenVectors([0, 0, 1], voronoi.centroid),
-                        voronoi.vertices.map(v => Quaternion.fromBetweenVectors([0, 0, 1], v)),
-                        this.state.voronoiMode === EVoronoiMode.KINGDOM ? 3 :
-                            this.state.voronoiMode === EVoronoiMode.DUCHY ? 2 : 1
+                        qCentroid,
+                        qVertices,
+                        3
                     );
                     acc.push(...Array.from(tiles).map((tile, index) => ({
                         id: `${id}-${index}`,
-                        tile
+                        tile,
+                        tileUv: tile.vertices.map(q => {
+                            const v1 = q.rotateVector([0, 0, 1]);
+                            const v = Quaternion.fromBetweenVectors([0, 0, 1], v1).mul(qLongestCentroidVerticesSegmentRotation.clone()).rotateVector([0, 0, 1]);
+                            return [
+                                (v[0] - bounds.minX) / (bounds.maxX - bounds.minX),
+                                (v[1] - bounds.minY) / (bounds.maxY - bounds.minY),
+                            ] as [number, number];
+                        }),
+                        textureName: `space${Math.abs(this.hashCode(id)) % SPACE_BACKGROUND_TEXTURES.length}`,
                     })));
                     return acc;
-                }, [] as Array<{id: string, tile: ITessellatedTriangle}>).filter(({tile}) => {
+                }, [] as Array<{id: string, tile: ITessellatedTriangle, tileUv: [number, number][], textureName: string}>).filter(({tile}) => {
                     const vertices = tile.vertices.map(v => {
                         const item = v.rotateVector([0, 0, 1]);
                         return [
@@ -847,137 +878,69 @@ export class PixiGame extends PixiGameNetworking {
                         DelaunayGraph.subtract(vertices[2], vertices[0]),
                     ), this.cameraPosition.rotateVector([0, 0, 1])) > 0;
                 });
-                for (const {id, tile} of voronoiDataStuff) {
-                    const voronoiMesh = this.voronoiMeshes.find(p => p.id === id);
+                for (const {id, tile, tileUv, textureName} of backgroundVoronoiDataStuff) {
+                    const voronoiMesh = this.backgroundVoronoiMeshes.find(p => p.id === id);
                     if (voronoiMesh) {
                         voronoiMesh.tick = pixiTick;
                     } else {
-                        this.addVoronoi({
+                        this.addBackgroundVoronoi({
                             id,
                             tile,
+                            tileUv,
                             cameraPosition: this.cameraPosition,
                             cameraOrientation: this.cameraOrientation,
-                            tick: pixiTick
+                            tick: pixiTick,
+                            textureName
                         });
                     }
                 }
-            }
-            for (const item of this.voronoiMeshes.filter(m => m.tick !== pixiTick || this.clearMeshes)) {
-                this.application.stage.removeChild(item.mesh);
-            }
-            this.voronoiMeshes = this.voronoiMeshes.filter(m => m.tick === pixiTick && !this.clearMeshes);
-
-            // background voronoi tiles
-            const backgroundVoronoiDataStuff = this.backgroundVoronoiData.reduce((acc, {id, voronoi}) => {
-                const qCentroid = Quaternion.fromBetweenVectors([0, 0, 1], voronoi.centroid);
-                const qVertices = voronoi.vertices.map(v => Quaternion.fromBetweenVectors([0, 0, 1], v));
-                const pCentroidVertices = qVertices.map(v => v.rotateVector([0, 0, 1])).map((v): [number, number, number] => [v[0], v[1], 0]);
-                const iLongestCentroidVerticesSegmentIndex = pCentroidVertices.map((_, i, arr): [number, number] => [i, DelaunayGraph.distanceFormula(arr[i % arr.length], arr[(i + 1) % arr.length])]).sort((a, b) => b[1] - a[1])[0][0];
-                const pLongestCentroidVerticesSegmentOrigin = pCentroidVertices[iLongestCentroidVerticesSegmentIndex];
-                const pLongestCentroidVerticesSegmentAxisPoint = DelaunayGraph.subtract(pCentroidVertices[(iLongestCentroidVerticesSegmentIndex + 1) % pCentroidVertices.length], pLongestCentroidVerticesSegmentOrigin);
-                const fLongestCentroidVerticesSegmentRotationAngle = Math.atan2(pLongestCentroidVerticesSegmentAxisPoint[1], pLongestCentroidVerticesSegmentAxisPoint[0]);
-                const qLongestCentroidVerticesSegmentRotation = Quaternion.fromAxisAngle([0, 0, 1], -fLongestCentroidVerticesSegmentRotationAngle);
-                const pRotatedCentroidVertices = pCentroidVertices.map(p => Quaternion.fromBetweenVectors([0, 0, 1], p).mul(qLongestCentroidVerticesSegmentRotation.clone()).rotateVector([0, 0, 1]));
-                const bounds = {
-                    minX: pRotatedCentroidVertices.reduce((acc, v) => Math.min(acc, v[0]), 1),
-                    maxX: pRotatedCentroidVertices.reduce((acc, v) => Math.max(acc, v[0]), -1),
-                    minY: pRotatedCentroidVertices.reduce((acc, v) => Math.min(acc, v[1]), 1),
-                    maxY: pRotatedCentroidVertices.reduce((acc, v) => Math.max(acc, v[1]), -1),
-                };
-                const tiles = this.game.getDelaunayTileTessellation(
-                    qCentroid,
-                    qVertices,
-                    3
-                );
-                acc.push(...Array.from(tiles).map((tile, index) => ({
-                    id: `${id}-${index}`,
-                    tile,
-                    tileUv: tile.vertices.map(q => {
-                        const v1 = q.rotateVector([0, 0, 1]);
-                        const v = Quaternion.fromBetweenVectors([0, 0, 1], v1).mul(qLongestCentroidVerticesSegmentRotation.clone()).rotateVector([0, 0, 1]);
-                        return [
-                            (v[0] - bounds.minX) / (bounds.maxX - bounds.minX),
-                            (v[1] - bounds.minY) / (bounds.maxY - bounds.minY),
-                        ] as [number, number];
-                    }),
-                    textureName: `space${Math.abs(this.hashCode(id)) % SPACE_BACKGROUND_TEXTURES.length}`,
-                })));
-                return acc;
-            }, [] as Array<{id: string, tile: ITessellatedTriangle, tileUv: [number, number][], textureName: string}>).filter(({tile}) => {
-                const vertices = tile.vertices.map(v => {
-                    const item = v.rotateVector([0, 0, 1]);
-                    return [
-                        item[0],
-                        item[1],
-                        item[2]
-                    ] as [number, number, number];
-                });
-                return DelaunayGraph.dotProduct(DelaunayGraph.crossProduct(
-                    DelaunayGraph.subtract(vertices[1], vertices[0]),
-                    DelaunayGraph.subtract(vertices[2], vertices[0]),
-                ), this.cameraPosition.rotateVector([0, 0, 1])) > 0;
-            });
-            for (const {id, tile, tileUv, textureName} of backgroundVoronoiDataStuff) {
-                const voronoiMesh = this.backgroundVoronoiMeshes.find(p => p.id === id);
-                if (voronoiMesh) {
-                    voronoiMesh.tick = pixiTick;
-                } else {
-                    this.addBackgroundVoronoi({
-                        id,
-                        tile,
-                        tileUv,
-                        cameraPosition: this.cameraPosition,
-                        cameraOrientation: this.cameraOrientation,
-                        tick: pixiTick,
-                        textureName
-                    });
+                for (const item of this.backgroundVoronoiMeshes.filter(m => m.tick !== pixiTick || this.clearMeshes)) {
+                    this.application.stage.removeChild(item.mesh as unknown as any);
                 }
-            }
-            for (const item of this.backgroundVoronoiMeshes.filter(m => m.tick !== pixiTick || this.clearMeshes)) {
-                this.application.stage.removeChild(item.mesh);
-            }
-            this.backgroundVoronoiMeshes = this.backgroundVoronoiMeshes.filter(m => m.tick === pixiTick && !this.clearMeshes);
+                this.backgroundVoronoiMeshes = this.backgroundVoronoiMeshes.filter(m => m.tick === pixiTick && !this.clearMeshes);
 
-            this.clearMeshes = false;
+                this.clearMeshes = false;
 
-            // update each render
-            this.pixiStarResources.getResources().handleRender();
-            this.pixiPlanetResources.getResources().handleRender();
-            this.pixiShipResources.getResources().handleRender();
-            this.pixiCannonBallResources.getResources().handleRender();
-            this.pixiSpellBallResources.getResources().handleRender();
-            this.pixiCrateResources.getResources().handleRender();
+                // update each render
+                this.pixiStarResources.getResources().handleRender();
+                this.pixiPlanetResources.getResources().handleRender();
+                this.pixiShipResources.getResources().handleRender();
+                this.pixiCannonBallResources.getResources().handleRender();
+                this.pixiSpellBallResources.getResources().handleRender();
+                this.pixiCrateResources.getResources().handleRender();
 
-            // draw voronoi terrain tiles for political boundaries
-            if (this.state.showVoronoi) {
-                for (const item of this.voronoiMeshes) {
+                // draw voronoi terrain tiles for political boundaries
+                if (this.state.showVoronoi) {
+                    for (const item of this.voronoiMeshes) {
+                        const shader = item.mesh.shader;
+                        shader.uniforms.uCameraPosition = this.cameraPosition.clone().toMatrix4();
+                        shader.uniforms.uCameraOrientation = this.cameraOrientation.clone().inverse().toMatrix4();
+                        shader.uniforms.uCameraScale = this.state.zoom;
+                    }
+                }
+
+                // draw background voronoi terrain tiles for background images
+                for (const item of this.backgroundVoronoiMeshes) {
                     const shader = item.mesh.shader;
                     shader.uniforms.uCameraPosition = this.cameraPosition.clone().toMatrix4();
                     shader.uniforms.uCameraOrientation = this.cameraOrientation.clone().inverse().toMatrix4();
                     shader.uniforms.uCameraScale = this.state.zoom;
                 }
-            }
 
-            // draw background voronoi terrain tiles for background images
-            for (const item of this.backgroundVoronoiMeshes) {
-                const shader = item.mesh.shader;
-                shader.uniforms.uCameraPosition = this.cameraPosition.clone().toMatrix4();
-                shader.uniforms.uCameraOrientation = this.cameraOrientation.clone().inverse().toMatrix4();
-                shader.uniforms.uCameraScale = this.state.zoom;
-            }
-
-            // render ship depth buffer
-            this.application.renderer.render(this.staticStage);
-            this.depthOutlineFilter.width = Math.floor(this.state.width / 2);
-            this.depthOutlineFilter.height = Math.floor(this.state.height / 2);
-            this.depthOutlineFilter.updateDepth();
-            this.projectileFilter.width = Math.floor(this.state.width / 2);
-            this.projectileFilter.height = Math.floor(this.state.height / 2);
-            this.projectileFilter.updateDepth();
-            this.textFilter.width = Math.floor(this.state.width / 2);
-            this.textFilter.height = Math.floor(this.state.height / 2);
-            this.textFilter.updateDepth();
-        });
+                // render ship depth buffer
+                this.application.renderer.render(this.staticStage as unknown as any);
+                this.depthOutlineFilter.width = Math.floor(this.state.width / 2);
+                this.depthOutlineFilter.height = Math.floor(this.state.height / 2);
+                this.depthOutlineFilter.updateDepth();
+                this.projectileFilter.width = Math.floor(this.state.width / 2);
+                this.projectileFilter.height = Math.floor(this.state.height / 2);
+                this.projectileFilter.updateDepth();
+                this.textFilter.width = Math.floor(this.state.width / 2);
+                this.textFilter.height = Math.floor(this.state.height / 2);
+                this.textFilter.updateDepth();
+            });
+        };
+        gameLoader();
     }
 
     /**
@@ -1463,7 +1426,7 @@ export class PixiGame extends PixiGameNetworking {
         }
         // add renderer
         if (this.showAppBodyRef.current) {
-            this.showAppBodyRef.current.appendChild(this.application.view);
+            this.showAppBodyRef.current.appendChild(this.application.view as unknown as any);
         }
 
         window.addEventListener("resize", this.handleResize);
@@ -1493,7 +1456,7 @@ export class PixiGame extends PixiGameNetworking {
         }
         // clean up renderer
         if (this.showAppBodyRef.current) {
-            this.showAppBodyRef.current.removeChild(this.application.view);
+            this.showAppBodyRef.current.removeChild(this.application!.view as unknown as any);
         }
 
         // clean up game stuff
@@ -2022,7 +1985,7 @@ export class PixiGame extends PixiGameNetworking {
 
     findMouseQuaternion(event: React.MouseEvent, flipX: boolean) {
         // get element coordinates
-        const node = this.application.view as HTMLElement;
+        const node = this.application.view as unknown as HTMLElement;
         const bounds = node.getBoundingClientRect();
         const x = event.clientX - bounds.left;
         const y = event.clientY - bounds.top;

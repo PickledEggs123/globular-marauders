@@ -63,7 +63,7 @@ export const PlanetGenerator = () => {
         app.stage.children.forEach(x => {
             app.stage.removeChild(x);
         });
-        app.stage.addChild(mesh);
+        app.stage.addChild(mesh as unknown as any);
     }, [context]);
     useEffect(() => {
         // @ts-ignore
@@ -73,7 +73,7 @@ export const PlanetGenerator = () => {
         if (context.app) {
             context.app.destroy(true);
         }
-        context.app = new PIXI.Application({ width : 256, height: 256 });
+        context.app = new PIXI.Application({ width : 256, height: 256, backgroundColor: 0x000000 });
         ref.current!.appendChild(context.app.view);
         context.app!.ticker.add(() => {
             context.app!.stage.children.forEach((c: any) => {

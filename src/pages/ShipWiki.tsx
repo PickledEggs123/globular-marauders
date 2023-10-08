@@ -149,13 +149,13 @@ export const ShipWiki = () => {
         const colorLayer = new Layer();
         colorLayer.useRenderTexture = true;
         colorLayer.getRenderTexture().framebuffer.addDepthTexture();
-        staticStage.addChild(colorLayer);
+        staticStage.addChild(colorLayer as unknown as any);
 
         // ship depth
         const depthLayer = new Layer();
         depthLayer.useRenderTexture = true;
         depthLayer.getRenderTexture().framebuffer.addDepthTexture();
-        staticStage.addChild(depthLayer);
+        staticStage.addChild(depthLayer as unknown as any);
         const depthOutlineFilter = new DepthOutlineFilter({
             colorLayer,
             depthLayer,
@@ -165,12 +165,12 @@ export const ShipWiki = () => {
             },
             depthOutlineThreshold: 1 / 0.0625,
         } as any, 256, 256);
-        app.stage.filters = [depthOutlineFilter];
+        app.stage.filters = [depthOutlineFilter as unknown as any];
         app.stage.filterArea = app.screen;
 
         // add objects
-        colorLayer.addChild(mesh);
-        depthLayer.addChild(depthMesh);
+        colorLayer.addChild(mesh as unknown as any);
+        depthLayer.addChild(depthMesh as unknown as any);
 
         // save to context
         context.staticStage = staticStage;
@@ -187,7 +187,7 @@ export const ShipWiki = () => {
         if (context.app) {
             context.app.destroy(true);
         }
-        context.app = new PIXI.Application({ width : 256, height: 256 });
+        context.app = new PIXI.Application({width: 256, height: 256, backgroundColor: 0x000000});
         ref.current!.appendChild(context.app.view);
         context.app!.ticker.add(() => {
             context.colorLayer!.children.forEach((c: any) => {

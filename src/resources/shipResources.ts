@@ -351,7 +351,7 @@ export class ShipResources {
                             ship.pathFinding.points.forEach(() => {
                                 const autoPilotLine = new PIXI.Graphics();
                                 autoPilotLine.zIndex = -5;
-                                this.game.application.stage.addChild(autoPilotLine);
+                                this.game.application.stage.addChild(autoPilotLine as unknown as any);
                                 shipMesh.autoPilotLines.push(autoPilotLine);
                             });
                         }
@@ -453,8 +453,8 @@ export class ShipResources {
 
                         // draw line
                         item.line.clear();
-                        item.line.beginFill(0xff0000ff);
-                        item.line.lineStyle(1, 0xff0000ff);
+                        item.line.beginFill(0x0000ff);
+                        item.line.lineStyle(1, 0x0000ff);
                         for (let i = 0; i < lineLength; i += dashLength * 2) {
                             item.line.moveTo(
                                 lineXS + lineDirection[0] * i,
@@ -502,8 +502,8 @@ export class ShipResources {
                         // draw line
                         const graphics: PIXI.Graphics = (item as any)[values.property] as PIXI.Graphics;
                         graphics.clear();
-                        graphics.beginFill(0xffffff88);
-                        graphics.lineStyle(1, 0xffffff88);
+                        graphics.beginFill(0xffff88);
+                        graphics.lineStyle(1, 0xffff88);
                         for (let i = 0; i < lineLength; i += dashLength * 2) {
                             graphics.moveTo(
                                 lineXS + lineDirection[0] * i,
