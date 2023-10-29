@@ -11,7 +11,7 @@
     "@mui/material": "^5.8.5",
     "@mui/styles": "^5.8.4",
     "@pickledeggs123/globular-marauders-game": "^0.2.168",
-    "@pickledeggs123/globular-marauders-generator": "^0.1.10",
+    "@pickledeggs123/globular-marauders-generator": "^0.1.11",
     "@pixi/core": "^7.2.4",
     "@pixi/layers": "^2.1.0",
     "@pixi/particle-emitter": "^5.0.8",
