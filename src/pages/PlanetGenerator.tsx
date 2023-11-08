@@ -1,9 +1,9 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import '../App.scss';
 import {WebsiteDrawer} from "../Drawer";
 import {Paper, Button, Card, CardContent, CardHeader, Container, Grid, Typography} from "@mui/material";
 // @ts-ignore
-import {generatePlanet, generatePlanetGltf} from "@pickledeggs123/globular-marauders-generator/dist/helpers";
+import {generatePlanetGltf} from "@pickledeggs123/globular-marauders-generator/dist/helpers";
 import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
 import * as PIXI from "pixi.js";
 import Quaternion from "quaternion";
@@ -11,18 +11,24 @@ import Quaternion from "quaternion";
 export const PlanetGenerator = () => {
     const [context] = useState<any>({});
     const ref = useRef<HTMLDivElement | null>(null);
-    const drawGraph = useCallback(() => {
-        const data = generatePlanet();
-        const app = context.app as PIXI.Application;
-        context.data = data;
+    const worker: Worker = useMemo(
+        () => new Worker(new URL("./planet-generator-worker", import.meta.url)),
+        []
+    );
+    useEffect(() => {
+        if (window.Worker) {
+            worker.onmessage = (e: MessageEvent<IGameMesh>) => {
+                const data = e.data;
+                const app = context.app as PIXI.Application;
+                context.data = data;
 
-        const planetGeometry = new PIXI.Geometry();
-        for (const attribute of data.attributes) {
-            planetGeometry.addAttribute(attribute.id, attribute.buffer, attribute.size);
-        }
-        planetGeometry.addIndex(data.index);
+                const planetGeometry = new PIXI.Geometry();
+                for (const attribute of data.attributes) {
+                    planetGeometry.addAttribute(attribute.id, attribute.buffer, attribute.size);
+                }
+                planetGeometry.addIndex(data.index);
 
-        const planetVertexShader = `
+                const planetVertexShader = `
             precision mediump float;
 
             attribute vec3 aPosition;
@@ -41,7 +47,7 @@ export const PlanetGenerator = () => {
                 vNormal = (uRotation * vec4(aNormal, 1.0)).xyz;
             }
         `;
-        const planetFragmentShader = `
+                const planetFragmentShader = `
             precision mediump float;
 
             varying vec3 vColor;
@@ -51,19 +57,26 @@ export const PlanetGenerator = () => {
                 gl_FragColor = vec4(vColor * (0.3 + 0.7 * max(0.0, pow(dot(vec3(0.0, 0.0, -1.0), vNormal), 3.0))), 1.0);
             }
         `;
-        const planetProgram = new PIXI.Program(planetVertexShader, planetFragmentShader);
+                const planetProgram = new PIXI.Program(planetVertexShader, planetFragmentShader);
 
-        const shader = new PIXI.Shader(planetProgram, {
-            uRotation: Quaternion.ONE.toMatrix4()
-        });
-        const state = PIXI.State.for2d();
-        state.depthTest = true;
-        const mesh = new PIXI.Mesh(planetGeometry, shader, state);
+                const shader = new PIXI.Shader(planetProgram, {
+                    uRotation: Quaternion.ONE.toMatrix4()
+                });
+                const state = PIXI.State.for2d();
+                state.depthTest = true;
+                const mesh = new PIXI.Mesh(planetGeometry, shader, state);
 
-        app.stage.children.forEach(x => {
-            app.stage.removeChild(x);
-        });
-        app.stage.addChild(mesh as unknown as any);
+                app.stage.children.forEach(x => {
+                    app.stage.removeChild(x);
+                });
+                app.stage.addChild(mesh as unknown as any);
+            }
+        }
+    }, [worker, context]);
+    const drawGraph = useCallback(() => {
+        if (window.Worker) {
+            worker.postMessage("");
+        }
     }, [context]);
     useEffect(() => {
         // @ts-ignore
