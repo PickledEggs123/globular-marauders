@@ -11,9 +11,9 @@ import Quaternion from "quaternion";
 export const PlanetGenerator = () => {
     const [context] = useState<any>({});
     const ref = useRef<HTMLDivElement | null>(null);
-    // @ts-ignore
     const worker: Worker | undefined = useMemo(
-        () => !global.use_srr && window?.Worker ? new Worker(new URL("./planet-generator-worker", import.meta.url)) : undefined,
+        // @ts-ignore
+        () => !global.use_ssr && window?.Worker ? new Worker(new URL("./planet-generator-worker", import.meta.url)) : undefined,
         []
     );
     useEffect(() => {
