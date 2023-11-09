@@ -13,7 +13,7 @@ export const PlanetGenerator = () => {
     const ref = useRef<HTMLDivElement | null>(null);
     const worker: Worker | undefined = useMemo(
         // @ts-ignore
-        () => !global.use_ssr && window?.Worker ? new Worker(new URL("./planet-generator-worker", import.meta.url)) : undefined,
+        () => !global.use_ssr && Worker ? new Worker(new URL("./planet-generator-worker", import.meta.url)) : undefined,
         []
     );
     useEffect(() => {
