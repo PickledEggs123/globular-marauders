@@ -12,11 +12,11 @@ export const PlanetGenerator = () => {
     const [context] = useState<any>({});
     const ref = useRef<HTMLDivElement | null>(null);
     const worker: Worker | undefined = useMemo(
-        () => window.Worker ? new Worker(new URL("./planet-generator-worker", import.meta.url)) : undefined,
+        () => window?.Worker ? new Worker(new URL("./planet-generator-worker", import.meta.url)) : undefined,
         []
     );
     useEffect(() => {
-        if (window.Worker && worker) {
+        if (window?.Worker && worker) {
             worker.onmessage = (e: MessageEvent<IGameMesh>) => {
                 const data = e.data;
                 const app = context.app as PIXI.Application;
@@ -74,7 +74,7 @@ export const PlanetGenerator = () => {
         }
     }, [worker, context]);
     const drawGraph = useCallback(() => {
-        if (window.Worker && worker) {
+        if (window?.Worker && worker) {
             worker.postMessage("");
         }
     }, [context]);
