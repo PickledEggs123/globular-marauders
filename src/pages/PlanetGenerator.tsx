@@ -11,12 +11,17 @@ import Quaternion from "quaternion";
 export const PlanetGenerator = () => {
     const [context] = useState<any>({});
     const ref = useRef<HTMLDivElement | null>(null);
+    // @ts-ignore
     const worker: Worker | undefined = useMemo(
-        () => window?.Worker ? new Worker(new URL("./planet-generator-worker", import.meta.url)) : undefined,
+        () => !global.use_srr && window?.Worker ? new Worker(new URL("./planet-generator-worker", import.meta.url)) : undefined,
         []
     );
     useEffect(() => {
-        if (window?.Worker && worker) {
+        // @ts-ignore
+        if (global.use_ssr) {
+            return;
+        }
+        if (worker) {
             worker.onmessage = (e: MessageEvent<IGameMesh>) => {
                 const data = e.data;
                 const app = context.app as PIXI.Application;
@@ -74,6 +79,10 @@ export const PlanetGenerator = () => {
         }
     }, [worker, context]);
     const drawGraph = useCallback(() => {
+        // @ts-ignore
+        if (global.use_ssr) {
+            return;
+        }
         if (window?.Worker && worker) {
             worker.postMessage("");
         }
