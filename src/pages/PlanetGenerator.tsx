@@ -1,3 +1,6 @@
+import 'aframe';
+// @ts-ignore
+import {Entity, Scene} from 'aframe-react';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import '../App.scss';
 import {WebsiteDrawer} from "../Drawer";
@@ -10,6 +13,7 @@ import Quaternion from "quaternion";
 
 export const PlanetGenerator = () => {
     const [context] = useState<any>({});
+    const [worldModelSource, setWorldModelSource] = useState<string>("");
     const ref = useRef<HTMLDivElement | null>(null);
     const worker: Worker | undefined = useMemo(
         // @ts-ignore
@@ -22,10 +26,28 @@ export const PlanetGenerator = () => {
             return;
         }
         if (worker) {
-            worker.onmessage = (e: MessageEvent<IGameMesh>) => {
-                const data = e.data;
+            worker.onmessage = (e: MessageEvent<{ mesh: IGameMesh, deleteBefore: boolean }>) => {
+                const data = e.data.mesh;
+                const deleteBefore = e.data.deleteBefore;
                 const app = context.app as PIXI.Application;
                 context.data = data;
+                generatePlanetGltf(data).then((gltf: any) => {
+                    const Uint8ToBase64 = (u8Arr: Uint8Array) => {
+                        const CHUNK_SIZE = 0x8000; //arbitrary number
+                        let index = 0;
+                        const length = u8Arr.length;
+                        let result = '';
+                        let slice: any;
+                        while (index < length) {
+                            slice = u8Arr.subarray(index, Math.min(index + CHUNK_SIZE, length));
+                            result += String.fromCharCode.apply(null, slice);
+                            index += CHUNK_SIZE;
+                        }
+                        return btoa(result);
+                    }
+                    const dataUri = `data:application/octet-stream;base64,${Uint8ToBase64(gltf)}`;
+                    setWorldModelSource(dataUri);
+                });
 
                 const planetGeometry = new PIXI.Geometry();
                 for (const attribute of data.attributes) {
@@ -34,34 +56,34 @@ export const PlanetGenerator = () => {
                 planetGeometry.addIndex(data.index);
 
                 const planetVertexShader = `
-            precision mediump float;
-
-            attribute vec3 aPosition;
-            attribute vec3 aColor;
-            attribute vec3 aNormal;
-            
-            uniform mat4 uRotation;
-
-            varying vec3 vColor;
-            varying vec3 vNormal;
-
-            void main() {
-                vColor = aColor;
-
-                gl_Position = uRotation * vec4(aPosition, 1.0);
-                vNormal = (uRotation * vec4(aNormal, 1.0)).xyz;
-            }
-        `;
+                    precision mediump float;
+        
+                    attribute vec3 aPosition;
+                    attribute vec3 aColor;
+                    attribute vec3 aNormal;
+                    
+                    uniform mat4 uRotation;
+        
+                    varying vec3 vColor;
+                    varying vec3 vNormal;
+        
+                    void main() {
+                        vColor = aColor;
+        
+                        gl_Position = uRotation * vec4(aPosition, 1.0);
+                        vNormal = (uRotation * vec4(aNormal, 1.0)).xyz;
+                    }
+                `;
                 const planetFragmentShader = `
-            precision mediump float;
-
-            varying vec3 vColor;
-            varying vec3 vNormal;
-
-            void main() {
-                gl_FragColor = vec4(vColor * (0.3 + 0.7 * max(0.0, pow(dot(vec3(0.0, 0.0, -1.0), vNormal), 3.0))), 1.0);
-            }
-        `;
+                    precision mediump float;
+        
+                    varying vec3 vColor;
+                    varying vec3 vNormal;
+        
+                    void main() {
+                        gl_FragColor = vec4(vColor * (0.3 + 0.7 * max(0.0, pow(dot(vec3(0.0, 0.0, -1.0), vNormal), 3.0))), 1.0);
+                    }
+                `;
                 const planetProgram = new PIXI.Program(planetVertexShader, planetFragmentShader);
 
                 const shader = new PIXI.Shader(planetProgram, {
@@ -71,9 +93,11 @@ export const PlanetGenerator = () => {
                 state.depthTest = true;
                 const mesh = new PIXI.Mesh(planetGeometry, shader, state);
 
-                app.stage.children.forEach(x => {
-                    app.stage.removeChild(x);
-                });
+                if (deleteBefore) {
+                    app.stage.children.forEach(x => {
+                        app.stage.removeChild(x);
+                    });
+                }
                 app.stage.addChild(mesh as unknown as any);
             }
         }
@@ -84,7 +108,7 @@ export const PlanetGenerator = () => {
             return;
         }
         if (window?.Worker && worker) {
-            worker.postMessage("");
+            worker.postMessage("init");
         }
     }, [context]);
     useEffect(() => {
@@ -154,6 +178,10 @@ export const PlanetGenerator = () => {
                             <CardContent>
                                 <div ref={ref}>
                                 </div>
+                                <Scene embedded style={{width: 250, height: 250}}>
+                                    <Entity camera look-controls position={{x: 0, y: 0, z: 0}}/>
+                                    <Entity gltf-model={worldModelSource} position={{x: 0, y: 0, z: -10}}/>
+                                </Scene>
                                 <Button onClick={() => {
                                     drawGraph();
                                 }}>Refresh</Button>
