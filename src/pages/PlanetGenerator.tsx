@@ -1,6 +1,3 @@
-import 'aframe';
-// @ts-ignore
-import {Entity, Scene} from 'aframe-react';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import '../App.scss';
 import {WebsiteDrawer} from "../Drawer";
@@ -11,8 +8,29 @@ import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interfa
 import * as PIXI from "pixi.js";
 import Quaternion from "quaternion";
 
+let Entity: any = () => null;
+let Scene: any = () => null;
+let importReady = false;
+const importPromise: Promise<void> = new Promise<void>((resolve) => {
+    // @ts-ignore
+    if (!global.use_ssr) {
+        // @ts-ignore
+        import("aframe").then(() => {
+            // @ts-ignore
+            import("aframe-react").then((importData: any) => {
+                Entity = importData.Entity;
+                Scene = importData.Scene;
+            });
+        });
+    }
+    resolve();
+});
+importPromise.then(() => {
+    importReady = true;
+});
+
 export const PlanetGenerator = () => {
-    const [context] = useState<any>({});
+    const [context, setContext] = useState<any>(null);
     const [worldModelSource, setWorldModelSource] = useState<string>("");
     const ref = useRef<HTMLDivElement | null>(null);
     const worker: Worker | undefined = useMemo(
@@ -22,7 +40,7 @@ export const PlanetGenerator = () => {
     );
     useEffect(() => {
         // @ts-ignore
-        if (global.use_ssr) {
+        if (global.use_ssr || !context) {
             return;
         }
         if (worker) {
@@ -104,7 +122,7 @@ export const PlanetGenerator = () => {
     }, [worker, context]);
     const drawGraph = useCallback(() => {
         // @ts-ignore
-        if (global.use_ssr) {
+        if (global.use_ssr || !context) {
             return;
         }
         if (window?.Worker && worker) {
@@ -113,7 +131,7 @@ export const PlanetGenerator = () => {
     }, [context]);
     useEffect(() => {
         // @ts-ignore
-        if (global.use_ssr) {
+        if (global.use_ssr || !context) {
             return;
         }
         if (context.app) {
@@ -163,7 +181,14 @@ export const PlanetGenerator = () => {
         };
         downloadBlob(new Blob([buffer]), "planet.glb", "application/octet-stream");
     };
-    
+
+    if (!importReady) {
+        importPromise.then(() => {
+            setContext({});
+        });
+        return null;
+    }
+
     return (
         <Paper style={{width: "100vw", minHeight: "100vh", height: "fit-content", display: "flex", flexDirection: "column"}}>
             <WebsiteDrawer rightSide={null}/>

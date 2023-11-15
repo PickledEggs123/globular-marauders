@@ -13,6 +13,7 @@ export const App = () => {
         <Routes>
             <Route path="/" element={<PixiGame />}/>
             <Route path="/game-model" element={<GameModel />}/>
+            {/* @ts-ignore */}
             <Route path="/planet-generator" element={<PlanetGenerator />}/>
             <Route path="/ship-wiki" element={<ShipWiki />}/>
             <Route path="/character-wiki" element={<CharacterWiki />}/>
