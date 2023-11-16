@@ -220,7 +220,7 @@ export const ShipWiki = () => {
                 return;
             }
             let a;
-            a = document.createElement('a');
+            a = document.createElement('a') as unknown as HTMLAnchorElement;
             a.href = data;
             a.download = fileName;
             document.body.appendChild(a);

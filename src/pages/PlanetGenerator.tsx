@@ -7,6 +7,7 @@ import {generatePlanetGltf} from "@pickledeggs123/globular-marauders-generator/d
 import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
 import * as PIXI from "pixi.js";
 import Quaternion from "quaternion";
+import * as THREE from "three";
 
 let Entity: any = () => null;
 let Scene: any = () => null;
@@ -15,22 +16,42 @@ const importPromise: Promise<void> = new Promise<void>((resolve) => {
     // @ts-ignore
     if (!global.use_ssr) {
         // @ts-ignore
-        import("aframe").then(() => {
-            // @ts-ignore
-            import("aframe-react").then((importData: any) => {
-                Entity = importData.Entity;
-                Scene = importData.Scene;
-            });
+        import("aframe-react").then((importData: any) => {
+            Entity = importData.Entity;
+            Scene = importData.Scene;
+        }).then(() => {
+            resolve();
         });
+    } else {
+        resolve();
     }
-    resolve();
 });
 importPromise.then(() => {
     importReady = true;
 });
 
+AFRAME.registerComponent('orbit-globe', {
+    schema: {},
+    tick: function () {
+        const trueUp = this.el.sceneEl!.camera.getWorldPosition(new THREE.Vector3()).sub(new THREE.Vector3()).normalize();
+        const currentUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.el.sceneEl!.camera.getWorldQuaternion(new THREE.Quaternion()));
+        const rotation = new THREE.Quaternion().setFromUnitVectors(currentUp, trueUp);
+        this.el.sceneEl!.camera.applyQuaternion(rotation);
+    }
+});
+
+AFRAME.registerComponent('globe-gravity', {
+    scheme: {},
+    tick: function () {
+        const object3D = this.el.object3D;
+        const trueUp = object3D.getWorldPosition(new THREE.Vector3()).sub(new THREE.Vector3(0, -100, 0)).normalize();
+        // @ts-ignore
+        this.el.body.applyForce(new CANNON.Vec3(-trueUp.x, -trueUp.y, -trueUp.z).vmul(new CANNON.Vec3(9.8, 9.8, 9.8)), new CANNON.Vec3(0, 0, 0));
+    }
+})
+
 export const PlanetGenerator = () => {
-    const [context, setContext] = useState<any>(null);
+    const [context, setContext] = useState<any>(importReady ? {} : null);
     const [worldModelSource, setWorldModelSource] = useState<string>("");
     const ref = useRef<HTMLDivElement | null>(null);
     const worker: Worker | undefined = useMemo(
@@ -44,11 +65,28 @@ export const PlanetGenerator = () => {
             return;
         }
         if (worker) {
-            worker.onmessage = (e: MessageEvent<{ mesh: IGameMesh, deleteBefore: boolean }>) => {
+            worker.onmessage = (e: MessageEvent<{ mesh: IGameMesh, deleteBefore: boolean, heightMapData: [number, number][] | null }>) => {
                 const data = e.data.mesh;
                 const deleteBefore = e.data.deleteBefore;
                 const app = context.app as PIXI.Application;
                 context.data = data;
+                context.heightMap = e.data.heightMapData;
+                if (context.heightMap) {
+                    (async () => {
+                        if (worker && context.heightMap) {
+                            for (const [index, height] of context.heightMap) {
+                                if (height >= 0) {
+                                    worker.postMessage(`${index}`);
+                                    await new Promise<void>((resolve) => {
+                                        setTimeout(() => {
+                                            resolve();
+                                        }, 100);
+                                    });
+                                }
+                            }
+                        }
+                    })();
+                }
                 generatePlanetGltf(data).then((gltf: any) => {
                     const Uint8ToBase64 = (u8Arr: Uint8Array) => {
                         const CHUNK_SIZE = 0x8000; //arbitrary number
@@ -64,7 +102,9 @@ export const PlanetGenerator = () => {
                         return btoa(result);
                     }
                     const dataUri = `data:application/octet-stream;base64,${Uint8ToBase64(gltf)}`;
-                    setWorldModelSource(dataUri);
+                    if (deleteBefore) {
+                        setWorldModelSource(dataUri);
+                    }
                 });
 
                 const planetGeometry = new PIXI.Geometry();
@@ -160,7 +200,7 @@ export const PlanetGenerator = () => {
                 return;
             }
             let a;
-            a = document.createElement('a');
+            a = document.createElement('a') as unknown as HTMLAnchorElement;
             a.href = data;
             a.download = fileName;
             document.body.appendChild(a);
@@ -201,11 +241,14 @@ export const PlanetGenerator = () => {
                         <Card>
                             <CardHeader title="Planet Generator" subheader="Create unique random planets"></CardHeader>
                             <CardContent>
-                                <div ref={ref}>
+                                <div ref={ref} style={{width: 250, height: 250}}>
                                 </div>
-                                <Scene embedded style={{width: 250, height: 250}}>
-                                    <Entity camera look-controls position={{x: 0, y: 0, z: 0}}/>
-                                    <Entity gltf-model={worldModelSource} position={{x: 0, y: 0, z: -10}}/>
+                                <Scene physics="debug: true; driver: local; friction: 0.1; restitution: 0.5; gravity: 0 0 0;" embedded style={{width: 250, height: 250}}>
+                                    <Entity camera look-controls={{fly: true}} position={{x: 0, y: 1.6, z: 0}}/>
+                                    <Entity static-body="shape: sphere; sphereRadius: 100" gltf-model={worldModelSource} position={{x: 0, y: -100, z: 0}} scale={{x: 100, y: 100, z: 100}}/>
+                                    <Entity dynamic-body="shape: box" globe-gravity primitive="a-box" position={{x: 0, y: 10, z: 0}}/>
+                                    <Entity dynamic-body="shape: box" globe-gravity primitive="a-box" position={{x: 0, y: 12, z: 0}}/>
+                                    <Entity dynamic-body="shape: box" globe-gravity primitive="a-box" position={{x: 0, y: 14, z: 0}}/>
                                 </Scene>
                                 <Button onClick={() => {
                                     drawGraph();

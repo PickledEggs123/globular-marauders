@@ -18,21 +18,24 @@ self.onmessage = (e: MessageEvent<string>) => {
 // eslint-disable-next-line no-restricted-globals
         self.postMessage({
             mesh: data0.mesh,
-            deleteBefore: true
+            deleteBefore: true,
+            heightMapData: null
         });
 
         const data1 = generatePlanet(1, seed);
 // eslint-disable-next-line no-restricted-globals
         self.postMessage({
             mesh: data1.mesh,
-            deleteBefore: true
+            deleteBefore: true,
+            heightMapData: null,
         });
 
         data2 = generatePlanet(2, seed);
 // eslint-disable-next-line no-restricted-globals
         self.postMessage({
             mesh: data2.mesh,
-            deleteBefore: true
+            deleteBefore: true,
+            heightMapData: data2.heightMapData
         });
     } else {
         const game = new Game();
@@ -70,7 +73,7 @@ self.onmessage = (e: MessageEvent<string>) => {
                         const color = colors[index];
                         // initial center index
                         const startingIndex = acc.index.reduce((acc, a) => Math.max(acc, a + 1), 0);
-                        acc.position.push.apply(acc.position, v.centroid);
+                        acc.position.push.apply(acc.position, v.centroid.map(x => x * 1.05));
                         acc.color.push.apply(acc.color, color);
                         acc.normal.push.apply(acc.normal, v.centroid);
                         for (let i = 0; i < v.vertices.length; i++) {
