@@ -30,25 +30,28 @@ importPromise.then(() => {
     importReady = true;
 });
 
-AFRAME.registerComponent('orbit-globe', {
-    schema: {},
-    tick: function () {
-        const trueUp = this.el.sceneEl!.camera.getWorldPosition(new THREE.Vector3()).sub(new THREE.Vector3()).normalize();
-        const currentUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.el.sceneEl!.camera.getWorldQuaternion(new THREE.Quaternion()));
-        const rotation = new THREE.Quaternion().setFromUnitVectors(currentUp, trueUp);
-        this.el.sceneEl!.camera.applyQuaternion(rotation);
-    }
-});
+// @ts-ignore
+if (!global.use_ssr) {
+    AFRAME.registerComponent('orbit-globe', {
+        schema: {},
+        tick: function () {
+            const trueUp = this.el.sceneEl!.camera.getWorldPosition(new THREE.Vector3()).sub(new THREE.Vector3()).normalize();
+            const currentUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.el.sceneEl!.camera.getWorldQuaternion(new THREE.Quaternion()));
+            const rotation = new THREE.Quaternion().setFromUnitVectors(currentUp, trueUp);
+            this.el.sceneEl!.camera.applyQuaternion(rotation);
+        }
+    });
 
-AFRAME.registerComponent('globe-gravity', {
-    scheme: {},
-    tick: function () {
-        const object3D = this.el.object3D;
-        const trueUp = object3D.getWorldPosition(new THREE.Vector3()).sub(new THREE.Vector3(0, -100, 0)).normalize();
-        // @ts-ignore
-        this.el.body.applyForce(new CANNON.Vec3(-trueUp.x, -trueUp.y, -trueUp.z).vmul(new CANNON.Vec3(9.8, 9.8, 9.8)), new CANNON.Vec3(0, 0, 0));
-    }
-})
+    AFRAME.registerComponent('globe-gravity', {
+        scheme: {},
+        tick: function () {
+            const object3D = this.el.object3D;
+            const trueUp = object3D.getWorldPosition(new THREE.Vector3()).sub(new THREE.Vector3(0, -100, 0)).normalize();
+            // @ts-ignore
+            this.el.body.applyForce(new CANNON.Vec3(-trueUp.x, -trueUp.y, -trueUp.z).vmul(new CANNON.Vec3(9.8, 9.8, 9.8)), new CANNON.Vec3(0, 0, 0));
+        }
+    });
+}
 
 export const PlanetGenerator = () => {
     const [context, setContext] = useState<any>(importReady ? {} : null);
