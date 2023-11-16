@@ -7,7 +7,6 @@ import {generatePlanetGltf} from "@pickledeggs123/globular-marauders-generator/d
 import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
 import * as PIXI from "pixi.js";
 import Quaternion from "quaternion";
-import {THREE} from "aframe";
 
 let Entity: any = () => null;
 let Scene: any = () => null;
@@ -35,8 +34,11 @@ if (!global.use_ssr) {
     AFRAME.registerComponent('orbit-globe', {
         schema: {},
         tick: function () {
+            // @ts-ignore
             const trueUp = this.el.sceneEl!.camera.getWorldPosition(new THREE.Vector3()).sub(new THREE.Vector3()).normalize();
+            // @ts-ignore
             const currentUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.el.sceneEl!.camera.getWorldQuaternion(new THREE.Quaternion()));
+            // @ts-ignore
             const rotation = new THREE.Quaternion().setFromUnitVectors(currentUp, trueUp);
             this.el.sceneEl!.camera.applyQuaternion(rotation);
         }
@@ -46,6 +48,7 @@ if (!global.use_ssr) {
         scheme: {},
         tick: function () {
             const object3D = this.el.object3D;
+            // @ts-ignore
             const trueUp = object3D.getWorldPosition(new THREE.Vector3()).sub(new THREE.Vector3(0, -100, 0)).normalize();
             // @ts-ignore
             this.el.body.applyForce(new CANNON.Vec3(-trueUp.x, -trueUp.y, -trueUp.z).vmul(new CANNON.Vec3(9.8, 9.8, 9.8)), new CANNON.Vec3(0, 0, 0));
