@@ -70,23 +70,6 @@ export const PlanetGenerator = () => {
                 const deleteBefore = e.data.deleteBefore;
                 const app = context.app as PIXI.Application;
                 context.data = data;
-                context.heightMap = e.data.heightMapData;
-                if (context.heightMap) {
-                    (async () => {
-                        if (worker && context.heightMap) {
-                            for (const [index, height] of context.heightMap) {
-                                if (height >= 0) {
-                                    worker.postMessage(`${index}`);
-                                    await new Promise<void>((resolve) => {
-                                        setTimeout(() => {
-                                            resolve();
-                                        }, 100);
-                                    });
-                                }
-                            }
-                        }
-                    })();
-                }
                 generatePlanetGltf(data).then((gltf: any) => {
                     const Uint8ToBase64 = (u8Arr: Uint8Array) => {
                         const CHUNK_SIZE = 0x8000; //arbitrary number
