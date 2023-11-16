@@ -7,7 +7,7 @@ import {generatePlanetGltf} from "@pickledeggs123/globular-marauders-generator/d
 import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
 import * as PIXI from "pixi.js";
 import Quaternion from "quaternion";
-import * as THREE from "three";
+import {THREE} from "aframe";
 
 let Entity: any = () => null;
 let Scene: any = () => null;
