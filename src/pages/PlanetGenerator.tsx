@@ -54,6 +54,229 @@ if (!global.use_ssr) {
             this.el.body.applyForce(new CANNON.Vec3(-trueUp.x, -trueUp.y, -trueUp.z).vmul(new CANNON.Vec3(9.8, 9.8, 9.8)), new CANNON.Vec3(0, 0, 0));
         }
     });
+
+    const KEYCODE_TO_CODE: { [x: string]: string } = {
+        '38': 'ArrowUp',
+        '37': 'ArrowLeft',
+        '40': 'ArrowDown',
+        '39': 'ArrowRight',
+        '87': 'KeyW',
+        '65': 'KeyA',
+        '83': 'KeyS',
+        '68': 'KeyD'
+    };
+    // @ts-ignore
+    const bind = AFRAME.utils.bind;
+    // @ts-ignore
+    const shouldCaptureKeyEvent = AFRAME.utils.shouldCaptureKeyEvent;
+    const CLAMP_VELOCITY = 0.00001;
+    const MAX_DELTA = 0.2;
+    const KEYS = [
+        'KeyW', 'KeyA', 'KeyS', 'KeyD',
+        'ArrowUp', 'ArrowLeft', 'ArrowRight', 'ArrowDown'
+    ];
+
+    AFRAME.registerComponent('globle-keyboard-controls', {
+        schema: {
+            acceleration: {default: 65},
+            enabled: {default: true},
+            fly: {default: false},
+        },
+
+        init: function () {
+            // To keep track of the pressed keys.
+            // @ts-ignore
+            this.keys = {};
+            // @ts-ignore
+            this.easing = 1.1;
+
+            // @ts-ignore
+            this.velocity = new THREE.Vector3();
+
+            // Bind methods and add event listeners.
+            this.onBlur = bind(this.onBlur, this);
+            this.onContextMenu = bind(this.onContextMenu, this);
+            this.onFocus = bind(this.onFocus, this);
+            this.onKeyDown = bind(this.onKeyDown, this);
+            this.onKeyUp = bind(this.onKeyUp, this);
+            this.onVisibilityChange = bind(this.onVisibilityChange, this);
+            this.attachVisibilityEventListeners();
+        },
+
+        tick: function (time: number, delta: number) {
+            var el = this.el;
+            // @ts-ignore
+            var velocity = this.velocity;
+
+            if (!velocity.x && !velocity.y && !velocity.z &&
+                // @ts-ignore
+                isEmptyObject(this.keys)) { return; }
+
+            // Update velocity.
+            delta = delta / 1000;
+            this.updateVelocity(delta);
+
+            if (!velocity.x && !velocity.y && !velocity.z) { return; }
+
+            // Get movement vector and translate position.
+            el.object3D.position.add(this.getMovementVector(delta));
+        },
+
+        remove: function () {
+            this.removeKeyEventListeners();
+            this.removeVisibilityEventListeners();
+        },
+
+        play: function () {
+            this.attachKeyEventListeners();
+        },
+
+        pause: function () {
+            // @ts-ignore
+            this.keys = {};
+            this.removeKeyEventListeners();
+        },
+
+        updateVelocity: function (delta: number) {
+            var acceleration;
+            var data = this.data;
+            // @ts-ignore
+            var keys = this.keys;
+            // @ts-ignore
+            var velocity = this.velocity;
+
+            // If FPS too low, reset velocity.
+            // @ts-ignore
+            if (delta > MAX_DELTA) {
+                velocity.x = 0;
+                velocity.y = 0;
+                velocity.z = 0;
+                return;
+            }
+
+            // https://gamedev.stackexchange.com/questions/151383/frame-rate-independant-movement-with-acceleration
+            // @ts-ignore
+            var scaledEasing = Math.pow(1 / this.easing, delta * 60);
+            // Velocity Easing.
+            if (velocity.x !== 0) {
+                velocity.x = velocity.x * scaledEasing;
+            }
+            if (velocity.z !== 0) {
+                velocity.z = velocity.z * scaledEasing;
+            }
+
+            // Clamp velocity easing.
+            if (Math.abs(velocity.x) < CLAMP_VELOCITY) { velocity.x = 0; }
+            if (Math.abs(velocity.z) < CLAMP_VELOCITY) { velocity.z = 0; }
+
+            if (!data.enabled) { return; }
+
+            // Update velocity using keys pressed.
+            acceleration = data.acceleration;
+            if (keys.KeyA || keys.ArrowLeft) { velocity.x -= acceleration * delta; }
+            if (keys.KeyD || keys.ArrowRight) { velocity.x += acceleration * delta; }
+            if (keys.KeyW || keys.ArrowUp) { velocity.z -= acceleration * delta; }
+            if (keys.KeyS || keys.ArrowDown) { velocity.z += acceleration * delta; }
+        },
+
+        getMovementVector: (function () {
+            // @ts-ignore
+            var directionVector = new THREE.Vector3(0, 0, 0);
+
+            return function (delta: number) {
+                // @ts-ignore
+                var velocity = this.velocity;
+                // @ts-ignore
+                const object3D = this.el.object3D;
+                // @ts-ignore
+                var rotation = this.el.object3D.getWorldQuaternion(new THREE.Quaternion());
+                // @ts-ignore
+                const trueUp = object3D.getWorldPosition(new THREE.Vector3()).sub(new THREE.Vector3(0, -100, 0)).normalize();
+
+                // @ts-ignore
+                directionVector.copy(velocity);
+                directionVector.multiplyScalar(delta);
+
+                // Absolute.
+                if (!rotation) { return directionVector; }
+
+                // Transform direction relative to heading.
+                // @ts-ignore
+                directionVector.applyQuaternion(rotation);
+                return directionVector;
+            };
+        })(),
+
+        attachVisibilityEventListeners: function () {
+            window.oncontextmenu = this.onContextMenu;
+            window.addEventListener('blur', this.onBlur);
+            window.addEventListener('focus', this.onFocus);
+            document.addEventListener('visibilitychange', this.onVisibilityChange);
+        },
+
+        removeVisibilityEventListeners: function () {
+            window.removeEventListener('blur', this.onBlur);
+            window.removeEventListener('focus', this.onFocus);
+            document.removeEventListener('visibilitychange', this.onVisibilityChange);
+        },
+
+        attachKeyEventListeners: function () {
+            window.addEventListener('keydown', this.onKeyDown);
+            window.addEventListener('keyup', this.onKeyUp);
+        },
+
+        removeKeyEventListeners: function () {
+            window.removeEventListener('keydown', this.onKeyDown);
+            window.removeEventListener('keyup', this.onKeyUp);
+        },
+
+        onContextMenu: function () {
+            // @ts-ignore
+            var keys = Object.keys(this.keys);
+            for (var i = 0; i < keys.length; i++) {
+                // @ts-ignore
+                delete this.keys[keys[i]];
+            }
+        },
+
+        onBlur: function () {
+            this.pause();
+        },
+
+        onFocus: function () {
+            this.play();
+        },
+
+        onVisibilityChange: function () {
+            if (document.hidden) {
+                this.onBlur();
+            } else {
+                this.onFocus();
+            }
+        },
+
+        onKeyDown: function (event: any) {
+            var code;
+            if (!shouldCaptureKeyEvent(event)) { return; }
+            code = event.code || KEYCODE_TO_CODE[event.keyCode];
+            // @ts-ignore
+            if (KEYS.indexOf(code) !== -1) { this.keys[code] = true; }
+        },
+
+        onKeyUp: function (event: any) {
+            var code;
+            code = event.code || KEYCODE_TO_CODE[event.keyCode];
+            // @ts-ignore
+            delete this.keys[code];
+        }
+    });
+
+    // @ts-ignore
+    function isEmptyObject (keys: any) {
+        var key;
+        for (key in keys) { return false; }
+        return true;
+    }
 }
 
 export const PlanetGenerator = () => {
@@ -232,8 +455,8 @@ export const PlanetGenerator = () => {
                             <CardContent>
                                 <div ref={ref} style={{width: 250, height: 250}}>
                                 </div>
-                                <Scene physics="debug: true; driver: local; friction: 0.1; restitution: 0.5; gravity: 0 0 0;" embedded style={{width: 250, height: 250}}>
-                                    <Entity camera look-controls={{fly: true}} position={{x: 0, y: 1.6, z: 0}}/>
+                                <Scene physics="debug: true; driver: local; gravity: 0 0 0;" embedded style={{width: 250, height: 250}}>
+                                    <Entity primitive="a-camera" wasd-controls-enabled="false" globle-keyboard-controls={{enabled: true, fly: true}} position={{x: 0, y: 1.6, z: 0}}/>
                                     <Entity static-body="shape: sphere; sphereRadius: 100" gltf-model={worldModelSource} position={{x: 0, y: -100, z: 0}} scale={{x: 100, y: 100, z: 100}}/>
                                     <Entity dynamic-body="shape: box" globe-gravity primitive="a-box" position={{x: 0, y: 10, z: 0}}/>
                                     <Entity dynamic-body="shape: box" globe-gravity primitive="a-box" position={{x: 0, y: 12, z: 0}}/>
