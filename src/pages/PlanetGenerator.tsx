@@ -35,12 +35,15 @@ if (!global.use_ssr) {
         schema: {},
         tick: function () {
             // @ts-ignore
-            const trueUp = this.el.sceneEl!.camera.getWorldPosition(new THREE.Vector3()).sub(new THREE.Vector3()).normalize();
+            const trueUp = this.el.sceneEl!.camera.getWorldPosition(new THREE.Vector3()).sub(new THREE.Vector3(0, -100, 0)).normalize();
             // @ts-ignore
             const currentUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.el.sceneEl!.camera.getWorldQuaternion(new THREE.Quaternion()));
             // @ts-ignore
             const rotation = new THREE.Quaternion().setFromUnitVectors(currentUp, trueUp);
-            this.el.sceneEl!.camera.applyQuaternion(rotation);
+            // @ts-ignore
+            const newPos = this.el.sceneEl!.camera.getWorldPosition(new THREE.Vector3()).sub(new THREE.Vector3(0, -100, 0)).normalize().multiplyScalar(101.6).add(new THREE.Vector3(0, -100, 0));
+            // @ts-ignore
+            this.el.sceneEl!.camera.applyMatrix4(new THREE.Matrix4().setPosition(newPos.clone().sub(this.el.sceneEl!.camera.getWorldPosition(new THREE.Vector3()))));
         }
     });
 
@@ -54,6 +57,27 @@ if (!global.use_ssr) {
             this.el.body.applyForce(new CANNON.Vec3(-trueUp.x, -trueUp.y, -trueUp.z).vmul(new CANNON.Vec3(9.8, 9.8, 9.8)), new CANNON.Vec3(0, 0, 0));
         }
     });
+
+    AFRAME.registerComponent('look-at-box', {
+        schema: {},
+        tick: function () {
+            const box = document.querySelector("#box").object3D;
+            // @ts-ignore
+            const boxWorldPos = box.getWorldPosition(new THREE.Vector3());
+            const object3D = this.el.object3D;
+            // @ts-ignore
+            const objectWorldPos = object3D.getWorldPosition(new THREE.Vector3());
+            // @ts-ignore
+            const quaternion = new THREE.Quaternion().setFromUnitVectors(objectWorldPos.clone().sub(new THREE.Vector3(0, -100, 0)).normalize(), boxWorldPos.clone().sub(new THREE.Vector3(0, -100, 0)).normalize());
+            // @ts-ignore
+            const slerp = quaternion.slerp(new THREE.Quaternion(), 0.1);
+            // @ts-ignore
+            const finalPosition = objectWorldPos.clone().sub(new THREE.Vector3(0, -100, 0)).normalize().multiplyScalar(120).applyQuaternion(slerp).add(new THREE.Vector3(0, -100, 0));
+            object3D.position.set(finalPosition.x, finalPosition.y, finalPosition.z);
+            const camera = this.el.sceneEl!.camera;
+            camera.lookAt(boxWorldPos);
+        }
+    })
 
     const KEYCODE_TO_CODE: { [x: string]: string } = {
         '38': 'ArrowUp',
@@ -119,7 +143,8 @@ if (!global.use_ssr) {
             if (!velocity.x && !velocity.y && !velocity.z) { return; }
 
             // Get movement vector and translate position.
-            el.object3D.position.add(this.getMovementVector(delta));
+            // @ts-ignore
+            el.body.applyForce(this.getMovementVector(delta), new CANNON.Vec3(0, 0, 0));
         },
 
         remove: function () {
@@ -187,11 +212,7 @@ if (!global.use_ssr) {
                 // @ts-ignore
                 var velocity = this.velocity;
                 // @ts-ignore
-                const object3D = this.el.object3D;
-                // @ts-ignore
                 var rotation = this.el.object3D.getWorldQuaternion(new THREE.Quaternion());
-                // @ts-ignore
-                const trueUp = object3D.getWorldPosition(new THREE.Vector3()).sub(new THREE.Vector3(0, -100, 0)).normalize();
 
                 // @ts-ignore
                 directionVector.copy(velocity);
@@ -456,7 +477,11 @@ export const PlanetGenerator = () => {
                                 <div ref={ref} style={{width: 250, height: 250}}>
                                 </div>
                                 <Scene physics="debug: true; driver: local; gravity: 0 0 0;" embedded style={{width: 250, height: 250}}>
-                                    <Entity primitive="a-camera" wasd-controls-enabled="false" globle-keyboard-controls={{enabled: true, fly: true}} position={{x: 0, y: 1.6, z: 0}}/>
+                                    <Entity id="box" dynamic-body="shape: box" globe-gravity primitive="a-box" globle-keyboard-controls={{enabled: true, fly: true}} position={{x: 0, y: 2, z: 0}}>
+                                    </Entity>
+                                    <Entity id="camera-rig" look-at-box position={{x: 0, y: 20, z: 20}}>
+                                        <Entity primitive="a-camera" wasd-controls-enabled="false" look-controls-enabled="false" position={{x: 0, y: 1.6, z: 0}}/>
+                                    </Entity>
                                     <Entity static-body="shape: sphere; sphereRadius: 100" gltf-model={worldModelSource} position={{x: 0, y: -100, z: 0}} scale={{x: 100, y: 100, z: 100}}/>
                                     <Entity dynamic-body="shape: box" globe-gravity primitive="a-box" position={{x: 0, y: 10, z: 0}}/>
                                     <Entity dynamic-body="shape: box" globe-gravity primitive="a-box" position={{x: 0, y: 12, z: 0}}/>
