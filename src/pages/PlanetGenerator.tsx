@@ -31,22 +31,6 @@ importPromise.then(() => {
 
 // @ts-ignore
 if (!global.use_ssr) {
-    AFRAME.registerComponent('orbit-globe', {
-        schema: {},
-        tick: function () {
-            // @ts-ignore
-            const trueUp = this.el.sceneEl!.camera.getWorldPosition(new THREE.Vector3()).sub(new THREE.Vector3(0, -100, 0)).normalize();
-            // @ts-ignore
-            const currentUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.el.sceneEl!.camera.getWorldQuaternion(new THREE.Quaternion()));
-            // @ts-ignore
-            const rotation = new THREE.Quaternion().setFromUnitVectors(currentUp, trueUp);
-            // @ts-ignore
-            const newPos = this.el.sceneEl!.camera.getWorldPosition(new THREE.Vector3()).sub(new THREE.Vector3(0, -100, 0)).normalize().multiplyScalar(101.6).add(new THREE.Vector3(0, -100, 0));
-            // @ts-ignore
-            this.el.sceneEl!.camera.applyMatrix4(new THREE.Matrix4().setPosition(newPos.clone().sub(this.el.sceneEl!.camera.getWorldPosition(new THREE.Vector3()))));
-        }
-    });
-
     AFRAME.registerComponent('globe-gravity', {
         scheme: {},
         tick: function () {
@@ -54,7 +38,18 @@ if (!global.use_ssr) {
             // @ts-ignore
             const trueUp = object3D.getWorldPosition(new THREE.Vector3()).sub(new THREE.Vector3(0, -100, 0)).normalize();
             // @ts-ignore
-            this.el.body.applyForce(new CANNON.Vec3(-trueUp.x, -trueUp.y, -trueUp.z).vmul(new CANNON.Vec3(9.8, 9.8, 9.8)), new CANNON.Vec3(0, 0, 0));
+            const currentUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
+            const diffUp = trueUp.clone().sub(currentUp.clone());
+            // @ts-ignore
+            this.el.body.applyForce(new CANNON.Vec3(-trueUp.x, -trueUp.y, -trueUp.z).scale(10), new CANNON.Vec3(0, 0, 0));
+            // @ts-ignore
+            const springForce = 10;
+            const rotateForce = new CANNON.Vec3(diffUp.x, diffUp.y, diffUp.z).scale(springForce);
+            const rotatePoint = new CANNON.Vec3(currentUp.x, currentUp.y, currentUp.z);
+            // @ts-ignore
+            this.el.body.applyForce(rotateForce, rotatePoint.clone());
+            // @ts-ignore
+            this.el.body.applyForce(rotateForce.scale(-1), rotatePoint.clone().scale(-1));
         }
     });
 
@@ -68,11 +63,13 @@ if (!global.use_ssr) {
             // @ts-ignore
             const objectWorldPos = object3D.getWorldPosition(new THREE.Vector3());
             // @ts-ignore
+            const height = boxWorldPos.clone().sub(new THREE.Vector3(0, -100, 0)).length();
+            // @ts-ignore
             const quaternion = new THREE.Quaternion().setFromUnitVectors(objectWorldPos.clone().sub(new THREE.Vector3(0, -100, 0)).normalize(), boxWorldPos.clone().sub(new THREE.Vector3(0, -100, 0)).normalize());
             // @ts-ignore
             const slerp = quaternion.slerp(new THREE.Quaternion(), 0.1);
             // @ts-ignore
-            const finalPosition = objectWorldPos.clone().sub(new THREE.Vector3(0, -100, 0)).normalize().multiplyScalar(120).applyQuaternion(slerp).add(new THREE.Vector3(0, -100, 0));
+            const finalPosition = objectWorldPos.clone().sub(new THREE.Vector3(0, -100, 0)).normalize().multiplyScalar(height + 20).applyQuaternion(slerp).add(new THREE.Vector3(0, -100, 0));
             object3D.position.set(finalPosition.x, finalPosition.y, finalPosition.z);
             const camera = this.el.sceneEl!.camera;
             camera.lookAt(boxWorldPos);
@@ -93,8 +90,6 @@ if (!global.use_ssr) {
     const bind = AFRAME.utils.bind;
     // @ts-ignore
     const shouldCaptureKeyEvent = AFRAME.utils.shouldCaptureKeyEvent;
-    const CLAMP_VELOCITY = 0.00001;
-    const MAX_DELTA = 0.2;
     const KEYS = [
         'KeyW', 'KeyA', 'KeyS', 'KeyD',
         'ArrowUp', 'ArrowLeft', 'ArrowRight', 'ArrowDown'
@@ -102,7 +97,7 @@ if (!global.use_ssr) {
 
     AFRAME.registerComponent('globle-keyboard-controls', {
         schema: {
-            acceleration: {default: 65},
+            acceleration: {default: 10},
             enabled: {default: true},
             fly: {default: false},
         },
@@ -111,9 +106,6 @@ if (!global.use_ssr) {
             // To keep track of the pressed keys.
             // @ts-ignore
             this.keys = {};
-            // @ts-ignore
-            this.easing = 1.1;
-
             // @ts-ignore
             this.velocity = new THREE.Vector3();
 
@@ -130,21 +122,15 @@ if (!global.use_ssr) {
         tick: function (time: number, delta: number) {
             var el = this.el;
             // @ts-ignore
-            var velocity = this.velocity;
-
-            if (!velocity.x && !velocity.y && !velocity.z &&
-                // @ts-ignore
-                isEmptyObject(this.keys)) { return; }
+            const body = this.el.body;
 
             // Update velocity.
             delta = delta / 1000;
             this.updateVelocity(delta);
 
-            if (!velocity.x && !velocity.y && !velocity.z) { return; }
-
             // Get movement vector and translate position.
             // @ts-ignore
-            el.body.applyForce(this.getMovementVector(delta), new CANNON.Vec3(0, 0, 0));
+            el.body.applyForce(this.getMovementVector(delta).clone(), new CANNON.Vec3(0, 0, 0));
         },
 
         remove: function () {
@@ -170,38 +156,24 @@ if (!global.use_ssr) {
             // @ts-ignore
             var velocity = this.velocity;
 
-            // If FPS too low, reset velocity.
-            // @ts-ignore
-            if (delta > MAX_DELTA) {
-                velocity.x = 0;
-                velocity.y = 0;
-                velocity.z = 0;
-                return;
-            }
-
-            // https://gamedev.stackexchange.com/questions/151383/frame-rate-independant-movement-with-acceleration
-            // @ts-ignore
-            var scaledEasing = Math.pow(1 / this.easing, delta * 60);
-            // Velocity Easing.
-            if (velocity.x !== 0) {
-                velocity.x = velocity.x * scaledEasing;
-            }
-            if (velocity.z !== 0) {
-                velocity.z = velocity.z * scaledEasing;
-            }
-
-            // Clamp velocity easing.
-            if (Math.abs(velocity.x) < CLAMP_VELOCITY) { velocity.x = 0; }
-            if (Math.abs(velocity.z) < CLAMP_VELOCITY) { velocity.z = 0; }
-
             if (!data.enabled) { return; }
 
             // Update velocity using keys pressed.
             acceleration = data.acceleration;
-            if (keys.KeyA || keys.ArrowLeft) { velocity.x -= acceleration * delta; }
-            if (keys.KeyD || keys.ArrowRight) { velocity.x += acceleration * delta; }
-            if (keys.KeyW || keys.ArrowUp) { velocity.z -= acceleration * delta; }
-            if (keys.KeyS || keys.ArrowDown) { velocity.z += acceleration * delta; }
+            velocity.set(0, 0, 0);
+            if (keys.KeyA || keys.ArrowLeft) { velocity.x = -acceleration; }
+            if (keys.KeyD || keys.ArrowRight) { velocity.x = acceleration; }
+            if (keys.KeyW || keys.ArrowUp) { velocity.z = -acceleration; }
+            if (keys.KeyS || keys.ArrowDown) { velocity.z = acceleration; }
+
+            // @ts-ignore
+            const bodyWorldVelocity = this.el.body.velocity.clone();
+            // @ts-ignore
+            const bodyWorldQuat = this.el.body.quaternion.clone().inverse();
+            // @ts-ignore
+            const bodyVelocity = new THREE.Vector3(bodyWorldVelocity.x, bodyWorldVelocity.y, bodyWorldVelocity.z).applyQuaternion(new THREE.Quaternion(bodyWorldQuat.x, bodyWorldQuat.y, bodyWorldQuat.z, bodyWorldQuat.w));
+            // @ts-ignore
+            velocity.sub(new THREE.Vector3(bodyVelocity.x, bodyVelocity.y, bodyVelocity.z).multiplyScalar(1))
         },
 
         getMovementVector: (function () {
@@ -216,7 +188,6 @@ if (!global.use_ssr) {
 
                 // @ts-ignore
                 directionVector.copy(velocity);
-                directionVector.multiplyScalar(delta);
 
                 // Absolute.
                 if (!rotation) { return directionVector; }
@@ -291,13 +262,6 @@ if (!global.use_ssr) {
             delete this.keys[code];
         }
     });
-
-    // @ts-ignore
-    function isEmptyObject (keys: any) {
-        var key;
-        for (key in keys) { return false; }
-        return true;
-    }
 }
 
 export const PlanetGenerator = () => {
@@ -477,7 +441,7 @@ export const PlanetGenerator = () => {
                                 <div ref={ref} style={{width: 250, height: 250}}>
                                 </div>
                                 <Scene physics="debug: true; driver: local; gravity: 0 0 0;" embedded style={{width: 250, height: 250}}>
-                                    <Entity id="box" dynamic-body="shape: box" globe-gravity primitive="a-box" globle-keyboard-controls={{enabled: true, fly: true}} position={{x: 0, y: 2, z: 0}}>
+                                    <Entity id="box" dynamic-body="shape: box; mass: 100" globe-gravity primitive="a-box" globle-keyboard-controls="enabled: true; fly: true" position={{x: 0, y: 2, z: 0}}>
                                     </Entity>
                                     <Entity id="camera-rig" look-at-box position={{x: 0, y: 20, z: 20}}>
                                         <Entity primitive="a-camera" wasd-controls-enabled="false" look-controls-enabled="false" position={{x: 0, y: 1.6, z: 0}}/>
