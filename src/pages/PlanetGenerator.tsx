@@ -40,16 +40,28 @@ if (!global.use_ssr) {
             // @ts-ignore
             const currentUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
             const diffUp = trueUp.clone().sub(currentUp.clone());
+
+            // apply gravity force
             // @ts-ignore
             this.el.body.applyForce(new CANNON.Vec3(-trueUp.x, -trueUp.y, -trueUp.z).scale(10), new CANNON.Vec3(0, 0, 0));
+
+            // apply drag
             // @ts-ignore
-            const springForce = 10;
+            this.el.body.applyForce(this.el.body.velocity.clone().scale(-5), new CANNON.Vec3(0, 0, 0));
+
+            // apply up right force
+            // @ts-ignore
+            const springForce = 10 - 10 * this.el.body.angularVelocity.length();
             const rotateForce = new CANNON.Vec3(diffUp.x, diffUp.y, diffUp.z).scale(springForce);
             const rotatePoint = new CANNON.Vec3(currentUp.x, currentUp.y, currentUp.z);
             // @ts-ignore
             this.el.body.applyForce(rotateForce, rotatePoint.clone());
             // @ts-ignore
             this.el.body.applyForce(rotateForce.scale(-1), rotatePoint.clone().scale(-1));
+
+            // apply angular drag
+            // @ts-ignore
+            this.el.body.angularVelocity.scale(0.9);
         }
     });
 
@@ -108,6 +120,8 @@ if (!global.use_ssr) {
             this.keys = {};
             // @ts-ignore
             this.velocity = new THREE.Vector3();
+            // @ts-ignore
+            this.rotation = new THREE.Vector3();
 
             // Bind methods and add event listeners.
             this.onBlur = bind(this.onBlur, this);
@@ -130,7 +144,16 @@ if (!global.use_ssr) {
 
             // Get movement vector and translate position.
             // @ts-ignore
-            el.body.applyForce(this.getMovementVector(delta).clone(), new CANNON.Vec3(0, 0, 0));
+            body.applyForce(this.getMovementVector(delta).clone(), new CANNON.Vec3(0, 0, 0));
+
+            // @ts-ignore
+            if (this.rotation.clone().y) {
+                // apply rotation force
+                // @ts-ignore
+                body.applyForce(new CANNON.Vec3(this.rotation.clone().y, 0, 0), new CANNON.Vec3(0, 0, 1));
+                // @ts-ignore
+                body.applyForce(new CANNON.Vec3(-this.rotation.clone().y, 0, 0), new CANNON.Vec3(0, 0, -1));
+            }
         },
 
         remove: function () {
@@ -155,14 +178,17 @@ if (!global.use_ssr) {
             var keys = this.keys;
             // @ts-ignore
             var velocity = this.velocity;
+            // @ts-ignore
+            var rotation = this.rotation;
 
             if (!data.enabled) { return; }
 
             // Update velocity using keys pressed.
             acceleration = data.acceleration;
             velocity.set(0, 0, 0);
-            if (keys.KeyA || keys.ArrowLeft) { velocity.x = -acceleration; }
-            if (keys.KeyD || keys.ArrowRight) { velocity.x = acceleration; }
+            rotation.set(0, 0, 0);
+            if (keys.KeyA || keys.ArrowLeft) { rotation.y = acceleration; }
+            if (keys.KeyD || keys.ArrowRight) { rotation.y = -acceleration; }
             if (keys.KeyW || keys.ArrowUp) { velocity.z = -acceleration; }
             if (keys.KeyS || keys.ArrowDown) { velocity.z = acceleration; }
 
@@ -173,7 +199,7 @@ if (!global.use_ssr) {
             // @ts-ignore
             const bodyVelocity = new THREE.Vector3(bodyWorldVelocity.x, bodyWorldVelocity.y, bodyWorldVelocity.z).applyQuaternion(new THREE.Quaternion(bodyWorldQuat.x, bodyWorldQuat.y, bodyWorldQuat.z, bodyWorldQuat.w));
             // @ts-ignore
-            velocity.sub(new THREE.Vector3(bodyVelocity.x, bodyVelocity.y, bodyVelocity.z).multiplyScalar(1))
+            velocity.sub(new THREE.Vector3(bodyVelocity.x, bodyVelocity.y, bodyVelocity.z).multiplyScalar(1));
         },
 
         getMovementVector: (function () {
@@ -188,9 +214,6 @@ if (!global.use_ssr) {
 
                 // @ts-ignore
                 directionVector.copy(velocity);
-
-                // Absolute.
-                if (!rotation) { return directionVector; }
 
                 // Transform direction relative to heading.
                 // @ts-ignore
@@ -441,15 +464,15 @@ export const PlanetGenerator = () => {
                                 <div ref={ref} style={{width: 250, height: 250}}>
                                 </div>
                                 <Scene physics="debug: true; driver: local; gravity: 0 0 0;" embedded style={{width: 250, height: 250}}>
-                                    <Entity id="box" dynamic-body="shape: box; mass: 100" globe-gravity primitive="a-box" globle-keyboard-controls="enabled: true; fly: true" position={{x: 0, y: 2, z: 0}}>
+                                    <Entity id="box" dynamic-body="shape: box; mass: 100" globe-gravity primitive="a-box" globle-keyboard-controls="enabled: true; fly: true" position={{x: 0, y: 3, z: 0}} scale="2 1 6">
                                     </Entity>
                                     <Entity id="camera-rig" look-at-box position={{x: 0, y: 20, z: 20}}>
                                         <Entity primitive="a-camera" wasd-controls-enabled="false" look-controls-enabled="false" position={{x: 0, y: 1.6, z: 0}}/>
                                     </Entity>
                                     <Entity static-body="shape: sphere; sphereRadius: 100" gltf-model={worldModelSource} position={{x: 0, y: -100, z: 0}} scale={{x: 100, y: 100, z: 100}}/>
-                                    <Entity dynamic-body="shape: box" globe-gravity primitive="a-box" position={{x: 0, y: 10, z: 0}}/>
-                                    <Entity dynamic-body="shape: box" globe-gravity primitive="a-box" position={{x: 0, y: 12, z: 0}}/>
-                                    <Entity dynamic-body="shape: box" globe-gravity primitive="a-box" position={{x: 0, y: 14, z: 0}}/>
+                                    <Entity dynamic-body="shape: box" globe-gravity primitive="a-box" position={{x: 3, y: 10, z: 0}} scale="2 1 6"/>
+                                    <Entity dynamic-body="shape: box" globe-gravity primitive="a-box" position={{x: 6, y: 12, z: 0}} scale="2 1 6"/>
+                                    <Entity dynamic-body="shape: box" globe-gravity primitive="a-box" position={{x: 9, y: 14, z: 0}} scale="2 1 6"/>
                                 </Scene>
                                 <Button onClick={() => {
                                     drawGraph();
