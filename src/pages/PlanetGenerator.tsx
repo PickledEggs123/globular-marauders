@@ -7,6 +7,7 @@ import {generatePlanetGltf} from "@pickledeggs123/globular-marauders-generator/d
 import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
 import * as PIXI from "pixi.js";
 import Quaternion from "quaternion";
+import sloopMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/sloop.mesh.json";
 
 let Entity: any = () => null;
 let Scene: any = () => null;
@@ -61,14 +62,18 @@ if (!global.use_ssr) {
 
             // apply angular drag
             // @ts-ignore
-            this.el.body.angularVelocity.scale(0.9);
+            this.el.body.angularVelocity.scale(0.5);
         }
     });
 
     AFRAME.registerComponent('look-at-box', {
         schema: {},
         tick: function () {
-            const box = document.querySelector("#box").object3D;
+            const box = document.querySelector("#box")?.object3D;
+            if (!box) {
+                return;
+            }
+
             // @ts-ignore
             const boxWorldPos = box.getWorldPosition(new THREE.Vector3());
             const object3D = this.el.object3D;
@@ -290,6 +295,7 @@ if (!global.use_ssr) {
 export const PlanetGenerator = () => {
     const [context, setContext] = useState<any>(importReady ? {} : null);
     const [worldModelSource, setWorldModelSource] = useState<string>("");
+    const [sloopModelSource, setSloopModelSource] = useState<string>("");
     const ref = useRef<HTMLDivElement | null>(null);
     const worker: Worker | undefined = useMemo(
         // @ts-ignore
@@ -307,7 +313,7 @@ export const PlanetGenerator = () => {
                 const deleteBefore = e.data.deleteBefore;
                 const app = context.app as PIXI.Application;
                 context.data = data;
-                generatePlanetGltf(data).then((gltf: any) => {
+                Promise.all<Uint8Array>([generatePlanetGltf(data), generatePlanetGltf(sloopMeshJson)]).then(([gltf1, gltf2]) => {
                     const Uint8ToBase64 = (u8Arr: Uint8Array) => {
                         const CHUNK_SIZE = 0x8000; //arbitrary number
                         let index = 0;
@@ -321,10 +327,12 @@ export const PlanetGenerator = () => {
                         }
                         return btoa(result);
                     }
-                    const dataUri = `data:application/octet-stream;base64,${Uint8ToBase64(gltf)}`;
+                    const dataUri1 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf1)}`;
                     if (deleteBefore) {
-                        setWorldModelSource(dataUri);
+                        setWorldModelSource(dataUri1);
                     }
+                    const dataUri2 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf2)}`;
+                    setSloopModelSource(dataUri2);
                 });
 
                 const planetGeometry = new PIXI.Geometry();
@@ -463,16 +471,25 @@ export const PlanetGenerator = () => {
                             <CardContent>
                                 <div ref={ref} style={{width: 250, height: 250}}>
                                 </div>
-                                <Scene physics="debug: true; driver: local; gravity: 0 0 0;" embedded style={{width: 250, height: 250}}>
-                                    <Entity id="box" dynamic-body="shape: box; mass: 100" globe-gravity primitive="a-box" globle-keyboard-controls="enabled: true; fly: true" position={{x: 0, y: 3, z: 0}} scale="2 1 6">
+                                <Scene physics="driver: local; gravity: 0 0 0;" embedded style={{width: 250, height: 250}}>
+                                    <Entity light="type: ambient; color: #CCC"></Entity>
+                                    <Entity light="type: directional; color: #EEE; intensity: 0.5" position="-1 1 0"></Entity>
+                                    <Entity id="box" dynamic-body="shape: sphere; sphereRadius: 1; mass: 100" globe-gravity globle-keyboard-controls="enabled: true; fly: true" position={{x: 0, y: 3, z: 0}} scale="0.1 0.1 0.1">
+                                        <Entity gltf-model={sloopModelSource} rotation="0 -90 0"></Entity>
                                     </Entity>
                                     <Entity id="camera-rig" look-at-box position={{x: 0, y: 20, z: 20}}>
                                         <Entity primitive="a-camera" wasd-controls-enabled="false" look-controls-enabled="false" position={{x: 0, y: 1.6, z: 0}}/>
                                     </Entity>
                                     <Entity static-body="shape: sphere; sphereRadius: 100" gltf-model={worldModelSource} position={{x: 0, y: -100, z: 0}} scale={{x: 100, y: 100, z: 100}}/>
-                                    <Entity dynamic-body="shape: box" globe-gravity primitive="a-box" position={{x: 3, y: 10, z: 0}} scale="2 1 6"/>
-                                    <Entity dynamic-body="shape: box" globe-gravity primitive="a-box" position={{x: 6, y: 12, z: 0}} scale="2 1 6"/>
-                                    <Entity dynamic-body="shape: box" globe-gravity primitive="a-box" position={{x: 9, y: 14, z: 0}} scale="2 1 6"/>
+                                    <Entity dynamic-body="shape: sphere; sphereRadius: 1" globe-gravity position={{x: 3, y: 10, z: 0}} scale="0.1 0.1 0.1">
+                                        <Entity gltf-model={sloopModelSource} rotation="0 -90 0"></Entity>
+                                    </Entity>
+                                    <Entity dynamic-body="shape: sphere; sphereRadius: 1" globe-gravity position={{x: 6, y: 12, z: 0}} scale="0.1 0.1 0.1">
+                                        <Entity gltf-model={sloopModelSource} rotation="0 -90 0"></Entity>
+                                    </Entity>
+                                    <Entity dynamic-body="shape: sphere; sphereRadius: 1" globe-gravity position={{x: 9, y: 14, z: 0}} scale="0.1 0.1 0.1">
+                                        <Entity gltf-model={sloopModelSource} rotation="0 -90 0"></Entity>
+                                    </Entity>
                                 </Scene>
                                 <Button onClick={() => {
                                     drawGraph();
