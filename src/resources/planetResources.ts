@@ -1,15 +1,5 @@
 import * as PIXI from "pixi.js";
 import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
-import planetMesh0 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet0.mesh.json";
-import planetMesh1 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet1.mesh.json";
-import planetMesh2 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet2.mesh.json";
-import planetMesh3 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet3.mesh.json";
-import planetMesh4 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet4.mesh.json";
-import planetMesh5 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet5.mesh.json";
-import planetMesh6 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet6.mesh.json";
-import planetMesh7 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet7.mesh.json";
-import planetMesh8 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet8.mesh.json";
-import planetMesh9 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet9.mesh.json";
 import Quaternion from "quaternion";
 import PixiGame from "../pages/PixiGame";
 import {DelaunayGraph} from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
@@ -17,25 +7,20 @@ import {PHYSICS_SCALE} from "@pickledeggs123/globular-marauders-game/lib/src/Shi
 
 export class PlanetResources {
     game: PixiGame;
+    planetContext: IGameMesh[];
     constructor(game: PixiGame) {
         this.game = game;
+        this.planetContext = game.planetContext;
+    }
+
+    public setPlanetContext() {
+        this.planetContext = this.game.planetContext;
     }
 
     private getFreshData() {
         // generate planets
         const planetGeometries: PIXI.Geometry[] = [];
-        const jsonFiles: IGameMesh[] = [
-            planetMesh0,
-            planetMesh1,
-            planetMesh2,
-            planetMesh3,
-            planetMesh4,
-            planetMesh5,
-            planetMesh6,
-            planetMesh7,
-            planetMesh8,
-            planetMesh9,
-        ];
+        const jsonFiles: IGameMesh[] = this.planetContext;
         for (const gameMesh of jsonFiles) {
             const planetGeometry = new PIXI.Geometry();
             for (const attribute of gameMesh.attributes) {

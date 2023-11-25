@@ -17,28 +17,30 @@ import Quaternion from "quaternion";
 import {EParticleState} from "../pages/PixiGameBase";
 import PixiGame from "../pages/PixiGame";
 import {DelaunayGraph, VoronoiGraph} from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
-import cutterMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/cutter.mesh.json";
-import sloopMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/sloop.mesh.json";
-import corvetteMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/corvette.mesh.json";
-import brigantineMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/brigantine.mesh.json";
-import brigMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/brig.mesh.json";
-import frigateMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/frigate.mesh.json";
-import galleonMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/galleon.mesh.json";
 import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
 
-const mapShipTypeToMeshJson = new Map<EShipType, IGameMesh>();
-mapShipTypeToMeshJson.set(EShipType.CUTTER, cutterMeshJson);
-mapShipTypeToMeshJson.set(EShipType.SLOOP, sloopMeshJson);
-mapShipTypeToMeshJson.set(EShipType.CORVETTE, corvetteMeshJson);
-mapShipTypeToMeshJson.set(EShipType.BRIGANTINE, brigantineMeshJson);
-mapShipTypeToMeshJson.set(EShipType.BRIG, brigMeshJson);
-mapShipTypeToMeshJson.set(EShipType.FRIGATE, frigateMeshJson);
-mapShipTypeToMeshJson.set(EShipType.GALLEON, galleonMeshJson);
+
 
 export class ShipResources {
     game: PixiGame;
+
+    mapShipTypeToMeshJson: Map<EShipType, IGameMesh>;
+
     constructor(game: PixiGame) {
         this.game = game;
+
+        this.mapShipTypeToMeshJson = new Map<EShipType, IGameMesh>();
+    }
+
+    public setShipContext() {
+        const shipContext = this.game.shipContext;
+        this.mapShipTypeToMeshJson.set(EShipType.CUTTER, shipContext[0]);
+        this.mapShipTypeToMeshJson.set(EShipType.SLOOP, shipContext[1]);
+        this.mapShipTypeToMeshJson.set(EShipType.CORVETTE, shipContext[2]);
+        this.mapShipTypeToMeshJson.set(EShipType.BRIGANTINE, shipContext[3]);
+        this.mapShipTypeToMeshJson.set(EShipType.BRIG, shipContext[4]);
+        this.mapShipTypeToMeshJson.set(EShipType.FRIGATE, shipContext[5]);
+        this.mapShipTypeToMeshJson.set(EShipType.GALLEON, shipContext[6]);
     }
 
     private getFreshData() {
@@ -166,7 +168,7 @@ export class ShipResources {
                 shipGeometryData.position = shipGeometryData.position.map((v, i) => i % 3 === 2 ? -v : v);
 
                 // insert gltf mesh
-                const gltfData = mapShipTypeToMeshJson.get(shipType);
+                const gltfData = this.mapShipTypeToMeshJson.get(shipType);
                 if (gltfData) {
                     const q = Quaternion.fromBetweenVectors([0, 0, 1], [1, 0, 0]).mul(Quaternion.fromAxisAngle([0, 0, 1], -Math.PI / 2));
 

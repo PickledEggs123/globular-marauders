@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {useCallback, useContext, useEffect, useRef, useState} from 'react';
 import '../App.scss';
 import {WebsiteDrawer} from "../Drawer";
 import {
@@ -14,13 +14,6 @@ import {
     Typography
 } from "@mui/material";
 import {EShipType} from "@pickledeggs123/globular-marauders-game/lib/src/ShipType";
-import cutterMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/cutter.mesh.json";
-import sloopMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/sloop.mesh.json";
-import corvetteMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/corvette.mesh.json";
-import brigantineMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/brigantine.mesh.json";
-import brigMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/brig.mesh.json";
-import frigateMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/frigate.mesh.json";
-import galleonMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/galleon.mesh.json";
 import * as PIXI from "pixi.js";
 import Quaternion from "quaternion";
 import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
@@ -28,35 +21,45 @@ import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interfa
 import {generatePlanetGltf} from "@pickledeggs123/globular-marauders-generator/dist/helpers";
 import {Layer, Stage} from "@pixi/layers";
 import {DepthOutlineFilter} from "../filters/DepthOutline/DepthOutlineFilter";
+import {ShipContext} from "../contextes/shipContext";
 
-const shipMeshes = new Map<EShipType, IGameMesh>();
-shipMeshes.set(EShipType.CUTTER, cutterMeshJson);
-shipMeshes.set(EShipType.SLOOP, sloopMeshJson);
-shipMeshes.set(EShipType.CORVETTE, corvetteMeshJson);
-shipMeshes.set(EShipType.BRIGANTINE, brigantineMeshJson);
-shipMeshes.set(EShipType.BRIG, brigMeshJson);
-shipMeshes.set(EShipType.FRIGATE, frigateMeshJson);
-shipMeshes.set(EShipType.GALLEON, galleonMeshJson);
-
-const shipThumbnails = new Map<EShipType, string>();
-shipThumbnails.set(EShipType.CUTTER, cutterMeshJson.image);
-shipThumbnails.set(EShipType.SLOOP, sloopMeshJson.image);
-shipThumbnails.set(EShipType.CORVETTE, corvetteMeshJson.image);
-shipThumbnails.set(EShipType.BRIGANTINE, brigantineMeshJson.image);
-shipThumbnails.set(EShipType.BRIG, brigMeshJson.image);
-shipThumbnails.set(EShipType.FRIGATE, frigateMeshJson.image);
-shipThumbnails.set(EShipType.GALLEON, galleonMeshJson.image);
-
-const shipBody = new Map<EShipType, string>();
-shipBody.set(EShipType.CUTTER, "A small fast and cheap ship that all players start with. This ship is equipped with 2 cannons on each side. The lack of fire power will relegate this ship to trade duties, carrying cargo between planets.");
-shipBody.set(EShipType.SLOOP, "A small and fast ship with 4 cannons on each side. This ship can also be seen trading but is able to participate in some invasions as a support ship.");
-shipBody.set(EShipType.CORVETTE, "A small and fast ship with 7 cannons on each side. This ship is the first ship that is able to be a lone pirate ship. It has enough fire power to bring down a cutter within 1 minute.");
-shipBody.set(EShipType.BRIGANTINE, "A medium ship with 9 cannons on each side. This ship makes a great pirate ship and invasion ship. It's slightly slower than a corvette.");
-shipBody.set(EShipType.BRIG, "A medium ship with 12 cannons on each side. It's slightly slower than a brigantine. It has high firepower able to capture a planet during an invasion.");
-shipBody.set(EShipType.FRIGATE, "A medium ship with 14 cannons on each side. It's somewhat slow but has great firepower.");
-shipBody.set(EShipType.GALLEON, "A large ship with 42 cannons on each side. It's primary goal is to transport large stacks of gold through space.");
 
 export const ShipWiki = () => {
+    const shipContext = useContext(ShipContext);
+    const shipMeshes = new Map<EShipType, IGameMesh>();
+    shipMeshes.set(EShipType.CUTTER, shipContext[0]);
+    shipMeshes.set(EShipType.SLOOP, shipContext[1]);
+    shipMeshes.set(EShipType.CORVETTE, shipContext[2]);
+    shipMeshes.set(EShipType.BRIGANTINE, shipContext[3]);
+    shipMeshes.set(EShipType.BRIG, shipContext[4]);
+    shipMeshes.set(EShipType.FRIGATE, shipContext[5]);
+    shipMeshes.set(EShipType.GALLEON, shipContext[6]);
+
+    const shipThumbnails = new Map<EShipType, string>();
+    // @ts-ignore
+    shipThumbnails.set(EShipType.CUTTER, shipContext[0].image);
+    // @ts-ignore
+    shipThumbnails.set(EShipType.SLOOP, shipContext[1].image);
+    // @ts-ignore
+    shipThumbnails.set(EShipType.CORVETTE, shipContext[2].image);
+    // @ts-ignore
+    shipThumbnails.set(EShipType.BRIGANTINE, shipContext[3].image);
+    // @ts-ignore
+    shipThumbnails.set(EShipType.BRIG, shipContext[4].image);
+    // @ts-ignore
+    shipThumbnails.set(EShipType.FRIGATE, shipContext[5].image);
+    // @ts-ignore
+    shipThumbnails.set(EShipType.GALLEON, shipContext[6].image);
+
+    const shipBody = new Map<EShipType, string>();
+    shipBody.set(EShipType.CUTTER, "A small fast and cheap ship that all players start with. This ship is equipped with 2 cannons on each side. The lack of fire power will relegate this ship to trade duties, carrying cargo between planets.");
+    shipBody.set(EShipType.SLOOP, "A small and fast ship with 4 cannons on each side. This ship can also be seen trading but is able to participate in some invasions as a support ship.");
+    shipBody.set(EShipType.CORVETTE, "A small and fast ship with 7 cannons on each side. This ship is the first ship that is able to be a lone pirate ship. It has enough fire power to bring down a cutter within 1 minute.");
+    shipBody.set(EShipType.BRIGANTINE, "A medium ship with 9 cannons on each side. This ship makes a great pirate ship and invasion ship. It's slightly slower than a corvette.");
+    shipBody.set(EShipType.BRIG, "A medium ship with 12 cannons on each side. It's slightly slower than a brigantine. It has high firepower able to capture a planet during an invasion.");
+    shipBody.set(EShipType.FRIGATE, "A medium ship with 14 cannons on each side. It's somewhat slow but has great firepower.");
+    shipBody.set(EShipType.GALLEON, "A large ship with 42 cannons on each side. It's primary goal is to transport large stacks of gold through space.");
+
     const [selectedShipType, setSelectedShipType] = useState<EShipType>(EShipType.CUTTER);
     const [context] = useState<any>({});
     const ref = useRef<HTMLDivElement | null>(null);

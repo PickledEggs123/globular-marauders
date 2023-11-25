@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useContext, useEffect, useMemo, useRef, useState} from 'react';
 import '../App.scss';
 import {WebsiteDrawer} from "../Drawer";
 import {Paper, Button, Card, CardContent, CardHeader, Container, Grid, Typography} from "@mui/material";
@@ -7,7 +7,7 @@ import {generatePlanetGltf} from "@pickledeggs123/globular-marauders-generator/d
 import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
 import * as PIXI from "pixi.js";
 import Quaternion from "quaternion";
-import sloopMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/sloop.mesh.json";
+import {ShipContext} from "../contextes/shipContext";
 
 let Entity: any = () => null;
 let Scene: any = () => null;
@@ -294,6 +294,7 @@ if (!global.use_ssr) {
 
 export const PlanetGenerator = () => {
     const [context, setContext] = useState<any>(importReady ? {} : null);
+    const shipContext = useContext(ShipContext);
     const [worldModelSource, setWorldModelSource] = useState<string>("");
     const [sloopModelSource, setSloopModelSource] = useState<string>("");
     const ref = useRef<HTMLDivElement | null>(null);
@@ -313,7 +314,7 @@ export const PlanetGenerator = () => {
                 const deleteBefore = e.data.deleteBefore;
                 const app = context.app as PIXI.Application;
                 context.data = data;
-                Promise.all<Uint8Array>([generatePlanetGltf(data), generatePlanetGltf(sloopMeshJson)]).then(([gltf1, gltf2]) => {
+                Promise.all<Uint8Array>([generatePlanetGltf(data), generatePlanetGltf(shipContext[1])]).then(([gltf1, gltf2]) => {
                     const Uint8ToBase64 = (u8Arr: Uint8Array) => {
                         const CHUNK_SIZE = 0x8000; //arbitrary number
                         let index = 0;

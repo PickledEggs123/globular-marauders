@@ -7,19 +7,21 @@ import {About} from "./pages/About";
 import {Contact} from "./pages/Contact";
 import {ShipWiki} from "./pages/ShipWiki";
 import {CharacterWiki} from "./pages/CharacterWiki";
+import {ShipContext} from "./contextes/shipContext";
+import {PlanetContext} from "./contextes/planetContext";
+
 
 export const App = () => {
     return (
         <Routes>
-            <Route path="/" element={<PixiGame />}/>
+            <Route path="/" element={<ShipContext.Consumer>{shipContext => <PlanetContext.Consumer>{planetContext => <PixiGame shipContext={shipContext} planetContext={planetContext} />}</PlanetContext.Consumer>}</ShipContext.Consumer>}/>
             <Route path="/game-model" element={<GameModel />}/>
-            {/* @ts-ignore */}
             <Route path="/planet-generator" element={<PlanetGenerator />}/>
             <Route path="/ship-wiki" element={<ShipWiki />}/>
             <Route path="/character-wiki" element={<CharacterWiki />}/>
             <Route path="/about" element={<About />}/>
             <Route path="/contact" element={<Contact />}/>
-            <Route index element={<PixiGame />}/>
+            <Route index element={<ShipContext.Consumer>{shipContext => <PlanetContext.Consumer>{planetContext => <PixiGame shipContext={shipContext} planetContext={planetContext} />}</PlanetContext.Consumer>}</ShipContext.Consumer>}/>
         </Routes>
     );
 };

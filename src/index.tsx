@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 import ReactDOM from 'react-dom';
 import './index.css';
 import {App} from './App';
@@ -13,6 +13,9 @@ import createCache from "@emotion/cache";
 import {CssBaseline} from "@mui/material";
 import {theme} from "./theme";
 import {ThemeProvider} from "@mui/material/styles";
+import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
+import {PlanetMeshLoader} from "./contextes/planetContext";
+import {ShipMeshLoader} from "./contextes/shipContext";
 
 particles.Emitter.registerBehavior(StaticQuaternionParticleBehavior);
 particles.Emitter.registerBehavior(MovementQuaternionParticleBehavior);
@@ -27,7 +30,11 @@ ReactDOM.render(
           <ThemeProvider theme={theme}>
               <CssBaseline/>
               <BrowserRouter>
-                  <App/>
+                  <PlanetMeshLoader>
+                      <ShipMeshLoader>
+                          <App/>
+                      </ShipMeshLoader>
+                  </PlanetMeshLoader>
               </BrowserRouter>
           </ThemeProvider>
       </CacheProvider>

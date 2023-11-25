@@ -10,7 +10,7 @@ import {
     ICameraState,
     ICameraStateWithOriginal,
     ICharacterSelectionItem,
-    IDrawable,
+    IDrawable, IGameMesh,
     MIN_DISTANCE
 } from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
 import {Ship, ShipActionItem,} from "@pickledeggs123/globular-marauders-game/lib/src/Ship";
@@ -106,13 +106,6 @@ import {WebsiteDrawer} from "../Drawer";
 import {ITutorialScriptContext, tutorialScript} from "../scripts/tutorial";
 import {CardRenderer} from "../forms/CardRenderer";
 import {PixiGameNetworking} from "./PixiGameNetworking";
-import cutterMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/cutter.mesh.json";
-import sloopMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/sloop.mesh.json";
-import corvetteMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/corvette.mesh.json";
-import brigantineMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/brigantine.mesh.json";
-import brigMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/brig.mesh.json";
-import frigateMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/frigate.mesh.json";
-import galleonMeshJson from "@pickledeggs123/globular-marauders-generator/meshes/ships/galleon.mesh.json";
 import {DepthOutlineFilter} from "../filters/DepthOutline/DepthOutlineFilter";
 import {RenderMobileGameUiTop} from "./RenderMobileGameUiTop";
 import {RenderMobileGameUiBottom} from "./RenderMobileGameUiBottom";
@@ -138,6 +131,8 @@ export class PixiGame extends PixiGameNetworking {
     public projectileFilter: LayerCompositeFilter;
     public textFilter: LayerCompositeFilter;
     public starField: particles.Emitter | undefined;
+    public shipContext: IGameMesh[] = [];
+    public planetContext: IGameMesh[] = [];
 
     // game loop stuff
     activeKeys: any[] = [];
@@ -331,13 +326,20 @@ export class PixiGame extends PixiGameNetworking {
     };
 
     loadShipThumbnails = () => {
-        this.shipThumbnails.set(EShipType.CUTTER, cutterMeshJson.image);
-        this.shipThumbnails.set(EShipType.SLOOP, sloopMeshJson.image);
-        this.shipThumbnails.set(EShipType.CORVETTE, corvetteMeshJson.image);
-        this.shipThumbnails.set(EShipType.BRIGANTINE, brigantineMeshJson.image);
-        this.shipThumbnails.set(EShipType.BRIG, brigMeshJson.image);
-        this.shipThumbnails.set(EShipType.FRIGATE, frigateMeshJson.image);
-        this.shipThumbnails.set(EShipType.GALLEON, galleonMeshJson.image);
+        // @ts-ignore
+        this.shipThumbnails.set(EShipType.CUTTER, this.shipContext[0].image);
+        // @ts-ignore
+        this.shipThumbnails.set(EShipType.SLOOP, this.shipContext[1].image);
+        // @ts-ignore
+        this.shipThumbnails.set(EShipType.CORVETTE, this.shipContext[2].image);
+        // @ts-ignore
+        this.shipThumbnails.set(EShipType.BRIGANTINE, this.shipContext[3].image);
+        // @ts-ignore
+        this.shipThumbnails.set(EShipType.BRIG, this.shipContext[4].image);
+        // @ts-ignore
+        this.shipThumbnails.set(EShipType.FRIGATE, this.shipContext[5].image);
+        // @ts-ignore
+        this.shipThumbnails.set(EShipType.GALLEON, this.shipContext[6].image);
     };
 
     handleSwitchGameMode = async (gameMode: EGameMode): Promise<void> => {
@@ -674,6 +676,11 @@ export class PixiGame extends PixiGameNetworking {
 
     constructor(props: IPixiGameProps) {
         super(props);
+
+        this.shipContext = props.shipContext ?? [];
+        this.planetContext = props.planetContext ?? [];
+        this.pixiShipResources.setShipContext();
+        this.pixiPlanetResources.setPlanetContext();
 
         // @ts-ignore
         if (global.use_ssr) {

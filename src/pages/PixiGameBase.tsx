@@ -18,18 +18,8 @@ import {EResourceType} from "@pickledeggs123/globular-marauders-game/lib/src/Res
 import {Faction, Star} from "@pickledeggs123/globular-marauders-game/lib/src";
 import {Planet} from "@pickledeggs123/globular-marauders-game/lib/src/Planet";
 import {CannonBall, Crate, SpellBall} from "@pickledeggs123/globular-marauders-game/lib/src/Item";
-import {ICameraState} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
+import {ICameraState, IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
 import React from "react";
-import planetMesh0 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet0.mesh.json";
-import planetMesh1 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet1.mesh.json";
-import planetMesh2 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet2.mesh.json";
-import planetMesh3 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet3.mesh.json";
-import planetMesh4 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet4.mesh.json";
-import planetMesh5 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet5.mesh.json";
-import planetMesh6 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet6.mesh.json";
-import planetMesh7 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet7.mesh.json";
-import planetMesh8 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet8.mesh.json";
-import planetMesh9 from "@pickledeggs123/globular-marauders-generator/meshes/planets/planet9.mesh.json";
 import {PlanetResources} from "../resources/planetResources";
 import {StarResources} from "../resources/starResources";
 import {convertPositionQuaternionToPositionPolar, hexToRgb} from "../helpers/pixiHelpers";
@@ -54,6 +44,8 @@ export interface IPixiGameProps {
      * The size of the world, initially
      */
     worldScale?: number;
+    shipContext: IGameMesh[];
+    planetContext: IGameMesh[];
 }
 
 export enum EGameMode {
@@ -166,6 +158,9 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
     public depthOutlineThreshold: number = 1;
     public abstract projectileColorLayer: Layer;
     public abstract textColorLayer: Layer;
+
+    public abstract planetContext: IGameMesh[];
+    public abstract shipContext: IGameMesh[];
 
     pixiStarResources = new StarResources(this as any);
 
@@ -283,18 +278,8 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
         const state = PIXI.State.for2d();
         state.depthTest = true;
         const [geometry, meshIndex] = this.pixiPlanetResources.getResources().getPlanetGeometry();
-        const planetThumbnail = [
-            planetMesh0,
-            planetMesh1,
-            planetMesh2,
-            planetMesh3,
-            planetMesh4,
-            planetMesh5,
-            planetMesh6,
-            planetMesh7,
-            planetMesh8,
-            planetMesh9,
-        ][meshIndex].image;
+        // @ts-ignore
+        const planetThumbnail = this.planetContext[meshIndex].image;
         this.planetThumbnails.set(planet.id, planetThumbnail);
 
         const mesh = new PIXI.Mesh(geometry, shader, state);
