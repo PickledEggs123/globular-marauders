@@ -37,9 +37,13 @@ if (!global.use_ssr) {
         tick: function () {
             const object3D = this.el.object3D;
             // @ts-ignore
-            const trueUp = object3D.getWorldPosition(new THREE.Vector3()).sub(new THREE.Vector3(0, -100, 0)).normalize();
+            const trueUpDistance = object3D.getWorldPosition(new THREE.Vector3()).sub(new THREE.Vector3(0, -100, 0));
+            // @ts-ignore
+            const trueUp = trueUpDistance.clone().normalize();
             // @ts-ignore
             const currentUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
+            // @ts-ignore
+            const currentForward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
             const diffUp = trueUp.clone().sub(currentUp.clone());
 
             // apply gravity force
@@ -48,21 +52,40 @@ if (!global.use_ssr) {
 
             // apply drag
             // @ts-ignore
-            this.el.body.applyForce(this.el.body.velocity.clone().scale(-5), new CANNON.Vec3(0, 0, 0));
+            this.el.body.applyForce(this.el.body.velocity.clone().scale(-100), new CANNON.Vec3(0, 0, 0));
 
             // apply up right force
             // @ts-ignore
-            const springForce = 10 - 10 * this.el.body.angularVelocity.length();
+            const springForce = 300;
             const rotateForce = new CANNON.Vec3(diffUp.x, diffUp.y, diffUp.z).scale(springForce);
             const rotatePoint = new CANNON.Vec3(currentUp.x, currentUp.y, currentUp.z);
             // @ts-ignore
-            this.el.body.applyForce(rotateForce, rotatePoint.clone());
+            const dragForce = this.el.body.angularVelocity.clone().cross(rotatePoint.clone()).scale(100);
             // @ts-ignore
-            this.el.body.applyForce(rotateForce.scale(-1), rotatePoint.clone().scale(-1));
+            this.el.body.applyForce(rotateForce.clone().vsub(dragForce), rotatePoint.clone());
+            // @ts-ignore
+            this.el.body.applyForce(rotateForce.clone().vsub(dragForce).scale(-1), rotatePoint.clone().scale(-1));
 
-            // apply angular drag
+            const horizontalRotatePoint = new CANNON.Vec3(currentForward.x, currentForward.y, currentForward.z);
             // @ts-ignore
-            this.el.body.angularVelocity.scale(0.5);
+            const horizontalDragForce = this.el.body.angularVelocity.clone().cross(horizontalRotatePoint.clone()).scale(100);
+            // @ts-ignore
+            this.el.body.applyForce(horizontalDragForce.clone().scale(-1), horizontalRotatePoint.clone());
+            // @ts-ignore
+            this.el.body.applyForce(horizontalDragForce.clone(), horizontalRotatePoint.clone().scale(-1));
+
+            if (trueUpDistance.length() < 103) {
+                const trueUpMagnitude = -(trueUpDistance.length() - 103);
+                const trueUpForce = new CANNON.Vec3(trueUp.x, trueUp.y, trueUp.z).scale(trueUpMagnitude * 1000);
+                // @ts-ignore
+                this.el.body.applyForce(trueUpForce, new CANNON.Vec3(0, 0, 0));
+            }
+            if (trueUpDistance.length() > 103) {
+                const trueUpMagnitude = (trueUpDistance.length() - 103);
+                const trueUpForce = new CANNON.Vec3(-trueUp.x, -trueUp.y, -trueUp.z).scale(trueUpMagnitude * 10000);
+                // @ts-ignore
+                this.el.body.applyForce(trueUpForce, new CANNON.Vec3(0, 0, 0));
+            }
         }
     });
 
@@ -89,6 +112,8 @@ if (!global.use_ssr) {
             const finalPosition = objectWorldPos.clone().sub(new THREE.Vector3(0, -100, 0)).normalize().multiplyScalar(height + 20).applyQuaternion(slerp).add(new THREE.Vector3(0, -100, 0));
             object3D.position.set(finalPosition.x, finalPosition.y, finalPosition.z);
             const camera = this.el.sceneEl!.camera;
+            // @ts-ignore
+            camera.up = new THREE.Vector3(0, 0, -1).applyQuaternion(box.getWorldQuaternion(new THREE.Quaternion()));
             camera.lookAt(boxWorldPos);
         }
     })
@@ -114,7 +139,7 @@ if (!global.use_ssr) {
 
     AFRAME.registerComponent('globle-keyboard-controls', {
         schema: {
-            acceleration: {default: 10},
+            acceleration: {default: 100},
             enabled: {default: true},
             fly: {default: false},
         },
@@ -472,24 +497,24 @@ export const PlanetGenerator = () => {
                             <CardContent>
                                 <div ref={ref} style={{width: 250, height: 250}}>
                                 </div>
-                                <Scene physics="driver: local; gravity: 0 0 0;" embedded style={{width: 250, height: 250}}>
+                                <Scene physics="debug: true; driver: local; gravity: 0 0 0;" embedded style={{width: 250, height: 250}}>
                                     <Entity light="type: ambient; color: #CCC"></Entity>
                                     <Entity light="type: directional; color: #EEE; intensity: 0.5" position="-1 1 0"></Entity>
-                                    <Entity id="box" dynamic-body="shape: sphere; sphereRadius: 1; mass: 100" globe-gravity globle-keyboard-controls="enabled: true; fly: true" position={{x: 0, y: 3, z: 0}} scale="0.1 0.1 0.1">
-                                        <Entity gltf-model={sloopModelSource} rotation="0 -90 0"></Entity>
+                                    <Entity id="box" dynamic-body="shape: sphere; sphereRadius: 1; mass: 100" globe-gravity globle-keyboard-controls="enabled: true; fly: true" position={{x: 0, y: 5, z: 0}}>
+                                        <Entity gltf-model={sloopModelSource} rotation="0 -90 0" scale="0.1 0.1 0.1"></Entity>
                                     </Entity>
                                     <Entity id="camera-rig" look-at-box position={{x: 0, y: 20, z: 20}}>
                                         <Entity primitive="a-camera" wasd-controls-enabled="false" look-controls-enabled="false" position={{x: 0, y: 1.6, z: 0}}/>
                                     </Entity>
-                                    <Entity static-body="shape: sphere; sphereRadius: 100" gltf-model={worldModelSource} position={{x: 0, y: -100, z: 0}} scale={{x: 100, y: 100, z: 100}}/>
-                                    <Entity dynamic-body="shape: sphere; sphereRadius: 1" globe-gravity position={{x: 3, y: 10, z: 0}} scale="0.1 0.1 0.1">
-                                        <Entity gltf-model={sloopModelSource} rotation="0 -90 0"></Entity>
+                                    <Entity static-body="shape: sphere; sphereRadius: 100;" gltf-model={worldModelSource} position={{x: 0, y: -100, z: 0}} scale={{x: 100, y: 100, z: 100}}/>
+                                    <Entity dynamic-body="shape: sphere; sphereRadius: 1; mass: 100;" globe-gravity position={{x: 3, y: 10, z: 0}}>
+                                        <Entity gltf-model={sloopModelSource} rotation="0 -90 0" scale="0.1 0.1 0.1"></Entity>
                                     </Entity>
-                                    <Entity dynamic-body="shape: sphere; sphereRadius: 1" globe-gravity position={{x: 6, y: 12, z: 0}} scale="0.1 0.1 0.1">
-                                        <Entity gltf-model={sloopModelSource} rotation="0 -90 0"></Entity>
+                                    <Entity dynamic-body="shape: sphere; sphereRadius: 1; mass: 100;" globe-gravity position={{x: 6, y: 12, z: 0}}>
+                                        <Entity gltf-model={sloopModelSource} rotation="0 -90 0" scale="0.1 0.1 0.1"></Entity>
                                     </Entity>
-                                    <Entity dynamic-body="shape: sphere; sphereRadius: 1" globe-gravity position={{x: 9, y: 14, z: 0}} scale="0.1 0.1 0.1">
-                                        <Entity gltf-model={sloopModelSource} rotation="0 -90 0"></Entity>
+                                    <Entity dynamic-body="shape: sphere; sphereRadius: 1; mass: 100;" globe-gravity position={{x: 9, y: 14, z: 0}}>
+                                        <Entity gltf-model={sloopModelSource} rotation="0 -90 0" scale="0.1 0.1 0.1"></Entity>
                                     </Entity>
                                 </Scene>
                                 <Button onClick={() => {
