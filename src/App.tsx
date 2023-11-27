@@ -7,8 +7,8 @@ import {About} from "./pages/About";
 import {Contact} from "./pages/Contact";
 import {ShipWiki} from "./pages/ShipWiki";
 import {CharacterWiki} from "./pages/CharacterWiki";
-import {ShipContext} from "./contextes/shipContext";
-import {PlanetContext} from "./contextes/planetContext";
+import {ShipContext} from "./contextes/ShipContext";
+import {PlanetContext} from "./contextes/PlanetContext";
 
 
 export const App = () => {

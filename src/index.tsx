@@ -14,8 +14,8 @@ import {CssBaseline} from "@mui/material";
 import {theme} from "./theme";
 import {ThemeProvider} from "@mui/material/styles";
 import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
-import {PlanetMeshLoader} from "./contextes/planetContext";
-import {ShipMeshLoader} from "./contextes/shipContext";
+import {PlanetMeshLoader} from "./contextes/PlanetContext";
+import {ShipMeshLoader} from "./contextes/ShipContext";
 
 particles.Emitter.registerBehavior(StaticQuaternionParticleBehavior);
 particles.Emitter.registerBehavior(MovementQuaternionParticleBehavior);

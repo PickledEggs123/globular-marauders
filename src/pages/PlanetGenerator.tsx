@@ -7,7 +7,7 @@ import {generatePlanetGltf} from "@pickledeggs123/globular-marauders-generator/d
 import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
 import * as PIXI from "pixi.js";
 import Quaternion from "quaternion";
-import {ShipContext} from "../contextes/shipContext";
+import {ShipContext} from "../contextes/ShipContext";
 
 let Entity: any = () => null;
 let Scene: any = () => null;
@@ -52,7 +52,7 @@ if (!global.use_ssr) {
 
             // apply drag
             // @ts-ignore
-            this.el.body.applyForce(this.el.body.velocity.clone().scale(-100), new CANNON.Vec3(0, 0, 0));
+            this.el.body.applyForce(this.el.body.velocity.clone().scale(-25), new CANNON.Vec3(0, 0, 0));
 
             // apply up right force
             // @ts-ignore
@@ -74,14 +74,14 @@ if (!global.use_ssr) {
             // @ts-ignore
             this.el.body.applyForce(horizontalDragForce.clone(), horizontalRotatePoint.clone().scale(-1));
 
-            if (trueUpDistance.length() < 103) {
-                const trueUpMagnitude = -(trueUpDistance.length() - 103);
+            if (trueUpDistance.length() < 102) {
+                const trueUpMagnitude = -(trueUpDistance.length() - 102);
                 const trueUpForce = new CANNON.Vec3(trueUp.x, trueUp.y, trueUp.z).scale(trueUpMagnitude * 1000);
                 // @ts-ignore
                 this.el.body.applyForce(trueUpForce, new CANNON.Vec3(0, 0, 0));
             }
-            if (trueUpDistance.length() > 103) {
-                const trueUpMagnitude = (trueUpDistance.length() - 103);
+            if (trueUpDistance.length() > 102) {
+                const trueUpMagnitude = (trueUpDistance.length() - 102);
                 const trueUpForce = new CANNON.Vec3(-trueUp.x, -trueUp.y, -trueUp.z).scale(trueUpMagnitude * 10000);
                 // @ts-ignore
                 this.el.body.applyForce(trueUpForce, new CANNON.Vec3(0, 0, 0));
@@ -116,7 +116,15 @@ if (!global.use_ssr) {
             camera.up = new THREE.Vector3(0, 0, -1).applyQuaternion(box.getWorldQuaternion(new THREE.Quaternion()));
             camera.lookAt(boxWorldPos);
         }
-    })
+    });
+
+    AFRAME.registerComponent('physics', {
+        schema: {},
+        init: function () {
+            // @ts-ignore
+            this.system.driver.world.gravity.set(0, 0, 0);
+        }
+    });
 
     const KEYCODE_TO_CODE: { [x: string]: string } = {
         '38': 'ArrowUp',
@@ -500,6 +508,7 @@ export const PlanetGenerator = () => {
                                 <Scene physics="debug: true; driver: local; gravity: 0 0 0;" embedded style={{width: 250, height: 250}}>
                                     <Entity light="type: ambient; color: #CCC"></Entity>
                                     <Entity light="type: directional; color: #EEE; intensity: 0.5" position="-1 1 0"></Entity>
+                                    <Entity physics/>
                                     <Entity id="box" dynamic-body="shape: sphere; sphereRadius: 1; mass: 100" globe-gravity globle-keyboard-controls="enabled: true; fly: true" position={{x: 0, y: 5, z: 0}}>
                                         <Entity gltf-model={sloopModelSource} rotation="0 -90 0" scale="0.1 0.1 0.1"></Entity>
                                     </Entity>

@@ -21,7 +21,7 @@ import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interfa
 import {generatePlanetGltf} from "@pickledeggs123/globular-marauders-generator/dist/helpers";
 import {Layer, Stage} from "@pixi/layers";
 import {DepthOutlineFilter} from "../filters/DepthOutline/DepthOutlineFilter";
-import {ShipContext} from "../contextes/shipContext";
+import {ShipContext} from "../contextes/ShipContext";
 
 
 export const ShipWiki = () => {
