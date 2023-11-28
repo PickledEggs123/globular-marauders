@@ -43,16 +43,30 @@ if (!global.use_ssr) {
             // @ts-ignore
             const currentUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
             // @ts-ignore
-            const currentForward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
+            const currentForward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));;
+            // @ts-ignore
+            const currentRight = new THREE.Vector3(1, 0, 0).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
             const diffUp = trueUp.clone().sub(currentUp.clone());
 
             // apply gravity force
             // @ts-ignore
-            this.el.body.applyForce(new CANNON.Vec3(-trueUp.x, -trueUp.y, -trueUp.z).scale(10), new CANNON.Vec3(0, 0, 0));
+            const gravityForce = this.el.body.mass * 10;
+            // @ts-ignore
+            this.el.body.applyForce(new CANNON.Vec3(-trueUp.x, -trueUp.y, -trueUp.z).scale(gravityForce), new CANNON.Vec3(0, 0, 0));
 
             // apply drag
             // @ts-ignore
             this.el.body.applyForce(this.el.body.velocity.clone().scale(-25), new CANNON.Vec3(0, 0, 0));
+
+            // apply sideways tilt force
+            // @ts-ignore
+            const sidewaysTilt = this.el.body.velocity.clone().scale(100).dot(currentRight.clone());
+            const tiltForce = new CANNON.Vec3(currentRight.x, currentRight.y, currentRight.z).scale(sidewaysTilt);
+            const tiltPoint = new CANNON.Vec3(currentUp.x, currentUp.y, currentUp.z);
+            // @ts-ignore
+            this.el.body.applyForce(tiltForce.clone(), tiltPoint.clone());
+            // @ts-ignore
+            this.el.body.applyForce(tiltForce.clone().scale(-1), tiltPoint.clone().scale(-1));
 
             // apply up right force
             // @ts-ignore
@@ -66,6 +80,7 @@ if (!global.use_ssr) {
             // @ts-ignore
             this.el.body.applyForce(rotateForce.clone().vsub(dragForce).scale(-1), rotatePoint.clone().scale(-1));
 
+            // apply horizontal drag
             const horizontalRotatePoint = new CANNON.Vec3(currentForward.x, currentForward.y, currentForward.z);
             // @ts-ignore
             const horizontalDragForce = this.el.body.angularVelocity.clone().cross(horizontalRotatePoint.clone()).scale(100);
@@ -77,12 +92,6 @@ if (!global.use_ssr) {
             if (trueUpDistance.length() < 102) {
                 const trueUpMagnitude = -(trueUpDistance.length() - 102);
                 const trueUpForce = new CANNON.Vec3(trueUp.x, trueUp.y, trueUp.z).scale(trueUpMagnitude * 1000);
-                // @ts-ignore
-                this.el.body.applyForce(trueUpForce, new CANNON.Vec3(0, 0, 0));
-            }
-            if (trueUpDistance.length() > 102) {
-                const trueUpMagnitude = (trueUpDistance.length() - 102);
-                const trueUpForce = new CANNON.Vec3(-trueUp.x, -trueUp.y, -trueUp.z).scale(trueUpMagnitude * 10000);
                 // @ts-ignore
                 this.el.body.applyForce(trueUpForce, new CANNON.Vec3(0, 0, 0));
             }
@@ -506,8 +515,9 @@ export const PlanetGenerator = () => {
                                 <div ref={ref} style={{width: 250, height: 250}}>
                                 </div>
                                 <Scene physics="debug: true; driver: local; gravity: 0 0 0;" embedded style={{width: 250, height: 250}}>
-                                    <Entity light="type: ambient; color: #CCC"></Entity>
-                                    <Entity light="type: directional; color: #EEE; intensity: 0.5" position="-1 1 0"></Entity>
+                                    <Entity light={{type: "ambient", color: "#CCC"}}></Entity>
+                                    <Entity light={{type: "directional", color: "#EEE", intensity: 0.5}} position={{x: 0, y: 1, z: 0}}></Entity>
+                                    <Entity light={{type: "directional", color: "#EEE", intensity: 0.5}} position={{x: 0, y: -1, z: 0}}></Entity>
                                     <Entity physics/>
                                     <Entity id="box" dynamic-body="shape: sphere; sphereRadius: 1; mass: 100" globe-gravity globle-keyboard-controls="enabled: true; fly: true" position={{x: 0, y: 5, z: 0}}>
                                         <Entity gltf-model={sloopModelSource} rotation="0 -90 0" scale="0.1 0.1 0.1"></Entity>
