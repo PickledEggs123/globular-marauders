@@ -21,10 +21,22 @@ const themeOptions: ThemeOptions = {
         success: {
             main: "#2c2",
         },
-        divider: "rgba(0,0,0,0.34)",
+        divider: "rgba(0,0,0,0.67)",
         background: {
             default: "#eed",
             paper: "#ddc",
+        },
+    },
+    typography: {
+        fontFamily: `"Tangerine", cursive, "Helvetica", "Arial", sans-serif`,
+        fontSize: 18,
+        fontWeightRegular: 900
+    },
+    components: {
+        MuiCard: {
+            defaultProps: {
+                raised: true,
+            },
         },
     },
 };
