@@ -339,6 +339,7 @@ export const PlanetGenerator = () => {
     const shipContext = useContext(ShipContext);
     const [worldModelSource, setWorldModelSource] = useState<string>("");
     const [sloopModelSource, setSloopModelSource] = useState<string>("");
+    const [loadMessage, setLoadMessage] = useState<string>("No data loaded...");
     const ref = useRef<HTMLDivElement | null>(null);
     const worker: Worker | undefined = useMemo(
         // @ts-ignore
@@ -351,9 +352,11 @@ export const PlanetGenerator = () => {
             return;
         }
         if (worker) {
-            worker.onmessage = (e: MessageEvent<{ mesh: IGameMesh, deleteBefore: boolean, heightMapData: [number, number][] | null }>) => {
+            worker.onmessage = (e: MessageEvent<{ mesh: IGameMesh, deleteBefore: boolean, heightMapData: [number, number][] | null, loadMessage: string }>) => {
                 const data = e.data.mesh;
                 const deleteBefore = e.data.deleteBefore;
+                const loadMessage1 = e.data.loadMessage;
+                setLoadMessage(loadMessage1);
                 const app = context.app as PIXI.Application;
                 context.data = data;
                 Promise.all<Uint8Array>([generatePlanetGltf(data), generatePlanetGltf(shipContext[1])]).then(([gltf1, gltf2]) => {
@@ -382,7 +385,7 @@ export const PlanetGenerator = () => {
                 for (const attribute of data.attributes) {
                     planetGeometry.addAttribute(attribute.id, attribute.buffer, attribute.size);
                 }
-                planetGeometry.addIndex(data.index);
+                planetGeometry.addIndex(new Uint32Array(data.index));
 
                 const planetVertexShader = `
                     precision mediump float;
@@ -512,6 +515,7 @@ export const PlanetGenerator = () => {
                         <Card>
                             <CardHeader title="Planet Generator" subheader="Create unique random planets"></CardHeader>
                             <CardContent>
+                                <Typography>Load Status: {loadMessage}</Typography>
                                 <div ref={ref} style={{width: 250, height: 250}}>
                                 </div>
                                 <Scene physics="debug: true; driver: local; gravity: 0 0 0;" embedded style={{width: 250, height: 250}}>

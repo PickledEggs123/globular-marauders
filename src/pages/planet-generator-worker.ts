@@ -19,7 +19,8 @@ self.onmessage = (e: MessageEvent<string>) => {
         self.postMessage({
             mesh: data0.mesh,
             deleteBefore: true,
-            heightMapData: null
+            heightMapData: null,
+            loadMessage: "Loaded 1/3 levels of detail",
         });
 
         const data1 = generatePlanet(1, seed);
@@ -28,6 +29,7 @@ self.onmessage = (e: MessageEvent<string>) => {
             mesh: data1.mesh,
             deleteBefore: true,
             heightMapData: null,
+            loadMessage: "Loaded 2/3 levels of detail",
         });
 
         data2 = generatePlanet(2, seed);
@@ -35,7 +37,8 @@ self.onmessage = (e: MessageEvent<string>) => {
         self.postMessage({
             mesh: data2.mesh,
             deleteBefore: true,
-            heightMapData: data2.heightMapData
+            heightMapData: data2.heightMapData,
+            loadMessage: "Loaded 3/3 levels of detail",
         });
     } else {
         const game = new Game();
