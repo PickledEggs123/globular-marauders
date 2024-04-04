@@ -8,6 +8,7 @@ import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interfa
 import * as PIXI from "pixi.js";
 import Quaternion from "quaternion";
 import {ShipContext} from "../contextes/ShipContext";
+import {threeToCannon, ShapeType} from "three-to-cannon";
 
 let Entity: any = () => null;
 let Scene: any = () => null;
@@ -37,7 +38,7 @@ if (!global.use_ssr) {
         tick: function () {
             const object3D = this.el.object3D;
             // @ts-ignore
-            const trueUpDistance = object3D.getWorldPosition(new THREE.Vector3()).sub(new THREE.Vector3(0, -100, 0));
+            const trueUpDistance = object3D.getWorldPosition(new THREE.Vector3()).sub(new THREE.Vector3(0, -PLANET_SIZE, 0));
             // @ts-ignore
             const trueUp = trueUpDistance.clone().normalize();
             // @ts-ignore
@@ -89,12 +90,32 @@ if (!global.use_ssr) {
             // @ts-ignore
             this.el.body.applyForce(horizontalDragForce.clone(), horizontalRotatePoint.clone().scale(-1));
 
-            if (trueUpDistance.length() < 102) {
-                const trueUpMagnitude = -(trueUpDistance.length() - 102);
+            if (trueUpDistance.length() < PLANET_SIZE + 1) {
+                const trueUpMagnitude = -(trueUpDistance.length() - PLANET_SIZE - 1);
                 const trueUpForce = new CANNON.Vec3(trueUp.x, trueUp.y, trueUp.z).scale(trueUpMagnitude * 1000);
                 // @ts-ignore
                 this.el.body.applyForce(trueUpForce, new CANNON.Vec3(0, 0, 0));
             }
+        }
+    });
+
+    AFRAME.registerComponent('globe-trimesh', {
+        scheme: {},
+        init: function () {
+            this.el.addEventListener('model-loaded', () => {
+                const obj = this.el.getObject3D('mesh');
+                const result = threeToCannon(obj, { type: ShapeType.MESH });
+                // @ts-ignore
+                const body = (this.el.components['static-body'].body as CANNON.Body);
+                body.shapes.splice(0, body.shapes.length);
+                body.shapeOffsets.splice(0, body.shapeOffsets.length)
+                body.shapeOrientations.splice(0, body.shapeOrientations.length)
+                if (result !== null) {
+                    const { shape, offset, orientation } = result;
+                    // @ts-ignore
+                    this.el.components['static-body'].addShape(shape, offset, orientation);
+                }
+            });
         }
     });
 
@@ -108,21 +129,23 @@ if (!global.use_ssr) {
 
             // @ts-ignore
             const boxWorldPos = box.getWorldPosition(new THREE.Vector3());
+            // @ts-ignore
+            const upVector = boxWorldPos.clone().sub(new THREE.Vector3(0, -PLANET_SIZE, 0)).normalize();
             const object3D = this.el.object3D;
             // @ts-ignore
             const objectWorldPos = object3D.getWorldPosition(new THREE.Vector3());
             // @ts-ignore
-            const height = boxWorldPos.clone().sub(new THREE.Vector3(0, -100, 0)).length();
+            const height = boxWorldPos.clone().sub(new THREE.Vector3(0, -PLANET_SIZE, 0)).length();
             // @ts-ignore
-            const quaternion = new THREE.Quaternion().setFromUnitVectors(objectWorldPos.clone().sub(new THREE.Vector3(0, -100, 0)).normalize(), boxWorldPos.clone().sub(new THREE.Vector3(0, -100, 0)).normalize());
+            const quaternion = new THREE.Quaternion().setFromUnitVectors(objectWorldPos.clone().sub(new THREE.Vector3(0, -PLANET_SIZE, 0)).normalize(), boxWorldPos.clone().sub(new THREE.Vector3(0, -PLANET_SIZE, 0)).normalize());
             // @ts-ignore
-            const slerp = quaternion.slerp(new THREE.Quaternion(), 0.1);
+            const slerp = quaternion.slerp(new THREE.Quaternion(), 0.000000001);
             // @ts-ignore
-            const finalPosition = objectWorldPos.clone().sub(new THREE.Vector3(0, -100, 0)).normalize().multiplyScalar(height + 20).applyQuaternion(slerp).add(new THREE.Vector3(0, -100, 0));
+            const finalPosition = objectWorldPos.clone().sub(new THREE.Vector3(0, -PLANET_SIZE, 0)).normalize().multiplyScalar(height + 20).applyQuaternion(slerp).add(new THREE.Vector3(0, -PLANET_SIZE, 0));
             object3D.position.set(finalPosition.x, finalPosition.y, finalPosition.z);
             const camera = this.el.sceneEl!.camera;
             // @ts-ignore
-            camera.up = new THREE.Vector3(0, 0, -1).applyQuaternion(box.getWorldQuaternion(new THREE.Quaternion()));
+            camera.up = upVector;
             camera.lookAt(boxWorldPos);
         }
     });
@@ -334,6 +357,8 @@ if (!global.use_ssr) {
     });
 }
 
+const PLANET_SIZE = 1000;
+
 export const PlanetGenerator = () => {
     const [context, setContext] = useState<any>(importReady ? {} : null);
     const shipContext = useContext(ShipContext);
@@ -359,7 +384,15 @@ export const PlanetGenerator = () => {
                 setLoadMessage(loadMessage1);
                 const app = context.app as PIXI.Application;
                 context.data = data;
-                Promise.all<Uint8Array>([generatePlanetGltf(data), generatePlanetGltf(shipContext[1])]).then(([gltf1, gltf2]) => {
+                const data2 = {
+                    ...data,
+                    attributes: [{
+                            ...data.attributes.find(x => x.id === "aPosition")!,
+                            buffer: [...data.attributes.find(x => x.id === "aPosition")!.buffer.map(x => x * PLANET_SIZE)],
+                        }, ...data.attributes.filter(x => x.id !== "aPosition"),
+                    ]
+                }
+                Promise.all<Uint8Array>([generatePlanetGltf(data2), generatePlanetGltf(shipContext[1])]).then(([gltf1, gltf2]) => {
                     const Uint8ToBase64 = (u8Arr: Uint8Array) => {
                         const CHUNK_SIZE = 0x8000; //arbitrary number
                         let index = 0;
@@ -523,20 +556,20 @@ export const PlanetGenerator = () => {
                                     <Entity light={{type: "directional", color: "#EEE", intensity: 0.5}} position={{x: 0, y: 1, z: 0}}></Entity>
                                     <Entity light={{type: "directional", color: "#EEE", intensity: 0.5}} position={{x: 0, y: -1, z: 0}}></Entity>
                                     <Entity physics/>
-                                    <Entity id="box" dynamic-body="shape: sphere; sphereRadius: 1; mass: 100" globe-gravity globle-keyboard-controls="enabled: true; fly: true" position={{x: 0, y: 5, z: 0}}>
+                                    <Entity id="box" dynamic-body="shape: sphere; sphereRadius: 1; mass: 100" globe-gravity globle-keyboard-controls="enabled: true; fly: true" position={{x: 0, y: 15, z: 0}}>
+                                        <Entity gltf-model={sloopModelSource} rotation="0 -90 0" scale="0.1 0.1 0.1"></Entity>
+                                        <Entity id="camera-rig" position={{x: 0, y: 0, z: 5}}>
+                                            <Entity primitive="a-camera" wasd-controls-enabled="false" look-controls-enabled="false" position={{x: 0, y: 1.6, z: 0}}/>
+                                        </Entity>
+                                    </Entity>
+                                    <Entity static-body="shape: none;" globe-trimesh gltf-model={worldModelSource} position={{x: 0, y: -PLANET_SIZE, z: 0}}/>
+                                    <Entity dynamic-body="shape: sphere; sphereRadius: 1; mass: 100;" globe-gravity position={{x: 3, y: 15, z: 0}}>
                                         <Entity gltf-model={sloopModelSource} rotation="0 -90 0" scale="0.1 0.1 0.1"></Entity>
                                     </Entity>
-                                    <Entity id="camera-rig" look-at-box position={{x: 0, y: 20, z: 20}}>
-                                        <Entity primitive="a-camera" wasd-controls-enabled="false" look-controls-enabled="false" position={{x: 0, y: 1.6, z: 0}}/>
-                                    </Entity>
-                                    <Entity static-body="shape: sphere; sphereRadius: 100;" gltf-model={worldModelSource} position={{x: 0, y: -100, z: 0}} scale={{x: 100, y: 100, z: 100}}/>
-                                    <Entity dynamic-body="shape: sphere; sphereRadius: 1; mass: 100;" globe-gravity position={{x: 3, y: 10, z: 0}}>
+                                    <Entity dynamic-body="shape: sphere; sphereRadius: 1; mass: 100;" globe-gravity position={{x: 6, y: 15, z: 0}}>
                                         <Entity gltf-model={sloopModelSource} rotation="0 -90 0" scale="0.1 0.1 0.1"></Entity>
                                     </Entity>
-                                    <Entity dynamic-body="shape: sphere; sphereRadius: 1; mass: 100;" globe-gravity position={{x: 6, y: 12, z: 0}}>
-                                        <Entity gltf-model={sloopModelSource} rotation="0 -90 0" scale="0.1 0.1 0.1"></Entity>
-                                    </Entity>
-                                    <Entity dynamic-body="shape: sphere; sphereRadius: 1; mass: 100;" globe-gravity position={{x: 9, y: 14, z: 0}}>
+                                    <Entity dynamic-body="shape: sphere; sphereRadius: 1; mass: 100;" globe-gravity position={{x: 9, y: 15, z: 0}}>
                                         <Entity gltf-model={sloopModelSource} rotation="0 -90 0" scale="0.1 0.1 0.1"></Entity>
                                     </Entity>
                                 </Scene>
