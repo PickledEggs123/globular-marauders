@@ -111,7 +111,6 @@ if (!global.use_ssr) {
                 body.shapeOffsets.splice(0, body.shapeOffsets.length)
                 body.shapeOrientations.splice(0, body.shapeOrientations.length)
                 if (result !== null) {
-                    console.log(result);
                     const {
                         offset,
                         orientation,
@@ -125,7 +124,6 @@ if (!global.use_ssr) {
                     const shape = new CANNON.Trimesh(vertices, indices);
                     // @ts-ignore
                     this.el.components['static-body'].addShape(shape, offset, orientation);
-                    console.log(shape);
                 }
             });
         }
@@ -382,12 +380,12 @@ if (!global.use_ssr) {
     });
 }
 
-const PLANET_SIZE = 30;
+const PLANET_SIZE = 100;
 
 export const PlanetGenerator = () => {
     const [context, setContext] = useState<any>(importReady ? {} : null);
     const shipContext = useContext(ShipContext);
-    const [worldModelSource, setWorldModelSource] = useState<string>("");
+    const [worldModelSource, setWorldModelSource] = useState<[string, boolean][]>([]);
     const [sloopModelSource, setSloopModelSource] = useState<string>("");
     const [loadMessage, setLoadMessage] = useState<string>("No data loaded...");
     const ref = useRef<HTMLDivElement | null>(null);
@@ -402,22 +400,22 @@ export const PlanetGenerator = () => {
             return;
         }
         if (worker) {
-            worker.onmessage = (e: MessageEvent<{ mesh: IGameMesh, deleteBefore: boolean, heightMapData: [number, number][] | null, loadMessage: string }>) => {
-                const data = e.data.mesh;
+            worker.onmessage = (e: MessageEvent<{ meshes: IGameMesh[], deleteBefore: boolean, heightMapData: [number, number][] | null, loadMessage: string }>) => {
+                const data: IGameMesh[] = e.data.meshes;
                 const deleteBefore = e.data.deleteBefore;
                 const loadMessage1 = e.data.loadMessage;
                 setLoadMessage(loadMessage1);
                 const app = context.app as PIXI.Application;
                 context.data = data;
-                const data2 = {
-                    ...data,
+                const data2: IGameMesh[] = data.map((d: IGameMesh) => ({
+                    ...d,
                     attributes: [{
-                            ...data.attributes.find(x => x.id === "aPosition")!,
-                            buffer: [...data.attributes.find(x => x.id === "aPosition")!.buffer.map(x => x * PLANET_SIZE)],
-                        }, ...data.attributes.filter(x => x.id !== "aPosition"),
+                            ...d.attributes.find(x => x.id === "aPosition")!,
+                            buffer: [...d.attributes.find(x => x.id === "aPosition")!.buffer.map(x => x * PLANET_SIZE)],
+                        }, ...d.attributes.filter(x => x.id !== "aPosition"),
                     ]
-                }
-                Promise.all<Uint8Array>([generatePlanetGltf(data2), generatePlanetGltf(shipContext[1])]).then(([gltf1, gltf2]) => {
+                } as IGameMesh));
+                Promise.all<Uint8Array>([...data2.map(m => generatePlanetGltf(m)), generatePlanetGltf(shipContext[1])]).then((gltf) => {
                     const Uint8ToBase64 = (u8Arr: Uint8Array) => {
                         const CHUNK_SIZE = 0x8000; //arbitrary number
                         let index = 0;
@@ -431,21 +429,27 @@ export const PlanetGenerator = () => {
                         }
                         return btoa(result);
                     }
-                    const dataUri1 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf1)}`;
-                    if (deleteBefore) {
-                        setWorldModelSource(dataUri1);
+                    const worldMeshes = [];
+                    for (let i = 0; i < gltf.length - 1; i++) {
+                        const dataUri1 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[i])}`;
+                        worldMeshes.push([dataUri1, data2[i].collidable] as [string, boolean]);
                     }
-                    const dataUri2 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf2)}`;
+                    if (deleteBefore) {
+                        setWorldModelSource(worldMeshes);
+                    }
+                    const dataUri2 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 1])}`;
                     setSloopModelSource(dataUri2);
                 });
 
-                const planetGeometry = new PIXI.Geometry();
-                for (const attribute of data.attributes) {
-                    planetGeometry.addAttribute(attribute.id, attribute.buffer, attribute.size);
-                }
-                planetGeometry.addIndex(new Uint32Array(data.index));
+                const meshesToSendToPixi: PIXI.Mesh<PIXI.Shader>[] = [];
+                for (const d of data) {
+                    const planetGeometry = new PIXI.Geometry();
+                    for (const attribute of d.attributes) {
+                        planetGeometry.addAttribute(attribute.id, attribute.buffer, attribute.size);
+                    }
+                    planetGeometry.addIndex(new Uint32Array(d.index));
 
-                const planetVertexShader = `
+                    const planetVertexShader = `
                     precision mediump float;
         
                     attribute vec3 aPosition;
@@ -464,7 +468,7 @@ export const PlanetGenerator = () => {
                         vNormal = (uRotation * vec4(aNormal, 1.0)).xyz;
                     }
                 `;
-                const planetFragmentShader = `
+                    const planetFragmentShader = `
                     precision mediump float;
         
                     varying vec3 vColor;
@@ -474,21 +478,25 @@ export const PlanetGenerator = () => {
                         gl_FragColor = vec4(vColor * (0.3 + 0.7 * max(0.0, pow(dot(vec3(0.0, 0.0, -1.0), vNormal), 3.0))), 1.0);
                     }
                 `;
-                const planetProgram = new PIXI.Program(planetVertexShader, planetFragmentShader);
+                    const planetProgram = new PIXI.Program(planetVertexShader, planetFragmentShader);
 
-                const shader = new PIXI.Shader(planetProgram, {
-                    uRotation: Quaternion.ONE.toMatrix4()
-                });
-                const state = PIXI.State.for2d();
-                state.depthTest = true;
-                const mesh = new PIXI.Mesh(planetGeometry, shader, state);
+                    const shader = new PIXI.Shader(planetProgram, {
+                        uRotation: Quaternion.ONE.toMatrix4()
+                    });
+                    const state = PIXI.State.for2d();
+                    state.depthTest = true;
+                    const mesh = new PIXI.Mesh(planetGeometry, shader, state);
+                    meshesToSendToPixi.push(mesh);
+                }
 
                 if (deleteBefore) {
                     app.stage.children.forEach(x => {
                         app.stage.removeChild(x);
                     });
                 }
-                app.stage.addChild(mesh as unknown as any);
+                for (const mesh of meshesToSendToPixi) {
+                    app.stage.addChild(mesh as unknown as any);
+                }
             }
         }
     }, [worker, context]);
@@ -588,7 +596,15 @@ export const PlanetGenerator = () => {
                                     <Entity id="camera-rig" look-at-box position={{x: 0, y: 0, z: 5}}>
                                         <Entity primitive="a-camera" wasd-controls-enabled="false" look-controls-enabled="false" position={{x: 0, y: 1.6, z: 0}}/>
                                     </Entity>
-                                    <Entity static-body="shape: none;" globe-trimesh gltf-model={worldModelSource} position={{x: 0, y: -PLANET_SIZE, z: 0}}/>
+                                    {
+                                        worldModelSource.map((i, index) => (
+                                            i[1] ? (
+                                                <Entity key={index} static-body="shape: none;" globe-trimesh gltf-model={i[0]} position={{x: 0, y: -PLANET_SIZE, z: 0}}/>
+                                            ): (
+                                                <Entity key={index} static-body="shape: none;" gltf-model={i[0]} position={{x: 0, y: -PLANET_SIZE, z: 0}}/>
+                                            )
+                                        ))
+                                    }
                                     <Entity dynamic-body="shape: sphere; sphereRadius: 1; mass: 100;" globe-gravity position={{x: 3, y: 15, z: 0}}>
                                         <Entity gltf-model={sloopModelSource} rotation="0 -90 0" scale="0.1 0.1 0.1"></Entity>
                                     </Entity>

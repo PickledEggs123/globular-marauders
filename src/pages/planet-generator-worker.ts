@@ -14,28 +14,28 @@ self.onmessage = (e: MessageEvent<string>) => {
     if (e.data === "init") {
         seed = new Date().toISOString();
 
-        const data0 = generatePlanet(0, seed);
+        const data0 = generatePlanet(0, seed, true);
 // eslint-disable-next-line no-restricted-globals
         self.postMessage({
-            mesh: data0.mesh,
+            meshes: data0.meshes,
             deleteBefore: true,
             heightMapData: null,
             loadMessage: "Loaded 1/3 levels of detail",
         });
 
-        const data1 = generatePlanet(1, seed);
+        const data1 = generatePlanet(1, seed, true);
 // eslint-disable-next-line no-restricted-globals
         self.postMessage({
-            mesh: data1.mesh,
+            meshes: data1.meshes,
             deleteBefore: true,
             heightMapData: null,
             loadMessage: "Loaded 2/3 levels of detail",
         });
 
-        data2 = generatePlanet(2, seed);
+        data2 = generatePlanet(2, seed, true);
 // eslint-disable-next-line no-restricted-globals
         self.postMessage({
-            mesh: data2.mesh,
+            meshes: data2.meshes,
             deleteBefore: true,
             heightMapData: data2.heightMapData,
             loadMessage: "Loaded 3/3 levels of detail",
@@ -115,7 +115,7 @@ self.onmessage = (e: MessageEvent<string>) => {
                 };
 // eslint-disable-next-line no-restricted-globals
                 self.postMessage({
-                    mesh,
+                    meshes: [mesh],
                     deleteBefore: false
                 });
             }
