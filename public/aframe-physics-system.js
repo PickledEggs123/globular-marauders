@@ -10060,7 +10060,7 @@ var Trimesh = /*#__PURE__*/function (_Shape) {
       type: Shape.types.TRIMESH
     }) || this;
     _this.vertices = new Float32Array(vertices);
-    _this.indices = new Int16Array(indices);
+    _this.indices = new Int32Array(indices);
     _this.normals = new Float32Array(indices.length);
     _this.aabb = new AABB();
     _this.edges = null;
@@ -10216,7 +10216,7 @@ var Trimesh = /*#__PURE__*/function (_Shape) {
     }
 
     var keys = Object.keys(edges);
-    this.edges = new Int16Array(keys.length * 2);
+    this.edges = new Int32Array(keys.length * 2);
 
     for (var _i = 0; _i < keys.length; _i++) {
       var indices = keys[_i].split('_');

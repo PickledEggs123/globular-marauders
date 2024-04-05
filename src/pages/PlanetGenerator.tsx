@@ -8,7 +8,7 @@ import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interfa
 import * as PIXI from "pixi.js";
 import Quaternion from "quaternion";
 import {ShipContext} from "../contextes/ShipContext";
-import {threeToCannon, ShapeType} from "three-to-cannon";
+import {getShapeParameters, ShapeType} from "three-to-cannon";
 
 let Entity: any = () => null;
 let Scene: any = () => null;
@@ -104,16 +104,28 @@ if (!global.use_ssr) {
         init: function () {
             this.el.addEventListener('model-loaded', () => {
                 const obj = this.el.getObject3D('mesh');
-                const result = threeToCannon(obj, { type: ShapeType.MESH });
+                const result = getShapeParameters(obj, { type: ShapeType.MESH });
                 // @ts-ignore
                 const body = (this.el.components['static-body'].body as CANNON.Body);
                 body.shapes.splice(0, body.shapes.length);
                 body.shapeOffsets.splice(0, body.shapeOffsets.length)
                 body.shapeOrientations.splice(0, body.shapeOrientations.length)
                 if (result !== null) {
-                    const { shape, offset, orientation } = result;
+                    console.log(result);
+                    const {
+                        offset,
+                        orientation,
+                        params: {
+                            // @ts-ignore
+                            vertices,
+                            // @ts-ignore
+                            indices,
+                        },
+                    } = result;
+                    const shape = new CANNON.Trimesh(vertices, indices);
                     // @ts-ignore
                     this.el.components['static-body'].addShape(shape, offset, orientation);
+                    console.log(shape);
                 }
             });
         }
@@ -122,26 +134,37 @@ if (!global.use_ssr) {
     AFRAME.registerComponent('look-at-box', {
         schema: {},
         tick: function () {
+            // get elements
             const box = document.querySelector("#box")?.object3D;
-            if (!box) {
+            const boxPos = document.querySelector("#box-position")?.object3D;
+            if (!box || !boxPos) {
                 return;
             }
 
+            // get position
             // @ts-ignore
             const boxWorldPos = box.getWorldPosition(new THREE.Vector3());
             // @ts-ignore
-            const upVector = boxWorldPos.clone().sub(new THREE.Vector3(0, -PLANET_SIZE, 0)).normalize();
+            const boxPosWorldPos = boxPos.getWorldPosition(new THREE.Vector3());
+
+            // get info
+            // @ts-ignore
+            const upVector = boxPosWorldPos.clone().sub(new THREE.Vector3(0, -PLANET_SIZE, 0)).normalize();
             const object3D = this.el.object3D;
             // @ts-ignore
             const objectWorldPos = object3D.getWorldPosition(new THREE.Vector3());
             // @ts-ignore
-            const height = boxWorldPos.clone().sub(new THREE.Vector3(0, -PLANET_SIZE, 0)).length();
+            const height = boxPosWorldPos.clone().sub(new THREE.Vector3(0, -PLANET_SIZE, 0)).length();
+
+            // update info
             // @ts-ignore
-            const quaternion = new THREE.Quaternion().setFromUnitVectors(objectWorldPos.clone().sub(new THREE.Vector3(0, -PLANET_SIZE, 0)).normalize(), boxWorldPos.clone().sub(new THREE.Vector3(0, -PLANET_SIZE, 0)).normalize());
+            const quaternion = new THREE.Quaternion().setFromUnitVectors(objectWorldPos.clone().sub(new THREE.Vector3(0, -PLANET_SIZE, 0)).normalize(), boxPosWorldPos.clone().sub(new THREE.Vector3(0, -PLANET_SIZE, 0)).normalize());
             // @ts-ignore
-            const slerp = quaternion.slerp(new THREE.Quaternion(), 0.000000001);
+            const slerp = new THREE.Quaternion().slerp(quaternion, 0.03);
             // @ts-ignore
-            const finalPosition = objectWorldPos.clone().sub(new THREE.Vector3(0, -PLANET_SIZE, 0)).normalize().multiplyScalar(height + 20).applyQuaternion(slerp).add(new THREE.Vector3(0, -PLANET_SIZE, 0));
+            const finalPosition = objectWorldPos.clone().sub(new THREE.Vector3(0, -PLANET_SIZE, 0)).normalize().multiplyScalar(height + 5).applyQuaternion(slerp).add(new THREE.Vector3(0, -PLANET_SIZE, 0));
+
+            // update camera
             object3D.position.set(finalPosition.x, finalPosition.y, finalPosition.z);
             const camera = this.el.sceneEl!.camera;
             // @ts-ignore
@@ -155,6 +178,8 @@ if (!global.use_ssr) {
         init: function () {
             // @ts-ignore
             this.system.driver.world.gravity.set(0, 0, 0);
+            // @ts-ignore
+            this.system.debug = true;
         }
     });
 
@@ -177,7 +202,7 @@ if (!global.use_ssr) {
         'ArrowUp', 'ArrowLeft', 'ArrowRight', 'ArrowDown'
     ];
 
-    AFRAME.registerComponent('globle-keyboard-controls', {
+    AFRAME.registerComponent('globe-keyboard-controls', {
         schema: {
             acceleration: {default: 100},
             enabled: {default: true},
@@ -357,7 +382,7 @@ if (!global.use_ssr) {
     });
 }
 
-const PLANET_SIZE = 1000;
+const PLANET_SIZE = 30;
 
 export const PlanetGenerator = () => {
     const [context, setContext] = useState<any>(importReady ? {} : null);
@@ -549,18 +574,19 @@ export const PlanetGenerator = () => {
                             <CardHeader title="Planet Generator" subheader="Create unique random planets"></CardHeader>
                             <CardContent>
                                 <Typography>Load Status: {loadMessage}</Typography>
-                                <div ref={ref} style={{width: 250, height: 250}}>
+                                <div ref={ref} style={{width: 256, height: 256}}>
                                 </div>
-                                <Scene physics="debug: true; driver: local; gravity: 0 0 0;" embedded style={{width: 250, height: 250}}>
+                                <Scene physics="debug: true; driver: local; gravity: 0 0 0;" embedded id="scene">
                                     <Entity light={{type: "ambient", color: "#CCC"}}></Entity>
                                     <Entity light={{type: "directional", color: "#EEE", intensity: 0.5}} position={{x: 0, y: 1, z: 0}}></Entity>
                                     <Entity light={{type: "directional", color: "#EEE", intensity: 0.5}} position={{x: 0, y: -1, z: 0}}></Entity>
                                     <Entity physics/>
-                                    <Entity id="box" dynamic-body="shape: sphere; sphereRadius: 1; mass: 100" globe-gravity globle-keyboard-controls="enabled: true; fly: true" position={{x: 0, y: 15, z: 0}}>
+                                    <Entity id="box" dynamic-body="shape: sphere; sphereRadius: 1; mass: 100" globe-gravity globe-keyboard-controls="enabled: true; fly: true" position={{x: 0, y: 15, z: 0}}>
                                         <Entity gltf-model={sloopModelSource} rotation="0 -90 0" scale="0.1 0.1 0.1"></Entity>
-                                        <Entity id="camera-rig" position={{x: 0, y: 0, z: 5}}>
-                                            <Entity primitive="a-camera" wasd-controls-enabled="false" look-controls-enabled="false" position={{x: 0, y: 1.6, z: 0}}/>
-                                        </Entity>
+                                        <Entity id="box-position" position={{x: 0, y: 0, z: 5}}/>
+                                    </Entity>
+                                    <Entity id="camera-rig" look-at-box position={{x: 0, y: 0, z: 5}}>
+                                        <Entity primitive="a-camera" wasd-controls-enabled="false" look-controls-enabled="false" position={{x: 0, y: 1.6, z: 0}}/>
                                     </Entity>
                                     <Entity static-body="shape: none;" globe-trimesh gltf-model={worldModelSource} position={{x: 0, y: -PLANET_SIZE, z: 0}}/>
                                     <Entity dynamic-body="shape: sphere; sphereRadius: 1; mass: 100;" globe-gravity position={{x: 3, y: 15, z: 0}}>
