@@ -243,9 +243,9 @@ if (!global.use_ssr) {
             if (this.rotation.clone().y) {
                 // apply rotation force
                 // @ts-ignore
-                body.applyForce(new CANNON.Vec3(this.rotation.clone().y, 0, 0), new CANNON.Vec3(0, 0, 1));
+                body.applyLocalForce(new CANNON.Vec3(this.rotation.clone().y, 0, 0), new CANNON.Vec3(0, 0, 1));
                 // @ts-ignore
-                body.applyForce(new CANNON.Vec3(-this.rotation.clone().y, 0, 0), new CANNON.Vec3(0, 0, -1));
+                body.applyLocalForce(new CANNON.Vec3(-this.rotation.clone().y, 0, 0), new CANNON.Vec3(0, 0, -1));
             }
         },
 
@@ -380,12 +380,138 @@ if (!global.use_ssr) {
     });
 }
 
+    AFRAME.registerComponent('globe-nav-agent', {
+        schema: {
+            destination: {type: 'vec3'},
+            active: {default: false},
+            speed: {default: 2}
+        },
+        system: null as any,
+        group: null as any,
+        path: [] as any,
+        raycaster: null as any,
+        init: function () {
+            this.system = (this.el.sceneEl as any).systems.nav;
+            this.system.addAgent(this);
+            this.group = null;
+            this.path = [];
+            // @ts-ignore
+            this.raycaster = new THREE.Raycaster();
+        },
+        remove: function () {
+            this.system.removeAgent(this);
+        },
+        update: function () {
+            this.path.length = 0;
+        },
+        updateNavLocation: function () {
+            this.group = null;
+            this.path = [];
+        },
+        tick: (function () {
+            // @ts-ignore
+            const vDest = new THREE.Vector3();
+            // @ts-ignore
+            const vDelta = new THREE.Vector3();
+            // @ts-ignore
+            const vNext = new THREE.Vector3();
+
+            return function (this: any, t, dt) {
+                const el = this.el;
+                const data = this.data;
+                const raycaster = this.raycaster;
+                const speed = data.speed * dt / 1000;
+
+                if (!data.active) return;
+
+                // Use PatrolJS pathfinding system to get shortest path to target.
+                if (!this.path.length) {
+                    const position = this.el.object3D.position;
+                    this.group = this.group || this.system.getGroup(position);
+                    this.path = this.system.getPath(position, vDest.copy(data.destination), this.group) || [];
+                    el.emit('navigation-start');
+                }
+
+                // If no path is found, exit.
+                if (!this.path.length) {
+                    console.warn('[nav] Unable to find path to %o.', data.destination);
+                    this.el.components['globe-nav-agent'].data.active = false;
+                    el.emit('navigation-end');
+                    el.object3D.position.set(vDest.x, vDest.y, vDest.z);
+                    return;
+                }
+
+                // Current segment is a vector from current position to next waypoint.
+                const vCurrent = el.object3D.position;
+                const vWaypoint = this.path[0];
+                vDelta.subVectors(vWaypoint, vCurrent);
+
+                const distance = vDelta.length();
+                let gazeTarget;
+
+                if (distance < speed) {
+                    // If <1 step from current waypoint, discard it and move toward next.
+                    this.path.shift();
+
+                    // After discarding the last waypoint, exit pathfinding.
+                    if (!this.path.length) {
+                        this.el.components['globe-nav-agent'].data.active = false;
+                        el.emit('navigation-end');
+                        return;
+                    }
+
+                    vNext.copy(vCurrent);
+                    gazeTarget = this.path[0];
+                } else {
+                    // If still far away from next waypoint, find next position for
+                    // the current frame.
+                    vNext.copy(vDelta.setLength(speed)).add(vCurrent);
+                    gazeTarget = vWaypoint;
+                }
+
+                // Look at the next waypoint.
+                gazeTarget.y = vCurrent.y;
+                el.object3D.lookAt(gazeTarget);
+
+                // Raycast against the nav mesh, to keep the agent moving along the
+                // ground, not traveling in a straight line from higher to lower waypoints.
+                raycaster.ray.origin.copy(vNext);
+                raycaster.ray.origin.y += 1.5;
+                raycaster.ray.direction = {x:0, y:-1, z:0};
+                const intersections = raycaster.intersectObject(this.system.getNavMesh());
+
+                if (!intersections.length) {
+                    // Raycasting failed. Step toward the waypoint and hope for the best.
+                    vCurrent.copy(vNext);
+                } else {
+                    // Re-project next position onto nav mesh.
+                    vDelta.subVectors(intersections[0].point, vCurrent);
+                    vCurrent.add(vDelta.setLength(speed));
+                }
+
+            };
+        }())
+    });
+
+    AFRAME.registerComponent('cursor-animator', {
+        init: function () {
+            this.el.addEventListener('click', function (e: any) {
+                const npcEl = document.querySelector('#npc');
+                npcEl.components['globe-nav-agent'].data = {
+                    active: true,
+                    destination: e.detail.intersection.point,
+                    speed: 2,
+                };
+            });
+        }
+    });
+
 const PLANET_SIZE = 100;
 
 export const PlanetGenerator = () => {
     const [context, setContext] = useState<any>(importReady ? {} : null);
     const shipContext = useContext(ShipContext);
-    const [worldModelSource, setWorldModelSource] = useState<[string, boolean][]>([]);
+    const [worldModelSource, setWorldModelSource] = useState<[string, boolean, boolean][]>([]);
     const [sloopModelSource, setSloopModelSource] = useState<string>("");
     const [loadMessage, setLoadMessage] = useState<string>("No data loaded...");
     const ref = useRef<HTMLDivElement | null>(null);
@@ -432,7 +558,7 @@ export const PlanetGenerator = () => {
                     const worldMeshes = [];
                     for (let i = 0; i < gltf.length - 1; i++) {
                         const dataUri1 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[i])}`;
-                        worldMeshes.push([dataUri1, data2[i].collidable] as [string, boolean]);
+                        worldMeshes.push([dataUri1, data2[i].collidable, data2[i].navmesh] as [string, boolean, boolean]);
                     }
                     if (deleteBefore) {
                         setWorldModelSource(worldMeshes);
@@ -443,6 +569,10 @@ export const PlanetGenerator = () => {
 
                 const meshesToSendToPixi: PIXI.Mesh<PIXI.Shader>[] = [];
                 for (const d of data) {
+                    if (d.navmesh) {
+                        continue;
+                    }
+
                     const planetGeometry = new PIXI.Geometry();
                     for (const attribute of d.attributes) {
                         planetGeometry.addAttribute(attribute.id, attribute.buffer, attribute.size);
@@ -584,7 +714,7 @@ export const PlanetGenerator = () => {
                                 <Typography>Load Status: {loadMessage}</Typography>
                                 <div ref={ref} style={{width: 256, height: 256}}>
                                 </div>
-                                <Scene physics="debug: true; driver: local; gravity: 0 0 0;" embedded id="scene">
+                                <Scene physics="debug: true; driver: local; gravity: 0 0 0;" nav embedded cursor="rayOrigin:mouse" id="scene">
                                     <Entity light={{type: "ambient", color: "#CCC"}}></Entity>
                                     <Entity light={{type: "directional", color: "#EEE", intensity: 0.5}} position={{x: 0, y: 1, z: 0}}></Entity>
                                     <Entity light={{type: "directional", color: "#EEE", intensity: 0.5}} position={{x: 0, y: -1, z: 0}}></Entity>
@@ -594,14 +724,18 @@ export const PlanetGenerator = () => {
                                         <Entity id="box-position" position={{x: 0, y: 0, z: 5}}/>
                                     </Entity>
                                     <Entity id="camera-rig" look-at-box position={{x: 0, y: 0, z: 5}}>
-                                        <Entity primitive="a-camera" wasd-controls-enabled="false" look-controls-enabled="false" position={{x: 0, y: 1.6, z: 0}}/>
+                                        <Entity primitive="a-camera" wasd-controls-enabled="false" look-controls-enabled="false" position={{x: 0, y: 1.6, z: 0}}>
+                                        </Entity>
                                     </Entity>
                                     {
-                                        worldModelSource.map((i, index) => (
-                                            i[1] ? (
-                                                <Entity key={index} static-body="shape: none;" globe-trimesh gltf-model={i[0]} position={{x: 0, y: -PLANET_SIZE, z: 0}}/>
+                                        worldModelSource.map(([str, collidable, navmesh], index) => (
+                                            navmesh ? (
+                                                <Entity key={index} nav-mesh gltf-model={str} position={{x: 0, y: -PLANET_SIZE, z: 0}}/>
+                                            ) : collidable ? (
+                                                <Entity key={index} static-body="shape: none;" globe-trimesh gltf-model={str} position={{x: 0, y: -PLANET_SIZE, z: 0}} cursor-animator
+                                                />
                                             ): (
-                                                <Entity key={index} static-body="shape: none;" gltf-model={i[0]} position={{x: 0, y: -PLANET_SIZE, z: 0}}/>
+                                                <Entity key={index} static-body="shape: none;" gltf-model={str} position={{x: 0, y: -PLANET_SIZE, z: 0}}/>
                                             )
                                         ))
                                     }
@@ -614,6 +748,7 @@ export const PlanetGenerator = () => {
                                     <Entity dynamic-body="shape: sphere; sphereRadius: 1; mass: 100;" globe-gravity position={{x: 9, y: 15, z: 0}}>
                                         <Entity gltf-model={sloopModelSource} rotation="0 -90 0" scale="0.1 0.1 0.1"></Entity>
                                     </Entity>
+                                    <Entity primitive="a-sphere" globe-nav-agent id="npc" position={{x: 0, y: 0, z: 0}}></Entity>
                                 </Scene>
                                 <Button onClick={() => {
                                     drawGraph();
