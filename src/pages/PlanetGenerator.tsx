@@ -38,7 +38,7 @@ if (!global.use_ssr) {
         tick: function () {
             const object3D = this.el.object3D;
             // @ts-ignore
-            const trueUpDistance = object3D.getWorldPosition(new THREE.Vector3()).sub(new THREE.Vector3(0, -PLANET_SIZE, 0));
+            const trueUpDistance = object3D.getWorldPosition(new THREE.Vector3());
             // @ts-ignore
             const trueUp = trueUpDistance.clone().normalize();
             // @ts-ignore
@@ -147,20 +147,20 @@ if (!global.use_ssr) {
 
             // get info
             // @ts-ignore
-            const upVector = boxPosWorldPos.clone().sub(new THREE.Vector3(0, -PLANET_SIZE, 0)).normalize();
+            const upVector = boxPosWorldPos.clone().sub(new THREE.Vector3(0, 0, 0)).normalize();
             const object3D = this.el.object3D;
             // @ts-ignore
             const objectWorldPos = object3D.getWorldPosition(new THREE.Vector3());
             // @ts-ignore
-            const height = boxPosWorldPos.clone().sub(new THREE.Vector3(0, -PLANET_SIZE, 0)).length();
+            const height = boxPosWorldPos.clone().sub(new THREE.Vector3(0, 0, 0)).length();
 
             // update info
             // @ts-ignore
-            const quaternion = new THREE.Quaternion().setFromUnitVectors(objectWorldPos.clone().sub(new THREE.Vector3(0, -PLANET_SIZE, 0)).normalize(), boxPosWorldPos.clone().sub(new THREE.Vector3(0, -PLANET_SIZE, 0)).normalize());
+            const quaternion = new THREE.Quaternion().setFromUnitVectors(objectWorldPos.clone().normalize(), boxPosWorldPos.clone().normalize());
             // @ts-ignore
             const slerp = new THREE.Quaternion().slerp(quaternion, 0.03);
             // @ts-ignore
-            const finalPosition = objectWorldPos.clone().sub(new THREE.Vector3(0, -PLANET_SIZE, 0)).normalize().multiplyScalar(height + 5).applyQuaternion(slerp).add(new THREE.Vector3(0, -PLANET_SIZE, 0));
+            const finalPosition = objectWorldPos.clone().normalize().multiplyScalar(height + 5).applyQuaternion(slerp);
 
             // update camera
             object3D.position.set(finalPosition.x, finalPosition.y, finalPosition.z);
@@ -470,14 +470,13 @@ if (!global.use_ssr) {
                 }
 
                 // Look at the next waypoint.
-                gazeTarget.y = vCurrent.y;
+                // gazeTarget.y = vCurrent.y;
                 el.object3D.lookAt(gazeTarget);
 
                 // Raycast against the nav mesh, to keep the agent moving along the
                 // ground, not traveling in a straight line from higher to lower waypoints.
-                raycaster.ray.origin.copy(vNext);
-                raycaster.ray.origin.y += 1.5;
-                raycaster.ray.direction = {x:0, y:-1, z:0};
+                raycaster.ray.origin.copy(vNext.clone().normalize().multiplyScalar(101.5));
+                raycaster.ray.direction = vNext.clone().normalize().negate();
                 const intersections = raycaster.intersectObject(this.system.getNavMesh());
 
                 if (!intersections.length) {
@@ -719,7 +718,7 @@ export const PlanetGenerator = () => {
                                     <Entity light={{type: "directional", color: "#EEE", intensity: 0.5}} position={{x: 0, y: 1, z: 0}}></Entity>
                                     <Entity light={{type: "directional", color: "#EEE", intensity: 0.5}} position={{x: 0, y: -1, z: 0}}></Entity>
                                     <Entity physics/>
-                                    <Entity id="box" dynamic-body="shape: sphere; sphereRadius: 1; mass: 100" globe-gravity globe-keyboard-controls="enabled: true; fly: true" position={{x: 0, y: 15, z: 0}}>
+                                    <Entity id="box" dynamic-body="shape: sphere; sphereRadius: 1; mass: 100" globe-gravity globe-keyboard-controls="enabled: true; fly: true" position={{x: 0, y: 15 + PLANET_SIZE, z: 0}}>
                                         <Entity gltf-model={sloopModelSource} rotation="0 -90 0" scale="0.1 0.1 0.1"></Entity>
                                         <Entity id="box-position" position={{x: 0, y: 0, z: 5}}/>
                                     </Entity>
@@ -730,25 +729,25 @@ export const PlanetGenerator = () => {
                                     {
                                         worldModelSource.map(([str, collidable, navmesh], index) => (
                                             navmesh ? (
-                                                <Entity key={index} nav-mesh gltf-model={str} position={{x: 0, y: -PLANET_SIZE, z: 0}}/>
+                                                <Entity key={index} nav-mesh gltf-model={str} position={{x: 0, y: 0, z: 0}}/>
                                             ) : collidable ? (
-                                                <Entity key={index} static-body="shape: none;" globe-trimesh gltf-model={str} position={{x: 0, y: -PLANET_SIZE, z: 0}} cursor-animator
+                                                <Entity key={index} static-body="shape: none;" globe-trimesh gltf-model={str} position={{x: 0, y: 0, z: 0}} cursor-animator
                                                 />
                                             ): (
-                                                <Entity key={index} static-body="shape: none;" gltf-model={str} position={{x: 0, y: -PLANET_SIZE, z: 0}}/>
+                                                <Entity key={index} static-body="shape: none;" gltf-model={str} position={{x: 0, y: 0, z: 0}}/>
                                             )
                                         ))
                                     }
-                                    <Entity dynamic-body="shape: sphere; sphereRadius: 1; mass: 100;" globe-gravity position={{x: 3, y: 15, z: 0}}>
+                                    <Entity dynamic-body="shape: sphere; sphereRadius: 1; mass: 100;" globe-gravity position={{x: 3, y: 15 + PLANET_SIZE, z: 0}}>
                                         <Entity gltf-model={sloopModelSource} rotation="0 -90 0" scale="0.1 0.1 0.1"></Entity>
                                     </Entity>
-                                    <Entity dynamic-body="shape: sphere; sphereRadius: 1; mass: 100;" globe-gravity position={{x: 6, y: 15, z: 0}}>
+                                    <Entity dynamic-body="shape: sphere; sphereRadius: 1; mass: 100;" globe-gravity position={{x: 6, y: 15 + PLANET_SIZE, z: 0}}>
                                         <Entity gltf-model={sloopModelSource} rotation="0 -90 0" scale="0.1 0.1 0.1"></Entity>
                                     </Entity>
-                                    <Entity dynamic-body="shape: sphere; sphereRadius: 1; mass: 100;" globe-gravity position={{x: 9, y: 15, z: 0}}>
+                                    <Entity dynamic-body="shape: sphere; sphereRadius: 1; mass: 100;" globe-gravity position={{x: 9, y: 15 + PLANET_SIZE, z: 0}}>
                                         <Entity gltf-model={sloopModelSource} rotation="0 -90 0" scale="0.1 0.1 0.1"></Entity>
                                     </Entity>
-                                    <Entity primitive="a-sphere" globe-nav-agent id="npc" position={{x: 0, y: 0, z: 0}}></Entity>
+                                    <Entity primitive="a-sphere" globe-nav-agent id="npc" position={{x: 0, y: PLANET_SIZE, z: 0}}></Entity>
                                 </Scene>
                                 <Button onClick={() => {
                                     drawGraph();
