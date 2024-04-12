@@ -1,5 +1,5 @@
 // @ts-ignore
-import {generatePlanet, generatePlanetMesh} from "@pickledeggs123/globular-marauders-generator/dist/helpers";
+import {generatePlanet} from "@pickledeggs123/globular-marauders-generator/dist/helpers";
 import {VoronoiCell} from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
 import {VoronoiTerrain} from "@pickledeggs123/globular-marauders-game/lib/src";
 import {Game} from "@pickledeggs123/globular-marauders-game/lib/src/Game";
