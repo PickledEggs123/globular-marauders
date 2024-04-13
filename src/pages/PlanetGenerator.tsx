@@ -378,7 +378,6 @@ if (!global.use_ssr) {
             delete this.keys[code];
         }
     });
-}
 
     AFRAME.registerComponent('globe-nav-agent', {
         schema: {
@@ -504,6 +503,7 @@ if (!global.use_ssr) {
             });
         }
     });
+}
 
 const PLANET_SIZE = 100;
 
