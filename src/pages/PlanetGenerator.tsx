@@ -9,6 +9,8 @@ import * as PIXI from "pixi.js";
 import Quaternion from "quaternion";
 import {ShipContext} from "../contextes/ShipContext";
 import {getShapeParameters, ShapeType} from "three-to-cannon";
+// @ts-ignore
+import {Pathfinding} from "@pickledeggs123/three-pathfinding";
 
 let Entity: any = () => null;
 let Scene: any = () => null;
@@ -379,6 +381,150 @@ if (!global.use_ssr) {
         }
     });
 
+    const pathfinder = new Pathfinding();
+    const ZONE = 'level';
+
+    /**
+     * nav
+     *
+     * Pathfinding system, using PatrolJS.
+     */
+    AFRAME.registerSystem('globe-nav', {
+        navMesh: null as any,
+        agents: new Set() as Set<any>,
+        init: function () {
+            this.navMesh = null;
+            this.agents = new Set();
+        },
+
+        /**
+         * @param {THREE.Geometry} geometry
+         */
+        setNavMeshGeometry: function (geometry: any) {
+            // @ts-ignore
+            this.navMesh = new THREE.Mesh(geometry);
+            pathfinder.setZoneData(ZONE, Pathfinding.createZone(geometry));
+            Array.from(this.agents).forEach((agent) => agent.updateNavLocation());
+        },
+
+        /**
+         * @return {THREE.Mesh}
+         */
+        getNavMesh: function () {
+            return this.navMesh;
+        },
+
+        /**
+         * @param {NavAgent} ctrl
+         */
+        addAgent: function (ctrl: any) {
+            this.agents.add(ctrl);
+        },
+
+        /**
+         * @param {NavAgent} ctrl
+         */
+        removeAgent: function (ctrl: any) {
+            this.agents.delete(ctrl);
+        },
+
+        /**
+         * @param  {THREE.Vector3} start
+         * @param  {THREE.Vector3} end
+         * @param  {number} groupID
+         * @return {Array<THREE.Vector3>}
+         */
+        getPath: function (start: any, end: any, groupID: any) {
+            return this.navMesh
+                ? pathfinder.findPath(start, end, ZONE, groupID)
+                : null;
+        },
+
+        /**
+         * @param {THREE.Vector3} position
+         * @return {number}
+         */
+        getGroup: function (position: any) {
+            return this.navMesh
+                ? pathfinder.getGroup(ZONE, position)
+                : null;
+        },
+
+        /**
+         * @param  {THREE.Vector3} position
+         * @param  {number} groupID
+         * @return {Node}
+         */
+        getNode: function (position: any, groupID: any) {
+            return this.navMesh
+                ? pathfinder.getClosestNode(position, ZONE, groupID, true)
+                : null;
+        },
+
+        /**
+         * @param  {THREE.Vector3} start Starting position.
+         * @param  {THREE.Vector3} end Desired ending position.
+         * @param  {number} groupID
+         * @param  {Node} node
+         * @param  {THREE.Vector3} endTarget (Output) Adjusted step end position.
+         * @return {Node} Current node, after step is taken.
+         */
+        clampStep: function (start: any, end: any, groupID: any, node: any, endTarget: any) {
+            if (!this.navMesh) {
+                endTarget.copy(end);
+                return null;
+            } else if (!node) {
+                endTarget.copy(end);
+                return this.getNode(end, groupID);
+            }
+            return pathfinder.clampStep(start, end, node, ZONE, groupID, endTarget);
+        }
+    });
+
+    AFRAME.registerComponent('globe-nav-mesh', {
+        schema: {
+            nodeName: {type: 'string'}
+        },
+        hasLoadedNavMesh: false as boolean,
+        nodeName: "" as string,
+        init: function () {
+            this.system = this.el.sceneEl!.systems['globe-nav'];
+            this.hasLoadedNavMesh = false;
+            this.nodeName = this.data.nodeName;
+            this.el.addEventListener('object3dset', this.loadNavMesh.bind(this));
+        },
+
+        play: function () {
+            if (!this.hasLoadedNavMesh) this.loadNavMesh();
+        },
+
+        loadNavMesh: function () {
+            var self = this;
+            const object = this.el.getObject3D('mesh');
+            const scene = this.el.sceneEl!.object3D;
+
+            if (!object) return;
+
+            let navMesh;
+            object.traverse((node: any) => {
+                if (node.isMesh &&
+                    (!self.nodeName || node.name === self.nodeName)) navMesh = node;
+            });
+
+            if (!navMesh) return;
+
+            // @ts-ignore
+            const navMeshGeometry = navMesh.geometry.clone();
+            // @ts-ignore
+            navMesh.updateWorldMatrix(true, false);
+            // @ts-ignore
+            navMeshGeometry.applyMatrix4(navMesh.matrixWorld);
+            // @ts-ignore
+            this.system!.setNavMeshGeometry(navMeshGeometry);
+            this.hasLoadedNavMesh = true;
+        }
+    });
+
     AFRAME.registerComponent('globe-nav-agent', {
         schema: {
             destination: {type: 'vec3'},
@@ -390,7 +536,7 @@ if (!global.use_ssr) {
         path: [] as any,
         raycaster: null as any,
         init: function () {
-            this.system = (this.el.sceneEl as any).systems.nav;
+            this.system = (this.el.sceneEl as any).systems['globe-nav'];
             this.system.addAgent(this);
             this.group = null;
             this.path = [];
@@ -437,6 +583,7 @@ if (!global.use_ssr) {
                     this.el.components['globe-nav-agent'].data.active = false;
                     el.emit('navigation-end');
                     el.object3D.position.set(vDest.x, vDest.y, vDest.z);
+                    this.group = null;
                     return;
                 }
 
@@ -724,7 +871,7 @@ export const PlanetGenerator = () => {
                                 <Typography>Load Status: {loadMessage}</Typography>
                                 <div ref={ref} style={{width: 256, height: 256}}>
                                 </div>
-                                <Scene physics="debug: true; driver: local; gravity: 0 0 0;" nav embedded cursor="rayOrigin:mouse" id="scene">
+                                <Scene physics="debug: true; driver: local; gravity: 0 0 0;" globe-nav embedded cursor="rayOrigin:mouse" id="scene">
                                     <Entity light={{type: "ambient", color: "#CCC"}}></Entity>
                                     <Entity light={{type: "directional", color: "#EEE", intensity: 0.5}} position={{x: 0, y: 1, z: 0}}></Entity>
                                     <Entity light={{type: "directional", color: "#EEE", intensity: 0.5}} position={{x: 0, y: -1, z: 0}}></Entity>
@@ -740,7 +887,7 @@ export const PlanetGenerator = () => {
                                     {
                                         worldModelSource.map(([str, collidable, navmesh], index) => (
                                             navmesh ? (
-                                                <Entity key={index} nav-mesh gltf-model={str} position={{x: 0, y: 0, z: 0}}/>
+                                                <Entity key={index} globe-nav-mesh gltf-model={str} position={{x: 0, y: 0, z: 0}}/>
                                             ) : collidable ? (
                                                 <Entity key={index} static-body="shape: none;" globe-trimesh gltf-model={str} position={{x: 0, y: 0, z: 0}} cursor-animator
                                                 />
