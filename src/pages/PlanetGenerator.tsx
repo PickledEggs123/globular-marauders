@@ -508,77 +508,36 @@ if (!global.use_ssr) {
 const PLANET_SIZE = 100;
 
 export const PlanetGenerator = () => {
-    const [context, setContext] = useState<any>(importReady ? {} : null);
+    const [context, setContext] = useState<{ app: PIXI.Application | null, preview: IGameMesh | null, gameData: IGameMesh[] } | null>(importReady ? { app: null, preview: null, gameData: [] } : null);
     const shipContext = useContext(ShipContext);
     const [worldModelSource, setWorldModelSource] = useState<[string, boolean, boolean][]>([]);
     const [sloopModelSource, setSloopModelSource] = useState<string>("");
     const [loadMessage, setLoadMessage] = useState<string>("No data loaded...");
     const ref = useRef<HTMLDivElement | null>(null);
-    const worker: Worker | undefined = useMemo(
-        // @ts-ignore
-        () => !global.use_ssr && Worker ? new Worker(new URL("./planet-generator-worker", import.meta.url)) : undefined,
-        []
-    );
+    const [forceRefresh, setForceRefresh] = useState<number>(0);
     useEffect(() => {
         // @ts-ignore
         if (global.use_ssr || !context) {
             return;
         }
-        if (worker) {
-            worker.onmessage = (e: MessageEvent<{ meshes: IGameMesh[], deleteBefore: boolean, heightMapData: [number, number][] | null, loadMessage: string }>) => {
-                const data: IGameMesh[] = e.data.meshes;
-                const deleteBefore = e.data.deleteBefore;
-                const loadMessage1 = e.data.loadMessage;
-                setLoadMessage(loadMessage1);
-                const app = context.app as PIXI.Application;
-                context.data = data;
-                const data2: IGameMesh[] = data.map((d: IGameMesh) => ({
-                    ...d,
-                    attributes: [{
-                            ...d.attributes.find(x => x.id === "aPosition")!,
-                            buffer: [...d.attributes.find(x => x.id === "aPosition")!.buffer.map(x => x * PLANET_SIZE)],
-                        }, ...d.attributes.filter(x => x.id !== "aPosition"),
-                    ]
-                } as IGameMesh));
-                Promise.all<Uint8Array>([...data2.map(m => generatePlanetGltf(m)), generatePlanetGltf(shipContext[1])]).then((gltf) => {
-                    const Uint8ToBase64 = (u8Arr: Uint8Array) => {
-                        const CHUNK_SIZE = 0x8000; //arbitrary number
-                        let index = 0;
-                        const length = u8Arr.length;
-                        let result = '';
-                        let slice: any;
-                        while (index < length) {
-                            slice = u8Arr.subarray(index, Math.min(index + CHUNK_SIZE, length));
-                            result += String.fromCharCode.apply(null, slice);
-                            index += CHUNK_SIZE;
-                        }
-                        return btoa(result);
-                    }
-                    const worldMeshes = [];
-                    for (let i = 0; i < gltf.length - 1; i++) {
-                        const dataUri1 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[i])}`;
-                        worldMeshes.push([dataUri1, data2[i].collidable, data2[i].navmesh] as [string, boolean, boolean]);
-                    }
-                    if (deleteBefore) {
-                        setWorldModelSource(worldMeshes);
-                    }
-                    const dataUri2 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 1])}`;
-                    setSloopModelSource(dataUri2);
-                });
 
-                const meshesToSendToPixi: PIXI.Mesh<PIXI.Shader>[] = [];
-                for (const d of data) {
-                    if (d.navmesh) {
-                        continue;
-                    }
+        setLoadMessage("No data loaded...");
+        const handlePixiRender = (data: IGameMesh[]) => {
+            const app = context.app as PIXI.Application;
 
-                    const planetGeometry = new PIXI.Geometry();
-                    for (const attribute of d.attributes) {
-                        planetGeometry.addAttribute(attribute.id, attribute.buffer, attribute.size);
-                    }
-                    planetGeometry.addIndex(new Uint32Array(d.index));
+            const meshesToSendToPixi: PIXI.Mesh<PIXI.Shader>[] = [];
+            for (const d of data) {
+                if (d.navmesh) {
+                    continue;
+                }
 
-                    const planetVertexShader = `
+                const planetGeometry = new PIXI.Geometry();
+                for (const attribute of d.attributes) {
+                    planetGeometry.addAttribute(attribute.id, attribute.buffer, attribute.size);
+                }
+                planetGeometry.addIndex(new Uint32Array(d.index));
+
+                const planetVertexShader = `
                     precision mediump float;
         
                     attribute vec3 aPosition;
@@ -593,11 +552,11 @@ export const PlanetGenerator = () => {
                     void main() {
                         vColor = aColor;
         
-                        gl_Position = uRotation * vec4(aPosition, 1.0);
+                        gl_Position = uRotation * vec4(aPosition * 0.90, 1.0);
                         vNormal = (uRotation * vec4(aNormal, 1.0)).xyz;
                     }
                 `;
-                    const planetFragmentShader = `
+                const planetFragmentShader = `
                     precision mediump float;
         
                     varying vec3 vColor;
@@ -607,36 +566,87 @@ export const PlanetGenerator = () => {
                         gl_FragColor = vec4(vColor * (0.3 + 0.7 * max(0.0, pow(dot(vec3(0.0, 0.0, -1.0), vNormal), 3.0))), 1.0);
                     }
                 `;
-                    const planetProgram = new PIXI.Program(planetVertexShader, planetFragmentShader);
+                const planetProgram = new PIXI.Program(planetVertexShader, planetFragmentShader);
 
-                    const shader = new PIXI.Shader(planetProgram, {
-                        uRotation: Quaternion.ONE.toMatrix4()
-                    });
-                    const state = PIXI.State.for2d();
-                    state.depthTest = true;
-                    const mesh = new PIXI.Mesh(planetGeometry, shader, state);
-                    meshesToSendToPixi.push(mesh);
-                }
-
-                if (deleteBefore) {
-                    app.stage.children.forEach(x => {
-                        app.stage.removeChild(x);
-                    });
-                }
-                for (const mesh of meshesToSendToPixi) {
-                    app.stage.addChild(mesh as unknown as any);
-                }
+                const shader = new PIXI.Shader(planetProgram, {
+                    uRotation: Quaternion.ONE.toMatrix4()
+                });
+                const state = PIXI.State.for2d();
+                state.depthTest = true;
+                state.culling = false;
+                const mesh = new PIXI.Mesh(planetGeometry, shader, state);
+                meshesToSendToPixi.push(mesh);
             }
+
+            app.stage.children.forEach(x => {
+                app.stage.removeChild(x);
+            });
+            for (const mesh of meshesToSendToPixi) {
+                app.stage.addChild(mesh as unknown as any);
+            }
+        };
+        const handleData = (meshes: IGameMesh[]) => {
+            const data: IGameMesh[] = meshes;
+            setLoadMessage("Data Loaded");
+            context.gameData = data;
+            const data2: IGameMesh[] = data.map((d: IGameMesh) => ({
+                ...d,
+                attributes: [{
+                    ...d.attributes.find(x => x.id === "aPosition")!,
+                    buffer: [...d.attributes.find(x => x.id === "aPosition")!.buffer.map(x => x * PLANET_SIZE)],
+                }, ...d.attributes.filter(x => x.id !== "aPosition"),
+                ]
+            } as IGameMesh));
+            Promise.all<Uint8Array>([...data2.map(m => generatePlanetGltf(m)), generatePlanetGltf(shipContext[1])]).then((gltf) => {
+                const Uint8ToBase64 = (u8Arr: Uint8Array) => {
+                    const CHUNK_SIZE = 0x8000; //arbitrary number
+                    let index = 0;
+                    const length = u8Arr.length;
+                    let result = '';
+                    let slice: any;
+                    while (index < length) {
+                        slice = u8Arr.subarray(index, Math.min(index + CHUNK_SIZE, length));
+                        result += String.fromCharCode.apply(null, slice);
+                        index += CHUNK_SIZE;
+                    }
+                    return btoa(result);
+                }
+                const worldMeshes = [];
+                for (let i = 0; i < gltf.length - 1; i++) {
+                    const dataUri1 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[i])}`;
+                    worldMeshes.push([dataUri1, data2[i].collidable, data2[i].navmesh] as [string, boolean, boolean]);
+                }
+                setWorldModelSource(worldMeshes);
+                const dataUri2 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 1])}`;
+                setSloopModelSource(dataUri2);
+            });
+
+            handlePixiRender(data);
         }
-    }, [worker, context]);
+
+        (async () => {
+            const planetResponse = await fetch("/api/planet");
+            const planetJson = await planetResponse.json();
+            if (planetJson) {
+                const {
+                    previewUrl,
+                    gameUrl,
+                } = planetJson;
+                const [previewResponse, gameResponse] = await Promise.all([fetch(previewUrl), fetch(gameUrl)]);
+                const previewJson = await previewResponse.json();
+                const gameJson = await gameResponse.json();
+
+                context.preview = previewJson as IGameMesh;
+                handleData(gameJson as IGameMesh[]);
+            }
+        })();
+    }, [context, forceRefresh]);
     const drawGraph = useCallback(() => {
         // @ts-ignore
         if (global.use_ssr || !context) {
             return;
         }
-        if (window?.Worker && worker) {
-            worker.postMessage("init");
-        }
+        setForceRefresh(forceRefresh + 1);
     }, [context]);
     useEffect(() => {
         // @ts-ignore
@@ -647,6 +657,7 @@ export const PlanetGenerator = () => {
             context.app.destroy(true);
         }
         context.app = new PIXI.Application({ width : 256, height: 256, backgroundColor: 0x000000 });
+        // @ts-ignore
         ref.current!.appendChild(context.app.view);
         context.app!.ticker.add(() => {
             context.app!.stage.children.forEach((c: any) => {
@@ -660,7 +671,7 @@ export const PlanetGenerator = () => {
         return () => {};
     }, [context, drawGraph, ref]);
     const download = async () => {
-        const data: IGameMesh = context.data!;
+        const data: IGameMesh = context!.preview!;
         const buffer = await generatePlanetGltf(data);
 
         const downloadURL = function(data: any, fileName: string) {
@@ -693,7 +704,7 @@ export const PlanetGenerator = () => {
 
     if (!importReady) {
         importPromise.then(() => {
-            setContext({});
+            setContext({ app: null, preview: null, gameData: [] });
         });
         return null;
     }

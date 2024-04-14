@@ -13,6 +13,7 @@ import createCache from "@emotion/cache";
 import {CssBaseline} from "@mui/material";
 import {theme} from "../src/theme";
 import {ThemeProvider} from "@mui/material/styles";
+import {PrismaClient} from "@prisma/client";
 
 const PORT = process.env.PORT || 8080;
 const app = express();
@@ -60,6 +61,30 @@ app.get('/ship-wiki', handleReactPage);
 app.get('/character-wiki', handleReactPage);
 app.get('/about', handleReactPage);
 app.get('/contact', handleReactPage);
+
+app.get('/api/planet', async (req, res) => {
+    const prisma = new PrismaClient();
+
+    let previewUrl = "";
+    let gameUrl = "";
+    try {
+        await prisma.$connect();
+        const max = await prisma.planet.count();
+        const planet = await prisma.planet.findFirstOrThrow({ where: { id: Math.floor(Math.random() * max) } });
+        previewUrl = planet.meshUrl;
+        gameUrl = planet.meshesUrl;
+
+        await prisma.$disconnect();
+    } catch (e) {
+        console.log(e);
+        await prisma.$disconnect();
+    }
+
+    res.status(200).json({
+        previewUrl,
+        gameUrl,
+    });
+});
 
 app.use(express.static('./build'));
 

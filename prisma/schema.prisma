@@ -1,0 +1,15 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+model Planet {
+  id        Int     @id(map: "PK__Planet__3213E83FB0AA2039") @default(autoincrement())
+  seed      String  @db.VarChar(255)
+  meshUrl   String  @db.VarChar(255)
+  meshesUrl String? @db.VarChar(255)
+}
