@@ -1,11 +1,12 @@
-import React, {useCallback, useContext, useEffect, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useContext, useEffect, useRef, useState} from 'react';
 import '../App.scss';
 import {WebsiteDrawer} from "../Drawer";
-import {Paper, Button, Card, CardContent, CardHeader, Container, Grid, Typography} from "@mui/material";
+import {Button, Card, CardContent, CardHeader, Container, Grid, Paper, Typography} from "@mui/material";
 // @ts-ignore
 import {generatePlanetGltf} from "@pickledeggs123/globular-marauders-generator/dist/helpers";
 import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
 import * as PIXI from "pixi.js";
+import {BLEND_MODES} from "pixi.js";
 import Quaternion from "quaternion";
 import {ShipContext} from "../contextes/ShipContext";
 import {getShapeParameters, ShapeType} from "three-to-cannon";
@@ -674,7 +675,7 @@ export const PlanetGenerator = () => {
 
             const meshesToSendToPixi: PIXI.Mesh<PIXI.Shader>[] = [];
             for (const d of data) {
-                if (d.navmesh) {
+                if (d.navmesh || d.ocean || d.oceanNavmesh) {
                     continue;
                 }
 
@@ -684,45 +685,78 @@ export const PlanetGenerator = () => {
                 }
                 planetGeometry.addIndex(new Uint32Array(d.index));
 
-                const planetVertexShader = `
-                    precision mediump float;
-        
-                    attribute vec3 aPosition;
-                    attribute vec3 aColor;
-                    attribute vec3 aNormal;
-                    
-                    uniform mat4 uRotation;
-        
-                    varying vec3 vColor;
-                    varying vec3 vNormal;
-        
-                    void main() {
-                        vColor = aColor;
-        
-                        gl_Position = uRotation * vec4(aPosition * 0.90, 1.0);
-                        vNormal = (uRotation * vec4(aNormal, 1.0)).xyz;
-                    }
-                `;
-                const planetFragmentShader = `
-                    precision mediump float;
-        
-                    varying vec3 vColor;
-                    varying vec3 vNormal;
-        
-                    void main() {
-                        gl_FragColor = vec4(vColor * (0.3 + 0.7 * max(0.0, pow(dot(vec3(0.0, 0.0, -1.0), vNormal), 3.0))), 1.0);
-                    }
-                `;
-                const planetProgram = new PIXI.Program(planetVertexShader, planetFragmentShader);
+                if (d.ocean) {
+                    const planetVertexShader = `
+                        precision mediump float;
+            
+                        attribute vec3 aPosition;
+                        
+                        uniform mat4 uRotation;
+            
+                        void main() {
+                            gl_Position = uRotation * vec4(aPosition * 0.90, 1.0);
+                        }
+                    `;
+                    const planetFragmentShader = `
+                        precision mediump float;
+            
+                        void main() {
+                            gl_FragColor = vec4(0.3, 0.3, 1.0, 0.8);
+                        }
+                    `;
+                    const planetProgram = new PIXI.Program(planetVertexShader, planetFragmentShader);
 
-                const shader = new PIXI.Shader(planetProgram, {
-                    uRotation: Quaternion.ONE.toMatrix4()
-                });
-                const state = PIXI.State.for2d();
-                state.depthTest = true;
-                state.culling = false;
-                const mesh = new PIXI.Mesh(planetGeometry, shader, state);
-                meshesToSendToPixi.push(mesh);
+                    const shader = new PIXI.Shader(planetProgram, {
+                        uRotation: Quaternion.ONE.toMatrix4()
+                    });
+                    const state = PIXI.State.for2d();
+                    state.depthTest = true;
+                    state.culling = false;
+                    state.blend = true;
+                    state.blendMode = BLEND_MODES.NORMAL;
+                    const mesh = new PIXI.Mesh(planetGeometry, shader, state);
+                    meshesToSendToPixi.push(mesh);
+                } else {
+                    const planetVertexShader = `
+                        precision mediump float;
+            
+                        attribute vec3 aPosition;
+                        attribute vec3 aColor;
+                        attribute vec3 aNormal;
+                        
+                        uniform mat4 uRotation;
+            
+                        varying vec3 vColor;
+                        varying vec3 vNormal;
+            
+                        void main() {
+                            vColor = aColor;
+            
+                            gl_Position = uRotation * vec4(aPosition * 0.90, 1.0);
+                            vNormal = (uRotation * vec4(aNormal, 1.0)).xyz;
+                        }
+                    `;
+                    const planetFragmentShader = `
+                        precision mediump float;
+            
+                        varying vec3 vColor;
+                        varying vec3 vNormal;
+            
+                        void main() {
+                            gl_FragColor = vec4(vColor * (0.3 + 0.7 * max(0.0, pow(dot(vec3(0.0, 0.0, -1.0), vNormal), 3.0))), 1.0);
+                        }
+                    `;
+                    const planetProgram = new PIXI.Program(planetVertexShader, planetFragmentShader);
+
+                    const shader = new PIXI.Shader(planetProgram, {
+                        uRotation: Quaternion.ONE.toMatrix4()
+                    });
+                    const state = PIXI.State.for2d();
+                    state.depthTest = true;
+                    state.culling = false;
+                    const mesh = new PIXI.Mesh(planetGeometry, shader, state);
+                    meshesToSendToPixi.push(mesh);
+                }
             }
 
             app.stage.children.forEach(x => {
@@ -744,7 +778,7 @@ export const PlanetGenerator = () => {
                 }, ...d.attributes.filter(x => x.id !== "aPosition"),
                 ]
             } as IGameMesh));
-            Promise.all<Uint8Array>([...data2.map(m => generatePlanetGltf(m)), generatePlanetGltf(shipContext[1])]).then((gltf) => {
+            Promise.all<Uint8Array>([...data2.map(m => generatePlanetGltf(m, m.ocean)), generatePlanetGltf(shipContext[1], false)]).then((gltf) => {
                 const Uint8ToBase64 = (u8Arr: Uint8Array) => {
                     const CHUNK_SIZE = 0x8000; //arbitrary number
                     let index = 0;
