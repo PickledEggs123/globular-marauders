@@ -658,12 +658,11 @@ const PLANET_SIZE = 100;
 export const PlanetGenerator = () => {
     const [context, setContext] = useState<{ app: PIXI.Application | null, preview: IGameMesh | null, gameData: IGameMesh[] } | null>(importReady ? { app: null, preview: null, gameData: [] } : null);
     const shipContext = useContext(ShipContext);
-    const [worldModelSource, setWorldModelSource] = useState<[string, boolean, boolean][]>([]);
+    const [worldModelSource, setWorldModelSource] = useState<[string, boolean, boolean, boolean][]>([]);
     const [sloopModelSource, setSloopModelSource] = useState<string>("");
     const [loadMessage, setLoadMessage] = useState<string>("No data loaded...");
     const ref = useRef<HTMLDivElement | null>(null);
-    const [forceRefresh, setForceRefresh] = useState<number>(0);
-    useEffect(() => {
+    const drawGraph = useCallback(() => {
         // @ts-ignore
         if (global.use_ssr || !context) {
             return;
@@ -795,7 +794,7 @@ export const PlanetGenerator = () => {
                 const worldMeshes = [];
                 for (let i = 0; i < gltf.length - 1; i++) {
                     const dataUri1 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[i])}`;
-                    worldMeshes.push([dataUri1, data2[i].collidable, data2[i].navmesh] as [string, boolean, boolean]);
+                    worldMeshes.push([dataUri1, data2[i].collidable, data2[i].navmesh, data2[i].ocean] as [string, boolean, boolean, boolean]);
                 }
                 setWorldModelSource(worldMeshes);
                 const dataUri2 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 1])}`;
@@ -821,13 +820,6 @@ export const PlanetGenerator = () => {
                 handleData(gameJson as IGameMesh[]);
             }
         })();
-    }, [context, forceRefresh]);
-    const drawGraph = useCallback(() => {
-        // @ts-ignore
-        if (global.use_ssr || !context) {
-            return;
-        }
-        setForceRefresh(forceRefresh + 1);
     }, [context]);
     useEffect(() => {
         // @ts-ignore
@@ -919,14 +911,16 @@ export const PlanetGenerator = () => {
                                         </Entity>
                                     </Entity>
                                     {
-                                        worldModelSource.map(([str, collidable, navmesh], index) => (
-                                            navmesh ? (
+                                        worldModelSource.map(([str, collidable, navmesh, ocean], index) => (
+                                            ocean ? (
+                                                <Entity key={index} gltf-model={str} position={{x: 0, y: 0, z: 0}}/>
+                                            ) :navmesh ? (
                                                 <Entity key={index} globe-nav-mesh gltf-model={str} position={{x: 0, y: 0, z: 0}}/>
                                             ) : collidable ? (
                                                 <Entity key={index} static-body="shape: none;" globe-trimesh gltf-model={str} position={{x: 0, y: 0, z: 0}} cursor-animator
                                                 />
                                             ): (
-                                                <Entity key={index} static-body="shape: none;" gltf-model={str} position={{x: 0, y: 0, z: 0}}/>
+                                                <Entity key={index} static-body="shape: none;" globe-trimesh gltf-model={str} position={{x: 0, y: 0, z: 0}}/>
                                             )
                                         ))
                                     }
