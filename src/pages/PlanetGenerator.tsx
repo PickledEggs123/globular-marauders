@@ -133,11 +133,14 @@ if (!global.use_ssr) {
     });
 
     AFRAME.registerComponent('look-at-box', {
-        schema: {},
+        schema: {
+            type: "string",
+            default: "#box",
+        },
         tick: function () {
             // get elements
-            const box = document.querySelector("#box")?.object3D;
-            const boxPos = document.querySelector("#box-position")?.object3D;
+            const box = document.querySelector(`${this.data}`)?.object3D;
+            const boxPos = document.querySelector(`${this.data}-position`)?.object3D;
             if (!box || !boxPos) {
                 return;
             }
@@ -639,18 +642,42 @@ if (!global.use_ssr) {
         }())
     });
 
-    AFRAME.registerComponent('cursor-animator', {
+    AFRAME.registerComponent('go-on-land', {
         init: function () {
             this.el.addEventListener('click', function (e: any) {
-                const npcEl = document.querySelector('#npc');
-                npcEl.components['globe-nav-agent'].data = {
-                    active: true,
-                    destination: e.detail.intersection.point,
-                    speed: 2,
-                };
+                const destination = e.detail.intersection.point;
+                setTimeout(() => {
+                    const npcEl = document.querySelector('#npc');
+                    npcEl.components['globe-nav-agent'].data = {
+                        active: true,
+                        destination,
+                        speed: 2,
+                    };
+                }, 1000);
+                setTimeout(() => {
+                    const npcEl = document.querySelector('#npc');
+                    const cameraEl = document.querySelector("#camera-rig");
+                    cameraEl.components['look-at-box'].data = "#npc";
+                    npcEl.components['globe-nav-agent'].data = {
+                        active: true,
+                        destination,
+                        speed: 2,
+                    };
+                }, 2000);
             });
         }
     });
+
+    AFRAME.registerComponent('go-to-sea', {
+        init: function () {
+            this.el.addEventListener('click', function (e: any) {
+                setTimeout(() => {
+                    const cameraEl = document.querySelector("#camera-rig");
+                    cameraEl.components['look-at-box'].data = "#box";
+                }, 2000);
+            });
+        }
+    })
 }
 
 const PLANET_SIZE = 100;
@@ -903,37 +930,30 @@ export const PlanetGenerator = () => {
                                     <Entity light={{type: "directional", color: "#EEE", intensity: 0.5}} position={{x: 0, y: -1, z: 0}}></Entity>
                                     <Entity physics/>
                                     <Entity id="box" dynamic-body="shape: sphere; sphereRadius: 1; mass: 100" globe-gravity globe-keyboard-controls="enabled: true; fly: true" position={{x: 0, y: 15 + PLANET_SIZE, z: 0}}>
-                                        <Entity gltf-model={sloopModelSource} rotation="0 -90 0" scale="0.1 0.1 0.1"></Entity>
+                                        <Entity gltf-model={sloopModelSource} go-to-sea rotation="0 -90 0" scale="0.1 0.1 0.1"></Entity>
                                         <Entity id="box-position" position={{x: 0, y: 0, z: 5}}/>
                                     </Entity>
-                                    <Entity id="camera-rig" look-at-box position={{x: 0, y: 0, z: 5}}>
+                                    <Entity id="npc" static-body="shape: sphere; sphereRadius: 0.1; mass: 1" globe-nav-agent position={{x: 0, y: PLANET_SIZE, z: 0}}>
+                                        <Entity primitive="a-sphere" scale="0.1 0.1 0.1"/>
+                                        <Entity id="npc-position" position={{x: 0, y: 0, z: -5}}/>
+                                    </Entity>
+                                    <Entity id="camera-rig" look-at-box="#box" position={{x: 0, y: 0, z: 5}}>
                                         <Entity primitive="a-camera" wasd-controls-enabled="false" look-controls-enabled="false" position={{x: 0, y: 1.6, z: 0}}>
                                         </Entity>
                                     </Entity>
                                     {
                                         worldModelSource.map(([str, collidable, navmesh, ocean], index) => (
                                             ocean ? (
-                                                <Entity key={index} gltf-model={str} position={{x: 0, y: 0, z: 0}}/>
-                                            ) :navmesh ? (
+                                                <Entity key={index} gltf-model={str} position={{x: 0, y: 0, z: 0}} go-to-sea/>
+                                            ) : navmesh ? (
                                                 <Entity key={index} globe-nav-mesh gltf-model={str} position={{x: 0, y: 0, z: 0}}/>
                                             ) : collidable ? (
-                                                <Entity key={index} static-body="shape: none;" globe-trimesh gltf-model={str} position={{x: 0, y: 0, z: 0}} cursor-animator
-                                                />
+                                                <Entity key={index} static-body="shape: none;" globe-trimesh gltf-model={str} position={{x: 0, y: 0, z: 0}} go-on-land/>
                                             ): (
                                                 <Entity key={index} static-body="shape: none;" globe-trimesh gltf-model={str} position={{x: 0, y: 0, z: 0}}/>
                                             )
                                         ))
                                     }
-                                    <Entity dynamic-body="shape: sphere; sphereRadius: 1; mass: 100;" globe-gravity position={{x: 3, y: 15 + PLANET_SIZE, z: 0}}>
-                                        <Entity gltf-model={sloopModelSource} rotation="0 -90 0" scale="0.1 0.1 0.1"></Entity>
-                                    </Entity>
-                                    <Entity dynamic-body="shape: sphere; sphereRadius: 1; mass: 100;" globe-gravity position={{x: 6, y: 15 + PLANET_SIZE, z: 0}}>
-                                        <Entity gltf-model={sloopModelSource} rotation="0 -90 0" scale="0.1 0.1 0.1"></Entity>
-                                    </Entity>
-                                    <Entity dynamic-body="shape: sphere; sphereRadius: 1; mass: 100;" globe-gravity position={{x: 9, y: 15 + PLANET_SIZE, z: 0}}>
-                                        <Entity gltf-model={sloopModelSource} rotation="0 -90 0" scale="0.1 0.1 0.1"></Entity>
-                                    </Entity>
-                                    <Entity primitive="a-sphere" globe-nav-agent id="npc" position={{x: 0, y: PLANET_SIZE, z: 0}}></Entity>
                                 </Scene>
                                 <Button onClick={() => {
                                     drawGraph();
