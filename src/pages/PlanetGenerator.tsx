@@ -139,17 +139,25 @@ if (!global.use_ssr) {
         },
         tick: function () {
             // get elements
-            const box = document.querySelector(`${this.data}`)?.object3D;
-            const boxPos = document.querySelector(`${this.data}-position`)?.object3D;
+            // @ts-ignore
+            const box = Array.from(document.querySelectorAll(`${this.data}`)).map(el => el.object3D);
+            // @ts-ignore
+            const boxPos = Array.from(document.querySelectorAll(`${this.data}-position`)).map(el => el.object3D);
             if (!box || !boxPos) {
                 return;
             }
 
             // get position
             // @ts-ignore
-            const boxWorldPos = box.getWorldPosition(new THREE.Vector3());
+            const boxWorldPos = new THREE.Vector3();
             // @ts-ignore
-            const boxPosWorldPos = boxPos.getWorldPosition(new THREE.Vector3());
+            box.forEach(b => boxWorldPos.add(b.getWorldPosition(new THREE.Vector3())));
+            boxWorldPos.divideScalar(box.length);
+            // @ts-ignore
+            const boxPosWorldPos = new THREE.Vector3();
+            // @ts-ignore
+            boxPos.forEach(b => boxPosWorldPos.add(b.getWorldPosition(new THREE.Vector3())));
+            boxPosWorldPos.divideScalar(boxPos.length);
 
             // get info
             // @ts-ignore
@@ -644,25 +652,40 @@ if (!global.use_ssr) {
 
     AFRAME.registerComponent('go-on-land', {
         init: function () {
-            this.el.addEventListener('click', function (e: any) {
-                const destination = e.detail.intersection.point;
+            this.system = this.el.sceneEl!.systems['globe-nav'];
+            // @ts-ignore
+            this.el.addEventListener('click', (e: any) => {
+                const destination1 = e.detail.intersection.point.clone();
                 setTimeout(() => {
-                    const npcEl = document.querySelector('#npc');
-                    npcEl.components['globe-nav-agent'].data = {
-                        active: true,
-                        destination,
-                        speed: 2,
-                    };
+                    const npcEls = document.querySelectorAll('.npc');
+                    npcEls.forEach(npcEl => {
+                        // @ts-ignore
+                        npcEl.components['globe-nav-agent'].data = {
+                            active: false,
+                            destination: destination1,
+                            speed: 2,
+                        };
+                    });
                 }, 1000);
                 setTimeout(() => {
-                    const npcEl = document.querySelector('#npc');
+                    const npcEls = document.querySelectorAll('.npc');
                     const cameraEl = document.querySelector("#camera-rig");
-                    cameraEl.components['look-at-box'].data = "#npc";
-                    npcEl.components['globe-nav-agent'].data = {
-                        active: true,
-                        destination,
-                        speed: 2,
-                    };
+                    cameraEl.components['look-at-box'].data = ".npc";
+                    npcEls.forEach(npcEl => {
+                        // @ts-ignore
+                        const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3).add(new THREE.Vector3().random()), destination1.clone().negate());
+                        // @ts-ignore
+                        const intersections = raycaster.intersectObject(this.system.getNavMesh());
+                        if (intersections[0]) {
+                            const destination2 = intersections[0].point.clone();
+                            // @ts-ignore
+                            npcEl.components['globe-nav-agent'].data = {
+                                active: true,
+                                destination: destination2,
+                                speed: 2,
+                            };
+                        }
+                    });
                 }, 2000);
             });
         }
@@ -933,10 +956,16 @@ export const PlanetGenerator = () => {
                                         <Entity gltf-model={sloopModelSource} go-to-sea rotation="0 -90 0" scale="0.1 0.1 0.1"></Entity>
                                         <Entity id="box-position" position={{x: 0, y: 0, z: 5}}/>
                                     </Entity>
-                                    <Entity id="npc" static-body="shape: sphere; sphereRadius: 0.1; mass: 1" globe-nav-agent position={{x: 0, y: PLANET_SIZE, z: 0}}>
-                                        <Entity primitive="a-sphere" scale="0.1 0.1 0.1"/>
-                                        <Entity id="npc-position" position={{x: 0, y: 0, z: -5}}/>
-                                    </Entity>
+                                    {
+                                        new Array(10).fill(0).map((_, i) => i).map(i => {
+                                            return (
+                                                <Entity key={i} className="npc" static-body="shape: sphere; sphereRadius: 0.1; mass: 1" globe-nav-agent position={{x: 0, y: PLANET_SIZE, z: i}}>
+                                                    <Entity primitive="a-sphere" scale="0.1 0.1 0.1"/>
+                                                    <Entity className="npc-position" position={{x: 0, y: 0, z: -5}}/>
+                                                </Entity>
+                                            );
+                                        })
+                                    }
                                     <Entity id="camera-rig" look-at-box="#box" position={{x: 0, y: 0, z: 5}}>
                                         <Entity primitive="a-camera" wasd-controls-enabled="false" look-controls-enabled="false" position={{x: 0, y: 1.6, z: 0}}>
                                         </Entity>
