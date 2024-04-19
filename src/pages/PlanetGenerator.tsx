@@ -34,6 +34,16 @@ importPromise.then(() => {
     importReady = true;
 });
 
+const NPC_CONTEXT: {
+    addNpcs: (() => void) | null,
+    removeNpcs: (() => void) | null,
+    updateNpcPosition: ((i: number, position: {x: number, y: number, z: number}) => void) | null,
+} = {
+    addNpcs: null,
+    removeNpcs: null,
+    updateNpcPosition: null,
+};
+
 // @ts-ignore
 if (!global.use_ssr) {
     AFRAME.registerComponent('globe-gravity', {
@@ -559,7 +569,8 @@ if (!global.use_ssr) {
             this.system.removeAgent(this);
         },
         update: function () {
-            this.path.length = 0;
+            this.path = [];
+            this.group = null;
         },
         updateNavLocation: function () {
             this.group = null;
@@ -594,8 +605,11 @@ if (!global.use_ssr) {
                     console.warn('[nav] Unable to find path to %o.', data.destination);
                     this.el.components['globe-nav-agent'].data.active = false;
                     el.emit('navigation-end');
-                    el.object3D.position.set(vDest.x, vDest.y, vDest.z);
+                    el.object3D.position.copy(vDest);
                     this.group = null;
+                    if (NPC_CONTEXT.updateNpcPosition) {
+                        NPC_CONTEXT.updateNpcPosition(this.el.components['npc-id'].data, vDest.clone());
+                    }
                     return;
                 }
 
@@ -658,6 +672,12 @@ if (!global.use_ssr) {
                 const destination1 = e.detail.intersection.point.clone();
                 setTimeout(() => {
                     const npcEls = document.querySelectorAll('.npc');
+                    if (!npcEls.length && NPC_CONTEXT.addNpcs) {
+                        NPC_CONTEXT.addNpcs();
+                    }
+                }, 0);
+                setTimeout(() => {
+                    const npcEls = document.querySelectorAll('.npc');
                     npcEls.forEach(npcEl => {
                         // @ts-ignore
                         npcEl.components['globe-nav-agent'].data = {
@@ -695,10 +715,25 @@ if (!global.use_ssr) {
         init: function () {
             this.el.addEventListener('click', function (e: any) {
                 setTimeout(() => {
+                    const npcEls = document.querySelectorAll('.npc');
+                    if (npcEls.length && NPC_CONTEXT.removeNpcs) {
+                        NPC_CONTEXT.removeNpcs();
+                    }
+                }, 0);
+                setTimeout(() => {
                     const cameraEl = document.querySelector("#camera-rig");
                     cameraEl.components['look-at-box'].data = "#box";
                 }, 2000);
             });
+        }
+    })
+
+    AFRAME.registerComponent('npc-id', {
+        schema: {
+            type: "number",
+            default: 0
+        },
+        init: function () {
         }
     })
 }
@@ -712,6 +747,18 @@ export const PlanetGenerator = () => {
     const [sloopModelSource, setSloopModelSource] = useState<string>("");
     const [loadMessage, setLoadMessage] = useState<string>("No data loaded...");
     const ref = useRef<HTMLDivElement | null>(null);
+    const [npcs, setNpcs] = useState<number[]>([]);
+    NPC_CONTEXT.addNpcs = () => {
+        setNpcs(new Array(10).fill(0).map((_, i) => i));
+    };
+    NPC_CONTEXT.removeNpcs = () => {
+        setNpcs([]);
+    };
+    NPC_CONTEXT.updateNpcPosition = (i: number, position) => {
+        const npc = Array.from(document.querySelectorAll(".npc"))[i];
+        // @ts-ignore
+        npc.components['position'].data = position;
+    };
     const drawGraph = useCallback(() => {
         // @ts-ignore
         if (global.use_ssr || !context) {
@@ -957,9 +1004,9 @@ export const PlanetGenerator = () => {
                                         <Entity id="box-position" position={{x: 0, y: 0, z: 5}}/>
                                     </Entity>
                                     {
-                                        new Array(10).fill(0).map((_, i) => i).map(i => {
+                                        npcs.map((i) => {
                                             return (
-                                                <Entity key={i} className="npc" static-body="shape: sphere; sphereRadius: 0.1; mass: 1" globe-nav-agent position={{x: 0, y: PLANET_SIZE, z: i}}>
+                                                <Entity key={i} className="npc" static-body="shape: sphere; sphereRadius: 0.1; mass: 1" globe-nav-agent position={{x: 0, y: PLANET_SIZE, z: i}} npc-id={i}>
                                                     <Entity primitive="a-sphere" scale="0.1 0.1 0.1"/>
                                                     <Entity className="npc-position" position={{x: 0, y: 0, z: -5}}/>
                                                 </Entity>
