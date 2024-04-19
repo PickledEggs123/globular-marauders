@@ -3,13 +3,13 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlserver"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
-model Planet {
-  id        Int     @id(map: "PK__Planet__3213E83FB0AA2039") @default(autoincrement())
-  seed      String  @db.VarChar(255)
-  meshUrl   String  @db.VarChar(255)
-  meshesUrl String? @db.VarChar(255)
+model planets {
+  id        Int    @id @default(autoincrement())
+  seed      String @db.VarChar(255)
+  meshUrl   String @db.VarChar(255)
+  meshesUrl String @db.VarChar(255)
 }

@@ -70,7 +70,7 @@ app.get('/api/planet', async (req, res) => {
     try {
         await prisma.$connect();
         const max = await prisma.planet.count();
-        const planet = await prisma.planet.findFirstOrThrow({ where: { id: Math.floor(Math.random() * max) } });
+        const planet = await prisma.planet.findFirstOrThrow({ where: { id: Math.floor(Math.random() * max) + 1 } });
         previewUrl = planet.meshUrl;
         gameUrl = planet.meshesUrl;
 
