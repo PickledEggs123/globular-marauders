@@ -14,6 +14,7 @@ import {CssBaseline} from "@mui/material";
 import {theme} from "../src/theme";
 import {ThemeProvider} from "@mui/material/styles";
 import {PrismaClient} from "@prisma/client";
+import compression from "compression";
 
 const PORT = process.env.PORT || 8080;
 const app = express();
@@ -86,6 +87,7 @@ app.get('/api/planet', async (req, res) => {
     });
 });
 
+app.use(compression());
 app.use(express.static('./build'));
 
 app.listen(PORT, () => {
