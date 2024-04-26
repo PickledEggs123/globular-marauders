@@ -5,6 +5,7 @@ import {Button, Card, CardContent, CardHeader, Container, Grid, Paper, Typograph
 // @ts-ignore
 import {generatePlanetGltf} from "@pickledeggs123/globular-marauders-generator/dist/helpers";
 import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
+import {IGameSpawnPoint, IGameBuilding} from "@pickledeggs123/globular-marauders-generator/helpers";
 import * as PIXI from "pixi.js";
 import {BLEND_MODES} from "pixi.js";
 import Quaternion from "quaternion";
@@ -122,7 +123,12 @@ export const PlanetGenerator = () => {
                 app.stage.addChild(mesh as unknown as any);
             }
         };
-        const handleData = (meshes: IGameMesh[]) => {
+        const handleData = (inputData: {meshes: IGameMesh[], spawnPoints: IGameSpawnPoint[], buildings: IGameBuilding[]}) => {
+            const {
+                meshes,
+                spawnPoints,
+                buildings,
+            } = inputData;
             const data: IGameMesh[] = meshes;
             setLoadMessage("Data Loaded");
             context.gameData = data;
@@ -182,7 +188,7 @@ export const PlanetGenerator = () => {
                 const gameJson = await gameResponse.json();
 
                 context.preview = previewJson as IGameMesh;
-                handleData(gameJson as IGameMesh[]);
+                handleData(gameJson as {meshes: IGameMesh[], spawnPoints: IGameSpawnPoint[], buildings: IGameBuilding[]});
             }
         })();
     }, [context]);
