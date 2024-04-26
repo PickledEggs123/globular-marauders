@@ -5,11 +5,20 @@ import {Button, Card, CardContent, CardHeader, Container, Grid, Paper, Typograph
 // @ts-ignore
 import {generatePlanetGltf} from "@pickledeggs123/globular-marauders-generator/dist/helpers";
 import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
-import {IGameSpawnPoint, IGameBuilding} from "@pickledeggs123/globular-marauders-generator/helpers";
 import * as PIXI from "pixi.js";
 import {BLEND_MODES} from "pixi.js";
 import Quaternion from "quaternion";
 import {ShipContext} from "../contextes/ShipContext";
+
+interface IGameSpawnPoint {
+    point: [number, number, number];
+}
+
+interface IGameBuilding {
+    type: "PORT";
+    point: [number, number, number];
+    lookAt: [number, number, number];
+}
 
 const PLANET_SIZE = 100;
 
