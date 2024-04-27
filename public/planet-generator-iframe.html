@@ -159,16 +159,6 @@
             }
         });
 
-        AFRAME.registerComponent('physics', {
-            schema: {},
-            init: function () {
-                // @ts-ignore
-                this.system.driver.world.gravity.set(0, 0, 0);
-                // @ts-ignore
-                this.system.debug = true;
-            }
-        });
-
         const KEYCODE_TO_CODE = {
             '38': 'ArrowUp',
             '37': 'ArrowLeft',
@@ -741,6 +731,62 @@
             const arr = Array.from(document.querySelectorAll("[terrain-tile]"));
             arr.forEach(a => scene.removeChild(a));
         }
+
+        function addPort(item) {
+            const {
+                data: str, point, lookAt
+            } = JSON.parse(item);
+            const rootPort = document.createElement("a-entity");
+            rootPort.setAttribute("position", `${point[0]} ${point[1]} ${point[2]}`);
+            rootPort.setAttribute("terrain-tile", "");
+
+            const rootModel = document.createElement("a-entity");
+            rootModel.setAttribute("gltf-model", str);
+            rootModel.setAttribute("scale", "0.1 0.1 0.1");
+            rootModel.setAttribute("rotation", "90 0 0");
+            rootModel.setAttribute("position", "1.35 -1.1 -0.5");
+            rootPort.appendChild(rootModel);
+
+            const scene = document.querySelector("a-scene");
+            scene.appendChild(rootPort);
+
+            rootPort.object3D.up = new THREE.Vector3(point[0], point[1], point[2]).normalize();
+            rootPort.object3D.lookAt(new THREE.Vector3(lookAt[0], lookAt[1], lookAt[2]));
+        }
+
+        function addShip(item) {
+            if (!!document.querySelector("#box")) {
+                return;
+            }
+
+            const {
+                data: str, point
+            } = JSON.parse(item);
+
+            const rootShip = document.createElement("a-entity");
+            rootShip.setAttribute("id", "box");
+            rootShip.setAttribute("dynamic-body", "shape: sphere; sphereRadius: 1; mass: 100");
+            rootShip.setAttribute("globe-gravity", "");
+            rootShip.setAttribute("globe-keyboard-controls", "enabled: true; fly: true");
+            rootShip.setAttribute("position", `${point[0]} ${point[1]} ${point[2]}`);
+
+            const rootModel = document.createElement("a-entity");
+            rootModel.setAttribute("gltf-model", str);
+            rootModel.setAttribute("go-to-sea", "");
+            rootModel.setAttribute("scale", "0.1 0.1 0.1");
+            rootModel.setAttribute("rotation", "0 -90 0");
+            rootShip.appendChild(rootModel);
+
+            const rootPosition = document.createElement("a-entity");
+            rootPosition.setAttribute("id", "box-position");
+            rootPosition.setAttribute("position", "0 0 5");
+            rootShip.appendChild(rootPosition);
+
+            const scene = document.querySelector("a-scene");
+            scene.appendChild(rootShip);
+            const cameraEl = document.querySelector("#camera-rig");
+            cameraEl.setAttribute("look-at-box", "#box");
+        }
     </script>
     <style>
         a-scene {
@@ -750,16 +796,11 @@
     </style>
 </head>
 <body>
-    <a-scene physics="debug: true; driver: local; gravity: 0 0 0;" globe-nav embedded cursor="rayOrigin:mouse" id="scene">
+    <a-scene physics="driver: local; gravity: 0 0 0;" globe-nav embedded cursor="rayOrigin:mouse" id="scene">
         <a-entity light="type: ambient; color: #CCC"></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.5" position="0 1 0"></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.5" position="0 -1 0"></a-entity>
-        <a-entity physics></a-entity>
-        <a-entity id="box" dynamic-body="shape: sphere; sphereRadius: 1; mass: 100" globe-gravity globe-keyboard-controls="enabled: true; fly: true" position="0 105 0">
-            <a-sphere go-to-sea></a-sphere>
-            <a-entity id="box-position" position="0 0 5"></a-entity>
-        </a-entity>
-        <a-entity id="camera-rig" look-at-box="#box" position="0 105 5">
+        <a-entity id="camera-rig" position="0 105 5">
             <a-camera wasd-controls-enabled="false" look-controls-enabled="false" position="0 1.6 0"></a-camera>
         </a-entity>
     </a-scene>
