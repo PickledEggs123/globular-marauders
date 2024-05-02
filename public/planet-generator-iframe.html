@@ -615,6 +615,293 @@
             }())
         });
 
+        /**
+         * nav
+         *
+         * Pathfinding system, using PatrolJS.
+         */
+        AFRAME.registerSystem('globe-ocean-nav', {
+            navMesh: null,
+            agents: new Set(),
+            init: function () {
+                this.navMesh = null;
+                this.agents = new Set();
+            },
+
+            /**
+             * @param {THREE.Geometry} geometry
+             */
+            setNavMeshGeometry: function (geometry) {
+                // @ts-ignore
+                this.navMesh = new THREE.Mesh(geometry);
+                pathfinder.setZoneData(ZONE, threePathfinding.Pathfinding.createZone(geometry));
+                Array.from(this.agents).forEach((agent) => agent.updateNavLocation());
+            },
+
+            /**
+             * @return {THREE.Mesh}
+             */
+            getNavMesh: function () {
+                return this.navMesh;
+            },
+
+            /**
+             * @param {NavAgent} ctrl
+             */
+            addAgent: function (ctrl) {
+                this.agents.add(ctrl);
+            },
+
+            /**
+             * @param {NavAgent} ctrl
+             */
+            removeAgent: function (ctrl) {
+                this.agents.delete(ctrl);
+            },
+
+            /**
+             * @param  {THREE.Vector3} start
+             * @param  {THREE.Vector3} end
+             * @param  {number} groupID
+             * @return {Array<THREE.Vector3>}
+             */
+            getPath: function (start, end, groupID) {
+                return this.navMesh
+                    ? groupID === null ? [] : pathfinder.findPath(start, end, ZONE, groupID)
+                    : null;
+            },
+
+            /**
+             * @param {THREE.Vector3} position
+             * @return {number}
+             */
+            getGroup: function (position) {
+                return this.navMesh
+                    ? pathfinder.getGroup(ZONE, position)
+                    : null;
+            },
+
+            /**
+             * @param  {THREE.Vector3} position
+             * @param  {number} groupID
+             * @return {Node}
+             */
+            getNode: function (position, groupID) {
+                return this.navMesh
+                    ? pathfinder.getClosestNode(position, ZONE, groupID, true)
+                    : null;
+            },
+
+            /**
+             * @param  {THREE.Vector3} start Starting position.
+             * @param  {THREE.Vector3} end Desired ending position.
+             * @param  {number} groupID
+             * @param  {Node} node
+             * @param  {THREE.Vector3} endTarget (Output) Adjusted step end position.
+             * @return {Node} Current node, after step is taken.
+             */
+            clampStep: function (start, end, groupID, node, endTarget) {
+                if (!this.navMesh) {
+                    endTarget.copy(end);
+                    return null;
+                } else if (!node) {
+                    endTarget.copy(end);
+                    return this.getNode(end, groupID);
+                }
+                return pathfinder.clampStep(start, end, node, ZONE, groupID, endTarget);
+            }
+        });
+
+        AFRAME.registerComponent('globe-ocean-nav-mesh', {
+            schema: {
+                nodeName: {type: 'string'}
+            },
+            hasLoadedNavMesh: false,
+            nodeName: "",
+            init: function () {
+                this.system = this.el.sceneEl.systems['globe-ocean-nav'];
+                this.hasLoadedNavMesh = false;
+                this.nodeName = this.data.nodeName;
+                this.el.addEventListener('object3dset', this.loadNavMesh.bind(this));
+            },
+
+            play: function () {
+                if (!this.hasLoadedNavMesh) this.loadNavMesh();
+            },
+
+            loadNavMesh: function () {
+                var self = this;
+                const object = this.el.getObject3D('mesh');
+                const scene = this.el.sceneEl.object3D;
+
+                if (!object) return;
+
+                let navMesh;
+                object.traverse((node) => {
+                    if (node.isMesh &&
+                        (!self.nodeName || node.name === self.nodeName)) navMesh = node;
+                });
+
+                if (!navMesh) return;
+
+                // @ts-ignore
+                const navMeshGeometry = navMesh.geometry.clone();
+                // @ts-ignore
+                navMesh.updateWorldMatrix(true, false);
+                // @ts-ignore
+                navMeshGeometry.applyMatrix4(navMesh.matrixWorld);
+                // @ts-ignore
+                this.system.setNavMeshGeometry(navMeshGeometry);
+                this.hasLoadedNavMesh = true;
+            }
+        });
+
+        AFRAME.registerComponent('globe-ocean-nav-agent', {
+            schema: {
+                destination: {type: 'vec3'},
+                active: {default: false},
+                speed: {default: 2}
+            },
+            system: null,
+            group: null,
+            path: [],
+            raycaster: null,
+            init: function () {
+                this.system = this.el.sceneEl.systems['globe-ocean-nav'];
+                this.system.addAgent(this);
+                this.group = null;
+                this.path = [];
+                // @ts-ignore
+                this.raycaster = new THREE.Raycaster();
+            },
+            remove: function () {
+                this.system.removeAgent(this);
+            },
+            update: function () {
+                this.path.length = 0;
+            },
+            updateNavLocation: function () {
+                this.group = null;
+                this.path = [];
+            },
+            tick: (function () {
+                // @ts-ignore
+                const vDest = new THREE.Vector3();
+                // @ts-ignore
+                const vDelta = new THREE.Vector3();
+                // @ts-ignore
+                const vNext = new THREE.Vector3();
+
+                return function (t, dt) {
+                    const el = this.el;
+                    const data = this.data;
+                    const raycaster = this.raycaster;
+                    const speed = data.speed * dt / 1000;
+
+                    if (!data.active) return;
+
+                    // Use PatrolJS pathfinding system to get shortest path to target.
+                    if (!this.path.length) {
+                        const position = this.el.object3D.position;
+                        this.group = this.group || this.system.getGroup(position);
+                        this.path = this.system.getPath(position, vDest.copy(data.destination), this.group) || [];
+                        el.emit('navigation-start');
+                    }
+
+                    // If no path is found, exit.
+                    if (!this.path.length) {
+                        console.warn('[nav] Unable to find path to %o.', data.destination);
+                        this.el.setAttribute("globe-ocean-nav-agent", "active: false;");
+                        el.emit('navigation-end');
+                        el.object3D.position.copy(vDest);
+                        console.log(el.object3D.position);
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyW"});
+                        this.group = null;
+                        return;
+                    }
+
+                    // Current segment is a vector from current position to next waypoint.
+                    const vCurrent = new THREE.Vector3().copy(el.components['dynamic-body'].body.position);
+                    const vWaypoint = this.path[0];
+                    vDelta.subVectors(vWaypoint, vCurrent);
+
+                    const distance = vDelta.length();
+                    let gazeTarget;
+
+                    if (distance < 4) {
+                        // If <1 step from current waypoint, discard it and move toward next.
+                        this.path.shift();
+
+                        // After discarding the last waypoint, exit pathfinding.
+                        if (!this.path.length) {
+                            this.el.setAttribute("globe-ocean-nav-agent", "active: false;");
+                            el.emit('navigation-end');
+                            el.components['globe-keyboard-controls'].onKeyUp({code: "KeyW"});
+                            return;
+                        }
+
+                        vNext.copy(vCurrent);
+                        gazeTarget = this.path[0];
+                    } else {
+                        // If still far away from next waypoint, find next position for
+                        // the current frame.
+                        vNext.copy(vDelta.setLength(speed)).add(vCurrent);
+                        gazeTarget = vWaypoint;
+                    }
+
+                    // Look at the next waypoint.
+                    // gazeTarget.y = vCurrent.y;
+                    // |  x  y  z |
+                    // | a1 b1 c1 |
+                    // | a2 b2 c2 |
+                    const getDeterminant = () => {
+                        const v1 = new THREE.Vector3(0, 0, -1).applyQuaternion(new THREE.Quaternion().copy(el.components['dynamic-body'].body.quaternion));
+                        const v2 = gazeTarget.clone().sub(vCurrent.clone()).normalize();
+                        const a1 = v1.x;
+                        const b1 = v1.y;
+                        const c1 = v1.z;
+                        const a2 = v2.x;
+                        const b2 = v2.y;
+                        const c2 = v2.z;
+                        const dot = v1.dot(v2);
+                        const det = a1 * b2 + b1 * c2 + c1 * a2 - b1 * a2 - c1 * b2 - a1 * c2;
+                        if (dot < -0.75) {
+                            return -1;
+                        } else if (dot < 0) {
+                            return Math.sign(det);
+                        } else {
+                            return det;
+                        }
+                    };
+                    const det = getDeterminant();
+                    if (det < 0) {
+                        if (Math.random() * 0.5 < Math.abs(det)) {
+                            el.components['globe-keyboard-controls'].onKeyDown({code: "KeyD"});
+                            el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA"});
+                        } else {
+                            el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD"});
+                        }
+                    } else if (det > 0) {
+                        if (Math.random() * 0.33 < Math.abs(det)) {
+                            el.components['globe-keyboard-controls'].onKeyDown({code: "KeyA"});
+                            el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD"});
+                        } else {
+                            el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA"});
+                        }
+                    } else {
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA"});
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD"});
+                    }
+
+                    if (Math.abs(det) < 0.1) {
+                        el.components['globe-keyboard-controls'].onKeyDown({code: "KeyW"});
+                    } else {
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyW"});
+                    }
+                };
+            }())
+        });
+
         AFRAME.registerComponent('go-on-land', {
             init: function () {
                 this.system = this.el.sceneEl.systems['globe-nav'];
@@ -635,7 +922,7 @@
                             // @ts-ignore
                             npcEl.setAttribute("globe-nav-agent", `active: false; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
                         });
-                    }, 1000);
+                    }, 500);
                     setTimeout(() => {
                         const npcEls = document.querySelectorAll('.npc');
                         const cameraEl = document.querySelector("#camera-rig");
@@ -651,7 +938,7 @@
                                 npcEl.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2;`);
                             }
                         });
-                    }, 2000);
+                    }, 1000);
                 });
             }
         });
@@ -659,6 +946,7 @@
         AFRAME.registerComponent('go-to-sea', {
             init: function () {
                 this.el.addEventListener('click', function (e) {
+                    const destination1 = e.detail.intersection.point.clone();
                     setTimeout(() => {
                         const cameraEl = document.querySelector("#camera-rig");
                         cameraEl.setAttribute("look-at-box", "#box");
@@ -668,6 +956,20 @@
                         if (npcs.length !== 0) {
                             removeNpc();
                         }
+                    }, 1000);
+                    setTimeout(() => {
+                        const shipEls = document.querySelectorAll('#box');
+                        shipEls.forEach(shipEl => {
+                            // @ts-ignore
+                            shipEl.setAttribute("globe-ocean-nav-agent", `active: false; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
+                        });
+                    }, 500);
+                    setTimeout(() => {
+                        const shipEls = document.querySelectorAll('#box');
+                        shipEls.forEach(shipEl => {
+                            // @ts-ignore
+                            shipEl.setAttribute("globe-ocean-nav-agent", `active: true; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
+                        });
                     }, 1000);
                 });
             }
@@ -711,6 +1013,7 @@
             rootTerrain.setAttribute("terrain-tile", "");
             if (ocean) {
                 rootTerrain.setAttribute("go-to-sea", "");
+                rootTerrain.setAttribute("globe-ocean-nav-mesh", "");
             } else if (navmesh) {
                 rootTerrain.setAttribute("globe-nav-mesh", "");
             } else if (collidable) {
@@ -796,7 +1099,7 @@
     </style>
 </head>
 <body>
-    <a-scene physics="driver: local; gravity: 0 0 0;" globe-nav embedded cursor="rayOrigin:mouse" id="scene">
+    <a-scene physics="driver: local; gravity: 0 0 0;" globe-nav globe-ocean-nav embedded cursor="rayOrigin:mouse" id="scene">
         <a-entity light="type: ambient; color: #CCC"></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.5" position="0 1 0"></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.5" position="0 -1 0"></a-entity>
