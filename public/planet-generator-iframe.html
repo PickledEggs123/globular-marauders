@@ -358,6 +358,7 @@
         });
 
         const pathfinder = new threePathfinding.Pathfinding();
+        const oceanPathfinder = new threePathfinding.Pathfinding();
         const ZONE = 'level';
 
         /**
@@ -634,7 +635,7 @@
             setNavMeshGeometry: function (geometry) {
                 // @ts-ignore
                 this.navMesh = new THREE.Mesh(geometry);
-                pathfinder.setZoneData(ZONE, threePathfinding.Pathfinding.createZone(geometry));
+                oceanPathfinder.setZoneData(ZONE, threePathfinding.Pathfinding.createZone(geometry));
                 Array.from(this.agents).forEach((agent) => agent.updateNavLocation());
             },
 
@@ -667,7 +668,7 @@
              */
             getPath: function (start, end, groupID) {
                 return this.navMesh
-                    ? groupID === null ? [] : pathfinder.findPath(start, end, ZONE, groupID)
+                    ? groupID === null ? [] : oceanPathfinder.findPath(start, end, ZONE, groupID)
                     : null;
             },
 
@@ -677,7 +678,7 @@
              */
             getGroup: function (position) {
                 return this.navMesh
-                    ? pathfinder.getGroup(ZONE, position)
+                    ? oceanPathfinder.getGroup(ZONE, position)
                     : null;
             },
 
@@ -688,7 +689,7 @@
              */
             getNode: function (position, groupID) {
                 return this.navMesh
-                    ? pathfinder.getClosestNode(position, ZONE, groupID, true)
+                    ? oceanPathfinder.getClosestNode(position, ZONE, groupID, true)
                     : null;
             },
 
@@ -708,7 +709,7 @@
                     endTarget.copy(end);
                     return this.getNode(end, groupID);
                 }
-                return pathfinder.clampStep(start, end, node, ZONE, groupID, endTarget);
+                return oceanPathfinder.clampStep(start, end, node, ZONE, groupID, endTarget);
             }
         });
 

@@ -41,7 +41,7 @@ export const PlanetGenerator = () => {
 
             const meshesToSendToPixi: PIXI.Mesh<PIXI.Shader>[] = [];
             for (const d of data) {
-                if (d.navmesh || d.ocean || d.oceanNavmesh) {
+                if (d.navmesh) {
                     continue;
                 }
 
@@ -60,7 +60,7 @@ export const PlanetGenerator = () => {
                         uniform mat4 uRotation;
             
                         void main() {
-                            gl_Position = uRotation * vec4(aPosition * 0.90, 1.0);
+                            gl_Position = uRotation * vec4(aPosition * 0.86, 1.0);
                         }
                     `;
                     const planetFragmentShader = `
@@ -98,7 +98,7 @@ export const PlanetGenerator = () => {
                         void main() {
                             vColor = aColor;
             
-                            gl_Position = uRotation * vec4(aPosition * 0.90, 1.0);
+                            gl_Position = uRotation * vec4(aPosition * 0.86, 1.0);
                             vNormal = (uRotation * vec4(aNormal, 1.0)).xyz;
                         }
                     `;
@@ -149,7 +149,7 @@ export const PlanetGenerator = () => {
                 }, ...d.attributes.filter(x => x.id !== "aPosition"),
                 ]
             } as IGameMesh));
-            Promise.all<Uint8Array>([...data2.map(m => generatePlanetGltf(m, m.ocean)), generatePlanetGltf(shipContext[1], false), fetch("/meshes/Cartoon_Medieval_Port_and_Props.glb").then(r => r.blob()).then(b => b.arrayBuffer()).then(a => new Uint8Array(a))]).then((gltf) => {
+            Promise.all<Uint8Array>([...data2.map(m => generatePlanetGltf(m, m.ocean, m.navmesh)), generatePlanetGltf(shipContext[1], false), fetch("/meshes/Cartoon_Medieval_Port_and_Props.glb").then(r => r.blob()).then(b => b.arrayBuffer()).then(a => new Uint8Array(a))]).then((gltf) => {
                 const Uint8ToBase64 = (u8Arr: Uint8Array) => {
                     const CHUNK_SIZE = 0x8000; //arbitrary number
                     let index = 0;
