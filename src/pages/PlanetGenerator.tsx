@@ -188,14 +188,15 @@ export const PlanetGenerator = () => {
                 }
 
                 const dataUri3 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 1])}`;
-                if (iframeRef.current && buildings[0]) {
-                    const spawnPoint = buildings[0];
-                    const {
-                        point,
-                        lookAt,
-                    } = spawnPoint;
-                    // @ts-ignore
-                    iframeRef.current.contentWindow.addPort(JSON.stringify({data: dataUri3, point: point.map(x => x * PLANET_SIZE), lookAt: lookAt.map(x => x * PLANET_SIZE)}));
+                if (iframeRef.current && buildings.length) {
+                    for (const spawnPoint of buildings) {
+                        const {
+                            point,
+                            lookAt,
+                        } = spawnPoint;
+                        // @ts-ignore
+                        iframeRef.current.contentWindow.addPort(JSON.stringify({data: dataUri3, point: point.map(x => x * PLANET_SIZE), lookAt: lookAt.map(x => x * PLANET_SIZE)}));
+                    }
                 }
             });
 
