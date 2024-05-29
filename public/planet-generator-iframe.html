@@ -595,6 +595,7 @@
 
                     // Look at the next waypoint.
                     // gazeTarget.y = vCurrent.y;
+                    el.object3D.up = new THREE.Vector3(vCurrent.x, vCurrent.y, vCurrent.z).normalize();
                     el.object3D.lookAt(gazeTarget);
 
                     // Raycast against the nav mesh, to keep the agent moving along the
@@ -1014,10 +1015,20 @@
             rootNpc.setAttribute("globe-nav-agent", "");
             rootNpc.setAttribute("position", "0 150 0");
 
-            const modelNpc = document.createElement("a-sphere");
-            modelNpc.setAttribute("scale", "0.1 0.1 0.1");
-            modelNpc.setAttribute("position", "0 0 0");
-            rootNpc.appendChild(modelNpc);
+            if (characterModels.has("WARRIOR")) {
+                const str = characterModels.get("WARRIOR");
+                const modelNpc = document.createElement("a-entity");
+                modelNpc.setAttribute("gltf-model", str);
+                modelNpc.setAttribute("scale", "1 1 1");
+                modelNpc.setAttribute("position", "0 0 0");
+                modelNpc.setAttribute("rotation", "0 0 0");
+                rootNpc.appendChild(modelNpc);
+            } else {
+                const modelNpc = document.createElement("a-sphere");
+                modelNpc.setAttribute("scale", "0.1 0.1 0.1");
+                modelNpc.setAttribute("position", "0 0 0");
+                rootNpc.appendChild(modelNpc);
+            }
 
             const positionNpc = document.createElement("a-entity");
             positionNpc.setAttribute("class", "npc-position");
@@ -1062,6 +1073,15 @@
             const scene = document.querySelector("a-scene");
             const arr = Array.from(document.querySelectorAll("[terrain-tile]"));
             arr.forEach(a => scene.removeChild(a));
+        }
+
+        var characterModels = new Map();
+        function addCharacterModel(item) {
+            const {
+                data: str, type
+            } = JSON.parse(item);
+
+            characterModels.set(type, str);
         }
 
         function addPort(item) {
