@@ -879,7 +879,6 @@
                         const basisZ = aVec.clone().normalize();
                         const basisX = new THREE.Vector3().crossVectors(basisY, basisZ);
                         const basis = new THREE.Matrix4().makeBasis(basisX, basisY, basisZ).invert();
-                        console.log(basis, basis.determinant());
 
                         // apply basis matrix
                         aVec = aVec.applyMatrix4(basis);
