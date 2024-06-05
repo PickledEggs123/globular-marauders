@@ -1106,6 +1106,28 @@
             rootPort.object3D.lookAt(new THREE.Vector3(lookAt[0], lookAt[1], lookAt[2]));
         }
 
+        function addHouse(item) {
+            const {
+                data: str, point, lookAt
+            } = JSON.parse(item);
+            const rootHouse = document.createElement("a-entity");
+            rootHouse.setAttribute("position", `${point[0]} ${point[1]} ${point[2]}`);
+            rootHouse.setAttribute("terrain-tile", "");
+
+            const rootModel = document.createElement("a-entity");
+            rootModel.setAttribute("gltf-model", str);
+            rootModel.setAttribute("scale", "1 1 1");
+            rootModel.setAttribute("rotation", "90 0 0");
+            rootModel.setAttribute("position", "0 0 0");
+            rootHouse.appendChild(rootModel);
+
+            const scene = document.querySelector("a-scene");
+            scene.appendChild(rootHouse);
+
+            rootHouse.object3D.up = new THREE.Vector3(point[0], point[1], point[2]).normalize();
+            rootHouse.object3D.lookAt(new THREE.Vector3(lookAt[0], lookAt[1], lookAt[2]));
+        }
+
         function addShip(item) {
             if (!!document.querySelector("#box")) {
                 return;

@@ -15,7 +15,7 @@ interface IGameSpawnPoint {
 }
 
 interface IGameBuilding {
-    type: "PORT";
+    type: "PORT" | "HOUSE";
     point: [number, number, number];
     lookAt: [number, number, number];
 }
@@ -154,6 +154,7 @@ export const PlanetGenerator = () => {
                 generatePlanetGltf(shipContext[1], false),
                 fetch("/meshes/Cartoon_Medieval_Port_and_Props.glb").then(r => r.blob()).then(b => b.arrayBuffer()).then(a => new Uint8Array(a)),
                 fetch("/meshes/golden+worier+glb+black+dull+gold.glb").then(r => r.blob()).then(b => b.arrayBuffer()).then(a => new Uint8Array(a)),
+                fetch("/meshes/House1.glb").then(r => r.blob()).then(b => b.arrayBuffer()).then(a => new Uint8Array(a)),
             ]).then((gltf) => {
                 const Uint8ToBase64 = (u8Arr: Uint8Array) => {
                     const CHUNK_SIZE = 0x8000; //arbitrary number
@@ -169,7 +170,7 @@ export const PlanetGenerator = () => {
                     return btoa(result);
                 }
                 const worldMeshes: [string, boolean, boolean, boolean][] = [];
-                for (let i = 0; i < gltf.length - 3; i++) {
+                for (let i = 0; i < gltf.length - 4; i++) {
                     const dataUri1 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[i])}`;
                     worldMeshes.push([dataUri1, data2[i].collidable, data2[i].navmesh, data2[i].ocean] as [string, boolean, boolean, boolean]);
                 }
@@ -182,7 +183,7 @@ export const PlanetGenerator = () => {
                     });
                 }
 
-                const dataUri2 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 3])}`;
+                const dataUri2 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 4])}`;
                 if (iframeRef.current && spawnPoints[0]) {
                     const spawnPoint = spawnPoints[0];
                     const {
@@ -192,19 +193,25 @@ export const PlanetGenerator = () => {
                     iframeRef.current.contentWindow.addShip(JSON.stringify({data: dataUri2, point: point.map(x => x * PLANET_SIZE)}));
                 }
 
-                const dataUri3 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 2])}`;
+                const dataUri3 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 3])}`;
+                const dataUri5 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 1])}`;
                 if (iframeRef.current && buildings.length) {
                     for (const spawnPoint of buildings) {
                         const {
                             point,
                             lookAt,
                         } = spawnPoint;
-                        // @ts-ignore
-                        iframeRef.current.contentWindow.addPort(JSON.stringify({data: dataUri3, point: point.map(x => x * PLANET_SIZE), lookAt: lookAt.map(x => x * PLANET_SIZE)}));
+                        if (spawnPoint.type === "PORT") {
+                            // @ts-ignore
+                            iframeRef.current.contentWindow.addPort(JSON.stringify({data: dataUri3, point: point.map(x => x * PLANET_SIZE), lookAt: lookAt.map(x => x * PLANET_SIZE)}));
+                        } else if (spawnPoint.type === "HOUSE") {
+                            // @ts-ignore
+                            iframeRef.current.contentWindow.addHouse(JSON.stringify({data: dataUri5, point: point.map(x => x * PLANET_SIZE), lookAt: lookAt.map(x => x * PLANET_SIZE)}));
+                        }
                     }
                 }
 
-                const dataUri4 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 1])}`;
+                const dataUri4 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 2])}`;
                 if (iframeRef.current) {
                     // @ts-ignore
                     iframeRef.current.contentWindow.addCharacterModel(JSON.stringify({type: "WARRIOR", data: dataUri4}));
