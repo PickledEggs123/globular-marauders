@@ -15,6 +15,19 @@
             schema: {
                 default: "",
             },
+            update: function () {
+                const data = this.data.split("|");
+
+                const lod0 = this.el.querySelector(".lod0");
+                const lod1 = this.el.querySelector(".lod1");
+                const lod2 = this.el.querySelector(".lod2");
+                if (!lod0 || !lod1 || !lod2) {
+                    return;
+                }
+                lod0.setAttribute("gltf-model", data[0]);
+                lod1.setAttribute("gltf-model", data[1]);
+                lod2.setAttribute("gltf-model", data[2]);
+            },
             tick: function () {
                 const object3D = this.el.object3D;
                 // @ts-ignore
@@ -27,12 +40,24 @@
                 const distance = pos.distanceTo(cameraPos);
 
                 const data = this.data.split("|");
+                const lod0 = this.el.querySelector(".lod0");
+                const lod1 = this.el.querySelector(".lod1");
+                const lod2 = this.el.querySelector(".lod2");
+                if (!lod0 || !lod1 || !lod2) {
+                    return;
+                }
                 if (distance >= 20) {
-                    this.el.setAttribute("gltf-model", data[2]);
-                } else if (distance < 20) {
-                    this.el.setAttribute("gltf-model", data[1]);
-                } else if (distance < 10) {
-                    this.el.setAttribute("gltf-model", data[0]);
+                    lod0.setAttribute("visible", "false");
+                    lod1.setAttribute("visible", "false");
+                    lod2.setAttribute("visible", "true");
+                } else if (distance >= 10) {
+                    lod0.setAttribute("visible", "false");
+                    lod1.setAttribute("visible", "true");
+                    lod2.setAttribute("visible", "false");
+                } else if (distance >= 0) {
+                    lod0.setAttribute("visible", "true");
+                    lod1.setAttribute("visible", "false");
+                    lod2.setAttribute("visible", "false");
                 }
             }
         });
@@ -1148,6 +1173,18 @@
             rootModel.setAttribute("rotation", "90 0 0");
             rootModel.setAttribute("position", "0 0 0");
             rootHouse.appendChild(rootModel);
+
+            const lod0 = document.createElement("a-entity");
+            lod0.setAttribute("class", "lod0");
+            rootModel.appendChild(lod0);
+
+            const lod1 = document.createElement("a-entity");
+            lod1.setAttribute("class", "lod1");
+            rootModel.appendChild(lod1);
+
+            const lod2 = document.createElement("a-entity");
+            lod2.setAttribute("class", "lod2");
+            rootModel.appendChild(lod2);
 
             const scene = document.querySelector("a-scene");
             scene.appendChild(rootHouse);
