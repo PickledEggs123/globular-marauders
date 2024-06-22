@@ -926,8 +926,8 @@
                         let bz = v2.z;
 
                         // make basis matrix for sphere
-                        let aVec = new THREE.Vector3().set(ax, ay, az);
-                        let bVec = new THREE.Vector3().set(bx, by, az);
+                        let aVec = new THREE.Vector3().set(ax, ay, az).normalize();
+                        let bVec = new THREE.Vector3().set(bx, by, az).normalize();
                         const basisY = a.clone().normalize();
                         const basisZ = aVec.clone().normalize();
                         const basisX = new THREE.Vector3().crossVectors(basisY, basisZ);
@@ -943,15 +943,11 @@
                         by = bVec.y;
                         bz = bVec.z;
 
-                        const dot = v1.dot(v2);
-                        const det = ax * by + ay * bz + az * bx - ay * bx - az * by - ax * bz;
-                        if (dot < -0.75) {
-                            return -1;
-                        } else if (dot < 0) {
-                            return Math.sign(det);
-                        } else {
-                            return det;
+                        let det = ax * by + ay * bz + az * bx - ay * bx - az * by - ax * bz;
+                        if (aVec.dot(bVec) < 0) {
+                            det += Math.sign(det);
                         }
+                        return det;
                     };
                     const det = getDeterminant();
                     if (det < 0) {
