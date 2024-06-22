@@ -41,7 +41,7 @@ export const PlanetGenerator = () => {
 
             const meshesToSendToPixi: PIXI.Mesh<PIXI.Shader>[] = [];
             for (const d of data) {
-                if (d.navmesh) {
+                if (d.navmesh || d.oceanNavmesh) {
                     continue;
                 }
 
@@ -150,7 +150,7 @@ export const PlanetGenerator = () => {
                 ]
             } as IGameMesh));
             Promise.all<Uint8Array>([
-                ...data2.map(m => generatePlanetGltf(m, m.ocean, m.navmesh)),
+                ...data2.map(m => generatePlanetGltf(m, m.ocean, m.navmesh || m.oceanNavmesh)),
                 generatePlanetGltf(shipContext[1], false),
                 fetch("/meshes/Port1-0.glb").then(r => r.blob()).then(b => b.arrayBuffer()).then(a => new Uint8Array(a)),
                 fetch("/meshes/Port1-1.glb").then(r => r.blob()).then(b => b.arrayBuffer()).then(a => new Uint8Array(a)),
@@ -176,10 +176,10 @@ export const PlanetGenerator = () => {
                     }
                     return btoa(result);
                 }
-                const worldMeshes: [string, boolean, boolean, boolean][] = [];
+                const worldMeshes: [string, boolean, boolean, boolean, boolean, [number, number, number]][] = [];
                 for (let i = 0; i < gltf.length - 11; i++) {
                     const dataUri1 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[i])}`;
-                    worldMeshes.push([dataUri1, data2[i].collidable, data2[i].navmesh, data2[i].ocean] as [string, boolean, boolean, boolean]);
+                    worldMeshes.push([dataUri1, data2[i].collidable, data2[i].navmesh, data2[i].ocean, data2[i].oceanNavmesh, data2[i].vertex] as [string, boolean, boolean, boolean, boolean, [number, number, number]]);
                 }
                 if (iframeRef.current) {
                     // @ts-ignore

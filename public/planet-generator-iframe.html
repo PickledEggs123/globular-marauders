@@ -16,6 +16,7 @@
             schema: {
                 default: "",
             },
+            counter: 60,
             update: function () {
                 const data = this.data.split("|");
 
@@ -30,6 +31,12 @@
                 lod2.setAttribute("gltf-model", data[2]);
             },
             tick: function () {
+                if (this.counter > 0) {
+                    this.counter -= 1;
+                    return;
+                }
+                this.counter = 60;
+
                 const object3D = this.el.object3D;
                 // @ts-ignore
                 const pos = object3D.getWorldPosition(new THREE.Vector3());
@@ -556,6 +563,7 @@
                 // @ts-ignore
                 this.system.setNavMeshGeometry(navMeshGeometry);
                 this.hasLoadedNavMesh = true;
+                this.el.setAttribute("visible", "false");
             }
         });
 
@@ -812,6 +820,7 @@
                 // @ts-ignore
                 this.system.setNavMeshGeometry(navMeshGeometry);
                 this.hasLoadedNavMesh = true;
+                this.el.setAttribute("visible", "false");
             }
         });
 
@@ -1058,7 +1067,31 @@
             }
         });
         AFRAME.registerComponent('terrain-tile', {
+            schema: {
+                type: "string",
+                default: ""
+            },
             init: function () {
+            },
+            tick: function () {
+                if (!this.data) {
+                    return;
+                }
+
+                const cameraEl = document.querySelector("#camera-rig");
+                // @ts-ignore
+                let cameraPos = cameraEl.object3D.getWorldPosition(new THREE.Vector3());
+                cameraPos = cameraPos.normalize();
+                // @ts-ignore
+                let tilePos = new THREE.Vector3();
+                tilePos = tilePos.set.apply(tilePos, this.data.split(" "));
+                tilePos = tilePos.normalize();
+
+                if (cameraPos.dot(tilePos) > 0.75) {
+                    this.el.setAttribute("visible", "true");
+                } else {
+                    this.el.setAttribute("visible", "false");
+                }
             }
         });
 
@@ -1099,16 +1132,18 @@
         }
 
         function addTerrain(item) {
-            const [str, collidable, navmesh, ocean] = JSON.parse(item);
+            const [str, collidable, navmesh, ocean, oceanNavmesh, vertex] = JSON.parse(item);
             const rootTerrain = document.createElement("a-entity");
             rootTerrain.setAttribute("gltf-model", str);
             rootTerrain.setAttribute("position", "0 0 0");
-            rootTerrain.setAttribute("terrain-tile", "");
-            if (ocean) {
+            rootTerrain.setAttribute("terrain-tile", (vertex ?? []).join(" "));
+            if (oceanNavmesh) {
                 rootTerrain.setAttribute("go-to-sea", "");
                 rootTerrain.setAttribute("globe-ocean-nav-mesh", "");
             } else if (navmesh) {
                 rootTerrain.setAttribute("globe-nav-mesh", "");
+            } else if (ocean) {
+                // do nothing
             } else if (collidable) {
                 rootTerrain.setAttribute("static-body", "shape: none;");
                 rootTerrain.setAttribute("globe-trimesh", "");
@@ -1224,7 +1259,7 @@
         <a-entity light="type: ambient; color: #CCC"></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.5" position="0 1 0"></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.5" position="0 -1 0"></a-entity>
-        <a-entity id="camera-rig" position="0 105 5">
+        <a-entity id="camera-rig" position="0 105 5" fps-counter>
             <a-camera wasd-controls-enabled="false" look-controls-enabled="false" position="0 1.6 0"></a-camera>
         </a-entity>
     </a-scene>
