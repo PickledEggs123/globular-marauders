@@ -8,6 +8,7 @@
     <script src="aframe-extras.min.js"></script>
     <script src="three-pathfinding.umd.js"></script>
     <script src="three-to-cannon.umd.js"></script>
+    <script src="aframe-fps-counter-component.min.js"></script>
     <script type="application/javascript">
         const PLANET_SIZE = 100;
 
@@ -46,7 +47,11 @@
                 if (!lod0 || !lod1 || !lod2) {
                     return;
                 }
-                if (distance >= 20) {
+                if (distance >= 40) {
+                    lod0.setAttribute("visible", "false");
+                    lod1.setAttribute("visible", "false");
+                    lod2.setAttribute("visible", "false");
+                } else if (distance >= 20) {
                     lod0.setAttribute("visible", "false");
                     lod1.setAttribute("visible", "false");
                     lod2.setAttribute("visible", "true");
@@ -1132,28 +1137,6 @@
             characterModels.set(type, str);
         }
 
-        function addPort(item) {
-            const {
-                data: str, point, lookAt
-            } = JSON.parse(item);
-            const rootPort = document.createElement("a-entity");
-            rootPort.setAttribute("position", `${point[0]} ${point[1]} ${point[2]}`);
-            rootPort.setAttribute("terrain-tile", "");
-
-            const rootModel = document.createElement("a-entity");
-            rootModel.setAttribute("gltf-model", str);
-            rootModel.setAttribute("scale", "0.1 0.1 0.1");
-            rootModel.setAttribute("rotation", "90 0 0");
-            rootModel.setAttribute("position", "1.35 -1.1 -0.5");
-            rootPort.appendChild(rootModel);
-
-            const scene = document.querySelector("a-scene");
-            scene.appendChild(rootPort);
-
-            rootPort.object3D.up = new THREE.Vector3(point[0], point[1], point[2]).normalize();
-            rootPort.object3D.lookAt(new THREE.Vector3(lookAt[0], lookAt[1], lookAt[2]));
-        }
-
         function addHouse(item) {
             const {
                 type, point, lookAt
@@ -1165,9 +1148,15 @@
 
             const rootModel = document.createElement("a-entity");
             rootModel.setAttribute("globe-lod", characterModels.get(type));
-            rootModel.setAttribute("scale", "1 1 1");
-            rootModel.setAttribute("rotation", "90 0 0");
-            rootModel.setAttribute("position", "0 0 0");
+            if (type === "PORT") {
+                rootModel.setAttribute("scale", "0.1 0.1 0.1");
+                rootModel.setAttribute("rotation", "90 0 0");
+                rootModel.setAttribute("position", "1.35 -1.1 -0.5");
+            } else {
+                rootModel.setAttribute("scale", "1 1 1");
+                rootModel.setAttribute("rotation", "90 0 0");
+                rootModel.setAttribute("position", "0 0 0");
+            }
             rootHouse.appendChild(rootModel);
 
             const lod0 = document.createElement("a-entity");
