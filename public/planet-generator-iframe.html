@@ -9,8 +9,99 @@
     <script src="three-pathfinding.umd.js"></script>
     <script src="three-to-cannon.umd.js"></script>
     <script src="aframe-fps-counter-component.min.js"></script>
+    <script src="instanced-mesh.min.js"></script>
     <script type="application/javascript">
         const PLANET_SIZE = 100;
+
+        function debounce(function_, wait = 100, options = {}) {
+            if (typeof function_ !== 'function') {
+                throw new TypeError(`Expected the first parameter to be a function, got \`${typeof function_}\`.`);
+            }
+
+            if (wait < 0) {
+                throw new RangeError('`wait` must not be negative.');
+            }
+
+            // TODO: Deprecate the boolean parameter at some point.
+            const {immediate} = typeof options === 'boolean' ? {immediate: options} : options;
+
+            let storedContext;
+            let storedArguments;
+            let timeoutId;
+            let timestamp;
+            let result;
+
+            function run() {
+                const callContext = storedContext;
+                const callArguments = storedArguments;
+                storedContext = undefined;
+                storedArguments = undefined;
+                result = function_.apply(callContext, callArguments);
+                return result;
+            }
+
+            function later() {
+                const last = Date.now() - timestamp;
+
+                if (last < wait && last >= 0) {
+                    timeoutId = setTimeout(later, wait - last);
+                } else {
+                    timeoutId = undefined;
+
+                    if (!immediate) {
+                        result = run();
+                    }
+                }
+            }
+
+            const debounced = function (...arguments_) {
+                if (storedContext && this !== storedContext) {
+                    throw new Error('Debounced method called with different contexts.');
+                }
+
+                storedContext = this; // eslint-disable-line unicorn/no-this-assignment
+                storedArguments = arguments_;
+                timestamp = Date.now();
+
+                const callNow = immediate && !timeoutId;
+
+                if (!timeoutId) {
+                    timeoutId = setTimeout(later, wait);
+                }
+
+                if (callNow) {
+                    result = run();
+                }
+
+                return result;
+            };
+
+            debounced.clear = () => {
+                if (!timeoutId) {
+                    return;
+                }
+
+                clearTimeout(timeoutId);
+                timeoutId = undefined;
+            };
+
+            debounced.flush = () => {
+                if (!timeoutId) {
+                    return;
+                }
+
+                debounced.trigger();
+            };
+
+            debounced.trigger = () => {
+                result = run();
+
+                debounced.clear();
+            };
+
+            return debounced;
+        }
+
 
         AFRAME.registerComponent('globe-lod', {
             schema: {
@@ -47,7 +138,6 @@
 
                 const distance = pos.distanceTo(cameraPos);
 
-                const data = this.data.split("|");
                 const lod0 = this.el.querySelector(".lod0");
                 const lod1 = this.el.querySelector(".lod1");
                 const lod2 = this.el.querySelector(".lod2");
@@ -603,15 +693,37 @@
                 // @ts-ignore
                 const vNext = new THREE.Vector3();
 
+                let dtSum = 0;
+
                 return function (t, dt) {
                     const el = this.el;
                     const data = this.data;
                     const raycaster = this.raycaster;
-                    const speed = data.speed * dt / 1000;
+                    const speed = data.speed * (dt + dtSum) / 1000;
 
                     if (!data.active) return;
 
-                    // Use PatrolJS pathfinding system to get shortest path to target.
+                    const object3D = this.el.object3D;
+                    // @ts-ignore
+                    const pos = object3D.getWorldPosition(new THREE.Vector3());
+
+                    const cameraEl = document.querySelector("#camera-rig");
+                    // @ts-ignore
+                    const cameraPos = cameraEl.object3D.getWorldPosition(new THREE.Vector3());
+
+                    const cameraDistance = pos.distanceTo(cameraPos);
+                    if (cameraDistance > 20) {
+                        if (dt + dtSum < 5) {
+                            dtSum += dt;
+                            return;
+                        }
+                        dtSum = 0;
+                    } else {
+                        dtSum = 0;
+                    }
+
+
+                    // Use PatrolJS pathfinding system to get the shortest path to target.
                     if (!this.path.length) {
                         const position = this.el.object3D.position;
                         this.group = this.group || this.system.getGroup(position);
@@ -625,7 +737,6 @@
                         this.el.setAttribute("globe-nav-agent", "active: false;");
                         el.emit('navigation-end');
                         el.object3D.position.copy(vDest);
-                        console.log(el.object3D.position);
                         this.group = null;
                         return;
                     }
@@ -638,7 +749,7 @@
                     const distance = vDelta.length();
                     let gazeTarget;
 
-                    if (distance < speed) {
+                    if (distance <= speed) {
                         // If <1 step from current waypoint, discard it and move toward next.
                         this.path.shift();
 
@@ -660,24 +771,10 @@
 
                     // Look at the next waypoint.
                     // gazeTarget.y = vCurrent.y;
-                    el.object3D.up = new THREE.Vector3(vCurrent.x, vCurrent.y, vCurrent.z).normalize();
+                    el.object3D.up = new THREE.Vector3().copy(vCurrent).normalize();
                     el.object3D.lookAt(gazeTarget);
 
-                    // Raycast against the nav mesh, to keep the agent moving along the
-                    // ground, not traveling in a straight line from higher to lower waypoints.
-                    raycaster.ray.origin.copy(vNext.clone().normalize().multiplyScalar(101.5));
-                    raycaster.ray.direction = vNext.clone().normalize().negate();
-                    const intersections = raycaster.intersectObject(this.system.getNavMesh());
-
-                    if (!intersections.length) {
-                        // Raycasting failed. Step toward the waypoint and hope for the best.
-                        vCurrent.copy(vNext);
-                    } else {
-                        // Re-project next position onto nav mesh.
-                        vDelta.subVectors(intersections[0].point, vCurrent);
-                        vCurrent.add(vDelta.setLength(speed));
-                    }
-
+                    vCurrent.copy(vNext);
                 };
             }())
         });
@@ -868,7 +965,7 @@
 
                     if (!data.active) return;
 
-                    // Use PatrolJS pathfinding system to get shortest path to target.
+                    // Use PatrolJS pathfinding system to get the shortest path to target.
                     if (!this.path.length) {
                         const position = this.el.object3D.position;
                         this.group = this.group || this.system.getGroup(position);
@@ -1095,6 +1192,254 @@
             }
         });
 
+        AFRAME.registerSystem('building', {
+            schema: {},
+            init: function () {
+                this.islandBuildings = new Map();
+                this.buildings = [];
+                this.updateBuildings = debounce(this.innerUpdateBuildings.bind(this), 1000);
+            },
+            innerUpdateBuildings: function () {
+                this.buildings.forEach(el => {
+                    const building = el.components['building'];
+                    const group = this.el.sceneEl.systems['globe-nav'].getGroup(el.components['position'].data);
+                    const arr = this.islandBuildings.get(group);
+                    if (arr) {
+                        building.locateNearestBuilding(arr);
+                    }
+                });
+            },
+            registerMe: function (el) {
+                if (this.el.sceneEl.systems['globe-nav'].navMesh) {
+                    const group = this.el.sceneEl.systems['globe-nav'].getGroup(el.components['position'].data);
+                    if (this.islandBuildings.has(group)) {
+                        this.islandBuildings.get(group).push(el);
+                    } else {
+                        this.islandBuildings.set(group, [el]);
+                    }
+                    this.buildings.push(el);
+                    this.updateBuildings();
+                } else {
+                    setTimeout(this.registerMe.bind(this, el), 100);
+                }
+            },
+            unregisterMe: function (el) {
+                const group = this.el.sceneEl.systems['globe-nav'].getGroup(el.components['position'].data);
+                if (this.islandBuildings.has(group)) {
+                    const arr = this.islandBuildings.get(group);
+                    const idx = arr.findIndex(el);
+                    if (idx >= 0) {
+                        arr.splice(idx, 1);
+                    }
+                }
+                {
+                    const arr = this.buildings;
+                    const idx = arr.findIndex(el);
+                    if (idx >= 0) {
+                        arr.splice(idx, 1);
+                    }
+                }
+            },
+        });
+
+        AFRAME.registerComponent('building', {
+            schema: {
+                type: "string",
+                default: "home",
+            },
+            init: function () {
+                this.system.registerMe(this.el);
+                const buildingTypes = [
+                    "home",
+                    "temple",
+                    "tavern",
+                    "workshop",
+                    "port"
+                ];
+                this.buildingType = buildingTypes[Math.floor(Math.random() * buildingTypes.length)];
+                if (this.buildingType === "home") {
+                    const numNpcs = Math.floor(Math.random() * 4) + 1;
+                    for (let i = 0; i < numNpcs; i++) {
+                        this.el.setAttribute(`npc-spawner__${i}`, "");
+                    }
+                }
+            },
+            locateNearestBuilding: function (islandBuildings) {
+                const buildingTypes = new Map();
+                for (const el of islandBuildings) {
+                    const building = el.components['building'];
+                    const buildingType = building.buildingType;
+                    if (buildingTypes.has(buildingType)) {
+                        const arr = buildingTypes.get(buildingType);
+                        arr.push(el);
+                    } else {
+                        const arr = [el];
+                        buildingTypes.set(buildingType, arr);
+                    }
+                }
+
+                this.nearestBuildingType = new Map();
+                for (const [buildingType, els] of buildingTypes.entries()) {
+                    const nearestBuilding = els.reduce((el, v) => {
+                        if (!el) {
+                            return v;
+                        }
+
+                        const start = new THREE.Vector3().set(this.el.components['position'].data);
+                        const endNew = new THREE.Vector3().set(v.components['position'].data);
+                        const endOld = new THREE.Vector3().set(el.components['position'].data);
+                        const distanceNew = start.distanceTo(endNew);
+                        const distanceOld = start.distanceTo(endOld);
+                        if (distanceNew < distanceOld) {
+                            return v;
+                        }
+                        return el;
+                    }, undefined);
+                    if (nearestBuilding) {
+                        this.nearestBuildingType.set(buildingType, nearestBuilding);
+                    }
+                }
+                this.el.emit("found-nearest-building");
+            },
+            remove: function () {
+                this.system.unregisterMe(this.el);
+            },
+        });
+
+        AFRAME.registerComponent('npc-spawner', {
+            schema: {},
+            multiple: true,
+            init: function () {
+                if (this.el.id) {
+                    this.elId = this.el.id;
+                } else {
+                    this.elId = "id" + Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(36);
+                    this.el.setAttribute("id", this.elId);
+                }
+                this.currentNpcId = null;
+                this.initFiniteStateMachine();
+                this.innerInitFiniteStateMachine = this.initFiniteStateMachine.bind(this)
+                this.innerTransition = this.transition.bind(this);
+                this.el.addEventListener('found-nearest-building', this.innerInitFiniteStateMachine);
+                this.el.addEventListener('transition', this.innerTransition);
+            },
+            initFiniteStateMachine: function () {
+                const building = this.el.components['building'];
+                if (!building.nearestBuildingType || this.isReady) {
+                    return;
+                }
+                this.isHome = true;
+                this.otherBuildings = new Map();
+                for (const [key, value] of building.nearestBuildingType.entries()) {
+                    this.otherBuildings.set(key, value);
+                }
+                if (this.otherBuildings.has('home')) {
+                    this.otherBuildings.delete('home');
+                }
+                this.isReady = true;
+                setTimeout(() => {
+                    this.transition();
+                }, 10_000);
+            },
+            transition: function (evt) {
+                const npcId = evt?.detail ?? null;
+                if (!this.isReady) {
+                    setTimeout(() => {
+                        this.innerTransition(evt);
+                    }, 10_000);
+                    return;
+                }
+                if (npcId && npcId === this.currentNpcId) {
+                    removeWalkingNpc(npcId);
+                }
+                if (npcId && npcId !== this.currentNpcId) {
+                    return;
+                }
+                if (this.isHome) {
+                    const arr = Array.from(this.otherBuildings.values());
+                    this.otherBuilding = arr[Math.floor(Math.random() * arr.length)];
+                    if (this.otherBuilding) {
+                        this.isHome = false;
+                        this.currentNpcId = addWalkingNpc(this.elId, this.el, this.otherBuilding);
+                    }
+                } else {
+                    this.isHome = true;
+                    this.currentNpcId = addWalkingNpc(this.elId, this.otherBuilding, this.el);
+                    this.otherBuilding = undefined;
+                }
+            },
+            remove: function () {
+                this.el.removeEventListener('found-nearest-building', this.innerInitFiniteStateMachine);
+                this.el.removeEventListener('transition', this.innerTransition);
+            },
+        });
+
+        AFRAME.registerComponent('npc-agent', {
+            schema: {
+                building: {type: 'selector'}
+            },
+            init: function () {
+                this.innerBeginTransition = this.beginTransition.bind(this);
+                this.el.addEventListener("navigation-end", this.innerBeginTransition);
+            },
+            beginTransition: function () {
+                this.data.building.emit('transition', this.el.id);
+            },
+            remove: function () {
+                this.el.removeEventListener("navigation-end", this.innerBeginTransition);
+            },
+        });
+
+        function addWalkingNpc(buildingId, buildingEl, destinationEl) {
+            const scene = document.querySelector("a-scene");
+            let personModel = scene.querySelector("#person-model");
+
+            const rootNpc = document.createElement("a-entity");
+            const id = "id" + Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(36);
+            rootNpc.setAttribute("id", id);
+            rootNpc.setAttribute("class", "walking-npc");
+            const destination2 = destinationEl.components['position'].data;
+            rootNpc.setAttribute("npc-agent", `building: #${buildingId}`);
+            const pos = buildingEl.components['position'].data;
+            rootNpc.setAttribute("position", `${pos.x} ${pos.y} ${pos.z}`);
+            rootNpc.setAttribute("globe-nav-agent", `active: false;`);
+            setTimeout(() => {
+                rootNpc.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2;`);
+            }, 2000);
+
+            if (characterModels.has("PERSON")) {
+                const str = characterModels.get("PERSON");
+
+                // add template
+                if (!personModel) {
+                    const modelNpc = document.createElement("a-entity");
+                    modelNpc.setAttribute("gltf-model", str);
+                    modelNpc.setAttribute("id", "person-model");
+                    modelNpc.setAttribute("instanced-mesh", "capacity: 1000; updateMode: auto; positioning: world")
+                    scene.appendChild(modelNpc);
+                }
+
+                // add graphics
+                rootNpc.setAttribute("instanced-mesh-member", "mesh: #person-model");
+            } else {
+                const modelNpc = document.createElement("a-sphere");
+                modelNpc.setAttribute("scale", "0.1 0.1 0.1");
+                modelNpc.setAttribute("position", "0 0 0");
+
+                rootNpc.appendChild(modelNpc);
+            }
+
+            scene.appendChild(rootNpc);
+
+            return id;
+        }
+
+        function removeWalkingNpc(npcId) {
+            const scene = document.querySelector("a-scene");
+            const a = document.querySelector(`#${npcId}`);
+            scene.removeChild(a);
+        }
+
         function addNpc(i) {
             const rootNpc = document.createElement("a-entity");
             rootNpc.setAttribute("class", "npc");
@@ -1134,6 +1479,7 @@
         function addTerrain(item) {
             const [str, collidable, navmesh, ocean, oceanNavmesh, vertex] = JSON.parse(item);
             const rootTerrain = document.createElement("a-entity");
+            rootTerrain.setAttribute("class", "clickable");
             rootTerrain.setAttribute("gltf-model", str);
             rootTerrain.setAttribute("position", "0 0 0");
             rootTerrain.setAttribute("terrain-tile", (vertex ?? []).join(" "));
@@ -1180,6 +1526,7 @@
             const rootHouse = document.createElement("a-entity");
             rootHouse.setAttribute("position", `${point[0]} ${point[1]} ${point[2]}`);
             rootHouse.setAttribute("terrain-tile", "");
+            rootHouse.setAttribute("building", type.toString().toLowerCase());
 
             const rootModel = document.createElement("a-entity");
             rootModel.setAttribute("globe-lod", characterModels.get(type));
@@ -1224,6 +1571,7 @@
 
             const rootShip = document.createElement("a-entity");
             rootShip.setAttribute("id", "box");
+            rootShip.setAttribute("class", "clickable");
             rootShip.setAttribute("dynamic-body", "shape: sphere; sphereRadius: 1; mass: 100");
             rootShip.setAttribute("globe-gravity", "");
             rootShip.setAttribute("globe-keyboard-controls", "enabled: true; fly: true");
@@ -1255,12 +1603,12 @@
     </style>
 </head>
 <body>
-    <a-scene physics="driver: local; gravity: 0 0 0;" globe-nav globe-ocean-nav embedded cursor="rayOrigin:mouse" id="scene">
+    <a-scene physics="driver: local; gravity: 0 0 0;" globe-nav globe-ocean-nav embedded id="scene">
         <a-entity light="type: ambient; color: #CCC"></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.5" position="0 1 0"></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.5" position="0 -1 0"></a-entity>
         <a-entity id="camera-rig" position="0 105 5" fps-counter>
-            <a-camera wasd-controls-enabled="false" look-controls-enabled="false" position="0 1.6 0"></a-camera>
+            <a-camera wasd-controls-enabled="false" look-controls-enabled="false" position="0 1.6 0" cursor="rayOrigin: mouse" raycaster="far: 50; interval: 100; objects: .clickable"></a-camera>
         </a-entity>
     </a-scene>
 </body>
