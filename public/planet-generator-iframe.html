@@ -3,6 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <title>Planet Generator</title>
+    <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+
+    <!-- Import ThreeJS 0.154.0 and our Octree lib-->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.154.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.154.0/examples/jsm/",
+                "threejs-octree": "../threeoctree.js"
+            }
+        }
+    </script>
     <script src="aframe-v1.5.0.js"></script>
     <script src="aframe-physics-system.js"></script>
     <script src="aframe-extras.min.js"></script>
@@ -101,7 +113,6 @@
 
             return debounced;
         }
-
 
         AFRAME.registerComponent('globe-lod', {
             schema: {
@@ -666,14 +677,11 @@
             system: null,
             group: null,
             path: [],
-            raycaster: null,
             init: function () {
                 this.system = this.el.sceneEl.systems['globe-nav'];
                 this.system.addAgent(this);
                 this.group = null;
                 this.path = [];
-                // @ts-ignore
-                this.raycaster = new THREE.Raycaster();
             },
             remove: function () {
                 this.system.removeAgent(this);
@@ -698,7 +706,6 @@
                 return function (t, dt) {
                     const el = this.el;
                     const data = this.data;
-                    const raycaster = this.raycaster;
                     const speed = data.speed * (dt + dtSum) / 1000;
 
                     if (!data.active) return;
@@ -736,8 +743,10 @@
                         console.warn('[nav] Unable to find path to %o.', data.destination);
                         this.el.setAttribute("globe-nav-agent", "active: false;");
                         el.emit('navigation-end');
+                        el.emit('navigation-group-change');
                         el.object3D.position.copy(vDest);
                         this.group = null;
+                        el.emit('navigation-group-changed');
                         return;
                     }
 
@@ -930,14 +939,11 @@
             system: null,
             group: null,
             path: [],
-            raycaster: null,
             init: function () {
                 this.system = this.el.sceneEl.systems['globe-ocean-nav'];
                 this.system.addAgent(this);
                 this.group = null;
                 this.path = [];
-                // @ts-ignore
-                this.raycaster = new THREE.Raycaster();
             },
             remove: function () {
                 this.system.removeAgent(this);
@@ -960,7 +966,6 @@
                 return function (t, dt) {
                     const el = this.el;
                     const data = this.data;
-                    const raycaster = this.raycaster;
                     const speed = data.speed * dt / 1000;
 
                     if (!data.active) return;
@@ -1132,6 +1137,7 @@
             }
         });
 
+
         AFRAME.registerComponent('go-to-sea', {
             init: function () {
                 this.el.addEventListener('click', function (e) {
@@ -1227,14 +1233,14 @@
                 const group = this.el.sceneEl.systems['globe-nav'].getGroup(el.components['position'].data);
                 if (this.islandBuildings.has(group)) {
                     const arr = this.islandBuildings.get(group);
-                    const idx = arr.findIndex(el);
+                    const idx = arr.indexOf(el);
                     if (idx >= 0) {
                         arr.splice(idx, 1);
                     }
                 }
                 {
                     const arr = this.buildings;
-                    const idx = arr.findIndex(el);
+                    const idx = arr.indexOf(el);
                     if (idx >= 0) {
                         arr.splice(idx, 1);
                     }
@@ -1245,19 +1251,20 @@
         AFRAME.registerComponent('building', {
             schema: {
                 type: "string",
-                default: "home",
+                default: "house",
             },
             init: function () {
                 this.system.registerMe(this.el);
-                const buildingTypes = [
-                    "home",
+                const buildingTypes = ((this.data?.toString()?.toLowerCase() ?? "") === "port") ? ["port"] : [
+                    "house",
+                    "house",
+                    "house",
                     "temple",
                     "tavern",
                     "workshop",
-                    "port"
                 ];
                 this.buildingType = buildingTypes[Math.floor(Math.random() * buildingTypes.length)];
-                if (this.buildingType === "home") {
+                if (this.buildingType === "house") {
                     const numNpcs = Math.floor(Math.random() * 4) + 1;
                     for (let i = 0; i < numNpcs; i++) {
                         this.el.setAttribute(`npc-spawner__${i}`, "");
@@ -1390,6 +1397,168 @@
             },
         });
 
+        AFRAME.registerComponent('npc-faction', {
+            schema: {
+                type: 'string',
+                default: ''
+            },
+        });
+
+        AFRAME.registerComponent('npc-attack', {
+            schema: {},
+            init: function () {
+                this.attackEls = [];
+                this.innerAttack = this.attack.bind(this);
+                this.innerBeginAttack = this.beginAttack.bind(this);
+                this.el.addEventListener('npc-attack', this.innerAttack);
+                this.el.addEventListener('npc-begin-attack', this.innerBeginAttack);
+
+                this.tickCounter = 0;
+                this.findTickCount = 120;
+            },
+            remove: function () {
+                this.el.removeEventListener('npc-attack', this.innerAttack);
+                this.el.removeEventListener('npc-begin-attack', this.innerBeginAttack);
+                this.attackEls = [];
+            },
+            tick: function () {
+                if (this.tickCounter < this.findTickCount) {
+                    this.tickCounter += 1;
+                    return;
+                }
+                this.tickCounter = 0;
+
+                const pos = this.el.object3D.position;
+                for (const el of this.attackEls) {
+                    const p = el.object3D.position;
+                    const distance = pos.distanceTo(p);
+                    if (distance < 10) {
+                        this.el.emit('npc-begin-attack', el);
+                        break;
+                    }
+                }
+            },
+            attack: function (evt) {
+                this.attackEls = evt.detail;
+            },
+            beginAttack: function (evt) {
+                const target = evt.detail;
+                addProjectile(this.el, target);
+            }
+        });
+
+        AFRAME.registerComponent('projectile-flight', {
+            schema: {
+                target: {type: 'selector'},
+                speed: {type: 'number', default: 10},
+            },
+            tick: (function () {
+                // @ts-ignore
+                const vDest = new THREE.Vector3();
+                // @ts-ignore
+                const vDelta = new THREE.Vector3();
+                // @ts-ignore
+                const vNext = new THREE.Vector3();
+
+                let dtSum = 0;
+
+                return function (t, dt) {
+                    const el = this.el;
+                    const data = this.data;
+                    const speed = data.speed * (dt + dtSum) / 1000;
+
+                    const object3D = this.el.object3D;
+                    // @ts-ignore
+                    const pos = object3D.getWorldPosition(new THREE.Vector3());
+
+                    const cameraEl = document.querySelector("#camera-rig");
+                    // @ts-ignore
+                    const cameraPos = cameraEl.object3D.getWorldPosition(new THREE.Vector3());
+
+                    const cameraDistance = pos.distanceTo(cameraPos);
+                    if (cameraDistance > 20) {
+                        if (dt + dtSum < 5) {
+                            dtSum += dt;
+                            return;
+                        }
+                        dtSum = 0;
+                    } else {
+                        dtSum = 0;
+                    }
+
+
+                    // Current segment is a vector from current position to next waypoint.
+                    const vCurrent = el.object3D.position;
+                    let vWaypoint = this.data.target.object3D.position.clone();
+                    vWaypoint = vWaypoint.add(vWaypoint.clone().normalize().multiplyScalar(2));
+                    vDelta.subVectors(vWaypoint, vCurrent);
+
+                    const distance = vDelta.length();
+                    let gazeTarget;
+
+                    if (distance <= speed) {
+                        vNext.copy(vCurrent);
+                        gazeTarget = vWaypoint;
+
+                        this.el.emit('hit');
+                        this.el.parentNode.removeChild(this.el);
+                    } else {
+                        // If still far away from next waypoint, find next position for
+                        // the current frame.
+                        vNext.copy(vDelta.setLength(speed)).add(vCurrent);
+                        gazeTarget = vWaypoint;
+                    }
+
+                    // Look at the next waypoint.
+                    // gazeTarget.y = vCurrent.y;
+                    el.object3D.up = new THREE.Vector3().copy(vCurrent).normalize();
+                    el.object3D.lookAt(gazeTarget);
+
+                    vCurrent.copy(vNext);
+                };
+            }())
+        });
+
+        function addProjectile(startEl, destinationEl) {
+            const scene = document.querySelector("a-scene");
+            let arrowModel = scene.querySelector("#arrow-model");
+
+            const rootProjectile = document.createElement("a-entity");
+            const id = "id" + Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(36);
+            rootProjectile.setAttribute("id", id);
+            rootProjectile.setAttribute("class", "projectile");
+            rootProjectile.setAttribute("projectile-flight", `target: #${destinationEl.id}`);
+            const pos = startEl.object3D.position.clone();
+            rootProjectile.setAttribute("position", `${pos.x} ${pos.y} ${pos.z}`);
+
+            if (characterModels.has("ARROW")) {
+                const str = characterModels.get("ARROW");
+
+                // add template
+                if (!arrowModel) {
+                    const modelArrow = document.createElement("a-entity");
+                    modelArrow.setAttribute("gltf-model", str);
+                    modelArrow.setAttribute("id", "arrow-model");
+                    modelArrow.setAttribute("instanced-mesh", "capacity: 1000; updateMode: auto; positioning: world");
+                    scene.appendChild(modelArrow);
+                }
+
+                // add graphics
+                rootProjectile.setAttribute("instanced-mesh-member", "mesh: #arrow-model");
+                rootProjectile.setAttribute("scale", "0.1 0.1 0.1");
+            } else {
+                const modelArrow = document.createElement("a-sphere");
+                modelArrow.setAttribute("scale", "0.1 0.1 0.1");
+                modelArrow.setAttribute("position", "0 0 0");
+
+                rootProjectile.appendChild(modelArrow);
+            }
+
+            scene.appendChild(rootProjectile);
+
+            return id;
+        }
+
         function addWalkingNpc(buildingId, buildingEl, destinationEl) {
             const scene = document.querySelector("a-scene");
             let personModel = scene.querySelector("#person-model");
@@ -1398,8 +1567,10 @@
             const id = "id" + Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(36);
             rootNpc.setAttribute("id", id);
             rootNpc.setAttribute("class", "walking-npc");
-            const destination2 = destinationEl.components['position'].data;
             rootNpc.setAttribute("npc-agent", `building: #${buildingId}`);
+            rootNpc.setAttribute("npc-faction", "native");
+            rootNpc.setAttribute("npc-finder", "");
+            const destination2 = destinationEl.components['position'].data;
             const pos = buildingEl.components['position'].data;
             rootNpc.setAttribute("position", `${pos.x} ${pos.y} ${pos.z}`);
             rootNpc.setAttribute("globe-nav-agent", `active: false;`);
@@ -1415,7 +1586,7 @@
                     const modelNpc = document.createElement("a-entity");
                     modelNpc.setAttribute("gltf-model", str);
                     modelNpc.setAttribute("id", "person-model");
-                    modelNpc.setAttribute("instanced-mesh", "capacity: 1000; updateMode: auto; positioning: world")
+                    modelNpc.setAttribute("instanced-mesh", "capacity: 1000; updateMode: auto; positioning: world");
                     scene.appendChild(modelNpc);
                 }
 
@@ -1445,6 +1616,9 @@
             rootNpc.setAttribute("class", "npc");
             rootNpc.setAttribute("globe-nav-agent", "");
             rootNpc.setAttribute("position", "0 150 0");
+            rootNpc.setAttribute("npc-faction", "player");
+            rootNpc.setAttribute("npc-finder", "");
+            rootNpc.setAttribute("npc-attack", "");
 
             if (characterModels.has("WARRIOR")) {
                 const str = characterModels.get("WARRIOR");
@@ -1594,6 +1768,146 @@
             const cameraEl = document.querySelector("#camera-rig");
             cameraEl.setAttribute("look-at-box", "#box");
         }
+    </script>
+    <script type="module">
+        import Octree from "threejs-octree";
+
+        AFRAME.registerSystem('npc-finder', {
+            schema: {},
+            init: function () {
+                this.islandNpcs = new Map();
+                this.islandNpcList = new Map();
+                this.npcs = [];
+                this.findNpc = this.findNpc.bind(this);
+            },
+            registerMe: function (el) {
+                const addNpcMeshToOctree = (octree) => {
+                    const geometry = new THREE.SphereGeometry();
+                    const material = new THREE.MeshStandardMaterial({ color: 0xffffff });
+                    const meshNode = new THREE.Mesh(geometry, material);
+                    meshNode.visible = false;
+                    el.setObject3D('octree-collider', meshNode);
+                    octree.addMesh(meshNode);
+                };
+
+                if (this.el.sceneEl.systems['globe-nav'].navMesh) {
+                    const pos = el.object3D.position;
+                    const group = this.el.sceneEl.systems['globe-nav'].getGroup(pos);
+                    if (this.islandNpcs.has(group)) {
+                        const octree = this.islandNpcs.get(group);
+                        addNpcMeshToOctree(octree);
+                    } else {
+                        const octree = new Octree(16, 4);
+                        const worldExtents = new THREE.Box3(new THREE.Vector3(-150, -150, -150), new THREE.Vector3(150, 150, 150));
+                        octree.initialize(worldExtents.min, worldExtents.max, []);
+                        addNpcMeshToOctree(octree);
+                        this.islandNpcs.set(group, octree);
+                    }
+                    if (this.islandNpcList.has(group)) {
+                        this.islandNpcList.get(group).push(el);
+                    } else {
+                        this.islandNpcList.set(group, [el]);
+                    }
+                    this.npcs.push(el);
+                } else {
+                    setTimeout(this.registerMe.bind(this, el), 100);
+                }
+            },
+            tick: function () {
+                for (const [group, octree] of this.islandNpcs.entries()) {
+                    const npcs = this.islandNpcList.get(group);
+                    if (npcs) {
+                        for (const el of npcs) {
+                            const collider = el.object3D.children.find(x => x.name === 'octree-collider');
+                            if (collider) {
+                                octree.updateMesh(collider);
+                            }
+                        }
+                    }
+                }
+            },
+            unregisterMe: function (el) {
+                const group = this.el.sceneEl.systems['globe-nav'].getGroup(el.object3D.position);
+                if (this.islandNpcs.has(group)) {
+                    const octree = this.islandNpcs.get(group);
+                    const collider = el.getObject3D('octree-collider');
+                    if (collider) {
+                        octree.removeMesh(collider);
+                    }
+                }
+                if (this.islandNpcList.has(group)) {
+                    const arr = this.islandNpcList.get(group);
+                    const idx = arr.indexOf(el);
+                    if (idx >= 0) {
+                        arr.splice(idx, 1);
+                    }
+                }
+                {
+                    const arr = this.npcs;
+                    const idx = arr.indexOf(el);
+                    if (idx >= 0) {
+                        arr.splice(idx, 1);
+                    }
+                }
+            },
+            findNpc: function (checkingNpc) {
+                const factionName = checkingNpc.components['npc-faction'].data;
+                const position = new THREE.Vector3().copy(checkingNpc.object3D.position);
+                const radius = 20;
+                const group = this.el.sceneEl.systems['globe-nav'].getGroup(position);
+                if (this.islandNpcs.has(group)) {
+                    const octree = this.islandNpcs.get(group);
+                    const intersects = octree.intersects(position, radius);
+                    const meshes = intersects.array;
+                    const els = meshes.map(x => x.parent.el);
+                    const filtered = els.filter(x => x.components['npc-faction'].data !== factionName);
+                    return filtered.sort((a, b) => {
+                        const distA = new THREE.Vector3().copy(a.object3D.position).distanceTo(position);
+                        const distB = new THREE.Vector3().copy(b.object3D.position).distanceTo(position);
+                        const avg = (distA + distB) / 2;
+                        return distA - distB - avg;
+                    });
+                }
+                return [];
+            },
+        });
+
+        AFRAME.registerComponent('npc-finder', {
+            schema: {},
+            init: function () {
+                this.system = this.el.sceneEl.systems['npc-finder'];
+                this.system.registerMe(this.el);
+                this.tickCounter = 0;
+                this.findTickCount = 120;
+                this.innerHandleNavigationGroupChange = this.navigationGroupChange.bind(this);
+                this.innerHandleNavigationGroupChanged = this.navigationGroupChanged.bind(this);
+                this.el.addEventListener("navigation-group-change", this.innerHandleNavigationGroupChange);
+                this.el.addEventListener("navigation-group-changed", this.innerHandleNavigationGroupChanged);
+            },
+            tick: function () {
+                if (this.tickCounter < this.findTickCount) {
+                    this.tickCounter += 1;
+                    return;
+                }
+                this.tickCounter = 0;
+
+                const els = this.system.findNpc(this.el);
+                this.el.emit('npc-attack', els);
+            },
+            remove: function () {
+                this.system.unregisterMe(this.el);
+                this.tickCounter = null;
+                this.findTickCount = null;
+                this.el.removeEventListener("navigation-group-change", this.innerHandleNavigationGroupChange);
+                this.el.removeEventListener("navigation-group-changed", this.innerHandleNavigationGroupChanged);
+            },
+            navigationGroupChange: function () {
+                this.system.unregisterMe(this.el);
+            },
+            navigationGroupChanged: function () {
+                this.system.registerMe(this.el);
+            },
+        });
     </script>
     <style>
         a-scene {
