@@ -1405,7 +1405,9 @@
         });
 
         AFRAME.registerComponent('npc-attack', {
-            schema: {},
+            schema: {
+                range: {type: 'number', default: 10},
+            },
             init: function () {
                 this.attackEls = [];
                 this.innerAttack = this.attack.bind(this);
@@ -1432,7 +1434,7 @@
                 for (const el of this.attackEls) {
                     const p = el.object3D.position;
                     const distance = pos.distanceTo(p);
-                    if (distance < 10) {
+                    if (distance < this.data.range) {
                         this.el.emit('npc-begin-attack', el);
                         break;
                     }
@@ -1453,8 +1455,6 @@
                 speed: {type: 'number', default: 10},
             },
             tick: (function () {
-                // @ts-ignore
-                const vDest = new THREE.Vector3();
                 // @ts-ignore
                 const vDelta = new THREE.Vector3();
                 // @ts-ignore
@@ -1490,7 +1490,7 @@
                     // Current segment is a vector from current position to next waypoint.
                     const vCurrent = el.object3D.position;
                     let vWaypoint = this.data.target.object3D.position.clone();
-                    vWaypoint = vWaypoint.add(vWaypoint.clone().normalize().multiplyScalar(2));
+                    vWaypoint = vWaypoint.add(vWaypoint.clone().normalize());
                     vDelta.subVectors(vWaypoint, vCurrent);
 
                     const distance = vDelta.length();
@@ -1528,7 +1528,7 @@
             rootProjectile.setAttribute("id", id);
             rootProjectile.setAttribute("class", "projectile");
             rootProjectile.setAttribute("projectile-flight", `target: #${destinationEl.id}`);
-            const pos = startEl.object3D.position.clone();
+            const pos = startEl.object3D.position.clone().add(startEl.object3D.position.clone().normalize());
             rootProjectile.setAttribute("position", `${pos.x} ${pos.y} ${pos.z}`);
 
             if (characterModels.has("ARROW")) {
@@ -1568,13 +1568,13 @@
             rootNpc.setAttribute("class", "walking-npc");
             rootNpc.setAttribute("npc-agent", `building: #${buildingId}`);
             rootNpc.setAttribute("npc-faction", "native");
-            rootNpc.setAttribute("npc-finder", "");
+            rootNpc.setAttribute("npc-finder", "active: false;");
             const destination2 = destinationEl.components['position'].data;
             const pos = buildingEl.components['position'].data;
             rootNpc.setAttribute("position", `${pos.x} ${pos.y} ${pos.z}`);
             rootNpc.setAttribute("globe-nav-agent", `active: false;`);
             setTimeout(() => {
-                rootNpc.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2;`);
+                rootNpc.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 1;`);
             }, 2000);
 
             if (characterModels.has("PERSON")) {
@@ -1616,8 +1616,8 @@
             rootNpc.setAttribute("globe-nav-agent", "");
             rootNpc.setAttribute("position", "0 150 0");
             rootNpc.setAttribute("npc-faction", "player");
-            rootNpc.setAttribute("npc-finder", "");
-            rootNpc.setAttribute("npc-attack", "");
+            rootNpc.setAttribute("npc-finder", "active: true;");
+            rootNpc.setAttribute("npc-attack", "range: 20;");
 
             if (characterModels.has("WARRIOR")) {
                 const str = characterModels.get("WARRIOR");
@@ -1863,8 +1863,7 @@
                     return filtered.sort((a, b) => {
                         const distA = new THREE.Vector3().copy(a.object3D.position).distanceTo(position);
                         const distB = new THREE.Vector3().copy(b.object3D.position).distanceTo(position);
-                        const avg = (distA + distB) / 2;
-                        return distA - distB - avg;
+                        return distA - distB;
                     });
                 }
                 return [];
@@ -1872,7 +1871,9 @@
         });
 
         AFRAME.registerComponent('npc-finder', {
-            schema: {},
+            schema: {
+                active: {type: 'boolean', default: false},
+            },
             init: function () {
                 this.system = this.el.sceneEl.systems['npc-finder'];
                 this.system.registerMe(this.el);
@@ -1884,6 +1885,10 @@
                 this.el.addEventListener("navigation-group-changed", this.innerHandleNavigationGroupChanged);
             },
             tick: function () {
+                if (!this.data.active) {
+                    return;
+                }
+
                 if (this.tickCounter < this.findTickCount) {
                     this.tickCounter += 1;
                     return;
