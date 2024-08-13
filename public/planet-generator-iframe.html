@@ -1407,20 +1407,37 @@
         AFRAME.registerComponent('npc-attack', {
             schema: {
                 range: {type: 'number', default: 10},
+                melee: {type: 'boolean', default: false},
             },
             init: function () {
                 this.attackEls = [];
                 this.innerAttack = this.attack.bind(this);
                 this.innerBeginAttack = this.beginAttack.bind(this);
+                this.innerMeleeCharge = this.meleeCharge.bind(this);
+                this.innerNavigationBegin = this.navigationBegin.bind(this);
+                this.innerNavigationEnd = this.navigationEnd.bind(this);
                 this.el.addEventListener('npc-attack', this.innerAttack);
                 this.el.addEventListener('npc-begin-attack', this.innerBeginAttack);
+                this.el.addEventListener('npc-melee-charge', this.innerMeleeCharge);
+                if (this.data.melee) {
+                    this.el.addEventListener('navigation-start', this.innerNavigationBegin);
+                    this.el.addEventListener('navigation-end', this.innerNavigationEnd);
+                }
 
                 this.tickCounter = 0;
                 this.findTickCount = 120;
+                this.charge = false;
+                this.immediateCharge = false;
+                this.chargeOrigin = this.el.object3D.position.clone();
             },
             remove: function () {
                 this.el.removeEventListener('npc-attack', this.innerAttack);
                 this.el.removeEventListener('npc-begin-attack', this.innerBeginAttack);
+                this.el.removeEventListener('npc-melee-charge', this.innerMeleeCharge);
+                if (this.data.melee) {
+                    this.el.removeEventListener('navigation-start', this.innerNavigationBegin);
+                    this.el.removeEventListener('navigation-end', this.innerNavigationEnd);
+                }
                 this.attackEls = [];
             },
             tick: function () {
@@ -1435,8 +1452,15 @@
                     const p = el.object3D.position;
                     const distance = pos.distanceTo(p);
                     if (distance < this.data.range) {
-                        this.el.emit('npc-begin-attack', el);
-                        break;
+                        if (this.data.melee && distance > 1) {
+                            if (this.chargeOrigin.distanceTo(p) < this.data.range) {
+                                this.el.emit('npc-melee-charge', el);
+                                return;
+                            }
+                        } else {
+                            this.el.emit('npc-begin-attack', el);
+                            return;
+                        }
                     }
                 }
             },
@@ -1446,7 +1470,33 @@
             beginAttack: function (evt) {
                 const target = evt.detail;
                 addProjectile(this.el, target);
-            }
+            },
+            meleeCharge: function (evt) {
+                const target = evt.detail;
+                const destination2 = target.object3D.position.clone();
+                this.el.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2;`);
+                this.charge = true;
+                this.immediateCharge = true;
+            },
+            navigationBegin: function () {
+                if (this.data.melee && this.charge && this.immediateCharge) {
+                    this.immediateCharge = false;
+                    return;
+                }
+                if (this.data.melee && this.charge && !this.immediateCharge) {
+                    this.charge = false;
+                }
+            },
+            navigationEnd: function () {
+                if (this.data.melee && this.charge && !this.immediateCharge) {
+                    this.tickCounter = this.findTickCount;
+                    this.charge = false;
+                    return;
+                }
+                if (this.data.melee && !this.charge && !this.immediateCharge) {
+                    this.chargeOrigin = this.el.object3D.position.clone();
+                }
+            },
         });
 
         AFRAME.registerComponent('projectile-flight', {
@@ -1466,6 +1516,12 @@
                     const el = this.el;
                     const data = this.data;
                     const speed = data.speed * (dt + dtSum) / 1000;
+
+                    if (!this.data.target) {
+                        this.el.emit('miss');
+                        this.el.parentNode.removeChild(this.el);
+                        return;
+                    }
 
                     const object3D = this.el.object3D;
                     // @ts-ignore
@@ -1617,7 +1673,7 @@
             rootNpc.setAttribute("position", "0 150 0");
             rootNpc.setAttribute("npc-faction", "player");
             rootNpc.setAttribute("npc-finder", "active: true;");
-            rootNpc.setAttribute("npc-attack", "range: 20;");
+            rootNpc.setAttribute("npc-attack", "range: 20; melee: true;");
 
             if (characterModels.has("WARRIOR")) {
                 const str = characterModels.get("WARRIOR");
