@@ -1,5 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
+import {Container, LinearProgress} from "@mui/material";
 
 export const PlanetContext = React.createContext([] as IGameMesh[]);
 
@@ -28,5 +29,11 @@ export const PlanetMeshLoader = ({children}: {children: any}) => {
             setPlanetMeshes(fetchPlanetMeshes);
         })();
     }, []);
-    return planetMeshes.length === 0 ? <span>Loading Planets ({loadedCount} / 10)...</span> : <PlanetContext.Provider value={planetMeshes}>{children}</PlanetContext.Provider>;
+    return planetMeshes.length === 0 ? (
+        <Container>
+            <span>Loading Planets ({loadedCount} / 10)...</span>
+            <LinearProgress variant="determinate" value={loadedCount / 10 * 100}></LinearProgress>
+            <LinearProgress variant="determinate" value={0}></LinearProgress>
+        </Container>
+    ): <PlanetContext.Provider value={planetMeshes}>{children}</PlanetContext.Provider>;
 };

@@ -1327,8 +1327,10 @@
                 this.initFiniteStateMachine();
                 this.innerInitFiniteStateMachine = this.initFiniteStateMachine.bind(this)
                 this.innerTransition = this.transition.bind(this);
+                this.innerHandleDead = this.handleDead.bind(this);
                 this.el.addEventListener('found-nearest-building', this.innerInitFiniteStateMachine);
                 this.el.addEventListener('transition', this.innerTransition);
+                this.el.addEventListener('dead', this.innerHandleDead);
             },
             initFiniteStateMachine: function () {
                 const building = this.el.components['building'];
@@ -1356,11 +1358,11 @@
                     }, 10_000);
                     return;
                 }
-                if (npcId && npcId === this.currentNpcId) {
-                    removeWalkingNpc(npcId);
-                }
                 if (npcId && npcId !== this.currentNpcId) {
                     return;
+                }
+                if (npcId && npcId === this.currentNpcId) {
+                    removeWalkingNpc(npcId);
                 }
                 if (this.isHome) {
                     const arr = Array.from(this.otherBuildings.values());
@@ -1375,6 +1377,21 @@
                     this.otherBuilding = undefined;
                 }
             },
+            handleDead: function (evt) {
+                const npcId = evt?.detail ?? null;
+                if (!this.isReady) {
+                    setTimeout(() => {
+                        this.innerHandleDead(evt);
+                    }, 10_000);
+                    return;
+                }
+                if (npcId && npcId !== this.currentNpcId) {
+                    return;
+                }
+                if (npcId && npcId === this.currentNpcId) {
+                    this.el.removeAttribute(`npc-spawner__${this.id}`);
+                }
+            },
             remove: function () {
                 this.el.removeEventListener('found-nearest-building', this.innerInitFiniteStateMachine);
                 this.el.removeEventListener('transition', this.innerTransition);
@@ -1387,13 +1404,19 @@
             },
             init: function () {
                 this.innerBeginTransition = this.beginTransition.bind(this);
+                this.innerHandleDead = this.handleDead.bind(this);
                 this.el.addEventListener("navigation-end", this.innerBeginTransition);
+                this.el.addEventListener("dead", this.innerHandleDead);
             },
             beginTransition: function () {
                 this.data.building.emit('transition', this.el.id);
             },
+            handleDead: function () {
+                this.data.building.emit('dead', this.el.id);
+            },
             remove: function () {
                 this.el.removeEventListener("navigation-end", this.innerBeginTransition);
+                this.el.removeEventListener("dead", this.innerHandleDead);
             },
         });
 
@@ -1556,7 +1579,7 @@
                         vNext.copy(vCurrent);
                         gazeTarget = vWaypoint;
 
-                        this.el.emit('hit');
+                        this.data.target.emit('hit', 10);
                         this.el.parentNode.removeChild(this.el);
                     } else {
                         // If still far away from next waypoint, find next position for
@@ -1572,7 +1595,30 @@
 
                     vCurrent.copy(vNext);
                 };
-            }())
+            }()),
+        });
+
+        AFRAME.registerComponent('health', {
+            schema: {
+                health: { type: 'number', default: 100 }
+            },
+            init: function () {
+                this.innerHandleHit = this.handleHit.bind(this);
+                this.el.addEventListener('hit', this.innerHandleHit);
+            },
+            remove: function () {
+                this.el.removeEventListener('hit', this.innerHandleHit);
+            },
+            handleHit: function (evt) {
+                const hit = evt.detail;
+                const newHealth = this.data.health - hit;
+                this.el.setAttribute("health", `health: ${newHealth}`);
+
+                if (newHealth <= 0) {
+                    this.el.emit('dead');
+                    this.el.parentNode.removeChild(this.el);
+                }
+            },
         });
 
         function addProjectile(startEl, destinationEl) {
@@ -1625,6 +1671,7 @@
             rootNpc.setAttribute("npc-agent", `building: #${buildingId}`);
             rootNpc.setAttribute("npc-faction", "native");
             rootNpc.setAttribute("npc-finder", "active: false;");
+            rootNpc.setAttribute("health", "");
             const destination2 = destinationEl.components['position'].data;
             const pos = buildingEl.components['position'].data;
             rootNpc.setAttribute("position", `${pos.x} ${pos.y} ${pos.z}`);
@@ -1673,7 +1720,8 @@
             rootNpc.setAttribute("position", "0 150 0");
             rootNpc.setAttribute("npc-faction", "player");
             rootNpc.setAttribute("npc-finder", "active: true;");
-            rootNpc.setAttribute("npc-attack", "range: 20; melee: true;");
+            rootNpc.setAttribute("npc-attack", `range: 20; melee: ${i % 2 === 0 ? 'true' : 'false'};`);
+            rootNpc.setAttribute("health", "");
 
             if (characterModels.has("WARRIOR")) {
                 const str = characterModels.get("WARRIOR");

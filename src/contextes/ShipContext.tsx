@@ -1,5 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
+import {Container, LinearProgress} from "@mui/material";
 
 export const ShipContext = React.createContext([] as IGameMesh[]);
 
@@ -25,5 +26,11 @@ export const ShipMeshLoader = ({children}: {children: any}) => {
             setShipMeshes(fetchShipMeshes);
         })();
     }, []);
-    return shipMeshes.length === 0 ? <span>Loading Ships... ({loadedCount} / 7)</span> : <ShipContext.Provider value={shipMeshes}>{children}</ShipContext.Provider>;
+    return shipMeshes.length === 0 ? (
+        <Container>
+            <span>Loading Ships ({loadedCount} / 7)...</span>
+            <LinearProgress variant="determinate" value={100}></LinearProgress>
+            <LinearProgress variant="determinate" value={loadedCount / 7 * 100}></LinearProgress>
+        </Container>
+    ) : <ShipContext.Provider value={shipMeshes}>{children}</ShipContext.Provider>;
 };
