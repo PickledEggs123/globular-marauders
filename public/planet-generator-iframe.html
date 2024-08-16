@@ -18,6 +18,7 @@
     <script src="aframe-v1.5.0.js"></script>
     <script src="aframe-physics-system.js"></script>
     <script src="aframe-extras.min.js"></script>
+    <script src="aframe-physics-extras.min.js"></script>
     <script src="three-pathfinding.umd.js"></script>
     <script src="three-to-cannon.umd.js"></script>
     <script src="aframe-fps-counter-component.min.js"></script>
@@ -1621,6 +1622,85 @@
             },
         });
 
+        AFRAME.registerComponent("spawn-gold", {
+            schema: {},
+            init: function () {
+                this.innerHandleDead = this.handleDead.bind(this);
+                this.el.addEventListener('dead', this.innerHandleDead);
+            },
+            remove: function () {
+                this.el.removeEventListener('dead', this.innerHandleDead);
+            },
+            handleDead: function () {
+                for (let i = 0; i < 10; i++) {
+                    addGoldCoin(this.el);
+                }
+            },
+        });
+
+        function addGoldCoin(startEl) {
+            const scene = document.querySelector("a-scene");
+            let goldModel = scene.querySelector("#gold-coin-model");
+
+            const rootGoldCoin = document.createElement("a-entity");
+            const id = "id" + Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(36);
+            rootGoldCoin.setAttribute("id", id);
+            rootGoldCoin.setAttribute("class", "gold-coin");
+            const pos = startEl.object3D.position.clone();
+            rootGoldCoin.setAttribute("position", `${pos.x} ${pos.y} ${pos.z}`);
+            rootGoldCoin.setAttribute("dynamic-body", "shape: sphere; sphereRadius: 1; mass: 100");
+            rootGoldCoin.setAttribute("globe-gravity", "");
+            rootGoldCoin.setAttribute("collision-filter", "group: gold-coin; ");
+            const disappearGoldCoin = () => {
+                rootGoldCoin.parentNode.removeChild(rootGoldCoin);
+            };
+            let applyImpulse = () => {};
+            applyImpulse = () => {
+                if (rootGoldCoin.body) {
+                    const getRandom1to1 = () => (Math.random() * 2 - 1);
+                    const impulse = new CANNON.Vec3().set(getRandom1to1(), getRandom1to1(), getRandom1to1());
+                    const bPos = rootGoldCoin.body.position.clone();
+                    impulse.normalize();
+                    impulse.vadd(bPos);
+                    impulse.vadd(bPos);
+                    impulse.scale(10);
+                    const bPosOffset = new CANNON.Vec3().set(getRandom1to1(), getRandom1to1(), getRandom1to1());
+                    bPosOffset.normalize();
+                    rootGoldCoin.body.applyImpulse(impulse, bPosOffset);
+                    setTimeout(disappearGoldCoin, 30_000);
+                } else {
+                    setTimeout(applyImpulse, 100);
+                }
+            };
+            setTimeout(applyImpulse, 100);
+
+            if (characterModels.has("GOLD_COIN")) {
+                const str = characterModels.get("GOLD_COIN");
+
+                // add template
+                if (!goldModel) {
+                    const modelGold = document.createElement("a-entity");
+                    modelGold.setAttribute("gltf-model", str);
+                    modelGold.setAttribute("id", "gold-coin-model");
+                    modelGold.setAttribute("instanced-mesh", "capacity: 1000; updateMode: auto; positioning: world");
+                    scene.appendChild(modelGold);
+                }
+
+                // add graphics
+                rootGoldCoin.setAttribute("instanced-mesh-member", "mesh: #gold-coin-model");
+            } else {
+                const modelGold = document.createElement("a-sphere");
+                modelGold.setAttribute("scale", "0.1 0.1 0.1");
+                modelGold.setAttribute("position", "0 0 0");
+
+                rootGoldCoin.appendChild(modelGold);
+            }
+
+            scene.appendChild(rootGoldCoin);
+
+            return id;
+        }
+
         function addProjectile(startEl, destinationEl) {
             const scene = document.querySelector("a-scene");
             let arrowModel = scene.querySelector("#arrow-model");
@@ -1672,6 +1752,7 @@
             rootNpc.setAttribute("npc-faction", "native");
             rootNpc.setAttribute("npc-finder", "active: false;");
             rootNpc.setAttribute("health", "");
+            rootNpc.setAttribute("spawn-gold", "");
             const destination2 = destinationEl.components['position'].data;
             const pos = buildingEl.components['position'].data;
             rootNpc.setAttribute("position", `${pos.x} ${pos.y} ${pos.z}`);

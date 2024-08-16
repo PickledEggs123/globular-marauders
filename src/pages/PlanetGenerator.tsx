@@ -151,6 +151,7 @@ export const PlanetGenerator = () => {
             } as IGameMesh));
             Promise.all<Uint8Array>([
                 ...data2.map(m => generatePlanetGltf(m, m.ocean, m.navmesh || m.oceanNavmesh)),
+                fetch("/meshes/GoldCoin.glb").then(r => r.blob()).then(b => b.arrayBuffer()).then(a => new Uint8Array(a)),
                 generatePlanetGltf(shipContext[1], false),
                 fetch("/meshes/WoodenArrow2.glb").then(r => r.blob()).then(b => b.arrayBuffer()).then(a => new Uint8Array(a)),
                 fetch("/meshes/MaleAnatomy.glb").then(r => r.blob()).then(b => b.arrayBuffer()).then(a => new Uint8Array(a)),
@@ -179,7 +180,7 @@ export const PlanetGenerator = () => {
                     return btoa(result);
                 }
                 const worldMeshes: [string, boolean, boolean, boolean, boolean, [number, number, number]][] = [];
-                for (let i = 0; i < gltf.length - 13; i++) {
+                for (let i = 0; i < gltf.length - 14; i++) {
                     const dataUri1 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[i])}`;
                     worldMeshes.push([dataUri1, data2[i].collidable, data2[i].navmesh, data2[i].ocean, data2[i].oceanNavmesh, data2[i].vertex] as [string, boolean, boolean, boolean, boolean, [number, number, number]]);
                 }
@@ -202,6 +203,7 @@ export const PlanetGenerator = () => {
                     iframeRef.current.contentWindow.addShip(JSON.stringify({data: dataUri2, point: point.map(x => x * PLANET_SIZE)}));
                 }
 
+                const dataUri313 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 14])}`;
                 const dataUri312 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 12])}`;
                 const dataUri311 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 11])}`;
                 const dataUri3 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 10])}`;
@@ -232,6 +234,8 @@ export const PlanetGenerator = () => {
                     iframeRef.current.contentWindow.addCharacterModel(JSON.stringify({type: "PERSON", data: dataUri311}));
                     // @ts-ignore
                     iframeRef.current.contentWindow.addCharacterModel(JSON.stringify({type: "ARROW", data: dataUri312}));
+                    // @ts-ignore
+                    iframeRef.current.contentWindow.addCharacterModel(JSON.stringify({type: "GOLD_COIN", data: dataUri313}));
                 }
 
                 const dataUri5 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 6])}`;
