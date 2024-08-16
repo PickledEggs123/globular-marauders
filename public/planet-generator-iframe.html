@@ -177,66 +177,51 @@
         });
 
         AFRAME.registerComponent('globe-gravity', {
-            schema: {},
+            schema: {
+                ship: {type: 'boolean', default: false}
+            },
             tick: function () {
                 const object3D = this.el.object3D;
-                // @ts-ignore
                 const trueUpDistance = object3D.getWorldPosition(new THREE.Vector3());
-                // @ts-ignore
                 const trueUp = trueUpDistance.clone().normalize();
-                // @ts-ignore
                 const currentUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
-                // @ts-ignore
                 const currentForward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));;
-                // @ts-ignore
                 const currentRight = new THREE.Vector3(1, 0, 0).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
                 const diffUp = trueUp.clone().sub(currentUp.clone());
 
                 // apply gravity force
-                // @ts-ignore
                 const gravityForce = this.el.body.mass * 10;
-                // @ts-ignore
                 this.el.body.applyForce(new CANNON.Vec3(-trueUp.x, -trueUp.y, -trueUp.z).scale(gravityForce), new CANNON.Vec3(0, 0, 0));
 
                 // apply drag
-                // @ts-ignore
                 this.el.body.applyForce(this.el.body.velocity.clone().scale(-25), new CANNON.Vec3(0, 0, 0));
 
-                // apply sideways tilt force
-                // @ts-ignore
-                const sidewaysTilt = this.el.body.velocity.clone().scale(100).dot(currentRight.clone());
-                const tiltForce = new CANNON.Vec3(currentRight.x, currentRight.y, currentRight.z).scale(sidewaysTilt);
-                const tiltPoint = new CANNON.Vec3(currentUp.x, currentUp.y, currentUp.z);
-                // @ts-ignore
-                this.el.body.applyForce(tiltForce.clone(), tiltPoint.clone());
-                // @ts-ignore
-                this.el.body.applyForce(tiltForce.clone().scale(-1), tiltPoint.clone().scale(-1));
+                if (this.data.ship) {
+                    // apply sideways tilt force
+                    const sidewaysTilt = this.el.body.velocity.clone().scale(100).dot(currentRight.clone());
+                    const tiltForce = new CANNON.Vec3(currentRight.x, currentRight.y, currentRight.z).scale(sidewaysTilt);
+                    const tiltPoint = new CANNON.Vec3(currentUp.x, currentUp.y, currentUp.z);
+                    this.el.body.applyForce(tiltForce.clone(), tiltPoint.clone());
+                    this.el.body.applyForce(tiltForce.clone().scale(-1), tiltPoint.clone().scale(-1));
 
-                // apply up right force
-                // @ts-ignore
-                const springForce = 300;
-                const rotateForce = new CANNON.Vec3(diffUp.x, diffUp.y, diffUp.z).scale(springForce);
-                const rotatePoint = new CANNON.Vec3(currentUp.x, currentUp.y, currentUp.z);
-                // @ts-ignore
-                const dragForce = this.el.body.angularVelocity.clone().cross(rotatePoint.clone()).scale(100);
-                // @ts-ignore
-                this.el.body.applyForce(rotateForce.clone().vsub(dragForce), rotatePoint.clone());
-                // @ts-ignore
-                this.el.body.applyForce(rotateForce.clone().vsub(dragForce).scale(-1), rotatePoint.clone().scale(-1));
+                    // apply up right force
+                    const springForce = 300;
+                    const rotateForce = new CANNON.Vec3(diffUp.x, diffUp.y, diffUp.z).scale(springForce);
+                    const rotatePoint = new CANNON.Vec3(currentUp.x, currentUp.y, currentUp.z);
+                    const dragForce = this.el.body.angularVelocity.clone().cross(rotatePoint.clone()).scale(100);
+                    this.el.body.applyForce(rotateForce.clone().vsub(dragForce), rotatePoint.clone());
+                    this.el.body.applyForce(rotateForce.clone().vsub(dragForce).scale(-1), rotatePoint.clone().scale(-1));
 
-                // apply horizontal drag
-                const horizontalRotatePoint = new CANNON.Vec3(currentForward.x, currentForward.y, currentForward.z);
-                // @ts-ignore
-                const horizontalDragForce = this.el.body.angularVelocity.clone().cross(horizontalRotatePoint.clone()).scale(100);
-                // @ts-ignore
-                this.el.body.applyForce(horizontalDragForce.clone().scale(-1), horizontalRotatePoint.clone());
-                // @ts-ignore
-                this.el.body.applyForce(horizontalDragForce.clone(), horizontalRotatePoint.clone().scale(-1));
+                    // apply horizontal drag
+                    const horizontalRotatePoint = new CANNON.Vec3(currentForward.x, currentForward.y, currentForward.z);
+                    const horizontalDragForce = this.el.body.angularVelocity.clone().cross(horizontalRotatePoint.clone()).scale(100);
+                    this.el.body.applyForce(horizontalDragForce.clone().scale(-1), horizontalRotatePoint.clone());
+                    this.el.body.applyForce(horizontalDragForce.clone(), horizontalRotatePoint.clone().scale(-1));
+                }
 
                 if (trueUpDistance.length() < PLANET_SIZE + 1) {
                     const trueUpMagnitude = -(trueUpDistance.length() - PLANET_SIZE - 1);
                     const trueUpForce = new CANNON.Vec3(trueUp.x, trueUp.y, trueUp.z).scale(trueUpMagnitude * 1000);
-                    // @ts-ignore
                     this.el.body.applyForce(trueUpForce, new CANNON.Vec3(0, 0, 0));
                 }
             }
@@ -1138,6 +1123,14 @@
             }
         });
 
+        AFRAME.registerComponent('raze-target', {
+            schema: {},
+            init: function () {
+                this.el.addEventListener("click", () => {
+                    this.el.emit("raze");
+                });
+            },
+        });
 
         AFRAME.registerComponent('go-to-sea', {
             init: function () {
@@ -1626,17 +1619,61 @@
             schema: {},
             init: function () {
                 this.innerHandleDead = this.handleDead.bind(this);
+                this.innerHandleRaze = this.handleRaze.bind(this);
                 this.el.addEventListener('dead', this.innerHandleDead);
+                this.el.addEventListener('raze', this.innerHandleRaze);
             },
             remove: function () {
                 this.el.removeEventListener('dead', this.innerHandleDead);
+                this.el.removeEventListener('raze', this.innerHandleRaze);
             },
             handleDead: function () {
+                for (let i = 0; i < 3; i++) {
+                    addGoldCoin(this.el);
+                }
+            },
+            handleRaze: function () {
                 for (let i = 0; i < 10; i++) {
                     addGoldCoin(this.el);
                 }
             },
         });
+
+        AFRAME.registerComponent("gold-coin-movement", {
+            schema: {},
+            init: function () {
+                this.interval = setTimeout(this.applyImpulse.bind(this), 100);
+            },
+            remove: function () {
+                if (this.interval) {
+                    clearInterval(this.interval);
+                    this.interval = null;
+                }
+            },
+            applyImpulse: function () {
+                if (this.el.body) {
+                    const getRandom1to1 = () => (Math.random() * 2 - 1);
+                    const bPos = this.el.body.position.clone();
+                    const impulse = new CANNON.Vec3().set(getRandom1to1(), getRandom1to1(), getRandom1to1());
+                    const bPosNorm = bPos.clone();
+                    bPosNorm.normalize();
+                    impulse.normalize();
+                    impulse.vadd(bPosNorm);
+                    impulse.vadd(bPosNorm);
+                    impulse.scale(2);
+                    const bPosOffset = new CANNON.Vec3().set(getRandom1to1(), getRandom1to1(), getRandom1to1());
+                    bPosOffset.normalize();
+                    bPosOffset.scale(5);
+                    this.el.body.applyImpulse(impulse, bPosOffset);
+                    this.interval = setTimeout(this.removeGoldCoin.bind(this), 30_000);
+                } else {
+                    this.interval = setTimeout(this.applyImpulse.bind(this), 100);
+                }
+            },
+            removeGoldCoin: function () {
+                this.el.parentNode.removeChild(this.el);
+            },
+        })
 
         function addGoldCoin(startEl) {
             const scene = document.querySelector("a-scene");
@@ -1646,33 +1683,12 @@
             const id = "id" + Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(36);
             rootGoldCoin.setAttribute("id", id);
             rootGoldCoin.setAttribute("class", "gold-coin");
-            const pos = startEl.object3D.position.clone();
+            const pos = startEl.object3D.getWorldPosition(new THREE.Vector3());
             rootGoldCoin.setAttribute("position", `${pos.x} ${pos.y} ${pos.z}`);
             rootGoldCoin.setAttribute("dynamic-body", "shape: sphere; sphereRadius: 1; mass: 100");
             rootGoldCoin.setAttribute("globe-gravity", "");
             rootGoldCoin.setAttribute("collision-filter", "group: gold-coin; ");
-            const disappearGoldCoin = () => {
-                rootGoldCoin.parentNode.removeChild(rootGoldCoin);
-            };
-            let applyImpulse = () => {};
-            applyImpulse = () => {
-                if (rootGoldCoin.body) {
-                    const getRandom1to1 = () => (Math.random() * 2 - 1);
-                    const impulse = new CANNON.Vec3().set(getRandom1to1(), getRandom1to1(), getRandom1to1());
-                    const bPos = rootGoldCoin.body.position.clone();
-                    impulse.normalize();
-                    impulse.vadd(bPos);
-                    impulse.vadd(bPos);
-                    impulse.scale(10);
-                    const bPosOffset = new CANNON.Vec3().set(getRandom1to1(), getRandom1to1(), getRandom1to1());
-                    bPosOffset.normalize();
-                    rootGoldCoin.body.applyImpulse(impulse, bPosOffset);
-                    setTimeout(disappearGoldCoin, 30_000);
-                } else {
-                    setTimeout(applyImpulse, 100);
-                }
-            };
-            setTimeout(applyImpulse, 100);
+            rootGoldCoin.setAttribute("gold-coin-movement", "");
 
             if (characterModels.has("GOLD_COIN")) {
                 const str = characterModels.get("GOLD_COIN");
@@ -1900,15 +1916,21 @@
             rootHouse.appendChild(rootModel);
 
             const lod0 = document.createElement("a-entity");
-            lod0.setAttribute("class", "lod0");
+            lod0.setAttribute("class", "lod0 clickable");
+            lod0.setAttribute("raze-target", "");
+            lod0.setAttribute("spawn-gold", "");
             rootModel.appendChild(lod0);
 
             const lod1 = document.createElement("a-entity");
-            lod1.setAttribute("class", "lod1");
+            lod1.setAttribute("class", "lod1 clickable");
+            lod1.setAttribute("raze-target", "");
+            lod1.setAttribute("spawn-gold", "");
             rootModel.appendChild(lod1);
 
             const lod2 = document.createElement("a-entity");
-            lod2.setAttribute("class", "lod2");
+            lod2.setAttribute("class", "lod2 clickable");
+            lod2.setAttribute("raze-target", "");
+            lod2.setAttribute("spawn-gold", "");
             rootModel.appendChild(lod2);
 
             const scene = document.querySelector("a-scene");
@@ -1931,7 +1953,8 @@
             rootShip.setAttribute("id", "box");
             rootShip.setAttribute("class", "clickable");
             rootShip.setAttribute("dynamic-body", "shape: sphere; sphereRadius: 1; mass: 100");
-            rootShip.setAttribute("globe-gravity", "");
+            rootShip.setAttribute("collision-filter", "group: ship; collidesWith: default, ship");
+            rootShip.setAttribute("globe-gravity", "ship: true;");
             rootShip.setAttribute("globe-keyboard-controls", "enabled: true; fly: true");
             rootShip.setAttribute("position", `${point[0]} ${point[1]} ${point[2]}`);
 
@@ -2110,7 +2133,7 @@
         <a-entity light="type: ambient; color: #CCC"></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.5" position="0 1 0"></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.5" position="0 -1 0"></a-entity>
-        <a-entity id="camera-rig" position="0 105 5" fps-counter>
+        <a-entity id="camera-rig" position="0 105 5">
             <a-camera wasd-controls-enabled="false" look-controls-enabled="false" position="0 1.6 0" cursor="rayOrigin: mouse" raycaster="far: 50; interval: 100; objects: .clickable"></a-camera>
         </a-entity>
     </a-scene>
