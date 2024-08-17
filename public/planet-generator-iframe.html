@@ -1658,12 +1658,11 @@
                     const bPosNorm = bPos.clone();
                     bPosNorm.normalize();
                     impulse.normalize();
-                    impulse.vadd(bPosNorm);
-                    impulse.vadd(bPosNorm);
-                    impulse.scale(2);
+                    impulse.vadd(bPosNorm, impulse);
+                    impulse.scale(100, impulse);
                     const bPosOffset = new CANNON.Vec3().set(getRandom1to1(), getRandom1to1(), getRandom1to1());
                     bPosOffset.normalize();
-                    bPosOffset.scale(5);
+                    bPosOffset.scale(5, bPosOffset);
                     this.el.body.applyImpulse(impulse, bPosOffset);
                     this.interval = setTimeout(this.removeGoldCoin.bind(this), 30_000);
                 } else {
@@ -1684,6 +1683,7 @@
             rootGoldCoin.setAttribute("id", id);
             rootGoldCoin.setAttribute("class", "gold-coin");
             const pos = startEl.object3D.getWorldPosition(new THREE.Vector3());
+            pos.add(pos.clone().normalize());
             rootGoldCoin.setAttribute("position", `${pos.x} ${pos.y} ${pos.z}`);
             rootGoldCoin.setAttribute("dynamic-body", "shape: sphere; sphereRadius: 1; mass: 100");
             rootGoldCoin.setAttribute("globe-gravity", "");
