@@ -668,6 +668,7 @@
                 this.system.addAgent(this);
                 this.group = null;
                 this.path = [];
+                this.dtSum = 0;
             },
             remove: function () {
                 this.system.removeAgent(this);
@@ -679,99 +680,92 @@
                 this.group = null;
                 this.path = [];
             },
-            tick: (function () {
-                // @ts-ignore
+            tick: function (t, dt) {
                 const vDest = new THREE.Vector3();
-                // @ts-ignore
                 const vDelta = new THREE.Vector3();
-                // @ts-ignore
                 const vNext = new THREE.Vector3();
 
-                let dtSum = 0;
+                const el = this.el;
+                const data = this.data;
+                const speed = data.speed * (dt + this.dtSum) / 1000;
 
-                return function (t, dt) {
-                    const el = this.el;
-                    const data = this.data;
-                    const speed = data.speed * (dt + dtSum) / 1000;
+                if (!data.active) return;
 
-                    if (!data.active) return;
+                const object3D = this.el.object3D;
+                // @ts-ignore
+                const pos = object3D.getWorldPosition(new THREE.Vector3());
 
-                    const object3D = this.el.object3D;
-                    // @ts-ignore
-                    const pos = object3D.getWorldPosition(new THREE.Vector3());
+                const cameraEl = document.querySelector("#camera-rig");
+                // @ts-ignore
+                const cameraPos = cameraEl.object3D.getWorldPosition(new THREE.Vector3());
 
-                    const cameraEl = document.querySelector("#camera-rig");
-                    // @ts-ignore
-                    const cameraPos = cameraEl.object3D.getWorldPosition(new THREE.Vector3());
-
-                    const cameraDistance = pos.distanceTo(cameraPos);
-                    if (cameraDistance > 20) {
-                        if (dt + dtSum < 5) {
-                            dtSum += dt;
-                            return;
-                        }
-                        dtSum = 0;
-                    } else {
-                        dtSum = 0;
+                const cameraDistance = pos.distanceTo(cameraPos);
+                if (cameraDistance > 20) {
+                    if (dt + this.dtSum < 5) {
+                        this.dtSum += dt;
+                        return;
                     }
+                    this.dtSum = 0;
+                } else {
+                    this.dtSum = 0;
+                }
 
 
-                    // Use PatrolJS pathfinding system to get the shortest path to target.
+                // Use PatrolJS pathfinding system to get the shortest path to target.
+                if (!this.path.length) {
+                    const position = this.el.object3D.position;
+                    this.group = this.group || this.system.getGroup(position);
+                    this.path = this.system.getPath(position, vDest.copy(data.destination), this.group) || [];
+                    el.emit('navigation-start');
+                }
+
+                // If no path is found, exit.
+                if (!this.path.length) {
+                    console.warn('[nav] Unable to find path to %o.', data.destination);
+                    this.el.setAttribute("globe-nav-agent", "active: false;");
+                    el.emit('navigation-end');
+                    el.emit('navigation-group-change');
+                    el.object3D.position.copy(vDest);
+                    this.group = null;
+                    el.emit('navigation-group-changed');
+                    return;
+                }
+
+                // Current segment is a vector from current position to next waypoint.
+                const vCurrent = el.object3D.position;
+                const vWaypoint = this.path[0];
+                vDelta.subVectors(vWaypoint, vCurrent);
+
+                const distance = vDelta.length();
+                let gazeTarget;
+
+                if (distance <= speed) {
+                    // If <1 step from current waypoint, discard it and move toward next.
+                    this.path.shift();
+
+                    // After discarding the last waypoint, exit pathfinding.
                     if (!this.path.length) {
-                        const position = this.el.object3D.position;
-                        this.group = this.group || this.system.getGroup(position);
-                        this.path = this.system.getPath(position, vDest.copy(data.destination), this.group) || [];
-                        el.emit('navigation-start');
-                    }
-
-                    // If no path is found, exit.
-                    if (!this.path.length) {
-                        console.warn('[nav] Unable to find path to %o.', data.destination);
                         this.el.setAttribute("globe-nav-agent", "active: false;");
                         el.emit('navigation-end');
-                        el.emit('navigation-group-change');
-                        el.object3D.position.copy(vDest);
-                        this.group = null;
-                        el.emit('navigation-group-changed');
                         return;
                     }
 
-                    // Current segment is a vector from current position to next waypoint.
-                    const vCurrent = el.object3D.position;
-                    const vWaypoint = this.path[0];
-                    vDelta.subVectors(vWaypoint, vCurrent);
+                    vNext.copy(vCurrent);
+                    gazeTarget = this.path[0];
+                } else {
+                    // If still far away from next waypoint, find next position for
+                    // the current frame.
+                    vNext.copy(vDelta.setLength(speed)).add(vCurrent);
+                    gazeTarget = vWaypoint;
+                }
 
-                    const distance = vDelta.length();
-                    let gazeTarget;
+                // Look at the next waypoint.
+                // gazeTarget.y = vCurrent.y;
+                el.object3D.up = new THREE.Vector3().copy(vCurrent).normalize();
+                el.object3D.lookAt(gazeTarget);
 
-                    if (distance <= speed) {
-                        // If <1 step from current waypoint, discard it and move toward next.
-                        this.path.shift();
-
-                        // After discarding the last waypoint, exit pathfinding.
-                        if (!this.path.length) {
-                            this.el.setAttribute("globe-nav-agent", "active: false;");
-                            el.emit('navigation-end');
-                            return;
-                        }
-
-                        vNext.copy(vCurrent);
-                        gazeTarget = this.path[0];
-                    } else {
-                        // If still far away from next waypoint, find next position for
-                        // the current frame.
-                        vNext.copy(vDelta.setLength(speed)).add(vCurrent);
-                        gazeTarget = vWaypoint;
-                    }
-
-                    // Look at the next waypoint.
-                    // gazeTarget.y = vCurrent.y;
-                    el.object3D.up = new THREE.Vector3().copy(vCurrent).normalize();
-                    el.object3D.lookAt(gazeTarget);
-
-                    vCurrent.copy(vNext);
-                };
-            }())
+                vCurrent.copy(vNext);
+            },
         });
 
         /**
@@ -941,145 +935,140 @@
                 this.group = null;
                 this.path = [];
             },
-            tick: (function () {
-                // @ts-ignore
+            tick: function (t, dt) {
                 const vDest = new THREE.Vector3();
-                // @ts-ignore
                 const vDelta = new THREE.Vector3();
-                // @ts-ignore
                 const vNext = new THREE.Vector3();
 
-                return function (t, dt) {
-                    const el = this.el;
-                    const data = this.data;
-                    const speed = data.speed * dt / 1000;
+                const el = this.el;
+                const data = this.data;
+                const speed = data.speed * dt / 1000;
 
-                    if (!data.active) return;
+                if (!data.active) return;
 
-                    // Use PatrolJS pathfinding system to get the shortest path to target.
+                // Use PatrolJS pathfinding system to get the shortest path to target.
+                if (!this.path.length) {
+                    const position = this.el.object3D.position;
+                    this.group = this.group || this.system.getGroup(position);
+                    this.path = this.system.getPath(position, vDest.copy(data.destination), this.group) || [];
+                    el.emit('navigation-start');
+                }
+
+                // If no path is found, exit.
+                if (!this.path.length) {
+                    console.warn('[nav] Unable to find path to %o.', data.destination);
+                    this.el.setAttribute("globe-ocean-nav-agent", "active: false;");
+                    el.emit('navigation-end');
+                    el.object3D.position.copy(vDest);
+                    console.log(el.object3D.position);
+                    el.components['globe-keyboard-controls'].onKeyUp({code: "KeyW"});
+                    el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD"});
+                    el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA"});
+                    this.group = null;
+                    return;
+                }
+
+                // Current segment is a vector from current position to next waypoint.
+                const vCurrent = new THREE.Vector3().copy(el.components['dynamic-body'].body.position);
+                const vWaypoint = this.path[0];
+                vDelta.subVectors(vWaypoint, vCurrent);
+
+                const distance = vDelta.length();
+                let gazeTarget;
+
+                if (distance < 4) {
+                    // If <1 step from current waypoint, discard it and move toward next.
+                    this.path.shift();
+
+                    // After discarding the last waypoint, exit pathfinding.
                     if (!this.path.length) {
-                        const position = this.el.object3D.position;
-                        this.group = this.group || this.system.getGroup(position);
-                        this.path = this.system.getPath(position, vDest.copy(data.destination), this.group) || [];
-                        el.emit('navigation-start');
-                    }
-
-                    // If no path is found, exit.
-                    if (!this.path.length) {
-                        console.warn('[nav] Unable to find path to %o.', data.destination);
                         this.el.setAttribute("globe-ocean-nav-agent", "active: false;");
                         el.emit('navigation-end');
-                        el.object3D.position.copy(vDest);
-                        console.log(el.object3D.position);
                         el.components['globe-keyboard-controls'].onKeyUp({code: "KeyW"});
                         el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD"});
                         el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA"});
-                        this.group = null;
                         return;
                     }
 
-                    // Current segment is a vector from current position to next waypoint.
-                    const vCurrent = new THREE.Vector3().copy(el.components['dynamic-body'].body.position);
-                    const vWaypoint = this.path[0];
-                    vDelta.subVectors(vWaypoint, vCurrent);
+                    vNext.copy(vCurrent);
+                    gazeTarget = this.path[0];
+                } else {
+                    // If still far away from next waypoint, find next position for
+                    // the current frame.
+                    vNext.copy(vDelta.setLength(speed)).add(vCurrent);
+                    gazeTarget = vWaypoint;
+                }
 
-                    const distance = vDelta.length();
-                    let gazeTarget;
+                // Look at the next waypoint.
+                // gazeTarget.y = vCurrent.y;
+                // |  x  y  z |
+                // | ax ay az |
+                // | bx by bz |
+                const getDeterminant = () => {
+                    const a = vCurrent.clone().normalize();
+                    const v1 = new THREE.Vector3(0, 0, -1).applyQuaternion(new THREE.Quaternion().copy(el.components['dynamic-body'].body.quaternion));
+                    const v2 = gazeTarget.clone().sub(vCurrent.clone()).normalize();
 
-                    if (distance < 4) {
-                        // If <1 step from current waypoint, discard it and move toward next.
-                        this.path.shift();
+                    // make two vectors for determinant
+                    let ax = v1.x;
+                    let ay = v1.y;
+                    let az = v1.z;
+                    let bx = v2.x;
+                    let by = v2.y;
+                    let bz = v2.z;
 
-                        // After discarding the last waypoint, exit pathfinding.
-                        if (!this.path.length) {
-                            this.el.setAttribute("globe-ocean-nav-agent", "active: false;");
-                            el.emit('navigation-end');
-                            el.components['globe-keyboard-controls'].onKeyUp({code: "KeyW"});
-                            el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD"});
-                            el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA"});
-                            return;
-                        }
+                    // make basis matrix for sphere
+                    let aVec = new THREE.Vector3().set(ax, ay, az).normalize();
+                    let bVec = new THREE.Vector3().set(bx, by, az).normalize();
+                    const basisY = a.clone().normalize();
+                    const basisZ = aVec.clone().normalize();
+                    const basisX = new THREE.Vector3().crossVectors(basisY, basisZ);
+                    const basis = new THREE.Matrix4().makeBasis(basisX, basisY, basisZ).invert();
 
-                        vNext.copy(vCurrent);
-                        gazeTarget = this.path[0];
-                    } else {
-                        // If still far away from next waypoint, find next position for
-                        // the current frame.
-                        vNext.copy(vDelta.setLength(speed)).add(vCurrent);
-                        gazeTarget = vWaypoint;
+                    // apply basis matrix
+                    aVec = aVec.applyMatrix4(basis);
+                    bVec = bVec.applyMatrix4(basis);
+                    ax = aVec.x;
+                    ay = aVec.y;
+                    az = aVec.z;
+                    bx = bVec.x;
+                    by = bVec.y;
+                    bz = bVec.z;
+
+                    let det = ax * by + ay * bz + az * bx - ay * bx - az * by - ax * bz;
+                    if (aVec.dot(bVec) < 0) {
+                        det += Math.sign(det);
                     }
-
-                    // Look at the next waypoint.
-                    // gazeTarget.y = vCurrent.y;
-                    // |  x  y  z |
-                    // | ax ay az |
-                    // | bx by bz |
-                    const getDeterminant = () => {
-                        const a = vCurrent.clone().normalize();
-                        const v1 = new THREE.Vector3(0, 0, -1).applyQuaternion(new THREE.Quaternion().copy(el.components['dynamic-body'].body.quaternion));
-                        const v2 = gazeTarget.clone().sub(vCurrent.clone()).normalize();
-
-                        // make two vectors for determinant
-                        let ax = v1.x;
-                        let ay = v1.y;
-                        let az = v1.z;
-                        let bx = v2.x;
-                        let by = v2.y;
-                        let bz = v2.z;
-
-                        // make basis matrix for sphere
-                        let aVec = new THREE.Vector3().set(ax, ay, az).normalize();
-                        let bVec = new THREE.Vector3().set(bx, by, az).normalize();
-                        const basisY = a.clone().normalize();
-                        const basisZ = aVec.clone().normalize();
-                        const basisX = new THREE.Vector3().crossVectors(basisY, basisZ);
-                        const basis = new THREE.Matrix4().makeBasis(basisX, basisY, basisZ).invert();
-
-                        // apply basis matrix
-                        aVec = aVec.applyMatrix4(basis);
-                        bVec = bVec.applyMatrix4(basis);
-                        ax = aVec.x;
-                        ay = aVec.y;
-                        az = aVec.z;
-                        bx = bVec.x;
-                        by = bVec.y;
-                        bz = bVec.z;
-
-                        let det = ax * by + ay * bz + az * bx - ay * bx - az * by - ax * bz;
-                        if (aVec.dot(bVec) < 0) {
-                            det += Math.sign(det);
-                        }
-                        return det;
-                    };
-                    const det = getDeterminant();
-                    if (det < 0) {
-                        if (Math.random() * 0.5 < Math.abs(det)) {
-                            el.components['globe-keyboard-controls'].onKeyDown({code: "KeyD"});
-                            el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA"});
-                        } else {
-                            el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA"});
-                            el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD"});
-                        }
-                    } else if (det > 0) {
-                        if (Math.random() * 0.33 < Math.abs(det)) {
-                            el.components['globe-keyboard-controls'].onKeyDown({code: "KeyA"});
-                            el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD"});
-                        } else {
-                            el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD"});
-                            el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA"});
-                        }
+                    return det;
+                };
+                const det = getDeterminant();
+                if (det < 0) {
+                    if (Math.random() * 0.5 < Math.abs(det)) {
+                        el.components['globe-keyboard-controls'].onKeyDown({code: "KeyD"});
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA"});
                     } else {
                         el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA"});
                         el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD"});
                     }
-
-                    if (Math.abs(det) < 0.1) {
-                        el.components['globe-keyboard-controls'].onKeyDown({code: "KeyW"});
+                } else if (det > 0) {
+                    if (Math.random() * 0.33 < Math.abs(det)) {
+                        el.components['globe-keyboard-controls'].onKeyDown({code: "KeyA"});
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD"});
                     } else {
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyW"});
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD"});
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA"});
                     }
-                };
-            }())
+                } else {
+                    el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA"});
+                    el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD"});
+                }
+
+                if (Math.abs(det) < 0.1) {
+                    el.components['globe-keyboard-controls'].onKeyDown({code: "KeyW"});
+                } else {
+                    el.components['globe-keyboard-controls'].onKeyUp({code: "KeyW"});
+                }
+            },
         });
 
         AFRAME.registerComponent('go-on-land', {
@@ -1521,75 +1510,72 @@
                 target: {type: 'selector'},
                 speed: {type: 'number', default: 10},
             },
-            tick: (function () {
-                // @ts-ignore
+            init: function () {
+                this.dtSum = 0;
+            },
+            tick: function (t, dt) {
                 const vDelta = new THREE.Vector3();
-                // @ts-ignore
                 const vNext = new THREE.Vector3();
 
-                let dtSum = 0;
+                const el = this.el;
+                const data = this.data;
+                const speed = data.speed * (dt + this.dtSum) / 1000;
 
-                return function (t, dt) {
-                    const el = this.el;
-                    const data = this.data;
-                    const speed = data.speed * (dt + dtSum) / 1000;
+                if (!this.data.target) {
+                    this.el.emit('miss');
+                    this.el.parentNode.removeChild(this.el);
+                    return;
+                }
 
-                    if (!this.data.target) {
-                        this.el.emit('miss');
-                        this.el.parentNode.removeChild(this.el);
+                const object3D = this.el.object3D;
+                // @ts-ignore
+                const pos = object3D.getWorldPosition(new THREE.Vector3());
+
+                const cameraEl = document.querySelector("#camera-rig");
+                // @ts-ignore
+                const cameraPos = cameraEl.object3D.getWorldPosition(new THREE.Vector3());
+
+                const cameraDistance = pos.distanceTo(cameraPos);
+                if (cameraDistance > 20) {
+                    if (dt + this.dtSum < 5) {
+                        this.dtSum += dt;
                         return;
                     }
-
-                    const object3D = this.el.object3D;
-                    // @ts-ignore
-                    const pos = object3D.getWorldPosition(new THREE.Vector3());
-
-                    const cameraEl = document.querySelector("#camera-rig");
-                    // @ts-ignore
-                    const cameraPos = cameraEl.object3D.getWorldPosition(new THREE.Vector3());
-
-                    const cameraDistance = pos.distanceTo(cameraPos);
-                    if (cameraDistance > 20) {
-                        if (dt + dtSum < 5) {
-                            dtSum += dt;
-                            return;
-                        }
-                        dtSum = 0;
-                    } else {
-                        dtSum = 0;
-                    }
+                    this.dtSum = 0;
+                } else {
+                    this.dtSum = 0;
+                }
 
 
-                    // Current segment is a vector from current position to next waypoint.
-                    const vCurrent = el.object3D.position;
-                    let vWaypoint = this.data.target.object3D.position.clone();
-                    vWaypoint = vWaypoint.add(vWaypoint.clone().normalize());
-                    vDelta.subVectors(vWaypoint, vCurrent);
+                // Current segment is a vector from current position to next waypoint.
+                const vCurrent = el.object3D.position;
+                let vWaypoint = this.data.target.object3D.position.clone();
+                vWaypoint = vWaypoint.add(vWaypoint.clone().normalize());
+                vDelta.subVectors(vWaypoint, vCurrent);
 
-                    const distance = vDelta.length();
-                    let gazeTarget;
+                const distance = vDelta.length();
+                let gazeTarget;
 
-                    if (distance <= speed) {
-                        vNext.copy(vCurrent);
-                        gazeTarget = vWaypoint;
+                if (distance <= speed) {
+                    vNext.copy(vCurrent);
+                    gazeTarget = vWaypoint;
 
-                        this.data.target.emit('hit', 10);
-                        this.el.parentNode.removeChild(this.el);
-                    } else {
-                        // If still far away from next waypoint, find next position for
-                        // the current frame.
-                        vNext.copy(vDelta.setLength(speed)).add(vCurrent);
-                        gazeTarget = vWaypoint;
-                    }
+                    this.data.target.emit('hit', 10);
+                    this.el.parentNode.removeChild(this.el);
+                } else {
+                    // If still far away from next waypoint, find next position for
+                    // the current frame.
+                    vNext.copy(vDelta.setLength(speed)).add(vCurrent);
+                    gazeTarget = vWaypoint;
+                }
 
-                    // Look at the next waypoint.
-                    // gazeTarget.y = vCurrent.y;
-                    el.object3D.up = new THREE.Vector3().copy(vCurrent).normalize();
-                    el.object3D.lookAt(gazeTarget);
+                // Look at the next waypoint.
+                // gazeTarget.y = vCurrent.y;
+                el.object3D.up = new THREE.Vector3().copy(vCurrent).normalize();
+                el.object3D.lookAt(gazeTarget);
 
-                    vCurrent.copy(vNext);
-                };
-            }()),
+                vCurrent.copy(vNext);
+            },
         });
 
         AFRAME.registerComponent('health', {
