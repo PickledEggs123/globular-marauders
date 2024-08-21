@@ -217,12 +217,12 @@
                     const horizontalDragForce = this.el.body.angularVelocity.clone().cross(horizontalRotatePoint.clone()).scale(100);
                     this.el.body.applyForce(horizontalDragForce.clone().scale(-1), horizontalRotatePoint.clone());
                     this.el.body.applyForce(horizontalDragForce.clone(), horizontalRotatePoint.clone().scale(-1));
-                }
 
-                if (trueUpDistance.length() < PLANET_SIZE + 1) {
-                    const trueUpMagnitude = -(trueUpDistance.length() - PLANET_SIZE - 1);
-                    const trueUpForce = new CANNON.Vec3(trueUp.x, trueUp.y, trueUp.z).scale(trueUpMagnitude * 1000);
-                    this.el.body.applyForce(trueUpForce, new CANNON.Vec3(0, 0, 0));
+                    if (trueUpDistance.length() < PLANET_SIZE + 1) {
+                        const trueUpMagnitude = -(trueUpDistance.length() - PLANET_SIZE - 1);
+                        const trueUpForce = new CANNON.Vec3(trueUp.x, trueUp.y, trueUp.z).scale(trueUpMagnitude * 1000);
+                        this.el.body.applyForce(trueUpForce, new CANNON.Vec3(0, 0, 0));
+                    }
                 }
             }
         });
@@ -2067,7 +2067,7 @@
                     const intersects = octree.intersects(position, radius);
                     const meshes = intersects.array;
                     const els = meshes.map(x => x.parent.el);
-                    const filtered = els.filter(x => x.components['npc-faction'].data !== factionName);
+                    const filtered = els.filter(x => x && x.components['npc-faction'].data !== factionName);
                     return filtered.sort((a, b) => {
                         const distA = new THREE.Vector3().copy(a.object3D.position).distanceTo(position);
                         const distB = new THREE.Vector3().copy(b.object3D.position).distanceTo(position);

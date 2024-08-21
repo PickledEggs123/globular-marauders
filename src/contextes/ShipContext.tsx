@@ -27,10 +27,11 @@ export const ShipMeshLoader = ({children}: {children: any}) => {
         })();
     }, []);
     return shipMeshes.length === 0 ? (
-        <Container>
+        <Container style={{textAlign: 'center'}}>
             <span>Loading Ships ({loadedCount} / 7)...</span>
             <LinearProgress variant="determinate" value={100}></LinearProgress>
             <LinearProgress variant="determinate" value={loadedCount / 7 * 100}></LinearProgress>
+            <img src="/images/loadingImage.png"/>
         </Container>
     ) : <ShipContext.Provider value={shipMeshes}>{children}</ShipContext.Provider>;
 };

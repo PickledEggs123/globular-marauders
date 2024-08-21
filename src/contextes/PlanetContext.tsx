@@ -30,10 +30,11 @@ export const PlanetMeshLoader = ({children}: {children: any}) => {
         })();
     }, []);
     return planetMeshes.length === 0 ? (
-        <Container>
+        <Container style={{textAlign: 'center'}}>
             <span>Loading Planets ({loadedCount} / 10)...</span>
             <LinearProgress variant="determinate" value={loadedCount / 10 * 100}></LinearProgress>
             <LinearProgress variant="determinate" value={0}></LinearProgress>
+            <img src="/images/loadingImage.png"/>
         </Container>
-    ): <PlanetContext.Provider value={planetMeshes}>{children}</PlanetContext.Provider>;
+    ) : <PlanetContext.Provider value={planetMeshes}>{children}</PlanetContext.Provider>;
 };
