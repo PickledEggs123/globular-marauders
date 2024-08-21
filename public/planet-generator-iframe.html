@@ -669,6 +669,10 @@
                 this.group = null;
                 this.path = [];
                 this.dtSum = 0;
+                this.material = new THREE.LineBasicMaterial({ color: 0xffffff });
+                this.geometry = new THREE.BufferGeometry().setFromPoints([]);
+                this.line = new THREE.Line(this.geometry, this.material);
+                this.debugId = "id" + Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(36);
             },
             remove: function () {
                 this.system.removeAgent(this);
@@ -717,6 +721,16 @@
                     this.group = this.group || this.system.getGroup(position);
                     this.path = this.system.getPath(position, vDest.copy(data.destination), this.group) || [];
                     el.emit('navigation-start');
+                }
+
+                if (el.classList.contains("npc")) {
+                    if (this.el.sceneEl.object3DMap[`line-debug-${this.debugId}`]) {
+                        this.el.sceneEl.removeObject3D(`line-debug-${this.debugId}`);
+                    }
+                    this.geometry.setFromPoints([this.el.object3D.position, ...this.path].map(x => new THREE.Vector3().addVectors(x, x.clone().normalize())));
+                    this.geometry.computeBoundingSphere();
+                    this.line = new THREE.Line(this.geometry, this.material);
+                    this.el.sceneEl.setObject3D(`line-debug-${this.debugId}`, this.line);
                 }
 
                 // If no path is found, exit.
@@ -1803,7 +1817,7 @@
             rootNpc.setAttribute("position", "0 150 0");
             rootNpc.setAttribute("npc-faction", "player");
             rootNpc.setAttribute("npc-finder", "active: true;");
-            rootNpc.setAttribute("npc-attack", `range: 20; melee: ${i % 2 === 0 ? 'true' : 'false'};`);
+            rootNpc.setAttribute("npc-attack", `range: 10; melee: false;`);
             rootNpc.setAttribute("health", "");
 
             if (characterModels.has("WARRIOR")) {
