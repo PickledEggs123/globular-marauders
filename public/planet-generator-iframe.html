@@ -1252,14 +1252,30 @@
             },
             init: function () {
                 this.system.registerMe(this.el);
-                const buildingTypes = ((this.data?.toString()?.toLowerCase() ?? "") === "port") ? ["port"] : [
-                    "house",
-                    "house",
-                    "house",
-                    "temple",
-                    "tavern",
-                    "workshop",
-                ];
+                const tempType = this.data?.toString()?.toLowerCase() ?? "";
+                let buildingTypes;
+                switch (tempType) {
+                    case "port": {
+                        buildingTypes = [
+                            "port"
+                        ];
+                        break;
+                    }
+                    case "temple": {
+                        buildingTypes = [
+                            "temple"
+                        ];
+                        break;
+                    }
+                    default: {
+                        buildingTypes = [
+                            "house",
+                            "house",
+                            "tavern",
+                            "workshop",
+                        ];
+                    }
+                }
                 this.buildingType = buildingTypes[Math.floor(Math.random() * buildingTypes.length)];
                 if (this.buildingType === "house") {
                     const numNpcs = Math.floor(Math.random() * 4) + 1;
