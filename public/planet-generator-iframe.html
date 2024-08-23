@@ -15,14 +15,17 @@
             }
         }
     </script>
-    <script src="aframe-v1.5.0.js"></script>
-    <script src="aframe-physics-system.js"></script>
-    <script src="aframe-extras.min.js"></script>
-    <script src="aframe-physics-extras.min.js"></script>
-    <script src="three-pathfinding.umd.js"></script>
-    <script src="three-to-cannon.umd.js"></script>
-    <script src="aframe-fps-counter-component.min.js"></script>
-    <script src="instanced-mesh.min.js"></script>
+    <script src="/aframe-v1.5.0.js"></script>
+    <script src="/aframe-physics-system.js"></script>
+    <script src="/aframe-extras.min.js"></script>
+    <script src="/aframe-physics-extras.min.js"></script>
+    <script src="/three-pathfinding.umd.js"></script>
+    <script src="/three-to-cannon.umd.js"></script>
+    <script src="/aframe-fps-counter-component.min.js"></script>
+    <script src="/instanced-mesh.min.js"></script>
+    <script src="/socket.io.min.js"></script>
+    <script src="/easyrtc/easyrtc.js"></script>
+    <script src="/networked-aframe.js"></script>
     <script type="application/javascript">
         const PLANET_SIZE = 100;
 
@@ -2145,7 +2148,7 @@
     </style>
 </head>
 <body>
-    <a-scene physics="driver: local; gravity: 0 0 0;" globe-nav globe-ocean-nav embedded id="scene">
+    <a-scene physics="driver: local; gravity: 0 0 0;" networked-scene="room: basic; debug: true; adapter: easyrtc;" globe-nav globe-ocean-nav embedded fog shadow id="scene">
         <a-entity light="type: ambient; color: #CCC"></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.5" position="0 1 0"></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.5" position="0 -1 0"></a-entity>

@@ -1,9 +1,5 @@
-import path from 'path';
-import fs from 'fs';
-
 import React from 'react';
 import ReactDOMServer from 'react-dom/server';
-import express from 'express';
 
 import {App} from '../src/App';
 import {StaticRouter} from "react-router-dom/server";
@@ -16,7 +12,19 @@ import {ThemeProvider} from "@mui/material/styles";
 import {PrismaClient} from "@prisma/client";
 import compression from "compression";
 
+const path = require('path');
+const fs = require('fs');
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+const easyrtc = require('open-easyrtc');
+
+process.title = "globular-marauders-server";
+
+// get port or default to 8080
 const PORT = process.env.PORT || 8080;
+
+// setup and configure express http server.
 const app = express();
 
 // handle react pages
@@ -90,6 +98,65 @@ app.get('/api/planet', async (req, res) => {
 app.use(compression());
 app.use(express.static('./build'));
 
-app.listen(PORT, () => {
-    console.log(`Server is listening on port ${PORT}`);
+// Start Express http server
+const webServer = http.createServer(app);
+// To enable https on the node server, comment the line above and uncomment the line below
+// const webServer = https.createServer(credentials, app);
+
+// Start Socket.io so it attaches itself to Express server
+const socketServer = socketIo(webServer, {"log level": 1});
+const myIceServers = [
+    {"urls":"stun:stun1.l.google.com:19302"},
+    {"urls":"stun:stun2.l.google.com:19302"},
+    // {
+    //   "urls":"turn:[ADDRESS]:[PORT]",
+    //   "username":"[USERNAME]",
+    //   "credential":"[CREDENTIAL]"
+    // },
+    // {
+    //   "urls":"turn:[ADDRESS]:[PORT][?transport=tcp]",
+    //   "username":"[USERNAME]",
+    //   "credential":"[CREDENTIAL]"
+    // }
+];
+easyrtc.setOption("appIceServers", myIceServers);
+easyrtc.setOption("logLevel", "debug");
+easyrtc.setOption("demosEnable", false);
+
+// Overriding the default easyrtcAuth listener, only so we can directly access its callback
+easyrtc.events.on("easyrtcAuth", (socket, easyrtcid, msg, socketCallback, callback) => {
+    easyrtc.events.defaultListeners.easyrtcAuth(socket, easyrtcid, msg, socketCallback, (err, connectionObj) => {
+        if (err || !msg.msgData || !msg.msgData.credential || !connectionObj) {
+            callback(err, connectionObj);
+            return;
+        }
+
+        connectionObj.setField("credential", msg.msgData.credential, {"isShared":false});
+
+        console.log("["+easyrtcid+"] Credential saved!", connectionObj.getFieldValueSync("credential"));
+
+        callback(err, connectionObj);
+    });
+});
+
+// To test, lets print the credential to the console for every room join!
+easyrtc.events.on("roomJoin", (connectionObj, roomName, roomParameter, callback) => {
+    console.log("["+connectionObj.getEasyrtcid()+"] Credential retrieved!", connectionObj.getFieldValueSync("credential"));
+    easyrtc.events.defaultListeners.roomJoin(connectionObj, roomName, roomParameter, callback);
+});
+
+// Start EasyRTC server
+easyrtc.listen(app, socketServer, null, (err, rtcRef) => {
+    console.log("Initiated");
+
+    rtcRef.events.on("roomCreate", (appObj, creatorConnectionObj, roomName, roomOptions, callback) => {
+        console.log("roomCreate fired! Trying to create: " + roomName);
+
+        appObj.events.defaultListeners.roomCreate(appObj, creatorConnectionObj, roomName, roomOptions, callback);
+    });
+});
+
+// Listen on port
+webServer.listen(PORT, () => {
+    console.log("listening on http://localhost:" + PORT);
 });
