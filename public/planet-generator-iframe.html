@@ -1699,7 +1699,16 @@
             const str = characterModels.get(charModelId);
 
             const rootGoldCoin = document.createElement("a-entity");
-            rootGoldCoin.setAttribute("gltf-model", str);
+            if (charModelId === "SHIP") {
+                const dataEl = document.createElement("a-entity");
+                dataEl.setAttribute("class", "data");
+                dataEl.setAttribute("scale", "0.1 0.1 0.1");
+                dataEl.setAttribute("rotation", "0 -90 0");
+                dataEl.setAttribute("gltf-model", str);
+                rootGoldCoin.appendChild(dataEl);
+            } else {
+                rootGoldCoin.setAttribute("gltf-model", str);
+            }
 
             const a = (() => {
                 const assets = document.querySelector("a-assets");
@@ -1743,6 +1752,14 @@
                                 {
                                     selector: '.data',
                                     component: 'gltf-model',
+                                },
+                                {
+                                    selector: '.data',
+                                    component: 'scale',
+                                },
+                                {
+                                    selector: '.data',
+                                    component: 'rotation',
                                 },
                             ]
                         });
@@ -1885,6 +1902,7 @@
             rootNpc.setAttribute("class", "npc");
             rootNpc.setAttribute("globe-nav-agent", "");
             rootNpc.setAttribute("position", "0 150 0");
+            rootNpc.setAttribute("rotation", "0 0 0");
             rootNpc.setAttribute("npc-faction", "player");
             rootNpc.setAttribute("npc-finder", "active: true;");
             rootNpc.setAttribute("npc-attack", `range: 10; melee: false;`);
@@ -1892,11 +1910,8 @@
 
             if (characterModels.has("WARRIOR")) {
                 const str = characterModels.get("WARRIOR");
-                const modelNpc = document.createElement("a-entity");
-                modelNpc.setAttribute("gltf-model", str);
-                modelNpc.setAttribute("position", "0 0 0");
-                modelNpc.setAttribute("rotation", "0 0 0");
-                rootNpc.appendChild(modelNpc);
+                rootNpc.setAttribute("gltf-model", str);
+                rootNpc.setAttribute("networked", "template: #warrior-template; attachTemplateToLocal: false;");
             } else {
                 const modelNpc = document.createElement("a-sphere");
                 modelNpc.setAttribute("scale", "0.1 0.1 0.1");
@@ -2052,12 +2067,13 @@
             rootShip.setAttribute("rotation", "0 0 0");
 
             const rootModel = document.createElement("a-entity");
-            rootModel.setAttribute("class", "mesh");
+            rootModel.setAttribute("class", "data");
             rootModel.setAttribute("gltf-model", str);
             rootModel.setAttribute("go-to-sea", "");
             rootModel.setAttribute("scale", "0.1 0.1 0.1");
             rootModel.setAttribute("rotation", "0 -90 0");
             rootShip.appendChild(rootModel);
+            rootShip.setAttribute("networked", "template: #ship-template; attachTemplateToLocal: false;");
 
             const rootPosition = document.createElement("a-entity");
             rootPosition.setAttribute("id", "box-position");
