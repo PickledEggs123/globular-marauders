@@ -149,22 +149,22 @@ export const PlanetGenerator = () => {
                 }, ...d.attributes.filter(x => x.id !== "aPosition"),
                 ]
             } as IGameMesh));
-            Promise.all<Uint8Array>([
+            Promise.all<Uint8Array | string>([
                 ...data2.map(m => generatePlanetGltf(m, m.ocean, m.navmesh || m.oceanNavmesh)),
-                fetch("/meshes/GoldCoin.glb").then(r => r.blob()).then(b => b.arrayBuffer()).then(a => new Uint8Array(a)),
+                "/meshes/GoldCoin.glb",
                 generatePlanetGltf(shipContext[1], false),
-                fetch("/meshes/WoodenArrow2.glb").then(r => r.blob()).then(b => b.arrayBuffer()).then(a => new Uint8Array(a)),
-                fetch("/meshes/MaleAnatomy.glb").then(r => r.blob()).then(b => b.arrayBuffer()).then(a => new Uint8Array(a)),
-                fetch("/meshes/Port1-0.glb").then(r => r.blob()).then(b => b.arrayBuffer()).then(a => new Uint8Array(a)),
-                fetch("/meshes/Port1-1.glb").then(r => r.blob()).then(b => b.arrayBuffer()).then(a => new Uint8Array(a)),
-                fetch("/meshes/Port1-2.glb").then(r => r.blob()).then(b => b.arrayBuffer()).then(a => new Uint8Array(a)),
-                fetch("/meshes/golden+worier+glb+black+dull+gold.glb").then(r => r.blob()).then(b => b.arrayBuffer()).then(a => new Uint8Array(a)),
-                fetch("/meshes/House1-0.glb").then(r => r.blob()).then(b => b.arrayBuffer()).then(a => new Uint8Array(a)),
-                fetch("/meshes/House1-1.glb").then(r => r.blob()).then(b => b.arrayBuffer()).then(a => new Uint8Array(a)),
-                fetch("/meshes/House1-2.glb").then(r => r.blob()).then(b => b.arrayBuffer()).then(a => new Uint8Array(a)),
-                fetch("/meshes/Temple1-0.glb").then(r => r.blob()).then(b => b.arrayBuffer()).then(a => new Uint8Array(a)),
-                fetch("/meshes/Temple1-1.glb").then(r => r.blob()).then(b => b.arrayBuffer()).then(a => new Uint8Array(a)),
-                fetch("/meshes/Temple1-2.glb").then(r => r.blob()).then(b => b.arrayBuffer()).then(a => new Uint8Array(a)),
+                "/meshes/WoodenArrow2.glb",
+                "/meshes/MaleAnatomy.glb",
+                "/meshes/Port1-0.glb",
+                "/meshes/Port1-1.glb",
+                "/meshes/Port1-2.glb",
+                "/meshes/golden+worier+glb+black+dull+gold.glb",
+                "/meshes/House1-0.glb",
+                "/meshes/House1-1.glb",
+                "/meshes/House1-2.glb",
+                "/meshes/Temple1-0.glb",
+                "/meshes/Temple1-1.glb",
+                "/meshes/Temple1-2.glb",
             ]).then((gltf) => {
                 const Uint8ToBase64 = (u8Arr: Uint8Array) => {
                     const CHUNK_SIZE = 0x8000; //arbitrary number
@@ -181,7 +181,7 @@ export const PlanetGenerator = () => {
                 }
                 const worldMeshes: [string, boolean, boolean, boolean, boolean, [number, number, number]][] = [];
                 for (let i = 0; i < gltf.length - 14; i++) {
-                    const dataUri1 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[i])}`;
+                    const dataUri1 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[i] as Uint8Array)}`;
                     worldMeshes.push([dataUri1, data2[i].collidable, data2[i].navmesh, data2[i].ocean, data2[i].oceanNavmesh, data2[i].vertex] as [string, boolean, boolean, boolean, boolean, [number, number, number]]);
                 }
                 if (iframeRef.current) {
@@ -193,22 +193,24 @@ export const PlanetGenerator = () => {
                     });
                 }
 
-                const dataUri2 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 13])}`;
+                const dataUri2 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 13] as Uint8Array)}`;
                 if (iframeRef.current && spawnPoints[0]) {
                     const spawnPoint = spawnPoints[0];
                     const {
                         point,
                     } = spawnPoint;
                     // @ts-ignore
+                    iframeRef.current.contentWindow.addCharacterModel(JSON.stringify({type: "SHIP", data: dataUri2}));
+                    // @ts-ignore
                     iframeRef.current.contentWindow.addShip(JSON.stringify({data: dataUri2, point: point.map(x => x * PLANET_SIZE)}));
                 }
 
-                const dataUri313 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 14])}`;
-                const dataUri312 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 12])}`;
-                const dataUri311 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 11])}`;
-                const dataUri3 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 10])}`;
-                const dataUri39 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 9])}`;
-                const dataUri38 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 8])}`;
+                const dataUri313 = gltf[gltf.length - 14];
+                const dataUri312 = gltf[gltf.length - 12];
+                const dataUri311 = gltf[gltf.length - 11];
+                const dataUri3 = gltf[gltf.length - 10];
+                const dataUri39 = gltf[gltf.length - 9];
+                const dataUri38 = gltf[gltf.length - 8];
                 const houseArray = [];
                 if (iframeRef.current && buildings.length) {
                     for (const spawnPoint of buildings) {
@@ -226,7 +228,7 @@ export const PlanetGenerator = () => {
                     }
                 }
 
-                const dataUri4 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 7])}`;
+                const dataUri4 = gltf[gltf.length - 7];
                 if (iframeRef.current) {
                     // @ts-ignore
                     iframeRef.current.contentWindow.addCharacterModel(JSON.stringify({type: "WARRIOR", data: dataUri4}));
@@ -238,12 +240,12 @@ export const PlanetGenerator = () => {
                     iframeRef.current.contentWindow.addCharacterModel(JSON.stringify({type: "GOLD_COIN", data: dataUri313}));
                 }
 
-                const dataUri5 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 6])}`;
-                const dataUri6 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 5])}`;
-                const dataUri7 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 4])}`;
-                const dataUri8 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 3])}`;
-                const dataUri9 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 2])}`;
-                const dataUri10 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 1])}`;
+                const dataUri5 = gltf[gltf.length - 6];
+                const dataUri6 = gltf[gltf.length - 5];
+                const dataUri7 = gltf[gltf.length - 4];
+                const dataUri8 = gltf[gltf.length - 3];
+                const dataUri9 = gltf[gltf.length - 2];
+                const dataUri10 = gltf[gltf.length - 1];
                 if (iframeRef.current) {
                     // @ts-ignore
                     iframeRef.current.contentWindow.addCharacterModel(JSON.stringify({type: "PORT", data: [dataUri3, dataUri39, dataUri38].join("|")}));

@@ -23,7 +23,7 @@
     <script src="/three-to-cannon.umd.js"></script>
     <script src="/aframe-fps-counter-component.min.js"></script>
     <script src="/instanced-mesh.min.js"></script>
-    <script src="/socket.io.min.js"></script>
+    <script src="/socket.io.slim.js"></script>
     <script src="/easyrtc/easyrtc.js"></script>
     <script src="/networked-aframe.js"></script>
     <script type="application/javascript">
@@ -1693,9 +1693,83 @@
             },
         })
 
+        function addTemplate(templateId, charModelId, instanceModelId) {
+            const scene = document.querySelector("a-scene");
+
+            const str = characterModels.get(charModelId);
+
+            const rootGoldCoin = document.createElement("a-entity");
+            rootGoldCoin.setAttribute("gltf-model", str);
+
+            const a = (() => {
+                const assets = document.querySelector("a-assets");
+                if (assets) {
+                    return assets;
+                } else {
+                    const a1 = document.createElement("a-assets");
+                    scene.appendChild(a1);
+                    return a1;
+                }
+            })();
+
+            const t = (() => {
+                const template = a.querySelector(`#${templateId}`);
+                if (template) {
+                    return null;
+                } else {
+                    const t1 = document.createElement("template");
+                    t1.setAttribute("id", templateId);
+                    return [t1];
+                }
+            })();
+
+            if (t) {
+                t[0].content.appendChild(rootGoldCoin);
+                a.appendChild(t[0]);
+
+                if (charModelId === "SHIP") {
+                    if (!NAF.schemas.hasTemplate(`#${templateId}`)) {
+                        NAF.schemas.add({
+                            template: `#${templateId}`,
+                            components: [
+                                {
+                                    component: 'position',
+                                    requiresNetworkUpdate: NAF.utils.vectorRequiresUpdate(0.001)
+                                },
+                                {
+                                    component: 'rotation',
+                                    requiresNetworkUpdate: NAF.utils.vectorRequiresUpdate(0.5)
+                                },
+                                {
+                                    selector: '.data',
+                                    component: 'gltf-model',
+                                },
+                            ]
+                        });
+                    }
+                } else {
+                    if (!NAF.schemas.hasTemplate(`#${templateId}`)) {
+                        NAF.schemas.add({
+                            template: `#${templateId}`,
+                            components: [
+                                {
+                                    component: 'position',
+                                    requiresNetworkUpdate: NAF.utils.vectorRequiresUpdate(0.001)
+                                },
+                                {
+                                    component: 'rotation',
+                                    requiresNetworkUpdate: NAF.utils.vectorRequiresUpdate(0.5)
+                                },
+                                'gltf-model',
+                            ]
+                        });
+                    }
+                }
+            }
+        }
+
         function addGoldCoin(startEl) {
             const scene = document.querySelector("a-scene");
-            let goldModel = scene.querySelector("#gold-coin-model");
 
             const rootGoldCoin = document.createElement("a-entity");
             const id = "id" + Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(36);
@@ -1704,6 +1778,7 @@
             const pos = startEl.object3D.getWorldPosition(new THREE.Vector3());
             pos.add(pos.clone().normalize());
             rootGoldCoin.setAttribute("position", `${pos.x} ${pos.y} ${pos.z}`);
+            rootGoldCoin.setAttribute("rotation", "0 0 0");
             rootGoldCoin.setAttribute("dynamic-body", "shape: sphere; sphereRadius: 1; mass: 100");
             rootGoldCoin.setAttribute("globe-gravity", "");
             rootGoldCoin.setAttribute("collision-filter", "group: gold-coin; ");
@@ -1712,17 +1787,9 @@
             if (characterModels.has("GOLD_COIN")) {
                 const str = characterModels.get("GOLD_COIN");
 
-                // add template
-                if (!goldModel) {
-                    const modelGold = document.createElement("a-entity");
-                    modelGold.setAttribute("gltf-model", str);
-                    modelGold.setAttribute("id", "gold-coin-model");
-                    modelGold.setAttribute("instanced-mesh", "capacity: 1000; updateMode: auto; positioning: world");
-                    scene.appendChild(modelGold);
-                }
-
                 // add graphics
-                rootGoldCoin.setAttribute("instanced-mesh-member", "mesh: #gold-coin-model");
+                rootGoldCoin.setAttribute("gltf-model", str);
+                rootGoldCoin.setAttribute("networked", "template: #gold-coin-template; attachTemplateToLocal: false;");
             } else {
                 const modelGold = document.createElement("a-sphere");
                 modelGold.setAttribute("scale", "0.1 0.1 0.1");
@@ -1738,7 +1805,6 @@
 
         function addProjectile(startEl, destinationEl) {
             const scene = document.querySelector("a-scene");
-            let arrowModel = scene.querySelector("#arrow-model");
 
             const rootProjectile = document.createElement("a-entity");
             const id = "id" + Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(36);
@@ -1747,21 +1813,14 @@
             rootProjectile.setAttribute("projectile-flight", `target: #${destinationEl.id}`);
             const pos = startEl.object3D.position.clone().add(startEl.object3D.position.clone().normalize());
             rootProjectile.setAttribute("position", `${pos.x} ${pos.y} ${pos.z}`);
+            rootProjectile.setAttribute("rotation", "0 0 0");
 
             if (characterModels.has("ARROW")) {
                 const str = characterModels.get("ARROW");
 
-                // add template
-                if (!arrowModel) {
-                    const modelArrow = document.createElement("a-entity");
-                    modelArrow.setAttribute("gltf-model", str);
-                    modelArrow.setAttribute("id", "arrow-model");
-                    modelArrow.setAttribute("instanced-mesh", "capacity: 1000; updateMode: auto; positioning: world");
-                    scene.appendChild(modelArrow);
-                }
-
                 // add graphics
-                rootProjectile.setAttribute("instanced-mesh-member", "mesh: #arrow-model");
+                rootProjectile.setAttribute("gltf-model", str);
+                rootProjectile.setAttribute("networked", "template: #arrow-template; attachTemplateToLocal: false;");
             } else {
                 const modelArrow = document.createElement("a-sphere");
                 modelArrow.setAttribute("scale", "0.1 0.1 0.1");
@@ -1777,7 +1836,6 @@
 
         function addWalkingNpc(buildingId, buildingEl, destinationEl) {
             const scene = document.querySelector("a-scene");
-            let personModel = scene.querySelector("#person-model");
 
             const rootNpc = document.createElement("a-entity");
             const id = "id" + Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(36);
@@ -1791,6 +1849,7 @@
             const destination2 = destinationEl.components['position'].data;
             const pos = buildingEl.components['position'].data;
             rootNpc.setAttribute("position", `${pos.x} ${pos.y} ${pos.z}`);
+            rootNpc.setAttribute("rotation", "0 0 0");
             rootNpc.setAttribute("globe-nav-agent", `active: false;`);
             setTimeout(() => {
                 rootNpc.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 1;`);
@@ -1799,17 +1858,9 @@
             if (characterModels.has("PERSON")) {
                 const str = characterModels.get("PERSON");
 
-                // add template
-                if (!personModel) {
-                    const modelNpc = document.createElement("a-entity");
-                    modelNpc.setAttribute("gltf-model", str);
-                    modelNpc.setAttribute("id", "person-model");
-                    modelNpc.setAttribute("instanced-mesh", "capacity: 1000; updateMode: auto; positioning: world");
-                    scene.appendChild(modelNpc);
-                }
-
                 // add graphics
-                rootNpc.setAttribute("instanced-mesh-member", "mesh: #person-model");
+                rootNpc.setAttribute("gltf-model", str);
+                // rootNpc.setAttribute("networked", "template: #person-template; attachTemplateToLocal: false;");
             } else {
                 const modelNpc = document.createElement("a-sphere");
                 modelNpc.setAttribute("scale", "0.1 0.1 0.1");
@@ -1843,7 +1894,6 @@
                 const str = characterModels.get("WARRIOR");
                 const modelNpc = document.createElement("a-entity");
                 modelNpc.setAttribute("gltf-model", str);
-                modelNpc.setAttribute("scale", "1 1 1");
                 modelNpc.setAttribute("position", "0 0 0");
                 modelNpc.setAttribute("rotation", "0 0 0");
                 rootNpc.appendChild(modelNpc);
@@ -1909,6 +1959,29 @@
             } = JSON.parse(item);
 
             characterModels.set(type, str);
+
+            switch (type) {
+                case "WARRIOR": {
+                    addTemplate("warrior-template", "WARRIOR", "warrior-model");
+                    break;
+                }
+                case "PERSON": {
+                    addTemplate("person-template", "PERSON", "person-model");
+                    break;
+                }
+                case "ARROW": {
+                    addTemplate("arrow-template", "ARROW", "arrow-model");
+                    break;
+                }
+                case "GOLD_COIN": {
+                    addTemplate("gold-coin-template", "GOLD_COIN", "gold-coin-model");
+                    break;
+                }
+                case "SHIP": {
+                    addTemplate("ship-template", "SHIP", "ship-model");
+                    break;
+                }
+            }
         }
 
         function addHouse(item) {
@@ -1976,8 +2049,10 @@
             rootShip.setAttribute("globe-gravity", "ship: true;");
             rootShip.setAttribute("globe-keyboard-controls", "enabled: true; fly: true");
             rootShip.setAttribute("position", `${point[0]} ${point[1]} ${point[2]}`);
+            rootShip.setAttribute("rotation", "0 0 0");
 
             const rootModel = document.createElement("a-entity");
+            rootModel.setAttribute("class", "mesh");
             rootModel.setAttribute("gltf-model", str);
             rootModel.setAttribute("go-to-sea", "");
             rootModel.setAttribute("scale", "0.1 0.1 0.1");
