@@ -2085,6 +2085,16 @@
             const cameraEl = document.querySelector("#camera-rig");
             cameraEl.setAttribute("look-at-box", "#box");
         }
+
+        function addClientSecret(item) {
+            const {
+                roomId
+            } = JSON.parse(item);
+
+            const scene = document.querySelector("a-scene");
+
+            scene.setAttribute("networked-scene", `room: ${roomId}; debug: true; adapter: easyrtc;`);
+        }
     </script>
     <script type="module">
         import Octree from "threejs-octree";
@@ -2239,7 +2249,7 @@
     </style>
 </head>
 <body>
-    <a-scene physics="driver: local; gravity: 0 0 0;" networked-scene="room: basic; debug: true; adapter: easyrtc;" globe-nav globe-ocean-nav embedded fog shadow id="scene">
+    <a-scene physics="driver: local; gravity: 0 0 0;" globe-nav globe-ocean-nav embedded fog shadow id="scene">
         <a-entity light="type: ambient; color: #CCC"></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.5" position="0 1 0"></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.5" position="0 -1 0"></a-entity>

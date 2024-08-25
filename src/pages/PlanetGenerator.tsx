@@ -25,7 +25,7 @@ const PLANET_SIZE = 100;
 export const PlanetGenerator = () => {
     const [context] = useState<{ app: PIXI.Application | null, preview: IGameMesh | null, gameData: IGameMesh[] } | null>({ app: null, preview: null, gameData: [] });
     const shipContext = useContext(ShipContext);
-    const [sloopModelSource, setSloopModelSource] = useState<string>("");
+    const [clientSecret] = useState(Math.random().toString(36).substring(2, 9));
     const [loadMessage, setLoadMessage] = useState<string>("No data loaded...");
     const ref = useRef<HTMLDivElement | null>(null);
     const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -132,7 +132,7 @@ export const PlanetGenerator = () => {
                 app.stage.addChild(mesh as unknown as any);
             }
         };
-        const handleData = (inputData: {meshes: IGameMesh[], spawnPoints: IGameSpawnPoint[], buildings: IGameBuilding[]}) => {
+        const handleData = (inputData: {meshes: IGameMesh[], spawnPoints: IGameSpawnPoint[], buildings: IGameBuilding[]}, {roomId}: {roomId: string}) => {
             const {
                 meshes,
                 spawnPoints,
@@ -258,14 +258,40 @@ export const PlanetGenerator = () => {
                         iframeRef.current.contentWindow.addHouse(house);
                     }
                 }
+
+                // load client secret for connection purposes
+                if (iframeRef.current) {
+                    // @ts-ignore
+                    iframeRef.current.contentWindow.addClientSecret(JSON.stringify({roomId}));
+                }
             });
 
             handlePixiRender(data);
         }
 
         (async () => {
-            const planetResponse = await fetch("/api/planet");
-            const planetJson = await planetResponse.json();
+            // get room which contains map
+            const roomResponse = await fetch(`/api/room/${clientSecret}`);
+            const roomJson = await roomResponse.json();
+            let roomId = null;
+            if (roomJson) {
+                const {
+                    id
+                } = roomJson;
+                roomId = id;
+            }
+
+            // get map
+            let planetJson;
+            if (roomId) {
+                const planetResponse = await fetch(`/api/planet/${roomId}`);
+                planetJson = await planetResponse.json();
+            } else {
+                const planetResponse = await fetch("/api/planet");
+                planetJson = await planetResponse.json();
+            }
+
+            // parse map data
             if (planetJson) {
                 const {
                     previewUrl,
@@ -276,7 +302,7 @@ export const PlanetGenerator = () => {
                 const gameJson = await gameResponse.json();
 
                 context.preview = previewJson as IGameMesh;
-                handleData(gameJson as {meshes: IGameMesh[], spawnPoints: IGameSpawnPoint[], buildings: IGameBuilding[]});
+                handleData(gameJson as {meshes: IGameMesh[], spawnPoints: IGameSpawnPoint[], buildings: IGameBuilding[]}, {roomId});
             }
         })();
     }, [context]);
