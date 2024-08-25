@@ -167,6 +167,31 @@ app.get('/api/room/:webrtcId', async (req, res) => {
     }
 });
 
+app.get('/api/room-manifest/:roomId', async (req, res) => {
+    const prisma = new PrismaClient();
+
+    let availableRoom;
+    try {
+        await prisma.$connect();
+
+         availableRoom = await prisma.room.findFirstOrThrow({
+            where: {
+                id: parseInt(req.params.roomId),
+            },
+            include: {
+                roomUser: true,
+            },
+        });
+
+        res.status(200).json(availableRoom);
+    } catch (e) {
+        console.log(e);
+        res.status(400).json({err: "an error has occurred"});
+    } finally {
+        await prisma.$disconnect();
+    }
+});
+
 app.get('/api/planet/:roomId', async (req, res) => {
     const prisma = new PrismaClient();
 

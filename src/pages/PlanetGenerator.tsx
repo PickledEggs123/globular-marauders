@@ -262,7 +262,7 @@ export const PlanetGenerator = () => {
                 // load client secret for connection purposes
                 if (iframeRef.current) {
                     // @ts-ignore
-                    iframeRef.current.contentWindow.addClientSecret(JSON.stringify({roomId}));
+                    iframeRef.current.contentWindow.addClientSecret(JSON.stringify({roomId, clientSecret}));
                 }
             });
 

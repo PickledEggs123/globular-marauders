@@ -738,7 +738,7 @@
 
                 // If no path is found, exit.
                 if (!this.path.length) {
-                    console.warn('[nav] Unable to find path to %o.', data.destination);
+                    // console.warn('[nav] Unable to find path to %o.', data.destination);
                     this.el.setAttribute("globe-nav-agent", "active: false;");
                     el.emit('navigation-end');
                     el.emit('navigation-group-change');
@@ -973,7 +973,7 @@
 
                 // If no path is found, exit.
                 if (!this.path.length) {
-                    console.warn('[nav] Unable to find path to %o.', data.destination);
+                    // console.warn('[nav] Unable to find path to %o.', data.destination);
                     this.el.setAttribute("globe-ocean-nav-agent", "active: false;");
                     el.emit('navigation-end');
                     el.object3D.position.copy(vDest);
@@ -1329,6 +1329,7 @@
             },
         });
 
+        window.spawnNpcsFlag = false;
         AFRAME.registerComponent('npc-spawner', {
             schema: {},
             multiple: true,
@@ -1369,6 +1370,12 @@
             transition: function (evt) {
                 const npcId = evt?.detail ?? null;
                 if (!this.isReady) {
+                    setTimeout(() => {
+                        this.innerTransition(evt);
+                    }, 10_000);
+                    return;
+                }
+                if (!window.spawnNpcsFlag) {
                     setTimeout(() => {
                         this.innerTransition(evt);
                     }, 10_000);
@@ -1877,7 +1884,7 @@
 
                 // add graphics
                 rootNpc.setAttribute("gltf-model", str);
-                // rootNpc.setAttribute("networked", "template: #person-template; attachTemplateToLocal: false;");
+                rootNpc.setAttribute("networked", "template: #person-template; attachTemplateToLocal: false;");
             } else {
                 const modelNpc = document.createElement("a-sphere");
                 modelNpc.setAttribute("scale", "0.1 0.1 0.1");
@@ -2088,12 +2095,62 @@
 
         function addClientSecret(item) {
             const {
-                roomId
+                roomId,
+                clientSecret,
             } = JSON.parse(item);
+
+            window.gmRoomId = roomId;
+            window.gmClientSecret = clientSecret;
+            window.gmClientSecretMap = new Map();
 
             const scene = document.querySelector("a-scene");
 
             scene.setAttribute("networked-scene", `room: ${roomId}; debug: true; adapter: easyrtc;`);
+        }
+
+        function spawnNpcsNow() {
+            window.spawnNpcsFlag = true;
+        }
+        async function handleWalkingNpcSwitchOnOrNot() {
+            const roomManifestResponse = await fetch(`/api/room-manifest/${window.gmRoomId}`);
+            const roomManifestJson = await roomManifestResponse.json();
+            const {
+                roomUser
+            } = roomManifestJson;
+            const orderedSecrets = roomUser.map(x => x.webrtcId);
+
+            const currentSet = Array.from(window.gmClientSecretMap.values());
+            const firstSecret = orderedSecrets.find(x => currentSet.includes(x));
+            if (firstSecret && firstSecret === window.gmClientSecret) {
+                spawnNpcsNow();
+            }
+        }
+        const debounceWalkingNpcSwitchOnOrNot = debounce(handleWalkingNpcSwitchOnOrNot.bind(window), 5_000);
+
+        function onConnect() {
+            window.gmClientSecretMap.set(NAF.clientId, window.gmClientSecret);
+            debounceWalkingNpcSwitchOnOrNot();
+
+            document.body.addEventListener("clientConnected", function (evt) {
+                NAF.connection.broadcastDataGuaranteed("gmShareClientSecret", {
+                    clientSecret: window.gmClientSecret
+                });
+            });
+            document.body.addEventListener("clientDisconnected", function (evt) {
+                window.gmClientSecretMap.delete(evt.detail.clientId);
+                debounceWalkingNpcSwitchOnOrNot();
+            });
+
+            NAF.connection.subscribeToDataChannel("gmShareClientSecret", function (senderId, dataType, data, targetId) {
+                window.gmClientSecretMap.set(senderId, data.clientSecret);
+                NAF.connection.sendDataGuaranteed(senderId, "gmReplyClientSecret", {
+                    clientSecret: window.gmClientSecret
+                });
+            });
+
+            NAF.connection.subscribeToDataChannel("gmReplyClientSecret", function (senderId, dataType, data, targetId) {
+                window.gmClientSecretMap.set(senderId, data.clientSecret);
+            });
         }
     </script>
     <script type="module">
