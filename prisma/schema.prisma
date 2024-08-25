@@ -12,4 +12,25 @@ model planet {
   seed      String @db.VarChar(255)
   meshUrl   String @db.VarChar(255)
   meshesUrl String @db.VarChar(255)
+  room      room[]
+}
+
+model room {
+  id           Int        @id @default(autoincrement())
+  creationDate DateTime   @db.DateTime(0)
+  planetId     Int
+  planet       planet     @relation(fields: [planetId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "mapId")
+  roomUser     roomUser[]
+
+  @@index([planetId], map: "mapId_idx")
+}
+
+model roomUser {
+  id       Int      @id @default(autoincrement())
+  roomId   Int
+  webrtcId String   @db.VarChar(45)
+  login    DateTime @db.DateTime(0)
+  room     room     @relation(fields: [roomId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "roomId")
+
+  @@index([roomId], map: "roomId_idx")
 }

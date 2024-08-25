@@ -71,7 +71,133 @@ app.get('/character-wiki', handleReactPage);
 app.get('/about', handleReactPage);
 app.get('/contact', handleReactPage);
 
-const planetRand = Math.random();
+app.get('/api/room/:webrtcId', async (req, res) => {
+    const prisma = new PrismaClient();
+
+    // try to find room that is less than 4 users
+    try {
+        // find room with less than 4 users and less than 5 minutes old
+        await prisma.$connect();
+        const availableRoomRecords = await prisma.roomUser.groupBy({
+            by: [
+                "roomId",
+            ],
+            _count: {
+                roomId: true,
+            },
+            where: {
+                room: {
+                    creationDate: {
+                        gt: new Date(+new Date() - 300_000).toISOString(),
+                    },
+                },
+            },
+            having: {
+                roomId: {
+                    _count: {
+                        lt: 4,
+                    },
+                },
+            },
+        });
+
+        // load room
+        let availableRoom;
+        if (availableRoomRecords.length > 0) {
+            availableRoom = await prisma.room.findFirst({
+                where: {
+                    id: availableRoomRecords[0].roomId,
+                },
+            });
+        }
+
+        // create room if not available
+        if (!availableRoom) {
+            // get planet
+            const max = await prisma.planet.count();
+            const planet = await prisma.planet.findFirst({ where: { id: Math.floor(Math.random() * max) + 1 } });
+
+            availableRoom = await prisma.room.create({
+                data: {
+                    creationDate: new Date().toISOString(),
+                    planetId: planet.id,
+                    roomUser: {
+                        create: [
+                            {
+                                webrtcId: req.params.webrtcId,
+                                login: new Date().toISOString(),
+                            },
+                        ],
+                    },
+                },
+                include: {
+                    roomUser: true,
+                },
+            });
+        } else {
+            // add to room
+            await prisma.roomUser.create({
+                data: {
+                    webrtcId: req.params.webrtcId,
+                    login: new Date().toISOString(),
+                    room: {
+                        connect: availableRoom
+                    },
+                },
+                include: {
+                    room: true,
+                },
+            });
+            availableRoom = await prisma.room.findFirst({
+                where: {
+                    id: availableRoomRecords[0].roomId,
+                },
+                include: {
+                    roomUser: true,
+                }
+            });
+        }
+
+        res.status(200).json(availableRoom);
+    } catch (e) {
+        console.log(e);
+        res.status(400).json({err: "an error has occurred"});
+    } finally {
+        await prisma.$disconnect();
+    }
+});
+
+app.get('/api/planet/:roomId', async (req, res) => {
+    const prisma = new PrismaClient();
+
+    let previewUrl = "";
+    let gameUrl = "";
+    try {
+        await prisma.$connect();
+
+        const availableRoom = await prisma.room.findFirstOrThrow({
+            where: {
+                id: parseInt(req.params.roomId),
+            },
+            include: {
+                planet: true,
+            },
+        });
+
+        previewUrl = availableRoom.planet.meshUrl;
+        gameUrl = availableRoom.planet.meshesUrl;
+
+        await prisma.$disconnect();
+    } catch (e) {
+        console.log(e);
+        await prisma.$disconnect();
+    }
+
+    res.status(200).json({
+        previewUrl,
+        gameUrl,
+    });
+});
 
 app.get('/api/planet', async (req, res) => {
     const prisma = new PrismaClient();
@@ -81,7 +207,7 @@ app.get('/api/planet', async (req, res) => {
     try {
         await prisma.$connect();
         const max = await prisma.planet.count();
-        const planet = await prisma.planet.findFirstOrThrow({ where: { id: Math.floor(planetRand * max) + 1 } });
+        const planet = await prisma.planet.findFirstOrThrow({ where: { id: Math.floor(Math.random() * max) + 1 } });
         previewUrl = planet.meshUrl;
         gameUrl = planet.meshesUrl;
 
