@@ -28,9 +28,30 @@ const themeOptions: ThemeOptions = {
         },
     },
     typography: {
-        fontFamily: `"Tangerine", cursive, "Helvetica", "Arial", sans-serif`,
-        fontSize: 18,
-        fontWeightRegular: 900
+        h1: {
+            fontFamily: `"Tangerine", cursive, "Helvetica", "Arial", sans-serif`,
+            fontWeightRegular: 900,
+        },
+        h2: {
+            fontFamily: `"Tangerine", cursive, "Helvetica", "Arial", sans-serif`,
+            fontWeightRegular: 900,
+        },
+        h3: {
+            fontFamily: `"Tangerine", cursive, "Helvetica", "Arial", sans-serif`,
+            fontWeightRegular: 900,
+        },
+        h4: {
+            fontFamily: `"Tangerine", cursive, "Helvetica", "Arial", sans-serif`,
+            fontWeightRegular: 900,
+        },
+        h5: {
+            fontFamily: `"Tangerine", cursive, "Helvetica", "Arial", sans-serif`,
+            fontWeightRegular: 900,
+        },
+        h6: {
+            fontFamily: `"Tangerine", cursive, "Helvetica", "Arial", sans-serif`,
+            fontWeightRegular: 900,
+        },
     },
     components: {
         MuiCard: {

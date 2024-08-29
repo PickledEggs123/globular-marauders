@@ -13,7 +13,6 @@ import createCache from "@emotion/cache";
 import {CssBaseline} from "@mui/material";
 import {theme} from "./theme";
 import {ThemeProvider} from "@mui/material/styles";
-import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
 import {PlanetMeshLoader} from "./contextes/PlanetContext";
 import {ShipMeshLoader} from "./contextes/ShipContext";
 
