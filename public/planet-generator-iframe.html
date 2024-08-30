@@ -1829,6 +1829,7 @@
             rootGoldCoin.setAttribute("globe-gravity", "");
             rootGoldCoin.setAttribute("collision-filter", "group: gold-coin; ");
             rootGoldCoin.setAttribute("gold-coin-movement", "");
+            rootGoldCoin.setAttribute("shadow", "");
 
             if (characterModels.has("GOLD_COIN")) {
                 const str = characterModels.get("GOLD_COIN");
@@ -1860,6 +1861,7 @@
             const pos = startEl.object3D.position.clone().add(startEl.object3D.position.clone().normalize());
             rootProjectile.setAttribute("position", `${pos.x} ${pos.y} ${pos.z}`);
             rootProjectile.setAttribute("rotation", "0 0 0");
+            rootProjectile.setAttribute("shadow", "");
 
             if (characterModels.has("ARROW")) {
                 const str = characterModels.get("ARROW");
@@ -1897,6 +1899,7 @@
             rootNpc.setAttribute("position", `${pos.x} ${pos.y} ${pos.z}`);
             rootNpc.setAttribute("rotation", "0 0 0");
             rootNpc.setAttribute("globe-nav-agent", `active: false;`);
+            rootNpc.setAttribute("shadow", "");
             setTimeout(() => {
                 rootNpc.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 1;`);
             }, 2000);
@@ -1936,6 +1939,7 @@
             rootNpc.setAttribute("npc-finder", "active: true;");
             rootNpc.setAttribute("npc-attack", `range: 10; melee: false;`);
             rootNpc.setAttribute("health", "");
+            rootNpc.setAttribute("shadow", "");
 
             if (characterModels.has("WARRIOR")) {
                 const str = characterModels.get("WARRIOR");
@@ -1969,6 +1973,7 @@
             rootTerrain.setAttribute("class", "clickable");
             rootTerrain.setAttribute("gltf-model", str);
             rootTerrain.setAttribute("position", "0 0 0");
+            rootTerrain.setAttribute("shadow", "");
             rootTerrain.setAttribute("terrain-tile", (vertex ?? []).join(" "));
             if (oceanNavmesh) {
                 rootTerrain.setAttribute("go-to-sea", "");
@@ -2055,18 +2060,21 @@
             lod0.setAttribute("class", "lod0 clickable");
             lod0.setAttribute("raze-target", "");
             lod0.setAttribute("spawn-gold", "");
+            lod0.setAttribute("shadow", "");
             rootModel.appendChild(lod0);
 
             const lod1 = document.createElement("a-entity");
             lod1.setAttribute("class", "lod1 clickable");
             lod1.setAttribute("raze-target", "");
             lod1.setAttribute("spawn-gold", "");
+            lod1.setAttribute("shadow", "");
             rootModel.appendChild(lod1);
 
             const lod2 = document.createElement("a-entity");
             lod2.setAttribute("class", "lod2 clickable");
             lod2.setAttribute("raze-target", "");
             lod2.setAttribute("spawn-gold", "");
+            lod2.setAttribute("shadow", "");
             rootModel.appendChild(lod2);
 
             const scene = document.querySelector("a-scene");
@@ -2092,6 +2100,7 @@
             rootShip.setAttribute("collision-filter", "group: ship; collidesWith: default, ship");
             rootShip.setAttribute("globe-gravity", "ship: true;");
             rootShip.setAttribute("globe-keyboard-controls", "enabled: true; fly: true");
+            rootShip.setAttribute("shadow", "");
             rootShip.setAttribute("position", `${point[0]} ${point[1]} ${point[2]}`);
             rootShip.setAttribute("rotation", "0 0 0");
 
@@ -2350,7 +2359,7 @@
     </style>
 </head>
 <body>
-    <a-scene physics="driver: local; gravity: 0 0 0;" globe-nav globe-ocean-nav embedded fog shadow id="scene">
+    <a-scene physics="driver: local; gravity: 0 0 0;" globe-nav globe-ocean-nav embedded fog shadow id="scene" inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
         <a-assets>
             <template id="avatar-template">
                 <a-entity class="avatar" networked-audio-source>
@@ -2358,10 +2367,10 @@
             </template>
         </a-assets>
         <a-entity light="type: ambient; color: #CCC"></a-entity>
-        <a-entity light="type: directional; color: #EEE; intensity: 0.5" position="0 1 0"></a-entity>
-        <a-entity light="type: directional; color: #EEE; intensity: 0.5" position="0 -1 0"></a-entity>
+        <a-entity light="type: directional; color: #EEE; intensity: 0.5; castShadow: true; shadowCameraBottom: -150; shadowCameraTop: 150; shadowCameraLeft: -150; shadowCameraRight: 150; shadowCameraNear: -150; shadowCameraFar: 150; shadowCameraVisible: true; shadowMapWidth: 2048; shadowMapHeight: 2048" position="0 1 0"></a-entity>
+        <a-entity light="type: directional; color: #EEE; intensity: 0.05" position="0 -1 0"></a-entity>
         <a-entity id="camera-rig" position="0 105 5" networked="template: #avatar-template; attachTemplateToLocal: false;">
-            <a-camera wasd-controls-enabled="false" look-controls-enabled="false" position="0 1.6 0" cursor="rayOrigin: mouse" raycaster="far: 50; interval: 100; objects: .clickable"></a-camera>
+            <a-camera wasd-controls-enabled="false" look-controls-enabled="false" position="0 1.6 0" cursor="rayOrigin: mouse" raycaster="far: 50; interval: 100; objects: .clickable" fps-counter></a-camera>
         </a-entity>
     </a-scene>
     <div class="actions">
