@@ -718,12 +718,14 @@
 
                 const cameraDistance = pos.distanceTo(cameraPos);
                 if (cameraDistance > 20) {
+                    object3D.visible = false;
                     if (dt + this.dtSum < 5) {
                         this.dtSum += dt;
                         return;
                     }
                     this.dtSum = 0;
                 } else {
+                    object3D.visible = true;
                     this.dtSum = 0;
                 }
 
@@ -2370,7 +2372,7 @@
         <a-entity light="type: directional; color: #EEE; intensity: 0.5; castShadow: true; shadowCameraBottom: -150; shadowCameraTop: 150; shadowCameraLeft: -150; shadowCameraRight: 150; shadowCameraNear: -150; shadowCameraFar: 150; shadowCameraVisible: true; shadowMapWidth: 2048; shadowMapHeight: 2048" position="0 1 0"></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.05" position="0 -1 0"></a-entity>
         <a-entity id="camera-rig" position="0 105 5" networked="template: #avatar-template; attachTemplateToLocal: false;">
-            <a-camera wasd-controls-enabled="false" look-controls-enabled="false" position="0 1.6 0" cursor="rayOrigin: mouse" raycaster="far: 50; interval: 100; objects: .clickable" fps-counter></a-camera>
+            <a-camera wasd-controls-enabled="false" look-controls-enabled="false" position="0 1.6 0" cursor="rayOrigin: mouse" raycaster="far: 50; interval: 100; objects: .clickable"></a-camera>
         </a-entity>
     </a-scene>
     <div class="actions">
