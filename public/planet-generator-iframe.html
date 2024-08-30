@@ -265,49 +265,59 @@
                 type: "string",
                 default: "#box",
             },
-            tick: function () {
+            init: function () {
+                this.dtSum = 0;
+                this.heightDiff = 5;
+                this.heightDiffLerp = 5;
+            },
+            tick: function (t, dt) {
                 // get elements
-                // @ts-ignore
                 const box = Array.from(document.querySelectorAll(`${this.data}`)).map(el => el.object3D);
-                // @ts-ignore
                 const boxPos = Array.from(document.querySelectorAll(`${this.data}-position`)).map(el => el.object3D);
                 if (!box || !boxPos) {
                     return;
                 }
 
                 // get position
-                // @ts-ignore
                 const boxWorldPos = new THREE.Vector3();
-                // @ts-ignore
                 box.forEach(b => boxWorldPos.add(b.getWorldPosition(new THREE.Vector3())));
                 boxWorldPos.divideScalar(box.length);
-                // @ts-ignore
                 const boxPosWorldPos = new THREE.Vector3();
-                // @ts-ignore
                 boxPos.forEach(b => boxPosWorldPos.add(b.getWorldPosition(new THREE.Vector3())));
                 boxPosWorldPos.divideScalar(boxPos.length);
 
                 // get info
-                // @ts-ignore
                 const upVector = boxPosWorldPos.clone().sub(new THREE.Vector3(0, 0, 0)).normalize();
                 const object3D = this.el.object3D;
-                // @ts-ignore
                 const objectWorldPos = object3D.getWorldPosition(new THREE.Vector3());
-                // @ts-ignore
                 const height = boxPosWorldPos.clone().sub(new THREE.Vector3(0, 0, 0)).length();
 
                 // update info
-                // @ts-ignore
                 const quaternion = new THREE.Quaternion().setFromUnitVectors(objectWorldPos.clone().normalize(), boxPosWorldPos.clone().normalize());
-                // @ts-ignore
                 const slerp = new THREE.Quaternion().slerp(quaternion, 0.03);
-                // @ts-ignore
-                const finalPosition = objectWorldPos.clone().normalize().multiplyScalar(height + 5).applyQuaternion(slerp);
+                let destination1 = objectWorldPos.clone().normalize().multiplyScalar(height + 5).applyQuaternion(slerp);
+
+                // compute raycast towards ground
+                let finalPosition;
+                if (this.dtSum + dt > 3000) {
+                    const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), destination1.clone().negate());
+                    const intersections = raycaster.intersectObjects(Array.from(document.querySelectorAll(".clickable")).map(el => el.object3D));
+                    if (intersections[0]) {
+                        destination1 = intersections[0].point.clone();
+                    }
+                    finalPosition = destination1.clone().add(destination1.clone().normalize().multiplyScalar(5));
+                    this.heightDiff = new THREE.Vector3().distanceTo(finalPosition) - (height + 5);
+                    this.heightDiffLerp = 0.1 * this.heightDiff + 0.9 * this.heightDiffLerp;
+                    this.dtSum = 0;
+                } else {
+                    this.heightDiffLerp = 0.1 * this.heightDiff + 0.9 * this.heightDiffLerp;
+                    finalPosition = objectWorldPos.clone().normalize().multiplyScalar(this.heightDiffLerp + height + 5).applyQuaternion(slerp);
+                    this.dtSum += dt;
+                }
 
                 // update camera
                 object3D.position.set(finalPosition.x, finalPosition.y, finalPosition.z);
                 const camera = this.el.sceneEl.camera;
-                // @ts-ignore
                 camera.up = upVector;
                 camera.lookAt(boxWorldPos);
             }
@@ -1117,13 +1127,10 @@
                         const cameraEl = document.querySelector("#camera-rig");
                         cameraEl.setAttribute("look-at-box", ".npc");
                         npcEls.forEach(npcEl => {
-                            // @ts-ignore
                             const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3).add(new THREE.Vector3().random()), destination1.clone().negate());
-                            // @ts-ignore
                             const intersections = raycaster.intersectObject(this.system.getNavMesh());
                             if (intersections[0]) {
                                 const destination2 = intersections[0].point.clone();
-                                // @ts-ignore
                                 npcEl.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2;`);
                             }
                         });
@@ -1463,11 +1470,13 @@
                 this.innerAttack = this.attack.bind(this);
                 this.innerBeginAttack = this.beginAttack.bind(this);
                 this.innerMeleeCharge = this.meleeCharge.bind(this);
+                this.innerMeleeReturn = this.meleeReturn.bind(this);
                 this.innerNavigationBegin = this.navigationBegin.bind(this);
                 this.innerNavigationEnd = this.navigationEnd.bind(this);
                 this.el.addEventListener('npc-attack', this.innerAttack);
                 this.el.addEventListener('npc-begin-attack', this.innerBeginAttack);
                 this.el.addEventListener('npc-melee-charge', this.innerMeleeCharge);
+                this.el.addEventListener('npc-melee-return', this.innerMeleeReturn);
                 if (this.data.melee) {
                     this.el.addEventListener('navigation-start', this.innerNavigationBegin);
                     this.el.addEventListener('navigation-end', this.innerNavigationEnd);
@@ -1483,6 +1492,7 @@
                 this.el.removeEventListener('npc-attack', this.innerAttack);
                 this.el.removeEventListener('npc-begin-attack', this.innerBeginAttack);
                 this.el.removeEventListener('npc-melee-charge', this.innerMeleeCharge);
+                this.el.removeEventListener('npc-melee-return', this.innerMeleeReturn);
                 if (this.data.melee) {
                     this.el.removeEventListener('navigation-start', this.innerNavigationBegin);
                     this.el.removeEventListener('navigation-end', this.innerNavigationEnd);
@@ -1512,6 +1522,9 @@
                         }
                     }
                 }
+                if (this.data.melee) {
+                    this.el.emit('npc-melee-return', this.chargeOrigin.clone());
+                }
             },
             attack: function (evt) {
                 this.attackEls = evt.detail;
@@ -1523,6 +1536,12 @@
             meleeCharge: function (evt) {
                 const target = evt.detail;
                 const destination2 = target.object3D.position.clone();
+                this.el.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2;`);
+                this.charge = true;
+                this.immediateCharge = true;
+            },
+            meleeReturn: function (evt) {
+                const destination2 = evt.detail.clone();
                 this.el.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2;`);
                 this.charge = true;
                 this.immediateCharge = true;
