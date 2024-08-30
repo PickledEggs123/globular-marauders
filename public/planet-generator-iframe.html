@@ -310,7 +310,7 @@
                     this.heightDiffLerp = 0.1 * this.heightDiff + 0.9 * this.heightDiffLerp;
                     this.dtSum = 0;
                 } else {
-                    this.heightDiffLerp = 0.1 * this.heightDiff + 0.9 * this.heightDiffLerp;
+                    this.heightDiffLerp = 0.03 * this.heightDiff + 0.97 * this.heightDiffLerp;
                     finalPosition = objectWorldPos.clone().normalize().multiplyScalar(this.heightDiffLerp + height + 5).applyQuaternion(slerp);
                     this.dtSum += dt;
                 }
@@ -2127,7 +2127,7 @@
 
             const scene = document.querySelector("a-scene");
 
-            scene.setAttribute("networked-scene", `room: ${roomId}; debug: true; adapter: easyrtc;`);
+            scene.setAttribute("networked-scene", `room: ${roomId}; debug: true; adapter: easyrtc; audio: true;`);
         }
 
         function spawnNpcsNow() {
@@ -2172,6 +2172,15 @@
 
             NAF.connection.subscribeToDataChannel("gmReplyClientSecret", function (senderId, dataType, data, targetId) {
                 window.gmClientSecretMap.set(senderId, data.clientSecret);
+            });
+
+            let micEnabled = true;
+            const micBtnEle = document.getElementById("mic-btn");
+
+            micBtnEle.addEventListener('click', function () {
+                NAF.connection.adapter.enableMicrophone(!micEnabled);
+                micEnabled = !micEnabled;
+                micBtnEle.textContent = micEnabled ? 'Mute Mic' : 'Unmute Mic';
             });
         }
     </script>
@@ -2325,16 +2334,38 @@
             width: 256px;
             height: 256px;
         }
+        .actions {
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            pointer-events: none;
+        }
+        .button {
+            border-radius: 8px;
+            background-color: bisque;
+            pointer-events: visible;
+        }
     </style>
 </head>
 <body>
     <a-scene physics="driver: local; gravity: 0 0 0;" globe-nav globe-ocean-nav embedded fog shadow id="scene">
+        <a-assets>
+            <template id="avatar-template">
+                <a-entity class="avatar" networked-audio-source>
+                </a-entity>
+            </template>
+        </a-assets>
         <a-entity light="type: ambient; color: #CCC"></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.5" position="0 1 0"></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.5" position="0 -1 0"></a-entity>
-        <a-entity id="camera-rig" position="0 105 5">
+        <a-entity id="camera-rig" position="0 105 5" networked="template: #avatar-template; attachTemplateToLocal: false;">
             <a-camera wasd-controls-enabled="false" look-controls-enabled="false" position="0 1.6 0" cursor="rayOrigin: mouse" raycaster="far: 50; interval: 100; objects: .clickable"></a-camera>
         </a-entity>
     </a-scene>
+    <div class="actions">
+        <button id="mic-btn" type="button" class="button">Mute Mic</button>
+    </div>
 </body>
 </html>
