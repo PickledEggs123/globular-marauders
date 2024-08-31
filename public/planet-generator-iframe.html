@@ -1665,6 +1665,27 @@
             },
         });
 
+        AFRAME.registerComponent('networked-health', {
+            schema: {
+            },
+            init: function () {
+                this.innerHandleHit = this.handleHit.bind(this);
+                this.el.addEventListener('hit', this.innerHandleHit);
+            },
+            remove: function () {
+                this.el.removeEventListener('hit', this.innerHandleHit);
+            },
+            handleHit: function (evt) {
+                const hit = evt.detail;
+                const senderId = this.el.components['networked'].data.owner;
+                const networkId = this.el.components['networked'].data.networkId;
+                NAF.connection.sendDataGuaranteed(senderId, "networkedHealth", {
+                    networkId,
+                    hit,
+                });
+            },
+        });
+
         AFRAME.registerComponent("spawn-gold", {
             schema: {},
             init: function () {
@@ -1761,6 +1782,17 @@
                 rootGoldCoin.appendChild(dataEl);
             } else {
                 rootGoldCoin.setAttribute("gltf-model", str);
+            }
+
+            if (charModelId === "PERSON") {
+                rootGoldCoin.setAttribute("npc-faction", "native");
+                rootGoldCoin.setAttribute("npc-finder", "active: false;");
+                rootGoldCoin.setAttribute("networked-health", "");
+            }
+
+            if (charModelId === "WARRIOR") {
+                rootGoldCoin.setAttribute("npc-faction", "player");
+                rootGoldCoin.setAttribute("npc-finder", "active: false;");
             }
 
             const a = (() => {
@@ -2207,6 +2239,17 @@
                 window.gmClientSecretMap.set(senderId, data.clientSecret);
             });
 
+            NAF.connection.subscribeToDataChannel('networkedHealth', function (sender, dataType, data, targetId) {
+                const {
+                    networkId,
+                    hit,
+                } = data;
+                const entity = NAF.entities.entities[networkId];
+                if (entity) {
+                    entity.emit("hit", hit);
+                }
+            });
+
             let micEnabled = true;
             const micBtnEle = document.getElementById("mic-btn");
 
@@ -2238,8 +2281,13 @@
                     octree.addMesh(meshNode);
                 };
 
+                const pos = el.object3D.position;
+                if (pos.length() === 0) {
+                    setTimeout(this.registerMe.bind(this, el), 100);
+                    return;
+                }
+
                 if (this.el.sceneEl.systems['globe-nav'].navMesh) {
-                    const pos = el.object3D.position;
                     const group = this.el.sceneEl.systems['globe-nav'].getGroup(pos);
                     if (this.islandNpcs.has(group)) {
                         const octree = this.islandNpcs.get(group);
@@ -2307,7 +2355,7 @@
                     const octree = this.islandNpcs.get(group);
                     const intersects = octree.intersects(position, radius);
                     const meshes = intersects.array;
-                    const els = meshes.map(x => x.parent.el);
+                    const els = meshes.map(x => x.parent.el ?? x.el);
                     const filtered = els.filter(x => x && x.components['npc-faction'].data !== factionName);
                     return filtered.sort((a, b) => {
                         const distA = new THREE.Vector3().copy(a.object3D.position).distanceTo(position);
