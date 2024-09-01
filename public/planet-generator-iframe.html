@@ -1971,7 +1971,7 @@
             const rootNpc = document.createElement("a-entity");
             rootNpc.setAttribute("class", "npc");
             rootNpc.setAttribute("globe-nav-agent", "");
-            rootNpc.setAttribute("position", "0 150 0");
+            rootNpc.setAttribute("position", "0 0 0");
             rootNpc.setAttribute("rotation", "0 0 0");
             rootNpc.setAttribute("npc-faction", "player");
             rootNpc.setAttribute("npc-finder", "active: true;");
@@ -2337,7 +2337,7 @@
                     const octree = this.islandNpcs.get(group);
                     const intersects = octree.intersects(position, radius);
                     const meshes = intersects.array;
-                    const els = meshes.map(x => x.parent.el ?? x.el);
+                    const els = meshes.map(x => x?.parent?.el ?? x?.el);
                     const filtered = els.filter(x => x && x.components['npc-faction'].data !== factionName);
                     return filtered.sort((a, b) => {
                         const distA = new THREE.Vector3().copy(a.object3D.position).distanceTo(position);
