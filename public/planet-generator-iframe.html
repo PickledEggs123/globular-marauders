@@ -22,6 +22,7 @@
     <script src="/three-pathfinding.umd.js"></script>
     <script src="/three-to-cannon.umd.js"></script>
     <script src="/aframe-fps-counter-component.min.js"></script>
+    <script src="/aframe-look-at-billboard-component.js"></script>
     <script src="/instanced-mesh.min.js"></script>
     <script src="/socket.io.slim.js"></script>
     <script src="/easyrtc/easyrtc.js"></script>
@@ -723,7 +724,6 @@
                 const pos = object3D.getWorldPosition(new THREE.Vector3());
 
                 const cameraEl = document.querySelector("#camera-rig");
-                // @ts-ignore
                 const cameraPos = cameraEl.object3D.getWorldPosition(new THREE.Vector3());
 
                 const cameraDistance = pos.distanceTo(cameraPos);
@@ -2174,7 +2174,7 @@
 
             const scene = document.querySelector("a-scene");
 
-            scene.setAttribute("networked-scene", `room: ${roomId}; debug: true; adapter: easyrtc; audio: true;`);
+            scene.setAttribute("networked-scene", `room: ${roomId}; debug: false; adapter: easyrtc; audio: true;`);
         }
 
         function spawnNpcsNow() {
@@ -2198,19 +2198,23 @@
 
         function onConnect() {
             window.gmClientSecretMap.set(NAF.clientId, window.gmClientSecret);
+            console.log("INIT", window.gmClientSecretMap);
             debounceWalkingNpcSwitchOnOrNot();
 
             document.body.addEventListener("clientConnected", function (evt) {
+                console.log("CONNECTED", evt, window.gmClientSecretMap);
                 NAF.connection.broadcastDataGuaranteed("gmShareClientSecret", {
                     clientSecret: window.gmClientSecret
                 });
             });
             document.body.addEventListener("clientDisconnected", function (evt) {
+                console.log("DISCONNECT", evt, window.gmClientSecretMap);
                 window.gmClientSecretMap.delete(evt.detail.clientId);
                 debounceWalkingNpcSwitchOnOrNot();
             });
 
             NAF.connection.subscribeToDataChannel("gmShareClientSecret", function (senderId, dataType, data, targetId) {
+                console.log("SHARE SECRET", senderId, window.gmClientSecretMap);
                 window.gmClientSecretMap.set(senderId, data.clientSecret);
                 NAF.connection.sendDataGuaranteed(senderId, "gmReplyClientSecret", {
                     clientSecret: window.gmClientSecret
@@ -2218,6 +2222,7 @@
             });
 
             NAF.connection.subscribeToDataChannel("gmReplyClientSecret", function (senderId, dataType, data, targetId) {
+                console.log("SHARE SECRET", targetId, window.gmClientSecretMap);
                 window.gmClientSecretMap.set(senderId, data.clientSecret);
             });
 

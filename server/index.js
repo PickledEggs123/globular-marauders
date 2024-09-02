@@ -273,7 +273,7 @@ const myIceServers = [
     // }
 ];
 easyrtc.setOption("appIceServers", myIceServers);
-easyrtc.setOption("logLevel", "debug");
+easyrtc.setOption("logLevel", "error");
 easyrtc.setOption("demosEnable", false);
 
 // Overriding the default easyrtcAuth listener, only so we can directly access its callback
