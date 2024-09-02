@@ -2188,10 +2188,15 @@
             } = roomManifestJson;
             const orderedSecrets = roomUser.map(x => x.webrtcId);
 
+            const hostSpanEle = document.getElementById("host-span");
+
             const currentSet = Array.from(window.gmClientSecretMap.values());
             const firstSecret = orderedSecrets.find(x => currentSet.includes(x));
             if (firstSecret && firstSecret === window.gmClientSecret) {
                 spawnNpcsNow();
+                hostSpanEle.textContent = "HOST";
+            } else {
+                hostSpanEle.textContent = "CLIENT";
             }
         }
         const debounceWalkingNpcSwitchOnOrNot = debounce(handleWalkingNpcSwitchOnOrNot.bind(window), 5_000);
@@ -2201,11 +2206,17 @@
             console.log("INIT", window.gmClientSecretMap);
             debounceWalkingNpcSwitchOnOrNot();
 
+            window.addEventListener("beforeunload", function () {
+                easyrtc.disconnect();
+            });
+
             document.body.addEventListener("clientConnected", function (evt) {
                 console.log("CONNECTED", evt, window.gmClientSecretMap);
-                NAF.connection.broadcastDataGuaranteed("gmShareClientSecret", {
-                    clientSecret: window.gmClientSecret
-                });
+                setTimeout(function () {
+                    NAF.connection.broadcastDataGuaranteed("gmShareClientSecret", {
+                        clientSecret: window.gmClientSecret
+                    });
+                }, 500);
             });
             document.body.addEventListener("clientDisconnected", function (evt) {
                 console.log("DISCONNECT", evt, window.gmClientSecretMap);
@@ -2415,6 +2426,12 @@
             background-color: bisque;
             pointer-events: visible;
         }
+        .host-span {
+            border-radius: 8px;
+            background-color: beige;
+            pointer-events: none;
+            display: inline-block;
+        }
     </style>
 </head>
 <body>
@@ -2434,6 +2451,7 @@
     </a-scene>
     <div class="actions">
         <button id="mic-btn" type="button" class="button">Mute Mic</button>
+        <span id="host-span" class="host-span">Connecting...</span>
     </div>
 </body>
 </html>
