@@ -64,6 +64,7 @@ const handleReactPage = (req, res) => {
 
 // handle react pages with router
 app.get('/', handleReactPage);
+app.get('/2d-game', handleReactPage);
 app.get('/game-model', handleReactPage);
 app.get('/planet-generator', handleReactPage);
 app.get('/ship-wiki', handleReactPage);

@@ -10,7 +10,18 @@ import {
     Toolbar,
     Typography
 } from "@mui/material";
-import {Menu, MenuOpen, People, Person, PieChart, PlayArrow, Public, QuestionMark, Sailing} from "@mui/icons-material";
+import {
+    Domain,
+    Menu,
+    MenuOpen,
+    People,
+    Person,
+    PieChart,
+    PlayArrow,
+    Public,
+    QuestionMark,
+    Sailing
+} from "@mui/icons-material";
 import PixiGame from "./pages/PixiGame";
 import {Link} from "react-router-dom";
 
@@ -52,8 +63,12 @@ export const WebsiteDrawer = ({rightSide}: {
                 <List>
                     {[{
                         link: "/",
+                        icon: <Domain/>,
+                        text: "Main"
+                    }, {
+                        link: "/2d-game",
                         icon: <PlayArrow/>,
-                        text: "Play"
+                        text: "Play 2D"
                     }, {
                         link: "/game-model",
                         icon: <PieChart/>,

@@ -288,11 +288,11 @@ export class PixiGame extends PixiGameNetworking {
             resources[`space${index}`] = await PIXI.Assets.load(textureUrl);
         }
         // load smoke trail
-        resources["smokeTrail"] = await PIXI.Assets.load("images/sprites/smokeTrail.svg");
-        resources["cannonBallTrail"] = await PIXI.Assets.load("images/sprites/cannonBallTrail.svg");
-        resources["spellBallTrail"] = await PIXI.Assets.load("images/sprites/cannonBallTrail.svg");
-        resources["glowTrail"] = await PIXI.Assets.load("images/sprites/glowTrail.svg");
-        resources["starFieldSpeckle"] = await PIXI.Assets.load("images/sprites/starFieldSpeckle.svg");
+        resources["smokeTrail"] = await PIXI.Assets.load("/images/sprites/smokeTrail.svg");
+        resources["cannonBallTrail"] = await PIXI.Assets.load("/images/sprites/cannonBallTrail.svg");
+        resources["spellBallTrail"] = await PIXI.Assets.load("/images/sprites/cannonBallTrail.svg");
+        resources["glowTrail"] = await PIXI.Assets.load("/images/sprites/glowTrail.svg");
+        resources["starFieldSpeckle"] = await PIXI.Assets.load("/images/sprites/starFieldSpeckle.svg");
 
         // onload handler
         // load images into cache
