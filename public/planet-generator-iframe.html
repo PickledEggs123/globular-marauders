@@ -326,7 +326,7 @@
                 object3D.position.set(finalPosition.x, finalPosition.y, finalPosition.z);
                 if (this.el.sceneEl?.renderer?.xr?.isPresenting || cameraLookControlsEl.components['globe-look-controls']?.magicWindowControls?.enabled) {
                     object3D.up = upVector;
-                    object3D.lookAt(boxWorldPos);
+                    object3D.lookAt(boxWorldPos.clone().add(upVector.clone().add(upVector.clone().multiplyScalar(5))));
                 } else {
                     const camera = this.el.sceneEl.camera;
                     camera.up = upVector;
@@ -558,10 +558,10 @@
                 // Calculate magic window HMD quaternion.
                 if (this.magicWindowControls && this.magicWindowControls.enabled) {
                     this.magicWindowControls.update();
-                    const quat = this.magicWindowObject.quaternion.clone().multiply(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 0, 1)));
-                    quat.x *= -1;
-                    quat.z *= -1;
-                    magicWindowAbsoluteQuaternion.copy(quat);
+                    const magicQuaternion = this.magicWindowObject.quaternion.clone().multiply(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 0, 1)));
+                    magicQuaternion.x *= -1;
+                    magicQuaternion.z *= -1;
+                    magicWindowAbsoluteQuaternion.copy(magicQuaternion);
                 }
             },
 
