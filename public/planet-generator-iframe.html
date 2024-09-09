@@ -2921,13 +2921,6 @@
                 const renderer = sceneEl.renderer;
                 const camera = sceneEl.camera;
 
-                // set camera rig to parent
-                sceneEl.addEventListener('sessionstart', function () {
-                    const xrCamera = renderer.xr.getCamera();
-                    const cameraRig = document.querySelector("#camera-rig");
-                    xrCamera.parent = cameraRig.object3D;
-                });
-
                 const compose = new EffectComposer(renderer);
                 this.composer = compose;
 
