@@ -1,7 +1,7 @@
 import React from 'react';
 import '../App.scss';
 import {WebsiteDrawer} from "../Drawer";
-import {Paper, Card, CardContent, CardHeader, Container, Grid, Typography, Box} from "@mui/material";
+import {Paper, Card, CardContent, CardHeader, Container, Grid, Typography, Box, Button} from "@mui/material";
 import {Image} from "@mui/icons-material";
 import {Link} from "react-router-dom";
 
@@ -20,10 +20,15 @@ export const Main = () => {
                             </CardHeader>
                             <CardContent>
                                 <Typography variant="body1">
-                                    I decided on a spherical geometry using quaternions as the basis of all math instead of vectors.
-                                    Here's some prototypes with early mathematics such as Voronoi Tesselation using quaternions.
-                                    I also did movement and rotation with quaternions. The graphics were very basic in the
-                                    beginning of the project. <Link to="/2d-game">Click here to play the latest version.</Link>
+                                    I decided on a spherical geometry using quaternions as the basis of all math instead
+                                    of vectors.
+                                    Here's some prototypes with early mathematics such as Voronoi Tesselation using
+                                    quaternions.
+                                    I also did movement and rotation with quaternions. The graphics were very basic in
+                                    the
+                                    beginning of the project.
+                                    <br/>
+                                    <Link to="/2d-game"><Button>Click here to play the latest version</Button></Link>
                                 </Typography>
                                 <br/>
                                 <Grid container xs={12} spacing={2}>
@@ -67,7 +72,8 @@ export const Main = () => {
                                     native NPCs or clicking buildings will spawn gold coins. The next step is to make
                                     ships fire cannon balls
                                     and add the ability to control multiple ships and multiple NPCs.
-                                    <Link to="/planet-generator">Click here to play the 3d game.</Link>
+                                    <br/>
+                                    <Link to="/planet-generator"><Button>Click here to play the 3d game</Button></Link>
                                 </Typography>
                                 <br/>
                                 <Grid container xs={12} spacing={2}>

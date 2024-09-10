@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React from 'react';
 import ReactDOM from 'react-dom';
 import './index.css';
 import {App} from './App';
@@ -13,7 +13,6 @@ import createCache from "@emotion/cache";
 import {CssBaseline} from "@mui/material";
 import {theme} from "./theme";
 import {ThemeProvider} from "@mui/material/styles";
-import {PlanetMeshLoader} from "./contextes/PlanetContext";
 import {ShipMeshLoader} from "./contextes/ShipContext";
 
 particles.Emitter.registerBehavior(StaticQuaternionParticleBehavior);
@@ -29,11 +28,9 @@ ReactDOM.render(
           <ThemeProvider theme={theme}>
               <CssBaseline/>
               <BrowserRouter>
-                  <PlanetMeshLoader>
-                      <ShipMeshLoader>
-                          <App/>
-                      </ShipMeshLoader>
-                  </PlanetMeshLoader>
+                  <ShipMeshLoader>
+                      <App/>
+                  </ShipMeshLoader>
               </BrowserRouter>
           </ThemeProvider>
       </CacheProvider>
