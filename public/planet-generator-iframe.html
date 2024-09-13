@@ -1186,7 +1186,7 @@
                 const cameraPos = cameraEl.object3D.getWorldPosition(new THREE.Vector3());
 
                 const cameraDistance = pos.distanceTo(cameraPos);
-                object3D.visible = cameraDistance < 20;
+                object3D.visible = cameraDistance < 1337;
 
 
                 // Use PatrolJS pathfinding system to get the shortest path to target.
@@ -3015,7 +3015,7 @@
     </style>
 </head>
 <body>
-    <a-scene physics="driver: local; gravity: 0 0 0;" globe-nav globe-ocean-nav embedded fog shadow outline-pass id="scene" inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
+    <a-scene physics="driver: local; gravity: 0 0 0;" globe-nav globe-ocean-nav embedded fog shadow outline-pass id="scene" webxr="referenceSpaceType: local;" inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
         <a-assets>
             <template id="avatar-template">
                 <a-entity class="avatar" networked-audio-source>
