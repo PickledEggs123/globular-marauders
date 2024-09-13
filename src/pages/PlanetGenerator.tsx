@@ -376,7 +376,7 @@ export const PlanetGenerator = () => {
                                 <div ref={ref} style={{width: 256, height: 256}}>
                                 </div>
                                 {/* @ts-ignore */}
-                                <iframe width={276} height={276} ref={iframeRef} allowFullScreen={true} allowvr="yes" src="/planet-generator-iframe.html"/>
+                                <iframe width={276} height={276} ref={iframeRef} allowfullscreen="yes" allowvr="yes" src="/planet-generator-iframe.html"/>
                                 <Button onClick={() => {
                                     drawGraph();
                                 }}>Refresh</Button>
