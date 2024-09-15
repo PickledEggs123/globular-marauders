@@ -314,19 +314,27 @@ export const PlanetGenerator = () => {
         if (context.app) {
             context.app.destroy(true);
         }
-        context.app = new PIXI.Application({ width : 256, height: 256, backgroundColor: 0x000000 });
-        // @ts-ignore
-        ref.current!.appendChild(context.app.view);
-        context.app!.ticker.add(() => {
+        const animation = () => {
             context.app!.stage.children.forEach((c: any) => {
                 const mesh = c as PIXI.Mesh;
                 if (mesh?.shader?.uniforms?.uRotation) {
                     mesh.shader.uniforms.uRotation = Quaternion.fromAxisAngle([0, 1, 0], Math.PI * 2 / 100 * (+new Date() % (10 * 1000) / 100)).toMatrix4();
                 }
             });
-        });
+        };
+        const curRef = ref.current;
+        if (ref.current) {
+            context.app = new PIXI.Application({ width : 256, height: 256, backgroundColor: 0x000000 });
+            // @ts-ignore
+            ref.current.appendChild(context.app.view);
+            context.app!.ticker.add(animation);
+        }
         drawGraph();
-        return () => {};
+        return () => {
+            if (curRef && context.app) {
+                context.app.ticker.remove(animation);
+            }
+        };
     }, [context, drawGraph, ref]);
     const download = async () => {
         const data: IGameMesh = context!.preview!;
@@ -376,26 +384,35 @@ export const PlanetGenerator = () => {
                                 <div ref={ref} style={{width: 256, height: 256}}>
                                 </div>
                                 {/* @ts-ignore */}
-                                <iframe width={256} height={256} ref={iframeRef} allowfullscreen="yes" allowvr="yes" src="/planet-generator-iframe.html"/>
+                                <iframe title="3d game" width={256} height={256} ref={iframeRef} allowfullscreen="yes"
+                                        allowvr="yes"
+                                        src="/planet-generator-iframe.html"/>
                                 <Button onClick={() => {
                                     drawGraph();
                                 }}>Refresh</Button>
                                 <Button onClick={download}>Download</Button>
                                 <Typography variant="body1">
-                                    This page allows you to generate a random planet, using the generator package. This is a
-                                    package written by me which computes spherical voronoi tesselation. Voronoi tesselation
-                                    is the drawing of polygons around a bunch of random points so that the area of each polygon
-                                    is closest to that point. It's essentially a map with perfect borders. I color each tile
+                                    This page allows you to generate a random planet, using the generator package. This
+                                    is a
+                                    package written by me which computes spherical voronoi tesselation. Voronoi
+                                    tesselation
+                                    is the drawing of polygons around a bunch of random points so that the area of each
+                                    polygon
+                                    is closest to that point. It's essentially a map with perfect borders. I color each
+                                    tile
                                     blue or green randomly to create mini planets.
                                 </Typography>
                                 <br/>
                                 <Typography variant="body1">
-                                    Do not forget to download your custom planet so you can view it in full 3d with the Windows 10 3D Viewer app.
-                                    Go to the Windows Store and download 3D Viewer so you can view the file from all angles.
+                                    Do not forget to download your custom planet so you can view it in full 3d with the
+                                    Windows 10 3D Viewer app.
+                                    Go to the Windows Store and download 3D Viewer so you can view the file from all
+                                    angles.
                                 </Typography>
                                 <br/>
                                 <Typography variant="body1">
-                                    There is a bug where the output of the generator is not valid with part of the sphere missing.
+                                    There is a bug where the output of the generator is not valid with part of the
+                                    sphere missing.
                                     I don't know how to prevent that from happening other than to run the app again.
                                 </Typography>
                             </CardContent>
