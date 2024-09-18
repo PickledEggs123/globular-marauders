@@ -1660,7 +1660,7 @@
                 tilePos = tilePos.set.apply(tilePos, this.data.split(" "));
                 tilePos = tilePos.normalize();
 
-                if (cameraPos.dot(tilePos) > 0.75) {
+                if (cameraPos.dot(tilePos) > 0.85) {
                     this.el.setAttribute("visible", "true");
                 } else {
                     this.el.setAttribute("visible", "false");
@@ -2881,13 +2881,13 @@
                 this.t = 0;
                 this.dt = 0;
                 this.selectedObjects = [];
-                this.outlinePassFactory();
+                // this.outlinePassFactory();
 
-                this.innerResizeOutlinePass = this.resizeOutlinePass.bind(this);
-                window.addEventListener("resize", this.innerResizeOutlinePass);
+                // this.innerResizeOutlinePass = this.resizeOutlinePass.bind(this);
+                // window.addEventListener("resize", this.innerResizeOutlinePass);
             },
             remove: function () {
-                window.removeEventListener("resize", this.innerResizeOutlinePass);
+                // window.removeEventListener("resize", this.innerResizeOutlinePass);
             },
             resizeOutlinePass: function () {
                 const sceneEl = document.querySelector("a-scene");
@@ -3028,7 +3028,7 @@
         <a-entity light="type: directional; color: #EEE; intensity: 0.8; castShadow: true; shadowCameraBottom: -150; shadowCameraTop: 150; shadowCameraLeft: -150; shadowCameraRight: 150; shadowCameraNear: -150; shadowCameraFar: 150; shadowMapWidth: 1024; shadowMapHeight: 1024;" position="0 1 0" handle-shadow-parameter></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.15" position="0 -1 0"></a-entity>
         <a-entity id="camera-rig" position="0 105 5" networked="template: #avatar-template; attachTemplateToLocal: false;">
-            <a-entity camera globe-look-controls="mouseEnabled: false; touchEnabled: false;" position="0 1.6 0" cursor="rayOrigin: mouse" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
+            <a-entity camera globe-look-controls="mouseEnabled: false; touchEnabled: false;" position="0 1.6 0" cursor="rayOrigin: mouse" raycaster="far: 50; interval: 100; objects: .clickable" fps-counter></a-entity>
             <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
             <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
         </a-entity>

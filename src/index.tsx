@@ -13,7 +13,6 @@ import createCache from "@emotion/cache";
 import {CssBaseline} from "@mui/material";
 import {theme} from "./theme";
 import {ThemeProvider} from "@mui/material/styles";
-import {ShipMeshLoader} from "./contextes/ShipContext";
 
 particles.Emitter.registerBehavior(StaticQuaternionParticleBehavior);
 particles.Emitter.registerBehavior(MovementQuaternionParticleBehavior);
@@ -28,9 +27,7 @@ ReactDOM.render(
           <ThemeProvider theme={theme}>
               <CssBaseline/>
               <BrowserRouter>
-                  <ShipMeshLoader>
-                      <App/>
-                  </ShipMeshLoader>
+                  <App/>
               </BrowserRouter>
           </ThemeProvider>
       </CacheProvider>

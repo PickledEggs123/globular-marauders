@@ -8,7 +8,6 @@ import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interfa
 import * as PIXI from "pixi.js";
 import {BLEND_MODES} from "pixi.js";
 import Quaternion from "quaternion";
-import {ShipContext} from "../contextes/ShipContext";
 
 interface IGameSpawnPoint {
     point: [number, number, number];
@@ -24,7 +23,6 @@ const PLANET_SIZE = 100;
 
 export const PlanetGenerator = () => {
     const [context] = useState<{ app: PIXI.Application | null, preview: IGameMesh | null, gameData: IGameMesh[] } | null>({ app: null, preview: null, gameData: [] });
-    const shipContext = useContext(ShipContext);
     const [clientSecret] = useState(Math.random().toString(36).substring(2, 9));
     const [loadMessage, setLoadMessage] = useState<string>("No data loaded...");
     const ref = useRef<HTMLDivElement | null>(null);
@@ -152,7 +150,7 @@ export const PlanetGenerator = () => {
             Promise.all<Uint8Array | string>([
                 ...data2.map(m => generatePlanetGltf(m, m.ocean, m.navmesh || m.oceanNavmesh)),
                 "/meshes/GoldCoin.glb",
-                generatePlanetGltf(shipContext[1], false),
+                "/meshes/ships/sloop.glb",
                 "/meshes/WoodenArrow2.glb",
                 "/meshes/MaleAnatomy.glb",
                 "/meshes/Port1-0.glb",
@@ -193,7 +191,7 @@ export const PlanetGenerator = () => {
                     });
                 }
 
-                const dataUri2 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[gltf.length - 13] as Uint8Array)}`;
+                const dataUri2 = gltf[gltf.length - 13];
                 if (iframeRef.current && spawnPoints[0]) {
                     const spawnPoint = spawnPoints[0];
                     const {
