@@ -10,8 +10,7 @@
         {
             "imports": {
                 "three": "https://unpkg.com/three@0.164.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.164.0/examples/jsm/",
-                "threejs-octree": "/threeoctree.js"
+                "three/addons/": "https://unpkg.com/three@0.164.0/examples/jsm/"
             }
         }
     </script>
@@ -176,6 +175,14 @@
                     lod0.setAttribute("visible", "true");
                     lod1.setAttribute("visible", "false");
                     lod2.setAttribute("visible", "false");
+                }
+
+                // auto update clickable
+                const className = "clickable";
+                if (distance >= 40 && this.el.classList.contains(className)) {
+                    this.el.classList.remove(className);
+                } else if (!(distance >= 40) && !this.el.classList.contains(className)) {
+                    this.el.classList.add(className);
                 }
             }
         });
@@ -1665,6 +1672,14 @@
                 } else {
                     this.el.setAttribute("visible", "false");
                 }
+
+                // auto update clickable
+                const className = "clickable";
+                if (cameraPos.dot(tilePos) > 0.85 && !this.el.classList.contains(className)) {
+                    this.el.classList.add(className);
+                } else if (!(cameraPos.dot(tilePos) > 0.85) && this.el.classList.contains(className)) {
+                    this.el.classList.remove(className);
+                }
             }
         });
 
@@ -2170,10 +2185,10 @@
                     bPosNorm.normalize();
                     impulse.normalize();
                     impulse.vadd(bPosNorm, impulse);
-                    impulse.scale(100, impulse);
+                    impulse.scale(300, impulse);
                     const bPosOffset = new CANNON.Vec3().set(getRandom1to1(), getRandom1to1(), getRandom1to1());
                     bPosOffset.normalize();
-                    bPosOffset.scale(5, bPosOffset);
+                    bPosOffset.scale(0.5, bPosOffset);
                     this.el.body.applyImpulse(impulse, bPosOffset);
                     this.interval = setTimeout(this.removeGoldCoin.bind(this), 30_000);
                 } else {
@@ -2321,7 +2336,7 @@
             pos.add(pos.clone().normalize());
             rootGoldCoin.setAttribute("position", `${pos.x} ${pos.y} ${pos.z}`);
             rootGoldCoin.setAttribute("rotation", "0 0 0");
-            rootGoldCoin.setAttribute("dynamic-body", "shape: sphere; sphereRadius: 1; mass: 100");
+            rootGoldCoin.setAttribute("dynamic-body", "shape: sphere; sphereRadius: 0.5; mass: 100");
             rootGoldCoin.setAttribute("globe-gravity", "");
             rootGoldCoin.setAttribute("collision-filter", "group: gold-coin; ");
             rootGoldCoin.setAttribute("gold-coin-movement", "");
@@ -2719,7 +2734,6 @@
         }
     </script>
     <script type="module">
-        import Octree from "threejs-octree";
         import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
         import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
         import { OutlinePass } from "three/addons/postprocessing/OutlinePass.js";
@@ -2728,21 +2742,11 @@
         AFRAME.registerSystem('npc-finder', {
             schema: {},
             init: function () {
-                this.islandNpcs = new Map();
                 this.islandNpcList = new Map();
                 this.npcs = [];
                 this.findNpc = this.findNpc.bind(this);
             },
             registerMe: function (el) {
-                const addNpcMeshToOctree = (octree) => {
-                    const geometry = new THREE.SphereGeometry();
-                    const material = new THREE.MeshStandardMaterial({ color: 0xffffff });
-                    const meshNode = new THREE.Mesh(geometry, material);
-                    meshNode.visible = false;
-                    el.setObject3D('octree-collider', meshNode);
-                    octree.addMesh(meshNode);
-                };
-
                 const pos = el.object3D.position;
                 if (pos.length() === 0) {
                     setTimeout(this.registerMe.bind(this, el), 100);
@@ -2751,16 +2755,6 @@
 
                 if (this.el.sceneEl.systems['globe-nav'].navMesh) {
                     const group = this.el.sceneEl.systems['globe-nav'].getGroup(pos);
-                    if (this.islandNpcs.has(group)) {
-                        const octree = this.islandNpcs.get(group);
-                        addNpcMeshToOctree(octree);
-                    } else {
-                        const octree = new Octree(16, 4);
-                        const worldExtents = new THREE.Box3(new THREE.Vector3(-150, -150, -150), new THREE.Vector3(150, 150, 150));
-                        octree.initialize(worldExtents.min, worldExtents.max, []);
-                        addNpcMeshToOctree(octree);
-                        this.islandNpcs.set(group, octree);
-                    }
                     if (this.islandNpcList.has(group)) {
                         this.islandNpcList.get(group).push(el);
                     } else {
@@ -2771,28 +2765,8 @@
                     setTimeout(this.registerMe.bind(this, el), 100);
                 }
             },
-            tick: function () {
-                for (const [group, octree] of this.islandNpcs.entries()) {
-                    const npcs = this.islandNpcList.get(group);
-                    if (npcs) {
-                        for (const el of npcs) {
-                            const collider = el.getObject3D('octree-collider');
-                            if (collider) {
-                                octree.updateMesh(collider);
-                            }
-                        }
-                    }
-                }
-            },
             unregisterMe: function (el) {
                 const group = this.el.sceneEl.systems['globe-nav'].getGroup(el.object3D.position);
-                if (this.islandNpcs.has(group)) {
-                    const octree = this.islandNpcs.get(group);
-                    const collider = el.getObject3D('octree-collider');
-                    if (collider) {
-                        octree.removeMesh(collider);
-                    }
-                }
                 if (this.islandNpcList.has(group)) {
                     const arr = this.islandNpcList.get(group);
                     const idx = arr.indexOf(el);
@@ -2813,11 +2787,13 @@
                 const position = new THREE.Vector3().copy(checkingNpc.object3D.position);
                 const radius = 20;
                 const group = this.el.sceneEl.systems['globe-nav'].getGroup(position);
-                if (this.islandNpcs.has(group)) {
-                    const octree = this.islandNpcs.get(group);
-                    const intersects = octree.intersects(position, radius);
-                    const meshes = intersects.array;
-                    const els = meshes.map(x => x?.parent?.el ?? x?.el);
+                if (this.islandNpcList.has(group)) {
+                    const list = this.islandNpcList.get(group);
+                    const els = list.filter(x => {
+                        const pos = x.object3D.position;
+                        const dist = position.distanceTo(pos);
+                        return dist <= radius;
+                    });
                     const filtered = els.filter(x => x && x.components['npc-faction'].data !== factionName);
                     return filtered.sort((a, b) => {
                         const distA = new THREE.Vector3().copy(a.object3D.position).distanceTo(position);
@@ -3028,9 +3004,9 @@
         <a-entity light="type: directional; color: #EEE; intensity: 0.8; castShadow: true; shadowCameraBottom: -150; shadowCameraTop: 150; shadowCameraLeft: -150; shadowCameraRight: 150; shadowCameraNear: -150; shadowCameraFar: 150; shadowMapWidth: 1024; shadowMapHeight: 1024;" position="0 1 0" handle-shadow-parameter></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.15" position="0 -1 0"></a-entity>
         <a-entity id="camera-rig" position="0 105 5" networked="template: #avatar-template; attachTemplateToLocal: false;">
-            <a-entity camera globe-look-controls="mouseEnabled: false; touchEnabled: false;" position="0 1.6 0" cursor="rayOrigin: mouse" raycaster="far: 50; interval: 100; objects: .clickable" fps-counter></a-entity>
-            <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
-            <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
+            <a-entity camera globe-look-controls="mouseEnabled: false; touchEnabled: false;" position="0 1.6 0" cursor="rayOrigin: mouse" raycaster="far: 20; interval: 100; objects: .clickable" fps-counter></a-entity>
+            <a-entity laser-controls="hand: left;" raycaster="far: 20; interval: 100; objects: .clickable"></a-entity>
+            <a-entity laser-controls="hand: right;" raycaster="far: 20; interval: 100; objects: .clickable"></a-entity>
         </a-entity>
     </a-scene>
     <div class="actions">
