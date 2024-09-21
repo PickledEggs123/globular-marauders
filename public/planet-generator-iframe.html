@@ -26,8 +26,28 @@
     <script src="/socket.io.slim.js"></script>
     <script src="/easyrtc/easyrtc.js"></script>
     <script src="/networked-aframe.js"></script>
+    <script src="/three-bvh.umd.cjs"></script>
     <script type="application/javascript">
         const PLANET_SIZE = 100;
+
+        // Add the extension functions
+        THREE.BufferGeometry.prototype.computeBoundsTree = MeshBVHLib.computeBoundsTree;
+        THREE.BufferGeometry.prototype.disposeBoundsTree = MeshBVHLib.disposeBoundsTree;
+        THREE.Mesh.prototype.raycast = MeshBVHLib.acceleratedRaycast;
+
+        THREE.BatchedMesh.prototype.computeBoundsTree = MeshBVHLib.computeBatchedBoundsTree;
+        THREE.BatchedMesh.prototype.disposeBoundsTree = MeshBVHLib.disposeBatchedBoundsTree;
+        THREE.BatchedMesh.prototype.raycast = MeshBVHLib.acceleratedRaycast;
+
+        const buildBoundsTree = (e) => {
+            const meshes = [];
+            e.detail.model.traverse((x) => {
+                if (x.isMesh) {
+                    meshes.push(x);
+                }
+            });
+            meshes.forEach((m) => m.geometry.computeBoundsTree());
+        };
 
         function debounce(function_, wait = 100, options = {}) {
             if (typeof function_ !== 'function') {
@@ -135,6 +155,9 @@
                 lod0.setAttribute("gltf-model", data[0]);
                 lod1.setAttribute("gltf-model", data[1]);
                 lod2.setAttribute("gltf-model", data[2]);
+                lod0.addEventListener("model-loaded", buildBoundsTree);
+                lod1.addEventListener("model-loaded", buildBoundsTree);
+                lod2.addEventListener("model-loaded", buildBoundsTree);
             },
             tick: function () {
                 if (this.counter > 0) {
@@ -1667,7 +1690,8 @@
                 tilePos = tilePos.set.apply(tilePos, this.data.split(" "));
                 tilePos = tilePos.normalize();
 
-                if (cameraPos.dot(tilePos) > 0.85) {
+                const cos45 = Math.acos(Math.PI / 4);
+                if (cameraPos.dot(tilePos) > cos45) {
                     this.el.setAttribute("visible", "true");
                 } else {
                     this.el.setAttribute("visible", "false");
@@ -1675,9 +1699,9 @@
 
                 // auto update clickable
                 const className = "clickable";
-                if (cameraPos.dot(tilePos) > 0.85 && !this.el.classList.contains(className)) {
+                if (cameraPos.dot(tilePos) > cos45 && !this.el.classList.contains(className)) {
                     this.el.classList.add(className);
-                } else if (!(cameraPos.dot(tilePos) > 0.85) && this.el.classList.contains(className)) {
+                } else if (!(cameraPos.dot(tilePos) > cos45) && this.el.classList.contains(className)) {
                     this.el.classList.remove(className);
                 }
             }
@@ -2484,6 +2508,7 @@
             const rootTerrain = document.createElement("a-entity");
             rootTerrain.setAttribute("class", "clickable");
             rootTerrain.setAttribute("gltf-model", str);
+            rootTerrain.addEventListener("model-loaded", buildBoundsTree);
             rootTerrain.setAttribute("position", "0 0 0");
             rootTerrain.setAttribute("shadow", "");
             rootTerrain.setAttribute("terrain-tile", (vertex ?? []).join(" "));
@@ -2620,6 +2645,7 @@
             const rootModel = document.createElement("a-entity");
             rootModel.setAttribute("class", "data");
             rootModel.setAttribute("gltf-model", str);
+            rootModel.addEventListener("model-loaded", buildBoundsTree);
             rootModel.setAttribute("go-to-sea", "");
             rootModel.setAttribute("scale", "0.1 0.1 0.1");
             rootModel.setAttribute("rotation", "0 -90 0");
@@ -3004,7 +3030,7 @@
         <a-entity light="type: directional; color: #EEE; intensity: 0.8; castShadow: true; shadowCameraBottom: -150; shadowCameraTop: 150; shadowCameraLeft: -150; shadowCameraRight: 150; shadowCameraNear: -150; shadowCameraFar: 150; shadowMapWidth: 1024; shadowMapHeight: 1024;" position="0 1 0" handle-shadow-parameter></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.15" position="0 -1 0"></a-entity>
         <a-entity id="camera-rig" position="0 105 5" networked="template: #avatar-template; attachTemplateToLocal: false;">
-            <a-entity camera globe-look-controls="mouseEnabled: false; touchEnabled: false;" position="0 1.6 0" cursor="rayOrigin: mouse" raycaster="far: 20; interval: 100; objects: .clickable" fps-counter></a-entity>
+            <a-entity camera globe-look-controls="mouseEnabled: false; touchEnabled: false;" position="0 1.6 0" cursor="rayOrigin: mouse" raycaster="far: 20; interval: 100; objects: .clickable"></a-entity>
             <a-entity laser-controls="hand: left;" raycaster="far: 20; interval: 100; objects: .clickable"></a-entity>
             <a-entity laser-controls="hand: right;" raycaster="far: 20; interval: 100; objects: .clickable"></a-entity>
         </a-entity>
