@@ -27,6 +27,7 @@
     <script src="/easyrtc/easyrtc.js"></script>
     <script src="/networked-aframe.js"></script>
     <script src="/three-bvh.umd.cjs"></script>
+    <script src="/aframe-html.js"></script>
     <script type="application/javascript">
         const PLANET_SIZE = 100;
 
@@ -2760,6 +2761,93 @@
                 micBtnEle.textContent = micEnabled ? 'Mute Mic' : 'Unmute Mic';
             });
         }
+
+        AFRAME.registerComponent('coin-purse', {
+            schema: {},
+            init: function () {
+                this.goldCoins = 0;
+                this.shipCount = 0;
+                this.raiderCount = 0;
+            },
+            updateUi: function () {
+                const goldAmount = document.querySelector("#gold-amount");
+                const shipAmount = document.querySelector("#ship-amount");
+                const raiderAmount = document.querySelector("#raider-amount");
+                goldAmount.innerText = this.goldCoins;
+                shipAmount.innerText = this.shipCount;
+                raiderAmount.innerText = this.raiderCount;
+            },
+            addGoldCoins: function (goldCoins) {
+                this.goldCoins += goldCoins;
+                this.updateUi();
+            },
+            addShip: function () {
+                if (this.goldCoins >= 30) {
+                    this.shipCount += 1;
+                    this.goldCoins -= 30;
+                    this.updateUi();
+                }
+            },
+            removeShip: function () {
+                if (this.shipCount > 0) {
+                    this.shipCount -= 1;
+                    this.goldCoins += 30;
+                    this.updateUi();
+                }
+            },
+            addRaider: function () {
+                if (this.goldCoins >= 30) {
+                    this.raiderCount += 10;
+                    this.goldCoins -= 30;
+                    this.updateUi();
+                }
+            },
+            removeRaider: function () {
+                if (this.raiderCount > 0) {
+                    this.raiderCount -= 10;
+                    this.goldCoins += 30;
+                    this.updateUi();
+                }
+            },
+        });
+
+        function openStoreMenu() {
+            const menu1 = document.querySelector("#over-world-menu");
+            const menu2 = document.querySelector("#store-menu");
+            menu1.style.visibility = "collapse";
+            menu1.style.display = "none";
+            menu2.style.visibility = "visible";
+            menu2.style.display = "inline-block";
+        }
+
+        function closeStoreMenu() {
+            const menu1 = document.querySelector("#over-world-menu");
+            const menu2 = document.querySelector("#store-menu");
+            menu1.style.visibility = "visible";
+            menu1.style.display = "inline-block";
+            menu2.style.visibility = "collapse";
+            menu2.style.display = "none";
+        }
+
+        function decrementShipAmount() {
+            const scene = document.querySelector("a-scene");
+            scene.components['coin-purse'].removeShip();
+        }
+
+        function incrementShipAmount() {
+            const scene = document.querySelector("a-scene");
+            scene.components['coin-purse'].addShip();
+        }
+
+        function decrementRaiderAmount() {
+            const scene = document.querySelector("a-scene");
+            scene.components['coin-purse'].removeRaider();
+        }
+
+        function incrementRaiderAmount() {
+            const scene = document.querySelector("a-scene");
+            scene.components['coin-purse'].addRaider();
+        }
     </script>
     <script type="module">
         import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
@@ -2990,172 +3078,13 @@
                 }
             },
         });
-
-        AFRAME.registerComponent('copy-camera-orientation', {
-            schema: {
-                type: 'vec3',
-            },
-            tick: function () {
-                const sceneEl = this.el.sceneEl;
-                const camera = sceneEl.camera;
-
-                const quaternion = camera.getWorldQuaternion(new THREE.Quaternion());
-                this.el.object3D.quaternion.copy(quaternion);
-                const position = new THREE.Vector3().copy(this.data ?? new THREE.Vector3(0, 0, -2.5));
-                position.applyQuaternion(quaternion);
-                this.el.object3D.position.copy(position);
-            },
-        });
-
-        AFRAME.registerComponent('open-store', {
-            schema: {},
-            init: function () {
-                this.openStore = this.openStore.bind(this);
-                this.el.addEventListener("click", this.openStore);
-            },
-            remove: function () {
-                this.el.removeEventListener("click", this.openStore);
-            },
-            openStore: function () {
-                const menu1 = document.querySelector("#over-world-menu");
-                const menu2 = document.querySelector("#store-menu");
-                menu1.setAttribute("visible", "false");
-                menu2.setAttribute("visible", "true");
-            },
-        });
-
-        AFRAME.registerComponent('close-store', {
-            schema: {},
-            init: function () {
-                this.closeStore = this.closeStore.bind(this);
-                this.el.addEventListener("click", this.closeStore);
-            },
-            remove: function () {
-                this.el.removeEventListener("click", this.closeStore);
-            },
-            closeStore: function () {
-                const menu1 = document.querySelector("#over-world-menu");
-                const menu2 = document.querySelector("#store-menu");
-                menu1.setAttribute("visible", "true");
-                menu2.setAttribute("visible", "false");
-            },
-        });
-
-        AFRAME.registerComponent('coin-purse', {
-            schema: {},
-            init: function () {
-                this.goldCoins = 0;
-                this.shipCount = 0;
-                this.raiderCount = 0;
-            },
-            addGoldCoins: function (goldCoins) {
-                this.goldCoins += goldCoins;
-            },
-            addShip: function () {
-                if (this.goldCoins >= 30) {
-                    this.shipCount += 1;
-                    this.goldCoins -= 30;
-                }
-            },
-            removeShip: function () {
-                if (this.shipCount > 0) {
-                    this.shipCount -= 1;
-                    this.goldCoins += 30;
-                }
-            },
-            addRaider: function () {
-                if (this.goldCoins >= 30) {
-                    this.raiderCount += 10;
-                    this.goldCoins -= 30;
-                }
-            },
-            removeRaider: function () {
-                if (this.raiderCount > 0) {
-                    this.raiderCount -= 10;
-                    this.goldCoins += 30;
-                }
-            },
-        });
-
-        AFRAME.registerComponent('display-coin-purse', {
-            schema: {},
-            tick: function () {
-                const scene = document.querySelector("a-scene");
-                this.el.setAttribute("text", `value: ${scene.components['coin-purse'].goldCoins}; align: center;`);
-            },
-        });
-
-        AFRAME.registerComponent('display-ship-purse', {
-            schema: {},
-            tick: function () {
-                const scene = document.querySelector("a-scene");
-                this.el.setAttribute("text", `value: ${scene.components['coin-purse'].shipCount}; align: center;`);
-            },
-        });
-
-        AFRAME.registerComponent('display-raider-purse', {
-            schema: {},
-            tick: function () {
-                const scene = document.querySelector("a-scene");
-                this.el.setAttribute("text", `value: ${scene.components['coin-purse'].raiderCount}; align: center;`);
-            },
-        });
-
-        AFRAME.registerComponent('toggle-clickable-buttons', {
-            schema: {},
-            tick: function () {
-                const obj = this.el.object3D;
-                const visible = obj.visible;
-                const buttons = Array.from(this.el.children).filter(x => x.id.endsWith("Button"));
-                buttons.forEach(b => {
-                    if (!visible && b.classList.contains('clickable')) {
-                        b.classList.remove('clickable');
-                    }
-                    if (visible && !b.classList.contains('clickable')) {
-                        b.classList.add('clickable');
-                    }
-                });
-            },
-        });
-
-        AFRAME.registerComponent('click-ship-raider', {
-            schema: {
-                type: {
-                    type: 'string',
-                    default: '',
-                },
-            },
-            init: function () {
-                this.clickAction = this.clickAction.bind(this);
-                this.el.addEventListener("click", this.clickAction);
-            },
-            remove: function () {
-                this.el.removeEventListener("click", this.clickAction);
-            },
-            clickAction: function () {
-                const scene = document.querySelector("a-scene");
-
-                if (this.data.type === 'ship+') {
-                    scene.components['coin-purse'].addShip();
-                }
-                if (this.data.type === 'ship-') {
-                    scene.components['coin-purse'].removeShip();
-                }
-                if (this.data.type === 'raider+') {
-                    scene.components['coin-purse'].addRaider();
-                }
-                if (this.data.type === 'raider-') {
-                    scene.components['coin-purse'].removeRaider();
-                }
-            },
-        });
     </script>
     <style>
         a-scene {
             width: 100%;
             aspect-ratio: 1;
         }
-        .actions {
+        #dom-overlay {
             position: fixed;
             top: 0;
             bottom: 0;
@@ -3163,14 +3092,11 @@
             right: 0;
             pointer-events: none;
         }
-        .button {
-            border-radius: 8px;
-            background-color: bisque;
+        .actions {
             pointer-events: visible;
         }
         .host-span {
             border-radius: 8px;
-            background-color: beige;
             pointer-events: none;
             display: inline-block;
         }
@@ -3197,73 +3123,35 @@
                 ></a-mixin>
             </template>
         </a-assets>
+        <a-sphere color="black" radius="0.01" id="cursor" material="shader: flat;" geometry></a-sphere>
         <a-entity light="type: ambient; color: #CCC"></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.8; castShadow: true; shadowCameraBottom: -150; shadowCameraTop: 150; shadowCameraLeft: -150; shadowCameraRight: 150; shadowCameraNear: -150; shadowCameraFar: 150; shadowMapWidth: 1024; shadowMapHeight: 1024;" position="0 1 0" handle-shadow-parameter></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.15" position="0 -1 0"></a-entity>
         <a-entity id="camera-rig" position="0 105 5" networked="template: #avatar-template; attachTemplateToLocal: false;">
             <a-entity camera globe-look-controls="mouseEnabled: false; touchEnabled: false;" position="0 1.6 0" cursor="rayOrigin: mouse" raycaster="far: 50; interval: 100; objects: .clickable">
-                <a-entity copy-camera-orientation="0 0 -1" id="ui">
-                    <a-entity id="over-world-menu" visible="true" toggle-clickable-buttons>
-                        <a-plane color="#000000" width="0.15" height="0.15" id="openShopButton" position="-0.3 -0.3 0" mixin="frame" class="clickable" open-store>
-                            <a-entity text="value: Shop; align: center;" mixin="frame_text"></a-entity>
-                        </a-plane>
-                        <a-plane color="#000000" width="0.15" height="0.15" id="closeShopButton" position="-0.15 -0.3 0" mixin="frame" class="clickable">
-                            <a-entity text="value: Gold; align: center;" mixin="frame_text"></a-entity>
-                        </a-plane>
-                        <a-plane color="#000000" width="0.3" height="0.15" id="closeShopButton" position="0 -0.3 0" mixin="frame" class="clickable">
-                            <a-entity display-coin-purse mixin="frame_text"></a-entity>
-                        </a-plane>
-                    </a-entity>
-                    <a-entity id="store-menu" visible="false" toggle-clickable-buttons>
-                        <a-plane color="#000000" width="0.15" height="0.15" id="closeShopButton" position="-0.3 -0.15 0" mixin="frame" class="clickable" close-store>
-                            <a-entity text="value: Exit; align: center;" mixin="frame_text"></a-entity>
-                        </a-plane>
-                        <a-plane color="#000000" width="0.15" height="0.15" id="goldLabelButton" position="-0.15 -0.15 0" mixin="frame" class="clickable">
-                            <a-entity text="value: Gold; align: center;" mixin="frame_text"></a-entity>
-                        </a-plane>
-                        <a-plane color="#000000" width="0.3" height="0.15" id="goldCountButton" position="0 -0.15 0" mixin="frame" class="clickable">
-                            <a-entity display-coin-purse mixin="frame_text"></a-entity>
-                        </a-plane>
-                        <a-plane color="#000000" width="0.15" height="0.15" id="shipCostButton" position="-0.3 0 0" mixin="frame" class="clickable">
-                            <a-entity text="value: $30; align: center;" mixin="frame_text"></a-entity>
-                        </a-plane>
-                        <a-plane color="#000000" width="0.15" height="0.15" id="shipLabelButton" position="-0.15 0 0" mixin="frame" class="clickable">
-                            <a-entity text="value: Ships; align: center;" mixin="frame_text"></a-entity>
-                        </a-plane>
-                        <a-plane click-ship-raider="type: ship-;" color="#000000" width="0.15" height="0.15" id="shipDecrementButton" position="0 0 0" mixin="frame" class="clickable">
-                            <a-entity text="value: -; align: center;" mixin="frame_text"></a-entity>
-                        </a-plane>
-                        <a-plane color="#000000" width="0.15" height="0.15" id="shipCountButton" position="0.15 0 0" mixin="frame" class="clickable">
-                            <a-entity display-ship-purse mixin="frame_text"></a-entity>
-                        </a-plane>
-                        <a-plane click-ship-raider="type: ship+;" color="#000000" width="0.15" height="0.15" id="shipIncrementButton" position="0.3 0 0" mixin="frame" class="clickable">
-                            <a-entity text="value: +; align: center;" mixin="frame_text"></a-entity>
-                        </a-plane>
-                        <a-plane color="#000000" width="0.15" height="0.15" id="raiderCostButton" position="-0.3 0.15 0" mixin="frame" class="clickable">
-                            <a-entity text="value: $30; align: center;" mixin="frame_text"></a-entity>
-                        </a-plane>
-                        <a-plane color="#000000" width="0.15" height="0.15" id="raiderLabelButton" position="-0.15 0.15 0" mixin="frame" class="clickable">
-                            <a-entity text="value: Raiders; align: center;" mixin="frame_text"></a-entity>
-                        </a-plane>
-                        <a-plane click-ship-raider="type: raider-;"  color="#000000" width="0.15" height="0.15" id="raiderDecrementButton" position="0 0.15 0" mixin="frame" class="clickable">
-                            <a-entity text="value: -; align: center;" mixin="frame_text"></a-entity>
-                        </a-plane>
-                        <a-plane color="#000000" width="0.15" height="0.15" id="raiderCountButton" position="0.15 0.15 0" mixin="frame" class="clickable">
-                            <a-entity display-raider-purse mixin="frame_text"></a-entity>
-                        </a-plane>
-                        <a-plane click-ship-raider="type: raider+;" color="#000000" width="0.15" height="0.15" id="raiderIncrementButton" position="0.3 0.15 0" mixin="frame" class="clickable">
-                            <a-entity text="value: +; align: center;" mixin="frame_text"></a-entity>
-                        </a-plane>
-                    </a-entity>
+                <a-entity copy-camera-orientation="0 0 -1" id="ui" html="cursor: #cursor; html: #my-interface" rotation="-90 90 0" scale="0.5 0.5 0.5">
                 </a-entity>
             </a-entity>
             <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
             <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
         </a-entity>
     </a-scene>
-    <div class="actions">
-        <button id="mic-btn" type="button" class="button">Mute Mic</button>
-        <span id="host-span" class="host-span">Connecting...</span>
+    <div id="dom-overlay">
+        <section id="my-interface" style="display: inline-block; background: lavenderblush; color: #333; border-radius: 1em; padding: 1em; margin: 0; accent-color: hotpink;">
+            <div class="actions">
+                <button id="mic-btn" type="button" class="button">Mute Mic</button>
+                <span id="host-span" class="host-span">Connecting...</span>
+            </div>
+            <div class="actions" id="over-world-menu">
+                <button onclick="openStoreMenu()">Shop</button>
+            </div>
+            <div class="actions" id="store-menu" style="visibility: collapse; display: none">
+                <button onclick="closeStoreMenu()">Exit</button><br/>
+                <label style="width: 50px; display: inline-block">Gold</label><label style="width: 50px; display: inline-block; text-align: right; padding: 8px" id="gold-amount">0</label><br/>
+                <label style="width: 50px; display: inline-block">Ships</label><button onclick="decrementShipAmount()">-</button><label style="width: 50px; display: inline-block; text-align: right; padding: 8px" id="ship-amount">0</label><button onclick="incrementShipAmount()">+</button><br/>
+                <label style="width: 50px; display: inline-block">Raiders</label><button onclick="decrementRaiderAmount()">-</button><label style="width: 50px; display: inline-block; text-align: right; padding: 8px" id="raider-amount">0</label><button onclick="incrementRaiderAmount()">+</button>
+            </div>
+        </section>
     </div>
 </body>
 </html>
