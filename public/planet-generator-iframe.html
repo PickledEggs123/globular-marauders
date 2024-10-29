@@ -304,7 +304,6 @@
                 this.heightDiffLerp = 5;
             },
             tick: function (t, dt) {
-                return;
                 // get elements
                 const box = Array.from(document.querySelectorAll(`${this.data}`)).map(el => el.object3D);
                 const boxPos = Array.from(document.querySelectorAll(`${this.data}-position`)).map(el => el.object3D);
