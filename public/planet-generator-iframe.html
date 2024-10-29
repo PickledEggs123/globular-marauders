@@ -304,6 +304,7 @@
                 this.heightDiffLerp = 5;
             },
             tick: function (t, dt) {
+                return;
                 // get elements
                 const box = Array.from(document.querySelectorAll(`${this.data}`)).map(el => el.object3D);
                 const boxPos = Array.from(document.querySelectorAll(`${this.data}-position`)).map(el => el.object3D);
@@ -2762,12 +2763,29 @@
             });
         }
 
+        AFRAME.registerComponent('align-with-projection', {
+            schema: {},
+            tick: function () {
+                const scene = document.querySelector("a-scene");
+                const camera = scene.camera;
+                const position = new THREE.Vector3();
+                const rotation = new THREE.Quaternion();
+                const scale = new THREE.Vector3();
+                camera.projectionMatrix.decompose(position, rotation, scale);
+                const aspect = window.innerHeight !== 0 ? window.innerWidth / window.innerHeight : 1;
+                const offset = new THREE.Vector3(0.25 * aspect, 0.25, -0.5);
+                position.add(offset).multiply(scale);
+                this.el.object3D.position.copy(position);
+            }
+        })
+
         AFRAME.registerComponent('coin-purse', {
             schema: {},
             init: function () {
-                this.goldCoins = 0;
+                this.goldCoins = 30;
                 this.shipCount = 0;
                 this.raiderCount = 0;
+                this.updateUi();
             },
             updateUi: function () {
                 const goldAmount = document.querySelector("#gold-amount");
@@ -3092,7 +3110,7 @@
             right: 0;
             pointer-events: none;
         }
-        .actions {
+        #my-interface {
             pointer-events: visible;
         }
         .host-span {
@@ -3111,45 +3129,49 @@
             <template id="avatar-template">
                 <a-entity class="avatar" networked-audio-source>
                 </a-entity>
-                <a-mixin
-                    id="frame"
-                    animation__scale="property: scale; to: 1.2 1.2 1.2; dur: 200; startEvents: mouseenter"
-                    animation__scale_reverse="property: scale; to: 1 1 1; dur: 200; startEvents: mouseleave"
-                >
-                </a-mixin>
-                <a-mixin
-                    id="frame_text"
-                    position="0 0 0.005"
-                ></a-mixin>
             </template>
         </a-assets>
-        <a-sphere color="black" radius="0.01" id="cursor" material="shader: flat;" geometry></a-sphere>
+        <a-sphere color="black" radius="0.01" id="cursor"></a-sphere>
         <a-entity light="type: ambient; color: #CCC"></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.8; castShadow: true; shadowCameraBottom: -150; shadowCameraTop: 150; shadowCameraLeft: -150; shadowCameraRight: 150; shadowCameraNear: -150; shadowCameraFar: 150; shadowMapWidth: 1024; shadowMapHeight: 1024;" position="0 1 0" handle-shadow-parameter></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.15" position="0 -1 0"></a-entity>
         <a-entity id="camera-rig" position="0 105 5" networked="template: #avatar-template; attachTemplateToLocal: false;">
             <a-entity camera globe-look-controls="mouseEnabled: false; touchEnabled: false;" position="0 1.6 0" cursor="rayOrigin: mouse" raycaster="far: 50; interval: 100; objects: .clickable">
-                <a-entity copy-camera-orientation="0 0 -1" id="ui" html="cursor: #cursor; html: #my-interface" rotation="-90 90 0" scale="0.5 0.5 0.5">
-                </a-entity>
+                <a-entity align-with-projection html="cursor:#cursor;html:#my-interface" class="clickable">
             </a-entity>
             <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
             <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
         </a-entity>
+        </a-entity>
     </a-scene>
     <div id="dom-overlay">
-        <section id="my-interface" style="display: inline-block; background: lavenderblush; color: #333; border-radius: 1em; padding: 1em; margin: 0; accent-color: hotpink;">
+        <section id="my-interface" style="display: inline-block; background: lavenderblush; position: absolute; left: -9999px; color: #333; border-radius: 1em; padding: 1em; margin: 0; accent-color: hotpink;">
             <div class="actions">
                 <button id="mic-btn" type="button" class="button">Mute Mic</button>
                 <span id="host-span" class="host-span">Connecting...</span>
             </div>
-            <div class="actions" id="over-world-menu">
+            <div class="actions" id="over-world-menu" style="visibility: collapse; display: none">
                 <button onclick="openStoreMenu()">Shop</button>
             </div>
-            <div class="actions" id="store-menu" style="visibility: collapse; display: none">
-                <button onclick="closeStoreMenu()">Exit</button><br/>
-                <label style="width: 50px; display: inline-block">Gold</label><label style="width: 50px; display: inline-block; text-align: right; padding: 8px" id="gold-amount">0</label><br/>
-                <label style="width: 50px; display: inline-block">Ships</label><button onclick="decrementShipAmount()">-</button><label style="width: 50px; display: inline-block; text-align: right; padding: 8px" id="ship-amount">0</label><button onclick="incrementShipAmount()">+</button><br/>
-                <label style="width: 50px; display: inline-block">Raiders</label><button onclick="decrementRaiderAmount()">-</button><label style="width: 50px; display: inline-block; text-align: right; padding: 8px" id="raider-amount">0</label><button onclick="incrementRaiderAmount()">+</button>
+            <div class="actions" id="store-menu">
+                <button onclick="closeStoreMenu()" style="visibility: collapse; display: none">Exit</button>
+                <fieldset>
+                    <legend>Gold Amount</legend>
+                    <label style="width: 50px; display: inline-block">Gold</label>
+                    <label style="width: 50px; display: inline-block; text-align: right; padding: 8px" id="gold-amount">0</label>
+                </fieldset>
+                <fieldset>
+                    <legend>Purchases</legend>
+                    <label style="width: 50px; display: inline-block">Ships</label>
+                    <button onclick="decrementShipAmount()">-</button>
+                    <label style="width: 50px; display: inline-block; text-align: right; padding: 8px" id="ship-amount">0</label>
+                    <button onclick="incrementShipAmount()">+</button>
+                    <br/>
+                    <label style="width: 50px; display: inline-block">Raiders</label>
+                    <button onclick="decrementRaiderAmount()">-</button>
+                    <label style="width: 50px; display: inline-block; text-align: right; padding: 8px" id="raider-amount">0</label>
+                    <button onclick="incrementRaiderAmount()">+</button>
+                </fieldset>
             </div>
         </section>
     </div>
