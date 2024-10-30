@@ -2771,10 +2771,13 @@
                 const rotation = new THREE.Quaternion();
                 const scale = new THREE.Vector3();
                 camera.projectionMatrix.decompose(position, rotation, scale);
-                const aspect = window.innerHeight !== 0 ? window.innerWidth / window.innerHeight : 1;
+                const aspect = scene.canvas.width / scene.canvas.height;
                 const offset = new THREE.Vector3(0.25 * aspect, 0.25, -0.5);
                 position.add(offset).multiply(scale);
+                camera.getWorldQuaternion(rotation);
+                position.applyQuaternion(rotation);
                 this.el.object3D.position.copy(position);
+                this.el.object3D.quaternion.copy(rotation);
             }
         })
 
