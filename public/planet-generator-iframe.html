@@ -2785,7 +2785,7 @@
                 const scale = new THREE.Vector3();
                 camera.projectionMatrix.decompose(position, rotation, scale);
                 const aspect = scene.canvas.width / scene.canvas.height;
-                const offset = new THREE.Vector3(0.25 * aspect, 0.25, -0.5);
+                const offset = new THREE.Vector3(0.25 * aspect, 0.2, -0.5);
                 position.add(offset).multiply(scale);
                 camera.getWorldQuaternion(rotation);
                 position.applyQuaternion(rotation);
@@ -2797,6 +2797,7 @@
         AFRAME.registerComponent('coin-purse', {
             schema: {},
             init: function () {
+                this.activeUnit = 'ship-1';
                 this.goldCoins = 30;
                 this.shipCount = 0;
                 this.raiderCount = 0;
@@ -2841,6 +2842,9 @@
                     this.goldCoins += 30;
                     this.updateUi();
                 }
+            },
+            setUnit: function(u) {
+                this.activeUnit = u;
             },
             buyShips: function () {
                 // TODO: spawn ships into a group
@@ -2888,6 +2892,11 @@
         function incrementRaiderAmount() {
             const scene = document.querySelector("a-scene");
             scene.components['coin-purse'].addRaider();
+        }
+
+        function handleCheckbox(t) {
+            const scene = document.querySelector("a-scene");
+            scene.components['coin-purse'].setUnit(t.value);
         }
 
         function buyShips() {
@@ -3198,6 +3207,19 @@
                     <button onclick="decrementRaiderAmount()">-</button>
                     <label style="width: 50px; display: inline-block; text-align: right; padding: 8px" id="raider-amount">0</label>
                     <button onclick="incrementRaiderAmount()">+</button>
+                    <br/>
+                    <button onclick="buyShips()">Buy</button>
+                </fieldset>
+                <fieldset>
+                    <legend>Units</legend>
+                    <input onclick="handleCheckbox(this)" id="unit-selection-ship-1" type="radio" name="unit-selection" value="ship-1" checked><label for="unit-selection-ship-1">Ship 1</label>
+                    <input onclick="handleCheckbox(this)" id="unit-selection-raider-1" type="radio" name="unit-selection" value="raider-1"><label for="unit-selection-ship-1">Raider 1</label>
+                    <br/>
+                    <input onclick="handleCheckbox(this)" id="unit-selection-ship-2" type="radio" name="unit-selection" value="ship-2"><label for="unit-selection-ship-2">Ship 2</label>
+                    <input onclick="handleCheckbox(this)" id="unit-selection-raider-2" type="radio" name="unit-selection" value="raider-2"><label for="unit-selection-raider-2">Raider 2</label>
+                    <br/>
+                    <input onclick="handleCheckbox(this)" id="unit-selection-ship-3" type="radio" name="unit-selection" value="ship-3"><label for="unit-selection-ship-3">Ship 3</label>
+                    <input onclick="handleCheckbox(this)" id="unit-selection-raider-3" type="radio" name="unit-selection" value="raider-3"><label for="unit-selection-raider-3">Raider 3</label>
                 </fieldset>
             </div>
         </section>
