@@ -295,7 +295,7 @@
         AFRAME.registerComponent('look-at-box', {
             schema: {
                 type: "string",
-                default: "#box",
+                default: ".ship-1",
             },
             init: function () {
                 this.dtSumTickSize = 5000;
@@ -1658,7 +1658,7 @@
                     const destination1 = e.detail.intersection.point.clone();
                     setTimeout(() => {
                         const cameraEl = document.querySelector("#camera-rig");
-                        cameraEl.setAttribute("look-at-box", "#box");
+                        cameraEl.setAttribute("look-at-box", ".ship-1");
                     }, 0);
                     setTimeout(() => {
                         const npcs = document.querySelectorAll('.npc');
@@ -1667,14 +1667,14 @@
                         }
                     }, 1000);
                     setTimeout(() => {
-                        const shipEls = document.querySelectorAll('#box');
+                        const shipEls = document.querySelectorAll('.ship-1');
                         shipEls.forEach(shipEl => {
                             // @ts-ignore
                             shipEl.setAttribute("globe-ocean-nav-agent", `active: false; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
                         });
                     }, 500);
                     setTimeout(() => {
-                        const shipEls = document.querySelectorAll('#box');
+                        const shipEls = document.querySelectorAll('.ship-1');
                         shipEls.forEach(shipEl => {
                             // @ts-ignore
                             shipEl.setAttribute("globe-ocean-nav-agent", `active: true; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
@@ -2637,18 +2637,17 @@
             rootHouse.object3D.lookAt(new THREE.Vector3(lookAt[0], lookAt[1], lookAt[2]));
         }
 
-        function addShip(item) {
-            if (!!document.querySelector("#box")) {
-                return;
-            }
+        window.shipModelStr = "";
 
+        function addShip(item) {
             const {
                 data: str, point
             } = JSON.parse(item);
 
+            window.shipModelStr = str;
+
             const rootShip = document.createElement("a-entity");
-            rootShip.setAttribute("id", "box");
-            rootShip.setAttribute("class", "clickable");
+            rootShip.setAttribute("class", "ship-1 clickable");
             rootShip.setAttribute("dynamic-body", "shape: sphere; sphereRadius: 1; mass: 100");
             rootShip.setAttribute("collision-filter", "group: ship; collidesWith: default, ship");
             rootShip.setAttribute("globe-gravity", "ship: true;");
@@ -2669,14 +2668,14 @@
             rootShip.setAttribute("networked", "template: #ship-template; attachTemplateToLocal: false;");
 
             const rootPosition = document.createElement("a-entity");
-            rootPosition.setAttribute("id", "box-position");
+            rootPosition.setAttribute("class", "ship-1-position");
             rootPosition.setAttribute("position", "0 0 5");
             rootShip.appendChild(rootPosition);
 
             const scene = document.querySelector("a-scene");
             scene.appendChild(rootShip);
             const cameraEl = document.querySelector("#camera-rig");
-            cameraEl.setAttribute("look-at-box", "#box");
+            cameraEl.setAttribute("look-at-box", ".ship-1");
         }
 
         function addClientSecret(item) {
@@ -2853,6 +2852,16 @@
                 const numRaiders = this.raiderCount;
                 this.raiderCount = 0;
                 this.updateUi();
+
+                if (this.activeUnit === "ship-1") {
+                    const ships = Array.from(document.querySelectorAll(".ship-1"));
+                    const point = ships.reduce((acc, x) => acc.add(x.object3D.position), new THREE.Vector3());
+                    point.divideScalar(ships.length);
+
+                    for (let i = 0; i < numShips; i++) {
+                        addShip(JSON.stringify({data: window.shipModelStr, point: [point.x, point.y, point.z]}));
+                    }
+                }
             }
         });
 
