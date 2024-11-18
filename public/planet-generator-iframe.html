@@ -1657,8 +1657,9 @@
                 this.el.addEventListener('click', function (e) {
                     const destination1 = e.detail.intersection.point.clone();
                     setTimeout(() => {
+                        const scene = document.querySelector("a-scene");
                         const cameraEl = document.querySelector("#camera-rig");
-                        cameraEl.setAttribute("look-at-box", ".ship-1");
+                        cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].activeUnit}`);
                     }, 0);
                     setTimeout(() => {
                         const npcs = document.querySelectorAll('.npc');
@@ -1667,14 +1668,16 @@
                         }
                     }, 1000);
                     setTimeout(() => {
-                        const shipEls = document.querySelectorAll('.ship-1');
+                        const scene = document.querySelector("a-scene");
+                        const shipEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
                         shipEls.forEach(shipEl => {
                             // @ts-ignore
                             shipEl.setAttribute("globe-ocean-nav-agent", `active: false; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
                         });
                     }, 500);
                     setTimeout(() => {
-                        const shipEls = document.querySelectorAll('.ship-1');
+                        const scene = document.querySelector("a-scene");
+                        const shipEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
                         shipEls.forEach(shipEl => {
                             // @ts-ignore
                             shipEl.setAttribute("globe-ocean-nav-agent", `active: true; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
@@ -2638,16 +2641,20 @@
         }
 
         window.shipModelStr = "";
+        window.shipSpawnPoint = new THREE.Vector3(0, 0, 100);
 
         function addShip(item) {
+            const scene = document.querySelector("a-scene");
+
             const {
                 data: str, point
             } = JSON.parse(item);
 
             window.shipModelStr = str;
+            window.shipSpawnPoint = new THREE.Vector3(point[0], point[1], point[2]);
 
             const rootShip = document.createElement("a-entity");
-            rootShip.setAttribute("class", "ship-1 clickable");
+            rootShip.setAttribute("class", `${scene.components['coin-purse'].activeUnit} clickable`);
             rootShip.setAttribute("dynamic-body", "shape: sphere; sphereRadius: 1; mass: 100");
             rootShip.setAttribute("collision-filter", "group: ship; collidesWith: default, ship");
             rootShip.setAttribute("globe-gravity", "ship: true;");
@@ -2668,14 +2675,13 @@
             rootShip.setAttribute("networked", "template: #ship-template; attachTemplateToLocal: false;");
 
             const rootPosition = document.createElement("a-entity");
-            rootPosition.setAttribute("class", "ship-1-position");
+            rootPosition.setAttribute("class", `${scene.components['coin-purse'].activeUnit}-position`);
             rootPosition.setAttribute("position", "0 0 5");
             rootShip.appendChild(rootPosition);
 
-            const scene = document.querySelector("a-scene");
             scene.appendChild(rootShip);
             const cameraEl = document.querySelector("#camera-rig");
-            cameraEl.setAttribute("look-at-box", ".ship-1");
+            cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].activeUnit}`);
         }
 
         function addClientSecret(item) {
@@ -2853,10 +2859,14 @@
                 this.raiderCount = 0;
                 this.updateUi();
 
-                if (this.activeUnit === "ship-1") {
-                    const ships = Array.from(document.querySelectorAll(".ship-1"));
+                if (this.activeUnit === "ship-1" || this.activeUnit === "ship-2" || this.activeUnit === "ship-3") {
+                    const ships = Array.from(document.querySelectorAll(this.activeUnit));
                     const point = ships.reduce((acc, x) => acc.add(x.object3D.position), new THREE.Vector3());
-                    point.divideScalar(ships.length);
+                    if (point.length() === 0) {
+                        point.copy(window.shipSpawnPoint);
+                    } else {
+                        point.divideScalar(ships.length);
+                    }
 
                     for (let i = 0; i < numShips; i++) {
                         addShip(JSON.stringify({data: window.shipModelStr, point: [point.x, point.y, point.z]}));
