@@ -847,11 +847,8 @@
 
             init: function () {
                 // To keep track of the pressed keys.
-                // @ts-ignore
                 this.keys = {};
-                // @ts-ignore
                 this.velocity = new THREE.Vector3();
-                // @ts-ignore
                 this.rotation = new THREE.Vector3();
 
                 // Bind methods and add event listeners.
@@ -866,7 +863,13 @@
 
             tick: function (time, delta) {
                 var el = this.el;
-                // @ts-ignore
+
+                const scene = document.querySelector("a-scene");
+                const ships = Array.from(scene.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`));
+                if (el !== ships[0]) {
+                    return;
+                }
+
                 const body = this.el.body;
 
                 // Update velocity.
@@ -874,15 +877,11 @@
                 this.updateVelocity(delta);
 
                 // Get movement vector and translate position.
-                // @ts-ignore
                 body.applyForce(this.getMovementVector(delta).clone(), new CANNON.Vec3(0, 0, 0));
 
-                // @ts-ignore
                 if (this.rotation.clone().y) {
                     // apply rotation force
-                    // @ts-ignore
                     body.applyLocalForce(new CANNON.Vec3(this.rotation.clone().y, 0, 0), new CANNON.Vec3(0, 0, 1));
-                    // @ts-ignore
                     body.applyLocalForce(new CANNON.Vec3(-this.rotation.clone().y, 0, 0), new CANNON.Vec3(0, 0, -1));
                 }
             },
@@ -897,7 +896,6 @@
             },
 
             pause: function () {
-                // @ts-ignore
                 this.keys = {};
                 this.removeKeyEventListeners();
             },
@@ -905,11 +903,8 @@
             updateVelocity: function (delta) {
                 var acceleration;
                 var data = this.data;
-                // @ts-ignore
                 var keys = this.keys;
-                // @ts-ignore
                 var velocity = this.velocity;
-                // @ts-ignore
                 var rotation = this.rotation;
 
                 if (!data.enabled) { return; }
@@ -923,31 +918,22 @@
                 if (keys.KeyW || keys.ArrowUp) { velocity.z = -acceleration; }
                 if (keys.KeyS || keys.ArrowDown) { velocity.z = acceleration; }
 
-                // @ts-ignore
                 const bodyWorldVelocity = this.el.body.velocity.clone();
-                // @ts-ignore
                 const bodyWorldQuat = this.el.body.quaternion.clone().inverse();
-                // @ts-ignore
                 const bodyVelocity = new THREE.Vector3(bodyWorldVelocity.x, bodyWorldVelocity.y, bodyWorldVelocity.z).applyQuaternion(new THREE.Quaternion(bodyWorldQuat.x, bodyWorldQuat.y, bodyWorldQuat.z, bodyWorldQuat.w));
-                // @ts-ignore
                 velocity.sub(new THREE.Vector3(bodyVelocity.x, bodyVelocity.y, bodyVelocity.z).multiplyScalar(1));
             },
 
             getMovementVector: (function () {
-                // @ts-ignore
                 var directionVector = new THREE.Vector3(0, 0, 0);
 
                 return function (delta) {
-                    // @ts-ignore
                     var velocity = this.velocity;
-                    // @ts-ignore
                     var rotation = this.el.object3D.getWorldQuaternion(new THREE.Quaternion());
 
-                    // @ts-ignore
                     directionVector.copy(velocity);
 
                     // Transform direction relative to heading.
-                    // @ts-ignore
                     directionVector.applyQuaternion(rotation);
                     return directionVector;
                 };
@@ -977,10 +963,8 @@
             },
 
             onContextMenu: function () {
-                // @ts-ignore
                 var keys = Object.keys(this.keys);
                 for (var i = 0; i < keys.length; i++) {
-                    // @ts-ignore
                     delete this.keys[keys[i]];
                 }
             },
@@ -1005,14 +989,12 @@
                 var code;
                 if (!shouldCaptureKeyEvent(event)) { return; }
                 code = event.code || KEYCODE_TO_CODE[event.keyCode];
-                // @ts-ignore
                 if (KEYS.indexOf(code) !== -1) { this.keys[code] = true; }
             },
 
             onKeyUp: function (event) {
                 var code;
                 code = event.code || KEYCODE_TO_CODE[event.keyCode];
-                // @ts-ignore
                 delete this.keys[code];
             }
         });
