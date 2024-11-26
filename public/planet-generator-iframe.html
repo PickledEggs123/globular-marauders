@@ -862,14 +862,6 @@
             },
 
             tick: function (time, delta) {
-                var el = this.el;
-
-                const scene = document.querySelector("a-scene");
-                const ships = Array.from(scene.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`));
-                if (el !== ships[0]) {
-                    return;
-                }
-
                 const body = this.el.body;
 
                 // Update velocity.
@@ -986,6 +978,19 @@
             },
 
             onKeyDown: function (event) {
+                var el = this.el;
+
+                const scene = document.querySelector("a-scene");
+                const ships = Array.from(scene.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`));
+                if (el !== ships[0]) {
+                    if (!event.synthetic) {
+                        for (const key in this.keys) {
+                            this.keys[key] = false;
+                        }
+                        return;
+                    }
+                }
+
                 var code;
                 if (!shouldCaptureKeyEvent(event)) { return; }
                 code = event.code || KEYCODE_TO_CODE[event.keyCode];
@@ -993,6 +998,19 @@
             },
 
             onKeyUp: function (event) {
+                var el = this.el;
+
+                const scene = document.querySelector("a-scene");
+                const ships = Array.from(scene.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`));
+                if (el !== ships[0]) {
+                    if (!event.synthetic) {
+                        for (const key in this.keys) {
+                            this.keys[key] = false;
+                        }
+                        return;
+                    }
+                }
+
                 var code;
                 code = event.code || KEYCODE_TO_CODE[event.keyCode];
                 delete this.keys[code];
@@ -1547,29 +1565,29 @@
                 const det = getDeterminant();
                 if (det < 0) {
                     if (Math.random() * 0.5 < Math.abs(det)) {
-                        el.components['globe-keyboard-controls'].onKeyDown({code: "KeyD"});
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA"});
+                        el.components['globe-keyboard-controls'].onKeyDown({code: "KeyD", synthetic: true});
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA", synthetic: true});
                     } else {
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA"});
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD"});
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA", synthetic: true});
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD", synthetic: true});
                     }
                 } else if (det > 0) {
                     if (Math.random() * 0.33 < Math.abs(det)) {
-                        el.components['globe-keyboard-controls'].onKeyDown({code: "KeyA"});
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD"});
+                        el.components['globe-keyboard-controls'].onKeyDown({code: "KeyA", synthetic: true});
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD", synthetic: true});
                     } else {
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD"});
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA"});
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD", synthetic: true});
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA", synthetic: true});
                     }
                 } else {
-                    el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA"});
-                    el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD"});
+                    el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA", synthetic: true});
+                    el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD", synthetic: true});
                 }
 
                 if (Math.abs(det) < 0.1) {
-                    el.components['globe-keyboard-controls'].onKeyDown({code: "KeyW"});
+                    el.components['globe-keyboard-controls'].onKeyDown({code: "KeyW", synthetic: true});
                 } else {
-                    el.components['globe-keyboard-controls'].onKeyUp({code: "KeyW"});
+                    el.components['globe-keyboard-controls'].onKeyUp({code: "KeyW", synthetic: true});
                 }
             },
         });
@@ -2803,7 +2821,9 @@
                 this.updateUi();
             },
             addShip: function () {
-                if (this.goldCoins >= 30 && this.shipCount < 5) {
+                const ships = Array.from(scene.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`));
+                const existingShips = ships.length;
+                if (this.goldCoins >= 30 && this.shipCount + existingShips < 5) {
                     this.shipCount += 1;
                     this.goldCoins -= 30;
                     this.updateUi();
@@ -2898,6 +2918,16 @@
         function handleCheckbox(t) {
             const scene = document.querySelector("a-scene");
             scene.components['coin-purse'].setUnit(t.value);
+
+            setTimeout(() => {
+                const scene = document.querySelector("a-scene");
+                const cameraEl = document.querySelector("#camera-rig");
+                const ships = Array.from(scene.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`));
+                const existingShips = ships.length;
+                if (existingShips) {
+                    cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].activeUnit}`);
+                }
+            }, 0);
         }
 
         function buyShips() {
