@@ -318,6 +318,9 @@
                 const boxPosWorldPos = new THREE.Vector3();
                 boxPos.forEach(b => boxPosWorldPos.add(b.getWorldPosition(new THREE.Vector3())));
                 boxPosWorldPos.divideScalar(boxPos.length);
+                if (!boxPos.length) {
+                    return;
+                }
 
                 // get info
                 const upVector = boxPosWorldPos.clone().sub(new THREE.Vector3(0, 0, 0)).normalize();
@@ -819,6 +822,23 @@
             }
         });
 
+        const unitMap = new Map([
+            ["ship-1", "raider-1"],
+            ["ship-2", "raider-2"],
+            ["ship-3", "raider-3"],
+            ["raider-1", "raider-1"],
+            ["raider-2", "raider-2"],
+            ["raider-3", "raider-3"],
+        ]);
+        const inverseUnitMap = new Map([
+            ["ship-1", "ship-1"],
+            ["ship-2", "ship-2"],
+            ["ship-3", "ship-3"],
+            ["raider-1", "ship-1"],
+            ["raider-2", "ship-2"],
+            ["raider-3", "ship-3"],
+        ]);
+
         const KEYCODE_TO_CODE = {
             '38': 'ArrowUp',
             '37': 'ArrowLeft',
@@ -1183,9 +1203,10 @@
                 this.debugId = "id" + Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(36);
             },
             remove: function () {
+                const scene = document.querySelector("a-scene");
                 this.system.removeAgent(this);
                 const el = this.el;
-                if (el.classList.contains("npc")) {
+                if (el.classList.contains(`${scene.components['coin-purse'].activeUnit}`)) {
                     if (this.el.sceneEl.object3DMap[`line-debug-${this.debugId}`]) {
                         this.el.sceneEl.removeObject3D(`line-debug-${this.debugId}`);
                     }
@@ -1227,7 +1248,8 @@
                     el.emit('navigation-start');
                 }
 
-                if (el.classList.contains("npc")) {
+                const scene = document.querySelector("a-scene");
+                if (el.classList.contains(`${scene.components['coin-purse'].activeUnit}`)) {
                     if (this.el.sceneEl.object3DMap[`line-debug-${this.debugId}`]) {
                         this.el.sceneEl.removeObject3D(`line-debug-${this.debugId}`);
                     }
@@ -1598,8 +1620,15 @@
                 // @ts-ignore
                 this.el.addEventListener('click', (e) => {
                     const destination1 = e.detail.intersection.point.clone();
+
+                    const scene = document.querySelector("a-scene");
+                    scene.components['coin-purse'].setUnit(unitMap.get(scene.components['coin-purse'].activeUnit));
+                    const checkBox = document.querySelector(`#unit-selection-${scene.components['coin-purse'].activeUnit}`);
+                    checkBox.checked = true;
+
                     setTimeout(() => {
-                        const npcs = document.querySelectorAll('.npc');
+                        const scene = document.querySelector("a-scene");
+                        const npcs = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
                         if (npcs.length === 0) {
                             for (let i = 0; i < 10; i++) {
                                 addNpc(i);
@@ -1607,16 +1636,18 @@
                         }
                     }, 0);
                     setTimeout(() => {
-                        const npcEls = document.querySelectorAll('.npc');
+                        const scene = document.querySelector("a-scene");
+                        const npcEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
                         npcEls.forEach(npcEl => {
                             // @ts-ignore
                             npcEl.setAttribute("globe-nav-agent", `active: false; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
                         });
                     }, 500);
                     setTimeout(() => {
-                        const npcEls = document.querySelectorAll('.npc');
+                        const scene = document.querySelector("a-scene");
+                        const npcEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
                         const cameraEl = document.querySelector("#camera-rig");
-                        cameraEl.setAttribute("look-at-box", ".npc");
+                        cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].activeUnit}`);
                         npcEls.forEach(npcEl => {
                             const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3).add(new THREE.Vector3().random()), destination1.clone().negate());
                             const intersections = raycaster.intersectObject(this.system.getNavMesh());
@@ -1627,9 +1658,10 @@
                         });
                     }, 750);
                     setTimeout(() => {
-                        const npcEls = document.querySelectorAll('.npc');
+                        const scene = document.querySelector("a-scene");
+                        const npcEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
                         const cameraEl = document.querySelector("#camera-rig");
-                        cameraEl.setAttribute("look-at-box", ".npc");
+                        cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].activeUnit}`);
                         npcEls.forEach(npcEl => {
                             const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3).add(new THREE.Vector3().random()), destination1.clone().negate());
                             const intersections = raycaster.intersectObject(this.system.getNavMesh());
@@ -1656,13 +1688,20 @@
             init: function () {
                 this.el.addEventListener('click', function (e) {
                     const destination1 = e.detail.intersection.point.clone();
+
+                    const scene = document.querySelector("a-scene");
+                    scene.components['coin-purse'].setUnit(inverseUnitMap.get(scene.components['coin-purse'].activeUnit));
+                    const checkBox = document.querySelector(`#unit-selection-${scene.components['coin-purse'].activeUnit}`);
+                    checkBox.checked = true;
+
                     setTimeout(() => {
                         const scene = document.querySelector("a-scene");
                         const cameraEl = document.querySelector("#camera-rig");
                         cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].activeUnit}`);
                     }, 0);
                     setTimeout(() => {
-                        const npcs = document.querySelectorAll('.npc');
+                        const scene = document.querySelector("a-scene");
+                        const npcs = document.querySelectorAll(`.${unitMap.get(scene.components['coin-purse'].activeUnit)}`);
                         if (npcs.length !== 0) {
                             removeNpc();
                         }
@@ -2484,8 +2523,10 @@
         }
 
         function addNpc(i) {
+            const scene = document.querySelector("a-scene");
+
             const rootNpc = document.createElement("a-entity");
-            rootNpc.setAttribute("class", "npc");
+            rootNpc.setAttribute("class", `${scene.components['coin-purse'].activeUnit}`);
             rootNpc.setAttribute("globe-nav-agent", "");
             rootNpc.setAttribute("position", "0 0 0");
             rootNpc.setAttribute("rotation", "0 0 0");
@@ -2508,17 +2549,16 @@
             }
 
             const positionNpc = document.createElement("a-entity");
-            positionNpc.setAttribute("class", "npc-position");
+            positionNpc.setAttribute("class", `${scene.components['coin-purse'].activeUnit}-position`);
             positionNpc.setAttribute("position", "0 0 -5");
             rootNpc.appendChild(positionNpc);
 
-            const scene = document.querySelector("a-scene");
             scene.appendChild(rootNpc);
         }
 
         function removeNpc() {
             const scene = document.querySelector("a-scene");
-            const arr = Array.from(document.querySelectorAll(".npc"));
+            const arr = Array.from(document.querySelectorAll(`.${unitMap.get(scene.components['coin-purse'].activeUnit)}`));
             arr.forEach(a => scene.removeChild(a));
         }
 
@@ -3192,7 +3232,7 @@
     </style>
 </head>
 <body>
-    <a-scene physics="driver: local; gravity: 0 0 0;" coin-purse globe-nav globe-ocean-nav embedded fog shadow="enabled: true" outline-pass id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
+    <a-scene coin-purse physics="driver: local; gravity: 0 0 0;" globe-nav globe-ocean-nav embedded fog shadow="enabled: true" outline-pass id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
         <a-assets>
             <template id="avatar-template">
                 <a-entity class="avatar" networked-audio-source>
