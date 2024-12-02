@@ -1624,13 +1624,14 @@
                     const scene = document.querySelector("a-scene");
                     scene.components['coin-purse'].setUnit(unitMap.get(scene.components['coin-purse'].activeUnit));
                     const checkBox = document.querySelector(`#unit-selection-${scene.components['coin-purse'].activeUnit}`);
-                    checkBox.checked = true;
+                    checkBox.click();
 
                     setTimeout(() => {
                         const scene = document.querySelector("a-scene");
                         const npcs = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
                         if (npcs.length === 0) {
-                            for (let i = 0; i < 10; i++) {
+                            const raiderAmount = scene.components['coin-purse'].getRaiderAmount();
+                            for (let i = 0; i < raiderAmount; i++) {
                                 addNpc(i);
                             }
                         }
@@ -1692,7 +1693,7 @@
                     const scene = document.querySelector("a-scene");
                     scene.components['coin-purse'].setUnit(inverseUnitMap.get(scene.components['coin-purse'].activeUnit));
                     const checkBox = document.querySelector(`#unit-selection-${scene.components['coin-purse'].activeUnit}`);
-                    checkBox.checked = true;
+                    checkBox.click();
 
                     setTimeout(() => {
                         const scene = document.querySelector("a-scene");
@@ -2846,6 +2847,11 @@
                 this.goldCoins = 30;
                 this.shipCount = 0;
                 this.raiderCount = 0;
+                this.raiderAmount = new Map([
+                    ['raider-1', 10],
+                    ['raider-2', 0],
+                    ['raider-3', 0],
+                ]);
                 this.updateUi();
             },
             updateUi: function () {
@@ -2876,8 +2882,14 @@
                     this.updateUi();
                 }
             },
+            getRaiderAmount: function () {
+                return this.raiderAmount.get(unitMap.get(this.activeUnit));
+            },
+            setRaiderAmount: function (amount) {
+                this.raiderAmount.set(unitMap.get(this.activeUnit), amount);
+            },
             addRaider: function () {
-                if (this.goldCoins >= 30 && this.raiderCount < 50) {
+                if (this.goldCoins >= 30 && this.raiderCount + this.getRaiderAmount() < 50) {
                     this.raiderCount += 10;
                     this.goldCoins -= 30;
                     this.updateUi();
@@ -2894,26 +2906,26 @@
                 this.activeUnit = u;
             },
             buyShips: function () {
-                // TODO: spawn ships into a group
                 const numShips = this.shipCount;
                 this.shipCount = 0;
                 const numRaiders = this.raiderCount;
                 this.raiderCount = 0;
                 this.updateUi();
 
-                if (this.activeUnit === "ship-1" || this.activeUnit === "ship-2" || this.activeUnit === "ship-3") {
-                    const ships = Array.from(document.querySelectorAll(this.activeUnit));
-                    const point = ships.reduce((acc, x) => acc.add(x.object3D.position), new THREE.Vector3());
-                    if (point.length() === 0) {
-                        point.copy(window.shipSpawnPoint);
-                    } else {
-                        point.divideScalar(ships.length);
-                    }
-
-                    for (let i = 0; i < numShips; i++) {
-                        addShip(JSON.stringify({data: window.shipModelStr, point: [point.x, point.y, point.z]}));
-                    }
+                const ships = Array.from(document.querySelectorAll(this.activeUnit));
+                const point = ships.reduce((acc, x) => acc.add(x.object3D.position), new THREE.Vector3());
+                if (point.length() === 0) {
+                    point.copy(window.shipSpawnPoint);
+                } else {
+                    point.divideScalar(ships.length);
                 }
+
+                for (let i = 0; i < numShips; i++) {
+                    addShip(JSON.stringify({data: window.shipModelStr, point: [point.x, point.y, point.z]}));
+                }
+
+                const initialRaiderAmount = this.getRaiderAmount();
+                this.setRaiderAmount(initialRaiderAmount + numRaiders);
             }
         });
 
