@@ -461,7 +461,7 @@
         AFRAME.registerComponent('look-at-box', {
             schema: {
                 type: "string",
-                default: ".ship-1",
+                default: ".ship-1:first-of-type",
             },
             init: function () {
                 this.dtSumTickSize = 5000;
@@ -471,10 +471,18 @@
             },
             tick: function (t, dt) {
                 // get elements
-                const box = Array.from(document.querySelectorAll(`${this.data}`)).map(el => el.object3D);
-                const boxPos = Array.from(document.querySelectorAll(`${this.data}-position`)).map(el => el.object3D);
-                if (!box || !boxPos) {
+                let [dataItem, dataPostfix] = this.data.split(":");
+                if (dataPostfix) {
+                    dataPostfix = `:${dataPostfix}`;
+                }
+                const box = Array.from(document.querySelectorAll(`${dataItem}`)).map(el => el.object3D);
+                const boxPos = Array.from(document.querySelectorAll(`${dataItem}-position`)).map(el => el.object3D);
+                if (!box.length || !boxPos.length) {
                     return;
+                }
+                if (dataPostfix) {
+                    box.splice(1, box.length - 1);
+                    boxPos.splice(1, box.length - 1);
                 }
 
                 // get position
@@ -1848,7 +1856,7 @@
                         const scene = document.querySelector("a-scene");
                         const npcEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
                         const cameraEl = document.querySelector("#camera-rig");
-                        cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].activeUnit}`);
+                        cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].getUnit()}`);
                         npcEls.forEach(npcEl => {
                             const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3).add(new THREE.Vector3().random()), destination1.clone().negate());
                             const intersections = raycaster.intersectObject(this.system.getNavMesh());
@@ -1862,7 +1870,7 @@
                         const scene = document.querySelector("a-scene");
                         const npcEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
                         const cameraEl = document.querySelector("#camera-rig");
-                        cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].activeUnit}`);
+                        cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].getUnit()}`);
                         npcEls.forEach(npcEl => {
                             const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3).add(new THREE.Vector3().random()), destination1.clone().negate());
                             const intersections = raycaster.intersectObject(this.system.getNavMesh());
@@ -1898,7 +1906,7 @@
                     setTimeout(() => {
                         const scene = document.querySelector("a-scene");
                         const cameraEl = document.querySelector("#camera-rig");
-                        cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].activeUnit}`);
+                        cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].getUnit()}`);
                     }, 0);
                     setTimeout(() => {
                         const scene = document.querySelector("a-scene");
@@ -2922,7 +2930,7 @@
 
             scene.appendChild(rootShip);
             const cameraEl = document.querySelector("#camera-rig");
-            cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].activeUnit}`);
+            cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].getUnit()}`);
         }
 
         function addClientSecret(item) {
@@ -3105,6 +3113,10 @@
             setUnit: function(u) {
                 this.activeUnit = u;
             },
+            getUnit: function () {
+                const postfix = this.activeUnit.startsWith("ship") ? ":first-of-type" : "";
+                return this.activeUnit + postfix;
+            },
             buyShips: function () {
                 const numShips = this.shipCount;
                 this.shipCount = 0;
@@ -3177,7 +3189,7 @@
                 const ships = Array.from(scene.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`));
                 const existingShips = ships.length;
                 if (existingShips) {
-                    cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].activeUnit}`);
+                    cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].getUnit()}`);
                 }
             }, 0);
         }
