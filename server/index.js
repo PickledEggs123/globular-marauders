@@ -265,9 +265,15 @@ if (process.env.NODE_ENV === 'production') {
     const redisClient = redis.createClient({
         url: "redis://10.15.144.3:6379",
     });
+    const pubClient = redisClient;
+    const subClient = redisClient.duplicate();
+    await Promise.all([
+        pubClient.connect(),
+        subClient.connect(),
+    ]);
     socketServer.adapter(socketRedis.createAdapter({
-        pubClient: redisClient,
-        subClient: redisClient,
+        pubClient,
+        subClient,
     }));
 }
 
