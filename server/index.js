@@ -19,7 +19,6 @@ const http = require('http');
 const socketIo = require('socket.io');
 const easyrtc = require('open-easyrtc');
 const socketRedis = require('socket.io-redis');
-const redis = require('redis');
 
 process.title = "globular-marauders-server";
 
@@ -261,21 +260,10 @@ const webServer = http.createServer(app);
 
 // Start Socket.io so it attaches itself to Express server
 const socketServer = socketIo(webServer, {"log level": 1});
-if (process.env.NODE_ENV === 'production') {
-    const redisClient = redis.createClient({
-        url: "redis://10.15.144.3:6379",
-    });
-    const pubClient = redisClient;
-    const subClient = redisClient.duplicate();
-    await Promise.all([
-        pubClient.connect(),
-        subClient.connect(),
-    ]);
-    socketServer.adapter(socketRedis.createAdapter({
-        pubClient,
-        subClient,
-    }));
-}
+socketServer.adapter(socketRedis({
+    host: process.env.NODE_ENV === 'production' ? "10.15.144.3" : "localhost",
+    port: 6379,
+}));
 
 const myIceServers = [
     {"urls":"stun:stun1.l.google.com:19302"},
