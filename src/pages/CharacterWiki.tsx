@@ -10,7 +10,7 @@ import {
     CardHeader,
     Container,
     Grid,
-    Typography, Box
+    Typography, Box, CardMedia
 } from "@mui/material";
 import {
     ERaceData,
@@ -19,6 +19,8 @@ import {
     IRaceData
 } from "@pickledeggs123/globular-marauders-game/lib/src/EFaction";
 import {CHARACTER_TYPE_TEXTURE_PAIRS, DEFAULT_IMAGE} from "../helpers/Data";
+import CheckBoxIcon from "@mui/icons-material/CheckBox";
+import {CheckBoxOutlineBlank} from "@mui/icons-material";
 
 export const CharacterWiki = () => {
     const classDatas = GameFactionData.reduce((acc, f) => [...acc, ...f.races], [] as IRaceData[]).reduce((acc, r) => [...acc, ...r.classes.map((i): [ERaceData, IClassData] => [r.id, i])], [] as Array<[ERaceData, IClassData]>);
@@ -47,11 +49,11 @@ export const CharacterWiki = () => {
                 }}>
                     <Grid item xs={12}>
                         <Card>
+                            <CardMedia component="img" alt={selectedCharacterClass[1].name} srcSet={renderCharacterUrl(selectedCharacterClass[0])?.url ?? undefined}>
+                            </CardMedia>
                             <CardHeader title={selectedCharacterClass[1].name}>
                             </CardHeader>
                             <CardContent>
-                                <Avatar variant="rounded" style={{width: 256, height: 256}} alt={selectedCharacterClass[1].name} srcSet={renderCharacterUrl(selectedCharacterClass[0])?.url ?? undefined}>
-                                </Avatar>
                                 <Typography variant="body1">
                                     {selectedCharacterClass[1].description}
                                 </Typography>
@@ -110,11 +112,12 @@ export const CharacterWiki = () => {
                                         <CardActionArea onClick={() => {
                                             setSelectedCharacterClass(classData);
                                         }}>
+                                            <CardMedia component="img" alt={classData[1].name} srcSet={renderCharacterUrl(classData[0])?.url ?? undefined}>
+                                            </CardMedia>
                                             <CardHeader title={classData[1].name}>
                                             </CardHeader>
                                             <CardContent>
-                                                <Avatar variant="rounded" style={{width: 256, height: 256}} alt={classData[1].name} srcSet={renderCharacterUrl(classData[0])?.url ?? undefined}>
-                                                </Avatar>
+                                                {classData[1].name === selectedCharacterClass[1].name ? <CheckBoxIcon/> : <CheckBoxOutlineBlank/>}
                                                 <Typography variant="body1">
                                                     {classData[1].description}
                                                 </Typography>

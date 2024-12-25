@@ -11,7 +11,7 @@ import {
     CardHeader,
     Container,
     Grid,
-    Typography
+    Typography, CardMedia, Icon
 } from "@mui/material";
 import {EShipType} from "@pickledeggs123/globular-marauders-game/lib/src/ShipType";
 import * as PIXI from "pixi.js";
@@ -22,6 +22,8 @@ import {generatePlanetGltf} from "@pickledeggs123/globular-marauders-generator/d
 import {Layer, Stage} from "@pixi/layers";
 import {DepthOutlineFilter} from "../filters/DepthOutline/DepthOutlineFilter";
 import {ShipContext} from "../contextes/ShipContext";
+import CheckBoxIcon from "@mui/icons-material/CheckBox";
+import {CheckBoxOutlineBlank} from "@mui/icons-material";
 
 
 export const ShipWiki = () => {
@@ -283,11 +285,12 @@ export const ShipWiki = () => {
                                         <CardActionArea onClick={() => {
                                             setSelectedShipType(shipType);
                                         }}>
+                                            <CardMedia component="img" alt={shipType} src={shipThumbnails.get(shipType) ?? undefined}>
+                                            </CardMedia>
                                             <CardHeader title={shipType}>
                                             </CardHeader>
                                             <CardContent>
-                                                <Avatar variant="rounded" style={{width: 256, height: 256}} alt={shipType} srcSet={shipThumbnails.get(shipType) ?? undefined}>
-                                                </Avatar>
+                                                {shipType === selectedShipType ? <CheckBoxIcon/> : <CheckBoxOutlineBlank/>}
                                                 <Typography variant="body1">
                                                     {shipBody.get(shipType) ?? undefined}
                                                 </Typography>

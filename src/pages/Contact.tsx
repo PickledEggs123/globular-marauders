@@ -1,7 +1,7 @@
 import React from 'react';
 import '../App.scss';
 import {WebsiteDrawer} from "../Drawer";
-import {Paper, Card, CardContent, CardHeader, Container, Grid, Typography} from "@mui/material";
+import {Paper, Card, CardContent, CardHeader, Container, Grid, Typography, CardMedia} from "@mui/material";
 
 export const Contact = () => {
     return (
@@ -12,8 +12,9 @@ export const Contact = () => {
                     About the Developer
                 </Typography>
                 <Grid container xs={12} spacing={2}>
-                    <Grid item xs={12}>
+                    <Grid item xs={6}>
                         <Card>
+                            <CardMedia component="img" src="/mainImages/GitHub_Logo.png"></CardMedia>
                             <CardHeader title="GitHub" subheader="The code to make the game">
                             </CardHeader>
                             <CardContent>
@@ -23,9 +24,10 @@ export const Contact = () => {
                             </CardContent>
                         </Card>
                     </Grid>
-                    <Grid item xs={12}>
+                    <Grid item xs={6}>
                         <Card>
-                            <CardHeader title="Tyler T" subheader="The Developer">
+                            <CardMedia component="img" src="/mainImages/DevPhoto.png"></CardMedia>
+                            <CardHeader title="Tyler Truong" subheader="The Developer">
                             </CardHeader>
                             <CardContent>
                                 <Typography variant="body1">
