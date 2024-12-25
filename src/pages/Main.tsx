@@ -1,7 +1,19 @@
 import React from 'react';
 import '../App.scss';
 import {WebsiteDrawer} from "../Drawer";
-import {Paper, Card, CardContent, CardHeader, Container, Grid, Typography, Box, Button} from "@mui/material";
+import {
+    Paper,
+    Card,
+    CardContent,
+    CardHeader,
+    Container,
+    Grid,
+    Typography,
+    Box,
+    Button,
+    Avatar,
+    CardMedia
+} from "@mui/material";
 import {Image} from "@mui/icons-material";
 import {Link} from "react-router-dom";
 
@@ -10,12 +22,10 @@ export const Main = () => {
         <Paper style={{width: "100vw", minHeight: "100vh", height: "fit-content", display: "flex", flexDirection: "column"}}>
             <WebsiteDrawer rightSide={null}/>
             <Container>
-                <Typography variant="h3">
-                    Globular Marauders
-                </Typography>
                 <Grid container xs={12} spacing={2}>
                     <Grid item xs={12}>
                         <Card>
+                            <CardMedia component="img" src="/mainImages/MainGameMedia.png"></CardMedia>
                             <CardHeader title="The Early Prototype" subheader="Asteroid style movement but you fire side ways">
                             </CardHeader>
                             <CardContent>
@@ -47,6 +57,7 @@ export const Main = () => {
                     </Grid>
                     <Grid item xs={12}>
                         <Card>
+                            <CardMedia component="img" src="/mainImages/3dGameMedia.png"></CardMedia>
                             <CardHeader title="More Reasonable Planet with Ocean" subheader="Ocean pathfinding is harder than space with no obstacles">
                             </CardHeader>
                             <CardContent>
