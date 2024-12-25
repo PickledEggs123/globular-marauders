@@ -101,7 +101,7 @@ export const CharacterWiki = () => {
                     </Grid>
                     <Grid item xs={12}>
                         <Typography variant="h3">
-                            Available Ships
+                            Available Characters
                         </Typography>
                     </Grid>
                     {
