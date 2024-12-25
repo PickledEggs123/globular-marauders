@@ -39,19 +39,19 @@ export const ShipWiki = () => {
 
     const shipThumbnails = new Map<EShipType, string>();
     // @ts-ignore
-    shipThumbnails.set(EShipType.CUTTER, shipContext[0].image);
+    shipThumbnails.set(EShipType.CUTTER, shipContext[0]?.image);
     // @ts-ignore
-    shipThumbnails.set(EShipType.SLOOP, shipContext[1].image);
+    shipThumbnails.set(EShipType.SLOOP, shipContext[1]?.image);
     // @ts-ignore
-    shipThumbnails.set(EShipType.CORVETTE, shipContext[2].image);
+    shipThumbnails.set(EShipType.CORVETTE, shipContext[2]?.image);
     // @ts-ignore
-    shipThumbnails.set(EShipType.BRIGANTINE, shipContext[3].image);
+    shipThumbnails.set(EShipType.BRIGANTINE, shipContext[3]?.image);
     // @ts-ignore
-    shipThumbnails.set(EShipType.BRIG, shipContext[4].image);
+    shipThumbnails.set(EShipType.BRIG, shipContext[4]?.image);
     // @ts-ignore
-    shipThumbnails.set(EShipType.FRIGATE, shipContext[5].image);
+    shipThumbnails.set(EShipType.FRIGATE, shipContext[5]?.image);
     // @ts-ignore
-    shipThumbnails.set(EShipType.GALLEON, shipContext[6].image);
+    shipThumbnails.set(EShipType.GALLEON, shipContext[6]?.image);
 
     const shipBody = new Map<EShipType, string>();
     shipBody.set(EShipType.CUTTER, "A small fast and cheap ship that all players start with. This ship is equipped with 2 cannons on each side. The lack of fire power will relegate this ship to trade duties, carrying cargo between planets.");
