@@ -472,11 +472,20 @@
             tick: function (t, dt) {
                 // get elements
                 let [dataItem, dataPostfix] = this.data.split(":");
+                let otherClassName = "";
                 if (dataPostfix) {
+                    [dataPostfix, otherClassName] = dataPostfix.split(" ", 2);
                     dataPostfix = `:${dataPostfix}`;
+                    if (otherClassName) {
+                        otherClassName = ` ${otherClassName}`;
+                    } else {
+                        otherClassName = "";
+                    }
                 }
-                const box = Array.from(document.querySelectorAll(`${dataItem}`)).map(el => el.object3D);
-                const boxPos = Array.from(document.querySelectorAll(`${dataItem}-position`)).map(el => el.object3D);
+                const boxSelector = `${dataItem}${otherClassName}`;
+                const boxPosSelector = `${dataItem}${otherClassName}-position`;
+                const box = Array.from(document.querySelectorAll(boxSelector)).map(el => el.object3D);
+                const boxPos = Array.from(document.querySelectorAll(boxPosSelector)).map(el => el.object3D);
                 if (!box.length || !boxPos.length) {
                     return;
                 }
@@ -3087,7 +3096,7 @@
                         this.el.appendChild(entity);
 
                         const positionEntity = document.createElement("a-entity");
-                        positionEntity.setAttribute("position", new THREE.Vector3(0, 0, -5).add(x.position));
+                        positionEntity.setAttribute("position", new THREE.Vector3(0, 0, -50).add(x.position));
                         positionEntity.setAttribute("class", "left-cannon-position");
                         this.el.appendChild(positionEntity);
                     });
@@ -3098,12 +3107,32 @@
                         this.el.appendChild(entity);
 
                         const positionEntity = document.createElement("a-entity");
-                        positionEntity.setAttribute("position", new THREE.Vector3(0, 0, 5).add(x.position));
+                        positionEntity.setAttribute("position", new THREE.Vector3(0, 0, 50).add(x.position));
                         positionEntity.setAttribute("class", "right-cannon-position");
                         this.el.appendChild(positionEntity);
                     });
                 });
             }
+        });
+
+        AFRAME.registerComponent('select-cannon-side', {
+            schema: {
+                selector: {
+                    type: "string",
+                    default: ""
+                },
+            },
+            init: function () {
+                this.selectCannonSide = this.selectCannonSide.bind(this);
+                this.el.addEventListener("click", this.selectCannonSide);
+            },
+            remove: function () {
+                this.el.removeEventListener("click", this.selectCannonSide);
+            },
+            selectCannonSide: function () {
+                const cameraEl = document.querySelector("#camera-rig");
+                cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].getUnit()} .${this.data.selector}`);
+            },
         });
 
         AFRAME.registerComponent('coin-purse', {
@@ -3530,8 +3559,8 @@
                 <a-entity align-with-projection="offset: 0.25 0.2 -0.5; rotation: 0 0 0" html="cursor:#cursor;html:#my-interface" class="clickable"></a-entity>
                 <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
                 <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
-                <a-entity align-with-projection="offset: -0.25 -0.2 -0.5; rotation: 0 90 0; scale: 0.03 0.03 0.03" gltf-model="/meshes/Cannon.glb" class="clickable"></a-entity>
-                <a-entity align-with-projection="offset: 0.25 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03" gltf-model="/meshes/Cannon.glb" class="clickable"></a-entity>
+                <a-entity align-with-projection="offset: -0.25 -0.2 -0.5; rotation: 0 90 0; scale: 0.03 0.03 0.03" gltf-model="/meshes/Cannon.glb" class="clickable" select-cannon-side="selector: right-cannon"></a-entity>
+                <a-entity align-with-projection="offset: 0.25 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03" gltf-model="/meshes/Cannon.glb" class="clickable" select-cannon-side="selector: left-cannon"></a-entity>
             </a-entity>
         </a-entity>
     </a-scene>
