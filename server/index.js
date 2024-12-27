@@ -261,7 +261,7 @@ const webServer = http.createServer(app);
 // Start Socket.io so it attaches itself to Express server
 const socketServer = socketIo(webServer, {"log level": 1});
 socketServer.adapter(socketRedis({
-    host: process.env.NODE_ENV === 'production' ? "10.15.144.3" : "localhost",
+    host: process.env.REDIS_HOST,
     port: 6379,
 }));
 
