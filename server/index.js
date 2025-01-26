@@ -299,10 +299,28 @@ easyrtc.events.on("easyrtcAuth", (socket, easyrtcid, msg, socketCallback, callba
     });
 });
 
+const roomMap = new Map();
 // To test, lets print the credential to the console for every room join!
 easyrtc.events.on("roomJoin", (connectionObj, roomName, roomParameter, callback) => {
     console.log("["+connectionObj.getEasyrtcid()+"] Credential retrieved!", connectionObj.getFieldValueSync("credential"));
+    if (roomMap.has(roomName)) {
+        roomMap.get(roomName).push(connectionObj);
+    } else {
+        roomMap.set(roomName, [connectionObj]);
+    }
     easyrtc.events.defaultListeners.roomJoin(connectionObj, roomName, roomParameter, callback);
+});
+// detect room leave
+easyrtc.events.on("roomLeave", (connectionObj, roomName, callback) => {
+    console.log("["+connectionObj.getEasyrtcid()+"] Room Leave!");
+    if (roomMap.has(roomName)) {
+        const arr = roomMap.get(roomName);
+        const idx = arr.indexOf(connectionObj);
+        if (idx >= 0) {
+            arr.splice(idx, 1);
+        }
+    }
+    easyrtc.events.defaultListeners.roomLeave(connectionObj, roomName, callback);
 });
 
 // Start EasyRTC server

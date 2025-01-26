@@ -1,4 +1,4 @@
-import React, {useCallback, useContext, useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import '../App.scss';
 import {WebsiteDrawer} from "../Drawer";
 import {Button, Card, CardContent, CardHeader, Container, Grid, Paper, Typography} from "@mui/material";

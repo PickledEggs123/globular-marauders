@@ -2395,6 +2395,14 @@
             },
         });
 
+        AFRAME.registerComponent('cannon-ball-flight', {
+            schema: {
+                speed: {type: 'number', default: 10},
+            },
+            init: function () {
+            },
+        });
+
         AFRAME.registerComponent('health', {
             schema: {
                 health: { type: 'number', default: 100 }
@@ -2433,6 +2441,50 @@
                 const senderId = this.el.components['networked'].data.owner;
                 const networkId = this.el.components['networked'].data.networkId;
                 NAF.connection.sendDataGuaranteed(senderId, "networkedHealth", {
+                    networkId,
+                    hit,
+                });
+            },
+        });
+
+        AFRAME.registerComponent('ship-health', {
+            schema: {
+                health: { type: 'number', default: 1000 }
+            },
+            init: function () {
+                this.innerHandleHit = this.handleHit.bind(this);
+                this.el.addEventListener('hit', this.innerHandleHit);
+            },
+            remove: function () {
+                this.el.removeEventListener('hit', this.innerHandleHit);
+            },
+            handleHit: function (evt) {
+                const hit = evt.detail;
+                const newHealth = this.data.health - hit;
+                this.el.setAttribute("health", `health: ${newHealth}`);
+
+                if (newHealth <= 0) {
+                    this.el.emit('dead');
+                    this.el.parentNode.removeChild(this.el);
+                }
+            },
+        });
+
+        AFRAME.registerComponent('networked-ship-health', {
+            schema: {
+            },
+            init: function () {
+                this.innerHandleHit = this.handleHit.bind(this);
+                this.el.addEventListener('hit', this.innerHandleHit);
+            },
+            remove: function () {
+                this.el.removeEventListener('hit', this.innerHandleHit);
+            },
+            handleHit: function (evt) {
+                const hit = evt.detail;
+                const senderId = this.el.components['networked'].data.owner;
+                const networkId = this.el.components['networked'].data.networkId;
+                NAF.connection.sendDataGuaranteed(senderId, "networkedShipHealth", {
                     networkId,
                     hit,
                 });
@@ -2529,9 +2581,12 @@
             if (charModelId === "SHIP") {
                 const dataEl = document.createElement("a-entity");
                 dataEl.setAttribute("class", "data");
+                dataEl.setAttribute("dynamic-body", "shape: sphere; sphereRadius: 1; mass: 100");
+                dataEl.setAttribute("collision-filter", "group: ship; collidesWith: default, ship");
                 dataEl.setAttribute("scale", "0.1 0.1 0.1");
                 dataEl.setAttribute("rotation", "0 -90 0");
                 dataEl.setAttribute("gltf-model", str);
+                dataEl.setAttribute("networked-ship-health", "");
                 rootGoldCoin.appendChild(dataEl);
             } else {
                 rootGoldCoin.setAttribute("gltf-model", str);
@@ -2917,6 +2972,9 @@
             rootShip.setAttribute("collision-filter", "group: ship; collidesWith: default, ship");
             rootShip.setAttribute("globe-gravity", "ship: true;");
             rootShip.setAttribute("globe-keyboard-controls", "enabled: true; fly: true");
+            rootShip.setAttribute("ship-health", "");
+            rootShip.setAttribute("fire-cannons", "");
+            rootShip.setAttribute("firing-cannons", "");
             rootShip.setAttribute("shadow", "");
             rootShip.setAttribute("position", `${point[0]} ${point[1]} ${point[2]}`);
             rootShip.setAttribute("rotation", "0 0 0");
@@ -2950,8 +3008,6 @@
             } = JSON.parse(item);
 
             window.gmRoomId = roomId;
-            window.gmClientSecret = clientSecret;
-            window.gmClientSecretMap = new Map();
 
             const scene = document.querySelector("a-scene");
 
@@ -2962,60 +3018,46 @@
             window.spawnNpcsFlag = true;
         }
         async function handleWalkingNpcSwitchOnOrNot() {
-            const roomManifestResponse = await fetch(`/api/room-manifest/${window.gmRoomId}`);
-            const roomManifestJson = await roomManifestResponse.json();
-            const {
-                roomUser
-            } = roomManifestJson;
-            const orderedSecrets = roomUser.map(x => x.webrtcId);
-
             const hostSpanEle = document.getElementById("host-span");
 
-            const currentSet = Array.from(window.gmClientSecretMap.values());
-            const firstSecret = orderedSecrets.find(x => currentSet.includes(x));
-            if (firstSecret && firstSecret === window.gmClientSecret) {
+            // find first client
+            const clients = [];
+            for (const client of Array.from(Object.values(NAF.connection.connectedClients))) {
+                const {
+                    easyrtcid,
+                    roomJoinTime,
+                } = client;
+                clients.push({
+                    easyrtcid,
+                    roomJoinTime,
+                });
+            }
+            const myEasyrtcid = NAF.clientId;
+            const myRoomJoinTime = NAF.connection.adapter._myRoomJoinTime;
+            clients.push({
+                easyrtcid: myEasyrtcid,
+                roomJoinTime: myRoomJoinTime,
+            });
+            clients.sort((a, b) => a.roomJoinTime - b.roomJoinTime);
+            const isFirst = clients[0].easyrtcid === NAF.clientId;
+
+            if (isFirst) {
                 spawnNpcsNow();
                 hostSpanEle.textContent = "HOST";
             } else {
                 hostSpanEle.textContent = "CLIENT";
             }
         }
-        const debounceWalkingNpcSwitchOnOrNot = debounce(handleWalkingNpcSwitchOnOrNot.bind(window), 5_000);
+        const debounceWalkingNpcSwitchOnOrNot = debounce(handleWalkingNpcSwitchOnOrNot.bind(window), 3_000);
 
         function onConnect() {
-            window.gmClientSecretMap.set(NAF.clientId, window.gmClientSecret);
-            console.log("INIT", window.gmClientSecretMap);
             debounceWalkingNpcSwitchOnOrNot();
 
-            window.addEventListener("beforeunload", function () {
-                easyrtc.disconnect();
-            });
-
             document.body.addEventListener("clientConnected", function (evt) {
-                console.log("CONNECTED", evt, window.gmClientSecretMap);
-                setTimeout(function () {
-                    NAF.connection.broadcastDataGuaranteed("gmShareClientSecret", {
-                        clientSecret: window.gmClientSecret
-                    });
-                }, 500);
+                console.log("CLIENT CONNECTED", evt.detail.clientId);
             });
             document.body.addEventListener("clientDisconnected", function (evt) {
-                console.log("DISCONNECT", evt, window.gmClientSecretMap);
-                window.gmClientSecretMap.delete(evt.detail.clientId);
-                debounceWalkingNpcSwitchOnOrNot();
-            });
-
-            NAF.connection.subscribeToDataChannel("gmShareClientSecret", function (senderId, dataType, data, targetId) {
-                console.log("SHARE SECRET", senderId, window.gmClientSecretMap);
-                window.gmClientSecretMap.set(senderId, data.clientSecret);
-                NAF.connection.sendDataGuaranteed(senderId, "gmReplyClientSecret", {
-                    clientSecret: window.gmClientSecret
-                });
-            });
-
-            NAF.connection.subscribeToDataChannel("gmReplyClientSecret", function (senderId, dataType, data, targetId) {
-                console.log("SHARE SECRET", targetId, window.gmClientSecretMap);
-                window.gmClientSecretMap.set(senderId, data.clientSecret);
+                console.log("CLIENT DISCONNECTED", evt.detail.clientId);
             });
 
             NAF.connection.subscribeToDataChannel('networkedHealth', function (sender, dataType, data, targetId) {
@@ -3026,6 +3068,30 @@
                 const entity = NAF.entities.entities[networkId];
                 if (entity) {
                     entity.emit("hit", hit);
+                }
+            });
+
+            NAF.connection.subscribeToDataChannel('networkedShipHealth', function (sender, dataType, data, targetId) {
+                const {
+                    networkId,
+                    hit,
+                } = data;
+                const entity = NAF.entities.entities[networkId];
+                if (entity) {
+                    entity.emit("hit", hit);
+                }
+            });
+
+            NAF.connection.subscribeToDataChannel('networkedFireCannons', function (sender, dataType, data, targetId) {
+                const {
+                    networkId,
+                    selector,
+                } = data;
+                const entity = NAF.entities.entities[networkId];
+                if (entity) {
+                    entity.emit("firing-cannons", selector);
+                    console.log("FIRING CANNONS");
+                    alert("DADB");
                 }
             });
 
@@ -3123,15 +3189,64 @@
                 },
             },
             init: function () {
-                this.selectCannonSide = this.selectCannonSide.bind(this);
-                this.el.addEventListener("click", this.selectCannonSide);
+                this.innerSelectCannonSide = this.selectCannonSide.bind(this);
+                this.el.addEventListener("click", this.innerSelectCannonSide);
             },
             remove: function () {
-                this.el.removeEventListener("click", this.selectCannonSide);
+                this.el.removeEventListener("click", this.innerSelectCannonSide);
             },
             selectCannonSide: function () {
                 const cameraEl = document.querySelector("#camera-rig");
-                cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].getUnit()} .${this.data.selector}`);
+                const selector = `.${scene.components['coin-purse'].getUnit()} .${this.data.selector}`;
+                const firstClick = cameraEl.getAttribute("look-at-box") !== selector;
+                if (firstClick) {
+                    cameraEl.setAttribute("look-at-box", selector);
+                } else {
+                    const ships = document.querySelectorAll(`.${scene.components['coin-purse'].getUnit().split(":", 2)[0]}`);
+                    ships.forEach(s => {
+                        s.emit("fire-cannons", this.data.selector);
+                    });
+                }
+            },
+        });
+
+        AFRAME.registerComponent('fire-cannons', {
+            schema: {},
+            init: function () {
+                this.innerFireCannons = this.fireCannons.bind(this);
+                this.el.addEventListener("fire-cannons", this.innerFireCannons);
+            },
+            remove: function () {
+                this.el.removeEventListener("fire-cannons", this.innerFireCannons);
+            },
+            fireCannons: function (e) {
+                const selector = e.detail;
+                const hostSpanEle = document.getElementById("host-span");
+                const firstClient = hostSpanEle.textContent === "HOST";
+                if (firstClient) {
+                    this.el.emit('firing-cannons');
+                } else {
+                    const senderId = clientIds[0];
+                    const networkId = this.el.components.networked.networkId;
+                    NAF.connection.sendDataGuaranteed(senderId, "networkedFireCannons", {
+                        networkId,
+                        selector,
+                    });
+                }
+            },
+        });
+
+        AFRAME.registerComponent('firing-cannons', {
+            schema: {},
+            init: function () {
+                this.innerFiringCannons = this.firingCannons.bind(this);
+                this.el.addEventListener("firing-cannons", this.innerFiringCannons);
+            },
+            remove: function () {
+                this.el.removeEventListener("firing-cannons", this.innerFiringCannons);
+            },
+            firingCannons: function (e) {
+                alert("FIRING CANNONS");
             },
         });
 
