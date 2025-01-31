@@ -23,8 +23,6 @@
     <script src="/aframe-fps-counter-component.min.js"></script>
     <script src="/aframe-look-at-billboard-component.js"></script>
     <script src="/instanced-mesh.min.js"></script>
-    <script src="/socket.io.slim.js"></script>
-    <script src="/easyrtc/easyrtc.js"></script>
     <script src="/networked-aframe.js"></script>
     <script src="/three-bvh.umd.cjs"></script>
     <script src="/aframe-html.js"></script>
@@ -3011,53 +3009,25 @@
 
             const scene = document.querySelector("a-scene");
 
-            scene.setAttribute("networked-scene", `room: ${roomId}; debug: false; adapter: easyrtc; audio: true;`);
+            scene.setAttribute("networked-scene", `room: ${roomId}; adapter: ws; debug: true;`);
         }
 
         function spawnNpcsNow() {
             window.spawnNpcsFlag = true;
         }
-        async function handleWalkingNpcSwitchOnOrNot() {
-            const hostSpanEle = document.getElementById("host-span");
-
-            // find first client
-            const clients = [];
-            for (const client of Array.from(Object.values(NAF.connection.connectedClients))) {
-                const {
-                    easyrtcid,
-                    roomJoinTime,
-                } = client;
-                clients.push({
-                    easyrtcid,
-                    roomJoinTime,
-                });
-            }
-            const myEasyrtcid = NAF.clientId;
-            const myRoomJoinTime = NAF.connection.adapter._myRoomJoinTime;
-            clients.push({
-                easyrtcid: myEasyrtcid,
-                roomJoinTime: myRoomJoinTime,
-            });
-            clients.sort((a, b) => a.roomJoinTime - b.roomJoinTime);
-            const isFirst = clients[0].easyrtcid === NAF.clientId;
-
-            if (isFirst) {
-                spawnNpcsNow();
-                hostSpanEle.textContent = "HOST";
-            } else {
-                hostSpanEle.textContent = "CLIENT";
-            }
-        }
-        const debounceWalkingNpcSwitchOnOrNot = debounce(handleWalkingNpcSwitchOnOrNot.bind(window), 3_000);
 
         function onConnect() {
-            debounceWalkingNpcSwitchOnOrNot();
-
             document.body.addEventListener("clientConnected", function (evt) {
                 console.log("CLIENT CONNECTED", evt.detail.clientId);
             });
             document.body.addEventListener("clientDisconnected", function (evt) {
                 console.log("CLIENT DISCONNECTED", evt.detail.clientId);
+            });
+
+            NAF.connection.subscribeToDataChannel('isHost', function (sender, dataType, data, targetId) {
+                const hostSpanEle = document.getElementById("host-span");
+                hostSpanEle.textContent = "HOST";
+                spawnNpcsNow();
             });
 
             NAF.connection.subscribeToDataChannel('networkedHealth', function (sender, dataType, data, targetId) {
@@ -3683,7 +3653,7 @@
         <section id="my-interface" style="display: inline-block; background: lavenderblush; position: absolute; left: -9999px; color: #333; border-radius: 1em; padding: 1em; margin: 0; accent-color: hotpink;">
             <div class="actions">
                 <button id="mic-btn" type="button" class="button">Mute Mic</button>
-                <span id="host-span" class="host-span">Connecting...</span>
+                <span id="host-span" class="host-span">CLIENT</span>
             </div>
             <div class="actions" id="over-world-menu" style="visibility: collapse; display: none">
                 <button onclick="openStoreMenu()">Shop</button>

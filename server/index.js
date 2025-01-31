@@ -12,18 +12,20 @@ import {ThemeProvider} from "@mui/material/styles";
 import {PrismaClient} from "@prisma/client";
 import compression from "compression";
 
+const express = require('express');
 const path = require('path');
 const fs = require('fs');
-const express = require('express');
 const http = require('http');
-const socketIo = require('socket.io');
-const easyrtc = require('open-easyrtc');
-const socketRedis = require('socket.io-redis');
+const EventEmitter = require("node:events");
+const WebSocketServer = require('ws').Server;
+const crypto = require("crypto");
 
 process.title = "globular-marauders-server";
 
-// get port or default to 8080
-const PORT = process.env.PORT || 8080;
+// Get port or default to 8080
+const port = process.env.PORT || 8080;
+
+const maxOccupantsInRoom = 4;
 
 // setup and configure express http server.
 const app = express();
@@ -259,82 +261,214 @@ const webServer = http.createServer(app);
 // const webServer = https.createServer(credentials, app);
 
 // Start Socket.io so it attaches itself to Express server
-const socketServer = socketIo(webServer, {"log level": 1});
-socketServer.adapter(socketRedis({
-    host: process.env.REDIS_HOST,
-    port: 6379,
-}));
+const io = new WebSocketServer({server: webServer});
 
-const myIceServers = [
-    {"urls":"stun:stun1.l.google.com:19302"},
-    {"urls":"stun:stun2.l.google.com:19302"},
-    // {
-    //   "urls":"turn:[ADDRESS]:[PORT]",
-    //   "username":"[USERNAME]",
-    //   "credential":"[CREDENTIAL]"
-    // },
-    // {
-    //   "urls":"turn:[ADDRESS]:[PORT][?transport=tcp]",
-    //   "username":"[USERNAME]",
-    //   "credential":"[CREDENTIAL]"
-    // }
-];
-easyrtc.setOption("appIceServers", myIceServers);
-easyrtc.setOption("logLevel", "error");
-easyrtc.setOption("demosEnable", false);
+const rooms = new Map();
 
-// Overriding the default easyrtcAuth listener, only so we can directly access its callback
-easyrtc.events.on("easyrtcAuth", (socket, easyrtcid, msg, socketCallback, callback) => {
-    easyrtc.events.defaultListeners.easyrtcAuth(socket, easyrtcid, msg, socketCallback, (err, connectionObj) => {
-        if (err || !msg.msgData || !msg.msgData.credential || !connectionObj) {
-            callback(err, connectionObj);
-            return;
+function randomBytes() {
+    return crypto.randomBytes(16).toString("base64url");
+}
+
+io.on("connection", (socket) => {
+    socket.id = randomBytes();
+    console.log("user connected", socket.id);
+
+    let curRoom = null;
+
+    const eventEmitterIn = new EventEmitter();
+    const eventEmitterOut = new EventEmitter();
+
+    socket.on("message", (msg) => {
+        const { from, type, data, to, msgType } = JSON.parse(msg);
+
+        switch (type) {
+            case 'joinRoom':
+            case 'pong': {
+                eventEmitterIn.emit(type, {
+                    from, type, data, to
+                });
+                break;
+            }
+            default: {
+                eventEmitterOut.emit(msgType, {
+                    from, type, data, to
+                });
+                break;
+            }
+        }
+    });
+
+    eventEmitterIn.on("joinRoom", ({ data }) => {
+        const { room } = data;
+
+        curRoom = room;
+        let roomInfo = rooms.get(room);
+        if (!roomInfo) {
+            roomInfo = {
+                name: room,
+                occupants: {},
+                occupantsCount: 0,
+                host: socket.id,
+            };
+            rooms.set(room, roomInfo);
         }
 
-        connectionObj.setField("credential", msg.msgData.credential, {"isShared":false});
+        if (roomInfo.occupantsCount >= maxOccupantsInRoom) {
+            // If room is full, search for spot in other instances
+            let availableRoomFound = false;
+            const roomPrefix = `${room}--`;
+            let numberOfInstances = 1;
+            for (const [roomName, roomData] of rooms.entries()) {
+                if (roomName.startsWith(roomPrefix)) {
+                    numberOfInstances++;
+                    if (roomData.occupantsCount < maxOccupantsInRoom) {
+                        availableRoomFound = true;
+                        curRoom = roomName;
+                        roomInfo = roomData;
+                        break;
+                    }
+                }
+            }
 
-        console.log("["+easyrtcid+"] Credential saved!", connectionObj.getFieldValueSync("credential"));
+            if (!availableRoomFound) {
+                // No available room found, create a new one
+                const newRoomNumber = numberOfInstances + 1;
+                curRoom = `${roomPrefix}${newRoomNumber}`;
+                roomInfo = {
+                    name: curRoom,
+                    occupants: {},
+                    occupantsCount: 0,
+                    host: socket.id,
+                };
+                rooms.set(curRoom, roomInfo);
+            }
+        }
 
-        callback(err, connectionObj);
+        const joinedTime = Date.now();
+        roomInfo.occupants[socket.id] = joinedTime;
+        roomInfo.occupantsCount++;
+
+        let sendIsHost = curRoom.host === socket.id;
+        console.log(`${socket.id} joined room ${curRoom}`);
+
+        eventEmitterOut.emit("send", {
+            from: "server",
+            to: socket.id,
+            type: "connectSuccess",
+            data: joinedTime,
+            msgType: 'send',
+        });
+        const occupants = roomInfo.occupants;
+        eventEmitterOut.emit("broadcast", {
+            from: "server",
+            type: "occupantsChanged",
+            data: { occupants },
+            msgType: 'broadcast',
+        });
+        if (sendIsHost) {
+            eventEmitterOut.emit("send", {
+                from: "server",
+                to: socket.id,
+                type: "isHost",
+                data: joinedTime,
+            });
+        }
+    });
+
+    eventEmitterOut.on("send", ({ data, from, to, type, msgType }) => {
+        Array.from(io.clients).find(x => x.id === to)?.send(JSON.stringify({
+            data, from, to, type, msgType,
+        }));
+    });
+
+    eventEmitterOut.on("broadcast", ({ data, from, type, to: msgTo, msgType }) => {
+        Array.from(Object.keys(rooms.get(curRoom)?.occupants ?? {})).forEach((to) => {
+            if (to === msgTo) {
+                return;
+            }
+            eventEmitterOut.emit("send", {
+                data, from, to, type, msgType,
+            });
+        });
+    });
+
+    // setup ping every 5 seconds for 4000 ms lag
+    let pingTimeout = null;
+    let pingInterval = setInterval(() => {
+        eventEmitterOut.emit("send", {
+            data: undefined,
+            from: 'server',
+            to: socket.id,
+            type: 'ping',
+            msgType: 'send',
+        });
+        pingTimeout = setTimeout(() => {
+            // clean up ping
+            clearInterval(pingInterval);
+            pingInterval = null;
+            pingTimeout = null;
+            socket.terminate();
+        }, 4000);
+    }, 5000);
+    eventEmitterIn.on("pong", () => {
+        clearTimeout(pingTimeout);
+        pingTimeout = null;
+    });
+
+    socket.on("disconnect", () => {
+        // clean up ping
+        clearInterval(pingInterval);
+        pingInterval = null;
+        if (pingTimeout) {
+            clearTimeout(pingTimeout);
+            pingTimeout = null;
+        }
+
+        // handle disconnect
+        console.log("disconnected: ", socket.id, curRoom);
+        const roomInfo = rooms.get(curRoom);
+        if (roomInfo) {
+            console.log("user disconnected", socket.id);
+
+            delete roomInfo.occupants[socket.id];
+            roomInfo.occupantsCount--;
+            const occupants = roomInfo.occupants;
+            eventEmitterOut.emit("broadcast", {
+                from: "server",
+                type: "occupantsChanged",
+                data: { occupants },
+            });
+
+            // update host
+            let sendIsHost = false;
+            if (roomInfo.host === socket.id) {
+                console.log(`${socket.id} disconnected from ${curRoom} as host`);
+                roomInfo.host = null;
+
+                roomInfo.host = Array.from(Object.keys(roomInfo.occupants))[0] || null;
+                if (roomInfo.host) {
+                    console.log(`${roomInfo.host} was promoted to ${curRoom} host`);
+                    sendIsHost = true;
+                }
+            }
+            if (sendIsHost) {
+                eventEmitterOut.emit("send", {
+                    from: 'server',
+                    to: socket.id,
+                    type: "isHost",
+                    data: null,
+                });
+            }
+
+            // delete room
+            if (roomInfo.occupantsCount === 0) {
+                console.log("everybody left room");
+                rooms.delete(curRoom);
+            }
+        }
     });
 });
 
-const roomMap = new Map();
-// To test, lets print the credential to the console for every room join!
-easyrtc.events.on("roomJoin", (connectionObj, roomName, roomParameter, callback) => {
-    console.log("["+connectionObj.getEasyrtcid()+"] Credential retrieved!", connectionObj.getFieldValueSync("credential"));
-    if (roomMap.has(roomName)) {
-        roomMap.get(roomName).push(connectionObj);
-    } else {
-        roomMap.set(roomName, [connectionObj]);
-    }
-    easyrtc.events.defaultListeners.roomJoin(connectionObj, roomName, roomParameter, callback);
-});
-// detect room leave
-easyrtc.events.on("roomLeave", (connectionObj, roomName, callback) => {
-    console.log("["+connectionObj.getEasyrtcid()+"] Room Leave!");
-    if (roomMap.has(roomName)) {
-        const arr = roomMap.get(roomName);
-        const idx = arr.indexOf(connectionObj);
-        if (idx >= 0) {
-            arr.splice(idx, 1);
-        }
-    }
-    easyrtc.events.defaultListeners.roomLeave(connectionObj, roomName, callback);
-});
-
-// Start EasyRTC server
-easyrtc.listen(app, socketServer, null, (err, rtcRef) => {
-    console.log("Initiated");
-
-    rtcRef.events.on("roomCreate", (appObj, creatorConnectionObj, roomName, roomOptions, callback) => {
-        console.log("roomCreate fired! Trying to create: " + roomName);
-
-        appObj.events.defaultListeners.roomCreate(appObj, creatorConnectionObj, roomName, roomOptions, callback);
-    });
-});
-
-// Listen on port
-webServer.listen(PORT, () => {
-    console.log("listening on http://localhost:" + PORT);
+webServer.listen(port, () => {
+    console.log("listening on http://localhost:" + port);
 });
