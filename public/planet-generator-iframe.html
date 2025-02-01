@@ -2579,8 +2579,9 @@
             if (charModelId === "SHIP") {
                 const dataEl = document.createElement("a-entity");
                 dataEl.setAttribute("class", "data");
-                dataEl.setAttribute("dynamic-body", "shape: sphere; sphereRadius: 1; mass: 100");
-                dataEl.setAttribute("collision-filter", "group: ship; collidesWith: default, ship");
+                // TODO: Fix this so it works, need collision between players
+                // dataEl.setAttribute("dynamic-body", "shape: sphere; sphereRadius: 1; mass: 100");
+                // dataEl.setAttribute("collision-filter", "group: ship; collidesWith: default, ship");
                 dataEl.setAttribute("scale", "0.1 0.1 0.1");
                 dataEl.setAttribute("rotation", "0 -90 0");
                 dataEl.setAttribute("gltf-model", str);
