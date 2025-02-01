@@ -407,7 +407,7 @@ io.on("connection", (socket) => {
             clearInterval(pingInterval);
             pingInterval = null;
             pingTimeout = null;
-            socket.terminate();
+            disconnect();
         }, 4000);
     }, 5000);
     eventEmitterIn.on("pong", () => {
@@ -415,7 +415,7 @@ io.on("connection", (socket) => {
         pingTimeout = null;
     });
 
-    socket.on("disconnect", () => {
+    function disconnect() {
         // clean up ping
         clearInterval(pingInterval);
         pingInterval = null;
@@ -466,7 +466,9 @@ io.on("connection", (socket) => {
                 rooms.delete(curRoom);
             }
         }
-    });
+        socket.terminate();
+    }
+    socket.on("disconnect", disconnect);
 });
 
 webServer.listen(port, () => {

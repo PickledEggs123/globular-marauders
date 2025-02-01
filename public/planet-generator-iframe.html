@@ -2546,7 +2546,7 @@
             removeGoldCoin: function () {
                 this.el.parentNode.removeChild(this.el);
             },
-        })
+        });
 
         AFRAME.registerComponent("handle-shadow-parameter", {
             schema: {},
@@ -2568,7 +2568,17 @@
                     shadowCameraRight,
                 });
             },
-        })
+        });
+
+        AFRAME.registerComponent("add-network-physics", {
+            schema: {},
+            init: function () {
+                setTimeout(() => {
+                    this.el.setAttribute("static-body", "shape: sphere; sphereRadius: 1; mass: 100");
+                    this.el.setAttribute("collision-filter", "group: ship; collidesWith: default, ship");
+                }, 1000);
+            }
+        });
 
         function addTemplate(templateId, charModelId, instanceModelId) {
             const scene = document.querySelector("a-scene");
@@ -2579,13 +2589,11 @@
             if (charModelId === "SHIP") {
                 const dataEl = document.createElement("a-entity");
                 dataEl.setAttribute("class", "data");
-                // TODO: Fix this so it works, need collision between players
-                // dataEl.setAttribute("dynamic-body", "shape: sphere; sphereRadius: 1; mass: 100");
-                // dataEl.setAttribute("collision-filter", "group: ship; collidesWith: default, ship");
                 dataEl.setAttribute("scale", "0.1 0.1 0.1");
                 dataEl.setAttribute("rotation", "0 -90 0");
                 dataEl.setAttribute("gltf-model", str);
                 dataEl.setAttribute("networked-ship-health", "");
+                dataEl.setAttribute("add-network-physics", "");
                 rootGoldCoin.appendChild(dataEl);
             } else {
                 rootGoldCoin.setAttribute("gltf-model", str);
