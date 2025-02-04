@@ -261,7 +261,10 @@ const webServer = http.createServer(app);
 // const webServer = https.createServer(credentials, app);
 
 // Start Socket.io so it attaches itself to Express server
-const io = new WebSocketServer({server: webServer});
+const io = new WebSocketServer({
+    server: webServer,
+    path: '/socket',
+});
 
 const rooms = new Map();
 
