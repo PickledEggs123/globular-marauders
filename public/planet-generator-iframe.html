@@ -2570,16 +2570,6 @@
             },
         });
 
-        AFRAME.registerComponent("add-network-physics", {
-            schema: {},
-            init: function () {
-                setTimeout(() => {
-                    this.el.setAttribute("static-body", "shape: sphere; sphereRadius: 1; mass: 100");
-                    this.el.setAttribute("collision-filter", "group: ship; collidesWith: default, ship");
-                }, 1000);
-            }
-        });
-
         function addTemplate(templateId, charModelId, instanceModelId) {
             const scene = document.querySelector("a-scene");
 
@@ -2594,7 +2584,6 @@
                 dataEl.setAttribute("gltf-model", str);
                 dataEl.setAttribute("networked-ship-health", "");
                 rootGoldCoin.appendChild(dataEl);
-                // rootGoldCoin.setAttribute("add-network-physics", "");
             } else {
                 rootGoldCoin.setAttribute("gltf-model", str);
             }
@@ -2742,6 +2731,39 @@
                 // add graphics
                 rootProjectile.setAttribute("gltf-model", str);
                 rootProjectile.setAttribute("networked", "template: #arrow-template; attachTemplateToLocal: false;");
+            } else {
+                const modelArrow = document.createElement("a-sphere");
+                modelArrow.setAttribute("scale", "0.1 0.1 0.1");
+                modelArrow.setAttribute("position", "0 0 0");
+
+                rootProjectile.appendChild(modelArrow);
+            }
+
+            scene.appendChild(rootProjectile);
+
+            return id;
+        }
+
+        function addCannonBall(pos, velocity) {
+            const scene = document.querySelector("a-scene");
+
+            const rootProjectile = document.createElement("a-entity");
+            const id = "id" + Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(36);
+            rootProjectile.setAttribute("id", id);
+            rootProjectile.setAttribute("class", "cannonball");
+            rootProjectile.setAttribute("position", `${pos.x} ${pos.y} ${pos.z}`);
+            rootProjectile.setAttribute("rotation", "0 0 0");
+            rootProjectile.setAttribute("shadow", "");
+            rootProjectile.setAttribute("dynamic-body", "shape: sphere; sphereRadius: 0.1; mass: 5");
+            rootProjectile.setAttribute("collision-filter", "group: cannonball; collidesWith: default");
+            rootProjectile.setAttribute("initial-velocity", velocity);
+
+            if (characterModels.has("CANNONBALL")) {
+                const str = characterModels.get("CANNONBALL");
+
+                // add graphics
+                rootProjectile.setAttribute("gltf-model", str);
+                rootProjectile.setAttribute("networked", "template: #cannonball-template; attachTemplateToLocal: false;");
             } else {
                 const modelArrow = document.createElement("a-sphere");
                 modelArrow.setAttribute("scale", "0.1 0.1 0.1");
@@ -3061,19 +3083,6 @@
                 }
             });
 
-            NAF.connection.subscribeToDataChannel('networkedFireCannons', function (sender, dataType, data, targetId) {
-                const {
-                    networkId,
-                    selector,
-                } = data;
-                const entity = NAF.entities.entities[networkId];
-                if (entity) {
-                    entity.emit("firing-cannons", selector);
-                    console.log("FIRING CANNONS");
-                    alert("DADB");
-                }
-            });
-
             let micEnabled = true;
             const micBtnEle = document.getElementById("mic-btn");
 
@@ -3132,8 +3141,8 @@
                             meshes.push(x);
                         }
                     });
-                    const leftCannons = meshes.filter(x => x.position.z < 0);
-                    const rightCannons = meshes.filter(x => x.position.z >= 0);
+                    const leftCannons = meshes.filter(x => x.position.z <= 0);
+                    const rightCannons = meshes.filter(x => x.position.z > 0);
                     leftCannons.forEach(x => {
                         const entity = document.createElement("a-entity");
                         entity.setAttribute("position", x.position);
@@ -3141,7 +3150,7 @@
                         this.el.appendChild(entity);
 
                         const positionEntity = document.createElement("a-entity");
-                        positionEntity.setAttribute("position", new THREE.Vector3(0, 0, -50).add(x.position));
+                        positionEntity.setAttribute("position", new THREE.Vector3(0, 0, 50).add(x.position));
                         positionEntity.setAttribute("class", "left-cannon-position");
                         this.el.appendChild(positionEntity);
                     });
@@ -3152,7 +3161,7 @@
                         this.el.appendChild(entity);
 
                         const positionEntity = document.createElement("a-entity");
-                        positionEntity.setAttribute("position", new THREE.Vector3(0, 0, 50).add(x.position));
+                        positionEntity.setAttribute("position", new THREE.Vector3(0, 0, -50).add(x.position));
                         positionEntity.setAttribute("class", "right-cannon-position");
                         this.el.appendChild(positionEntity);
                     });
@@ -3199,19 +3208,7 @@
                 this.el.removeEventListener("fire-cannons", this.innerFireCannons);
             },
             fireCannons: function (e) {
-                const selector = e.detail;
-                const hostSpanEle = document.getElementById("host-span");
-                const firstClient = hostSpanEle.textContent === "HOST";
-                if (firstClient) {
-                    this.el.emit('firing-cannons');
-                } else {
-                    const senderId = clientIds[0];
-                    const networkId = this.el.components.networked.networkId;
-                    NAF.connection.sendDataGuaranteed(senderId, "networkedFireCannons", {
-                        networkId,
-                        selector,
-                    });
-                }
+                this.el.emit('firing-cannons', e.detail);
             },
         });
 
@@ -3225,7 +3222,26 @@
                 this.el.removeEventListener("firing-cannons", this.innerFiringCannons);
             },
             firingCannons: function (e) {
-                alert("FIRING CANNONS");
+                const selector = `.${scene.components['coin-purse'].getUnit().split(":", 2)[0]} .${e.detail}`;
+                const cannons = Array.from(document.querySelectorAll(selector));
+                cannons.forEach(cannon => {
+                    const worldPosition = cannon.object3D.getWorldPosition(new THREE.Vector3());
+                    const velocity = new THREE.Vector3(0, 0, e.detail.includes("left") ? -100 : 100).applyQuaternion(cannon.object3D.getWorldQuaternion(new THREE.Quaternion()));
+
+                    addCannonBall(worldPosition, velocity);
+                });
+            },
+        });
+
+        AFRAME.registerComponent("initial-velocity", {
+            schema: {
+                type: "vec3",
+                default: "0 0 0",
+            },
+            init: function () {
+                setTimeout(() => {
+                    this.el.body.applyImpulse(new CANNON.Vec3(this.data.x, this.data.y, this.data.z), new CANNON.Vec3(0, 0, 0));
+                }, 10);
             },
         });
 
