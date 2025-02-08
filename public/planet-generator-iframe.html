@@ -2447,7 +2447,7 @@
 
         AFRAME.registerComponent('ship-health', {
             schema: {
-                health: { type: 'number', default: 1000 }
+                health: { type: 'number', default: 400 }
             },
             init: function () {
                 this.innerHandleHit = this.handleHit.bind(this);
@@ -2459,7 +2459,7 @@
             handleHit: function (evt) {
                 const hit = evt.detail;
                 const newHealth = this.data.health - hit;
-                this.el.setAttribute("health", `health: ${newHealth}`);
+                this.el.setAttribute("ship-health", `health: ${newHealth}`);
 
                 if (newHealth <= 0) {
                     this.el.emit('dead');
@@ -2480,8 +2480,8 @@
             },
             handleHit: function (evt) {
                 const hit = evt.detail;
-                const senderId = this.el.components['networked'].data.owner;
-                const networkId = this.el.components['networked'].data.networkId;
+                const senderId = this.el.parentEl.components['networked'].data.owner;
+                const networkId = this.el.parentEl.components['networked'].data.networkId;
                 NAF.connection.sendDataGuaranteed(senderId, "networkedShipHealth", {
                     networkId,
                     hit,
@@ -2583,6 +2583,7 @@
                 dataEl.setAttribute("rotation", "0 -90 0");
                 dataEl.setAttribute("gltf-model", str);
                 dataEl.setAttribute("networked-ship-health", "");
+                dataEl.setAttribute("cannonball-collider", "");
                 rootGoldCoin.appendChild(dataEl);
             } else {
                 rootGoldCoin.setAttribute("gltf-model", str);
@@ -2758,6 +2759,7 @@
             rootProjectile.setAttribute("globe-gravity", "");
             rootProjectile.setAttribute("collision-filter", "group: cannonball; collidesWith: default");
             rootProjectile.setAttribute("initial-velocity", velocity);
+            rootProjectile.setAttribute("despawn", "");
 
             if (characterModels.has("CANNONBALL")) {
                 const str = characterModels.get("CANNONBALL");
@@ -3247,12 +3249,41 @@
                 setTimeout(() => {
                     this.el.body.applyImpulse(new CANNON.Vec3(this.data.x, this.data.y, this.data.z), new CANNON.Vec3(0, 0, 0));
                 }, 10);
-                this.deleteTime = +new Date() + 10_000;
+            },
+        });
+
+        AFRAME.registerComponent("despawn", {
+            schema: {
+                type: "number",
+                default: 10,
+            },
+            init: function () {
+                this.deleteTime = +new Date() + this.data * 1000;
             },
             tick: function () {
                 if (+new Date() > this.deleteTime) {
                     this.el.parentElement.removeChild(this.el);
                 }
+            },
+        });
+
+        AFRAME.registerComponent("cannonball-collider", {
+            schema: {},
+            init: function () {
+                this.innerCollision = this.collision.bind(this);
+            },
+            tick: function () {
+                const shipPosition = this.el.object3D.getWorldPosition(new THREE.Vector3());
+                const cannonballs = Array.from(document.querySelectorAll(".cannonball"));
+                cannonballs.forEach((cannonball) => {
+                    const cannonballPosition = cannonball.object3D.getWorldPosition(new THREE.Vector3());
+                    if (shipPosition.distanceTo(cannonballPosition) < 1.5) {
+                        this.innerCollision();
+                    }
+                });
+            },
+            collision: function () {
+                this.el.emit("hit", 10);
             },
         });
 
