@@ -2754,7 +2754,8 @@
             rootProjectile.setAttribute("position", `${pos.x} ${pos.y} ${pos.z}`);
             rootProjectile.setAttribute("rotation", "0 0 0");
             rootProjectile.setAttribute("shadow", "");
-            rootProjectile.setAttribute("dynamic-body", "shape: sphere; sphereRadius: 0.1; mass: 5");
+            rootProjectile.setAttribute("dynamic-body", "shape: sphere; sphereRadius: 0.5; mass: 5");
+            rootProjectile.setAttribute("globe-gravity", "");
             rootProjectile.setAttribute("collision-filter", "group: cannonball; collidesWith: default");
             rootProjectile.setAttribute("initial-velocity", velocity);
 
@@ -2918,6 +2919,10 @@
                 }
                 case "ARROW": {
                     addTemplate("arrow-template", "ARROW", "arrow-model");
+                    break;
+                }
+                case "CANNONBALL": {
+                    addTemplate("cannonball-template", "CANNONBALL", "cannonball-model");
                     break;
                 }
                 case "GOLD_COIN": {
@@ -3226,7 +3231,7 @@
                 const cannons = Array.from(document.querySelectorAll(selector));
                 cannons.forEach(cannon => {
                     const worldPosition = cannon.object3D.getWorldPosition(new THREE.Vector3());
-                    const velocity = new THREE.Vector3(0, 0, e.detail.includes("left") ? -100 : 100).applyQuaternion(cannon.object3D.getWorldQuaternion(new THREE.Quaternion()));
+                    const velocity = new THREE.Vector3(0, 0, e.detail.includes("left") ? -300 : 300).applyQuaternion(cannon.object3D.getWorldQuaternion(new THREE.Quaternion()));
 
                     addCannonBall(worldPosition, velocity);
                 });
@@ -3242,6 +3247,12 @@
                 setTimeout(() => {
                     this.el.body.applyImpulse(new CANNON.Vec3(this.data.x, this.data.y, this.data.z), new CANNON.Vec3(0, 0, 0));
                 }, 10);
+                this.deleteTime = +new Date() + 10_000;
+            },
+            tick: function () {
+                if (+new Date() > this.deleteTime) {
+                    this.el.parentElement.removeChild(this.el);
+                }
             },
         });
 
@@ -3669,8 +3680,8 @@
                 <a-entity align-with-projection="offset: 0.25 0.2 -0.5; rotation: 0 0 0" html="cursor:#cursor;html:#my-interface" class="clickable"></a-entity>
                 <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
                 <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
-                <a-entity align-with-projection="offset: -0.25 -0.2 -0.5; rotation: 0 90 0; scale: 0.03 0.03 0.03" gltf-model="/meshes/Cannon.glb" class="clickable" select-cannon-side="selector: right-cannon"></a-entity>
-                <a-entity align-with-projection="offset: 0.25 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03" gltf-model="/meshes/Cannon.glb" class="clickable" select-cannon-side="selector: left-cannon"></a-entity>
+                <a-entity align-with-projection="offset: -0.25 -0.2 -0.5; rotation: 0 90 0; scale: 0.03 0.03 0.03" gltf-model="/meshes/Cannon.glb" class="clickable" select-cannon-side="selector: left-cannon"></a-entity>
+                <a-entity align-with-projection="offset: 0.25 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03" gltf-model="/meshes/Cannon.glb" class="clickable" select-cannon-side="selector: right-cannon"></a-entity>
             </a-entity>
         </a-entity>
     </a-scene>

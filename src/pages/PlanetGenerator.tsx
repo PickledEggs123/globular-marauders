@@ -149,6 +149,7 @@ export const PlanetGenerator = () => {
             } as IGameMesh));
             Promise.all<Uint8Array | string>([
                 ...data2.map(m => generatePlanetGltf(m, m.ocean, m.navmesh || m.oceanNavmesh)),
+                "/meshes/CannonBall.glb",
                 "/meshes/GoldCoin.glb",
                 "/meshes/ships/sloop.glb",
                 "/meshes/WoodenArrow2.glb",
@@ -162,7 +163,7 @@ export const PlanetGenerator = () => {
                 "/meshes/House1-2.glb",
                 "/meshes/Temple1-0.glb",
                 "/meshes/Temple1-1.glb",
-                "/meshes/Temple1-2.glb",
+                "/meshes/Temple1-2.glb"
             ]).then((gltf) => {
                 const Uint8ToBase64 = (u8Arr: Uint8Array) => {
                     const CHUNK_SIZE = 0x8000; //arbitrary number
@@ -178,7 +179,7 @@ export const PlanetGenerator = () => {
                     return btoa(result);
                 }
                 const worldMeshes: [string, boolean, boolean, boolean, boolean, [number, number, number]][] = [];
-                for (let i = 0; i < gltf.length - 14; i++) {
+                for (let i = 0; i < gltf.length - 15; i++) {
                     const dataUri1 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[i] as Uint8Array)}`;
                     worldMeshes.push([dataUri1, data2[i].collidable, data2[i].navmesh, data2[i].ocean, data2[i].oceanNavmesh, data2[i].vertex] as [string, boolean, boolean, boolean, boolean, [number, number, number]]);
                 }
@@ -203,6 +204,7 @@ export const PlanetGenerator = () => {
                     iframeRef.current.contentWindow.addShip(JSON.stringify({data: dataUri2, point: point.map(x => x * PLANET_SIZE)}));
                 }
 
+                const dataUri314 = gltf[gltf.length - 15];
                 const dataUri313 = gltf[gltf.length - 14];
                 const dataUri312 = gltf[gltf.length - 12];
                 const dataUri311 = gltf[gltf.length - 11];
@@ -236,6 +238,8 @@ export const PlanetGenerator = () => {
                     iframeRef.current.contentWindow.addCharacterModel(JSON.stringify({type: "ARROW", data: dataUri312}));
                     // @ts-ignore
                     iframeRef.current.contentWindow.addCharacterModel(JSON.stringify({type: "GOLD_COIN", data: dataUri313}));
+                    // @ts-ignore
+                    iframeRef.current.contentWindow.addCharacterModel(JSON.stringify({type: "CANNONBALL", data: dataUri314}));
                 }
 
                 const dataUri5 = gltf[gltf.length - 6];
