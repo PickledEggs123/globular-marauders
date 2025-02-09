@@ -1031,15 +1031,17 @@
             '87': 'KeyW',
             '65': 'KeyA',
             '83': 'KeyS',
-            '68': 'KeyD'
+            '68': 'KeyD',
+            '81': 'KeyQ',
+            '69': 'KeyE',
         };
         // @ts-ignore
         const bind = AFRAME.utils.bind;
         // @ts-ignore
         const shouldCaptureKeyEvent = AFRAME.utils.shouldCaptureKeyEvent;
         const KEYS = [
-            'KeyW', 'KeyA', 'KeyS', 'KeyD',
-            'ArrowUp', 'ArrowLeft', 'ArrowRight', 'ArrowDown'
+            'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE',
+            'ArrowUp', 'ArrowLeft', 'ArrowRight', 'ArrowDown',
         ];
 
         AFRAME.registerComponent('globe-keyboard-controls', {
@@ -1211,6 +1213,15 @@
                 var code;
                 if (!shouldCaptureKeyEvent(event)) { return; }
                 code = event.code || KEYCODE_TO_CODE[event.keyCode];
+
+                if (code === "KeyE") {
+                    const leftCannonFire = document.querySelector("#left-cannon-fire");
+                    leftCannonFire.components["select-cannon-side"].innerSelectCannonSide();
+                }
+                if (code === "KeyQ") {
+                    const rightCannonFire = document.querySelector("#right-cannon-fire");
+                    rightCannonFire.components["select-cannon-side"].innerSelectCannonSide();
+                }
 
                 const scene = document.querySelector("a-scene");
                 const ships = Array.from(scene.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`));
@@ -3730,8 +3741,8 @@
                 <a-entity align-with-projection="offset: 0.25 0.2 -0.5; rotation: 0 0 0" html="cursor:#cursor;html:#my-interface" class="clickable"></a-entity>
                 <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
                 <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
-                <a-entity align-with-projection="offset: -0.25 -0.2 -0.5; rotation: 0 90 0; scale: 0.03 0.03 0.03" gltf-model="/meshes/Cannon.glb" class="clickable" select-cannon-side="selector: left-cannon"></a-entity>
-                <a-entity align-with-projection="offset: 0.25 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03" gltf-model="/meshes/Cannon.glb" class="clickable" select-cannon-side="selector: right-cannon"></a-entity>
+                <a-entity id="left-cannon-fire" align-with-projection="offset: -0.25 -0.2 -0.5; rotation: 0 90 0; scale: 0.03 0.03 0.03" gltf-model="/meshes/Cannon.glb" class="clickable" select-cannon-side="selector: left-cannon"></a-entity>
+                <a-entity id="right-cannon-fire" align-with-projection="offset: 0.25 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03" gltf-model="/meshes/Cannon.glb" class="clickable" select-cannon-side="selector: right-cannon"></a-entity>
             </a-entity>
         </a-entity>
     </a-scene>
