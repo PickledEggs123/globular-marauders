@@ -363,31 +363,33 @@
                 // apply drag
                 this.el.body.applyForce(this.el.body.velocity.clone().scale(-25), new CANNON.Vec3(0, 0, 0));
 
-                if (this.data.ship && this.data.buoyancy) {
-                    // apply sideways tilt force
-                    const sidewaysTilt = this.el.body.velocity.clone().scale(100).dot(currentRight.clone());
-                    const tiltForce = new CANNON.Vec3(currentRight.x, currentRight.y, currentRight.z).scale(sidewaysTilt);
-                    const tiltPoint = new CANNON.Vec3(currentUp.x, currentUp.y, currentUp.z);
-                    this.el.body.applyForce(tiltForce.clone(), tiltPoint.clone());
-                    this.el.body.applyForce(tiltForce.clone().scale(-1), tiltPoint.clone().scale(-1));
+                if (this.data.ship) {
+                    if (this.data.buoyancy) {
+                        // apply sideways tilt force
+                        const sidewaysTilt = this.el.body.velocity.clone().scale(100).dot(currentRight.clone());
+                        const tiltForce = new CANNON.Vec3(currentRight.x, currentRight.y, currentRight.z).scale(sidewaysTilt);
+                        const tiltPoint = new CANNON.Vec3(currentUp.x, currentUp.y, currentUp.z);
+                        this.el.body.applyForce(tiltForce.clone(), tiltPoint.clone());
+                        this.el.body.applyForce(tiltForce.clone().scale(-1), tiltPoint.clone().scale(-1));
 
-                    // apply up right force
-                    const springForce = 300;
-                    const rotateForce = new CANNON.Vec3(diffUp.x, diffUp.y, diffUp.z).scale(springForce);
-                    const rotatePoint = new CANNON.Vec3(currentUp.x, currentUp.y, currentUp.z);
-                    const dragForce = this.el.body.angularVelocity.clone().cross(rotatePoint.clone()).scale(100);
-                    this.el.body.applyForce(rotateForce.clone().vsub(dragForce), rotatePoint.clone());
-                    this.el.body.applyForce(rotateForce.clone().vsub(dragForce).scale(-1), rotatePoint.clone().scale(-1));
+                        // apply up right force
+                        const springForce = 300;
+                        const rotateForce = new CANNON.Vec3(diffUp.x, diffUp.y, diffUp.z).scale(springForce);
+                        const rotatePoint = new CANNON.Vec3(currentUp.x, currentUp.y, currentUp.z);
+                        const dragForce = this.el.body.angularVelocity.clone().cross(rotatePoint.clone()).scale(100);
+                        this.el.body.applyForce(rotateForce.clone().vsub(dragForce), rotatePoint.clone());
+                        this.el.body.applyForce(rotateForce.clone().vsub(dragForce).scale(-1), rotatePoint.clone().scale(-1));
 
-                    // apply horizontal drag
-                    const horizontalRotatePoint = new CANNON.Vec3(currentForward.x, currentForward.y, currentForward.z);
-                    const horizontalDragForce = this.el.body.angularVelocity.clone().cross(horizontalRotatePoint.clone()).scale(100);
-                    this.el.body.applyForce(horizontalDragForce.clone().scale(-1), horizontalRotatePoint.clone());
-                    this.el.body.applyForce(horizontalDragForce.clone(), horizontalRotatePoint.clone().scale(-1));
+                        // apply horizontal drag
+                        const horizontalRotatePoint = new CANNON.Vec3(currentForward.x, currentForward.y, currentForward.z);
+                        const horizontalDragForce = this.el.body.angularVelocity.clone().cross(horizontalRotatePoint.clone()).scale(100);
+                        this.el.body.applyForce(horizontalDragForce.clone().scale(-1), horizontalRotatePoint.clone());
+                        this.el.body.applyForce(horizontalDragForce.clone(), horizontalRotatePoint.clone().scale(-1));
+                    }
 
                     if (trueUpDistance.length() < PLANET_SIZE + 1) {
                         const trueUpMagnitude = -(trueUpDistance.length() - PLANET_SIZE - 1);
-                        const trueUpForce = new CANNON.Vec3(trueUp.x, trueUp.y, trueUp.z).scale(trueUpMagnitude * 1000);
+                        const trueUpForce = new CANNON.Vec3(trueUp.x, trueUp.y, trueUp.z).scale(trueUpMagnitude * (this.data.buoyancy ? 1000 : 10));
                         this.el.body.applyForce(trueUpForce, new CANNON.Vec3(0, 0, 0));
                     }
                 }
@@ -2501,7 +2503,7 @@
                 setTimeout(() => {
                     this.el.parentNode.removeChild(this.el);
                 }, 10_000);
-                this.el.setAttribute("globe-gravity", "buoyancy: false;");
+                this.el.setAttribute("globe-gravity", "ship: true; buoyancy: false;");
             },
         });
 

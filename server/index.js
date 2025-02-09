@@ -352,7 +352,7 @@ io.on("connection", (socket) => {
         roomInfo.occupants[socket.id] = joinedTime;
         roomInfo.occupantsCount++;
 
-        let sendIsHost = curRoom.host === socket.id;
+        let sendIsHost = roomInfo.host === socket.id;
         console.log(`${socket.id} joined room ${curRoom}`);
 
         eventEmitterOut.emit("send", {
@@ -460,7 +460,7 @@ io.on("connection", (socket) => {
             if (sendIsHost) {
                 eventEmitterOut.emit("send", {
                     from: 'server',
-                    to: socket.id,
+                    to: roomInfo.host,
                     type: "isHost",
                     data: null,
                     msgType: 'send',
