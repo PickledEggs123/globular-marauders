@@ -344,7 +344,8 @@
 
         AFRAME.registerComponent('globe-gravity', {
             schema: {
-                ship: {type: 'boolean', default: false}
+                ship: {type: 'boolean', default: false},
+                buoyancy: {type: 'boolean', default: true},
             },
             tick: function () {
                 const object3D = this.el.object3D;
@@ -362,7 +363,7 @@
                 // apply drag
                 this.el.body.applyForce(this.el.body.velocity.clone().scale(-25), new CANNON.Vec3(0, 0, 0));
 
-                if (this.data.ship) {
+                if (this.data.ship && this.data.buoyancy) {
                     // apply sideways tilt force
                     const sidewaysTilt = this.el.body.velocity.clone().scale(100).dot(currentRight.clone());
                     const tiltForce = new CANNON.Vec3(currentRight.x, currentRight.y, currentRight.z).scale(sidewaysTilt);
@@ -2463,7 +2464,6 @@
 
                 if (newHealth <= 0) {
                     this.el.emit('dead');
-                    this.el.parentNode.removeChild(this.el);
                 }
             },
         });
@@ -2486,6 +2486,22 @@
                     networkId,
                     hit,
                 });
+            },
+        });
+        AFRAME.registerComponent("ship-death", {
+            schema: {},
+            init: function () {
+                this.innerHandleDeath = this.handleDeath.bind(this);
+                this.el.addEventListener('dead', this.innerHandleDeath);
+            },
+            remove: function () {
+                this.el.removeEventListener('dead', this.innerHandleDeath);
+            },
+            handleDeath: function () {
+                setTimeout(() => {
+                    this.el.parentNode.removeChild(this.el);
+                }, 10_000);
+                this.el.setAttribute("globe-gravity", "buoyancy: false;");
             },
         });
 
@@ -3009,6 +3025,7 @@
             rootShip.setAttribute("globe-gravity", "ship: true;");
             rootShip.setAttribute("globe-keyboard-controls", "enabled: true; fly: true");
             rootShip.setAttribute("ship-health", "");
+            rootShip.setAttribute("ship-death", "");
             rootShip.setAttribute("fire-cannons", "");
             rootShip.setAttribute("firing-cannons", "");
             rootShip.setAttribute("shadow", "");
