@@ -413,9 +413,11 @@ export const PlanetGenerator = () => {
                                 </Typography>
                                 <br/>
                                 <Typography variant="body1">
-                                    There is a bug where the output of the generator is not valid with part of the
-                                    sphere missing.
-                                    I don't know how to prevent that from happening other than to run the app again.
+                                    Included on this page is a video game in the second window. Please use arrow keys or WASD
+                                    to move the ship. You can also click on the water to far away from the ship to move the ship.
+                                    Click on the cannons to fire cannon balls or use QE keys to aim and fire cannon balls.
+                                    Click on land to send a landing party of pirates/knights that will attack villagers for coins.
+                                    Coins can be used to purchase additional ships.
                                 </Typography>
                             </CardContent>
                         </Card>
