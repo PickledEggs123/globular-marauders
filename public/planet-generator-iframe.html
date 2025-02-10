@@ -2511,9 +2511,7 @@
                 this.el.removeEventListener('dead', this.innerHandleDeath);
             },
             handleDeath: function () {
-                setTimeout(() => {
-                    this.el.parentNode.removeChild(this.el);
-                }, 10_000);
+                this.el.setAttribute("despawn", "");
                 this.el.setAttribute("globe-gravity", "ship: true; buoyancy: false;");
             },
         });
