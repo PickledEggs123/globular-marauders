@@ -2781,8 +2781,23 @@
                     networkId,
                     hit,
                 });
+
+                this.el.parentEl.components['sound__hit'].playSound();
             },
         });
+        AFRAME.registerComponent('networked-ship-cannonball', {
+            schema: {},
+            init: function () {
+                this.innerHandleFire = this.handleFire.bind(this);
+                this.el.addEventListener('firing', this.innerHandleFire);
+            },
+            remove: function () {
+                this.el.removeEventListener('firing', this.innerHandleFire);
+            },
+            handleFire: function (evt) {
+                this.el.components['sound__fire'].playSound();
+            }
+        })
         AFRAME.registerComponent("ship-death", {
             schema: {},
             init: function () {
@@ -2893,6 +2908,9 @@
                 dataEl.setAttribute("gltf-model", str);
                 dataEl.setAttribute("networked-ship-health", "");
                 dataEl.setAttribute("cannonball-collider", "");
+                rootGoldCoin.setAttribute("sound__fire", "src: #fire; poolSize: 40; volume: 5;");
+                rootGoldCoin.setAttribute("sound__hit", "src: #hit; poolSize: 40; volume: 5;");
+                rootGoldCoin.setAttribute("networked-ship-cannonball", "");
                 rootGoldCoin.appendChild(dataEl);
             } else {
                 rootGoldCoin.setAttribute("gltf-model", str);
@@ -3326,8 +3344,8 @@
             rootShip.setAttribute("position", `${point[0]} ${point[1]} ${point[2]}`);
             rootShip.setAttribute("rotation", "0 0 0");
             rootShip.setAttribute("outline-pass", "");
-            rootShip.setAttribute("sound__fire", "src: #fire; poolSize: 40");
-            rootShip.setAttribute("sound__hit", "src: #hit; poolSize: 40");
+            rootShip.setAttribute("sound__fire", "src: #fire; poolSize: 40; volume: 5;");
+            rootShip.setAttribute("sound__hit", "src: #hit; poolSize: 40; volume: 5;");
 
             const rootModel = document.createElement("a-entity");
             rootModel.setAttribute("class", "data");
@@ -3400,6 +3418,16 @@
                 const entity = NAF.entities.entities[networkId];
                 if (entity) {
                     entity.emit("hit", hit);
+                }
+            });
+
+            NAF.connection.subscribeToDataChannel('networkedShipCannonball', function (sender, dataType, data, targetId) {
+                const {
+                    networkId
+                } = data;
+                const entity = NAF.entities.entities[networkId];
+                if (entity) {
+                    entity.emit("firing");
                 }
             });
 
@@ -3523,12 +3551,17 @@
             init: function () {
                 this.innerFireCannons = this.fireCannons.bind(this);
                 this.el.addEventListener("fire-cannons", this.innerFireCannons);
+                this.lastFire = 0;
             },
             remove: function () {
                 this.el.removeEventListener("fire-cannons", this.innerFireCannons);
             },
             fireCannons: function (e) {
-                this.el.emit('firing-cannons', e.detail);
+                const dateValue = +new Date();
+                if (this.lastFire < dateValue + 2_000) {
+                    this.lastFire = dateValue;
+                    this.el.emit('firing-cannons', e.detail);
+                }
             },
         });
 
@@ -3551,7 +3584,15 @@
                     addCannonBall(worldPosition, velocity);
                 });
 
-                this.el.components['sound__fire'].playSound();
+                // make sound for all 4 cannons.
+                for (let i = 0; i < 4; i++) {
+                    this.el.components['sound__fire'].playSound();
+
+                    const networkId = this.el.components['networked'].data.networkId;
+                    NAF.connection.broadcastDataGuaranteed("networkedShipCannonball", {
+                        networkId,
+                    });
+                }
             },
         });
 
