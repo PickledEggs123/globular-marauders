@@ -2755,6 +2755,7 @@
                 const hit = evt.detail;
                 const newHealth = this.data.health - hit;
                 this.el.setAttribute("ship-health", `health: ${newHealth}`);
+                this.el.components['sound__hit'].playSound();
 
                 if (newHealth <= 0) {
                     this.el.emit('dead');
@@ -3325,6 +3326,8 @@
             rootShip.setAttribute("position", `${point[0]} ${point[1]} ${point[2]}`);
             rootShip.setAttribute("rotation", "0 0 0");
             rootShip.setAttribute("outline-pass", "");
+            rootShip.setAttribute("sound__fire", "src: #fire; poolSize: 40");
+            rootShip.setAttribute("sound__hit", "src: #hit; poolSize: 40");
 
             const rootModel = document.createElement("a-entity");
             rootModel.setAttribute("class", "data");
@@ -3547,6 +3550,8 @@
 
                     addCannonBall(worldPosition, velocity);
                 });
+
+                this.el.components['sound__fire'].playSound();
             },
         });
 
@@ -4011,6 +4016,8 @@
                 <a-entity class="avatar" networked-audio-source>
                 </a-entity>
             </template>
+            <audio id="fire" src="/sounds/FireSFX.m4a" preload="auto"></audio>
+            <audio id="hit" src="/sounds/WoodHitSFX.m4a" preload="auto"></audio>
         </a-assets>
         <a-sphere color="black" radius="0.01" id="cursor"></a-sphere>
         <a-entity light="type: ambient; color: #CCC"></a-entity>
