@@ -3557,9 +3557,10 @@
                 this.el.removeEventListener("fire-cannons", this.innerFireCannons);
             },
             fireCannons: function (e) {
+                // fire every 2 seconds
                 const dateValue = +new Date();
-                if (this.lastFire < dateValue + 2_000) {
-                    this.lastFire = dateValue;
+                if (this.lastFire < dateValue) {
+                    this.lastFire = dateValue + 2_000;
                     this.el.emit('firing-cannons', e.detail);
                 }
             },
