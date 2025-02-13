@@ -3531,6 +3531,12 @@
             remove: function () {
                 this.el.removeEventListener("click", this.innerSelectCannonSide);
             },
+            tick: function () {
+                const scene = document.querySelector("a-scene");
+                const unit = scene.components['coin-purse'].getUnit();
+                const visible = unit.startsWith("ship");
+                this.el.setAttribute("visible", visible);
+            },
             selectCannonSide: function () {
                 const cameraEl = document.querySelector("#camera-rig");
                 const selector = `.${scene.components['coin-purse'].getUnit()} .${this.data.selector}`;
