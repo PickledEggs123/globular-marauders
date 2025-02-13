@@ -3478,6 +3478,41 @@
             }
         });
 
+        AFRAME.registerComponent('respawn', {
+            schema: {},
+            init: function () {
+                this.respawnTick = +new Date() + 10_000;
+                this.activeRespawn = false;
+            },
+            tick: function () {
+                // respawn 5 seconds after no more ships
+                const time = +new Date();
+                if (this.activeRespawn) {
+                    if (this.respawnTick < time) {
+                        this.activeRespawn = false;
+                        const scene = document.querySelector("a-scene");
+                        scene.components['coin-purse'].shipCount = 1;
+                        scene.components['coin-purse'].buyShips();
+                    }
+                } else {
+                    const ships = [];
+                    const activeUnits = [
+                        'ship-1',
+                        'ship-2',
+                        'ship-3',
+                    ];
+                    for (const activeUnit of activeUnits) {
+                        const s = Array.from(document.querySelectorAll(`.${activeUnit}`));
+                        ships.push(...s);
+                    }
+                    if (ships.length === 0) {
+                        this.respawnTick = time + 5_000;
+                        this.activeRespawn = true;
+                    }
+                }
+            },
+        });
+
         AFRAME.registerComponent('setup-cannons', {
             dependencies: ['gltf-model'],
             schema: {},
@@ -4058,7 +4093,7 @@
     </style>
 </head>
 <body>
-    <a-scene onclick="window.musicPlayer.start();" coin-purse physics="driver: local; gravity: 0 0 0;" globe-nav globe-ocean-nav embedded fog shadow="enabled: true" outline-pass id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
+    <a-scene onclick="window.musicPlayer.start();" coin-purse respawn physics="driver: local; gravity: 0 0 0;" globe-nav globe-ocean-nav embedded fog shadow="enabled: true" outline-pass id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
         <a-assets>
             <template id="avatar-template">
                 <a-entity class="avatar" networked-audio-source>
