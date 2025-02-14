@@ -3290,21 +3290,21 @@
             rootHouse.appendChild(rootModel);
 
             const lod0 = document.createElement("a-entity");
-            lod0.setAttribute("class", "lod0 clickable");
+            lod0.setAttribute("class", `lod0 clickable${type === "PORT" ? " port" : ""}`);
             lod0.setAttribute("raze-target", "");
             lod0.setAttribute("spawn-gold", "");
             lod0.setAttribute("shadow", "");
             rootModel.appendChild(lod0);
 
             const lod1 = document.createElement("a-entity");
-            lod1.setAttribute("class", "lod1 clickable");
+            lod1.setAttribute("class", `lod1 clickable${type === "PORT" ? " port" : ""}`);
             lod1.setAttribute("raze-target", "");
             lod1.setAttribute("spawn-gold", "");
             lod1.setAttribute("shadow", "");
             rootModel.appendChild(lod1);
 
             const lod2 = document.createElement("a-entity");
-            lod2.setAttribute("class", "lod2 clickable");
+            lod2.setAttribute("class", `lod2 clickable${type === "PORT" ? " port" : ""}`);
             lod2.setAttribute("raze-target", "");
             lod2.setAttribute("spawn-gold", "");
             lod2.setAttribute("shadow", "");
@@ -3333,7 +3333,7 @@
             const rootShip = document.createElement("a-entity");
             rootShip.setAttribute("class", `${scene.components['coin-purse'].activeUnit} clickable`);
             rootShip.setAttribute("dynamic-body", "shape: sphere; sphereRadius: 1; mass: 100");
-            rootShip.setAttribute("collision-filter", "group: ship; collidesWith: default, ship");
+            rootShip.setAttribute("collision-filter", "group: ship; collidesWith: default");
             rootShip.setAttribute("globe-gravity", "ship: true;");
             rootShip.setAttribute("globe-keyboard-controls", "enabled: true; fly: true");
             rootShip.setAttribute("ship-health", "");
@@ -3505,7 +3505,7 @@
                         const s = Array.from(document.querySelectorAll(`.${activeUnit}`));
                         ships.push(...s);
                     }
-                    if (ships.length === 0) {
+                    if (ships.length === 0 && !!window.shipModelStr) {
                         this.respawnTick = time + 5_000;
                         this.activeRespawn = true;
                     }
@@ -3661,6 +3661,38 @@
             tick: function () {
                 if (+new Date() > this.deleteTime) {
                     this.el.parentElement.removeChild(this.el);
+                }
+            },
+        });
+
+        AFRAME.registerComponent("port-show", {
+            schema: {},
+            tick: function () {
+                const scene = document.querySelector("a-scene");
+                const activeUnit = scene.components['coin-purse'].activeUnit;
+                const ship = scene.querySelector(`.${activeUnit}`);
+                if (ship) {
+                    const position = ship.object3D.getWorldPosition(new THREE.Vector3());
+                    const ports = Array.from(document.querySelectorAll(".port"));
+                    const port = ports.find(x => {
+                        const xPos = x.object3D.getWorldPosition(new THREE.Vector3());
+                        const distance = xPos.distanceTo(position);
+                        return distance < 5;
+                    });
+                    const visible = !!port;
+                    this.el.setAttribute("visible", visible);
+                    if (visible && !this.el.classList.contains("clickable")) {
+                        this.el.classList.add("clickable");
+                    }
+                    if (!visible && this.el.classList.contains("clickable")) {
+                        this.el.classList.remove("clickable");
+                    }
+                } else {
+                    const visible = true;
+                    this.el.setAttribute("visible", visible);
+                    if (visible && !this.el.classList.contains("clickable")) {
+                        this.el.classList.add("clickable");
+                    }
                 }
             },
         });
@@ -4102,13 +4134,13 @@
             <audio id="fire" src="/sounds/FireSFX.m4a" preload="auto"></audio>
             <audio id="hit" src="/sounds/WoodHitSFX.m4a" preload="auto"></audio>
         </a-assets>
-        <a-sphere color="black" radius="0.01" id="cursor"></a-sphere>
+        <a-sphere color="black" radius="0.01" id="cursor" port-show></a-sphere>
         <a-entity light="type: ambient; color: #CCC"></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.8; castShadow: true; shadowCameraBottom: -150; shadowCameraTop: 150; shadowCameraLeft: -150; shadowCameraRight: 150; shadowCameraNear: -150; shadowCameraFar: 150; shadowMapWidth: 1024; shadowMapHeight: 1024;" position="0 1 0" handle-shadow-parameter></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.15" position="0 -1 0"></a-entity>
         <a-entity id="camera-rig" position="0 105 5" networked="template: #avatar-template; attachTemplateToLocal: false;">
             <a-entity camera globe-look-controls="mouseEnabled: false; touchEnabled: false;" position="0 1.6 0" cursor-updater cursor="rayOrigin: mouse" raycaster="far: 50; interval: 100; objects: .clickable">
-                <a-entity align-with-projection="offset: 0.25 0.2 -0.5; rotation: 0 0 0" html="cursor:#cursor;html:#my-interface" class="clickable"></a-entity>
+                <a-entity align-with-projection="offset: 0.25 0.2 -0.5; rotation: 0 0 0" port-show html="cursor:#cursor;html:#my-interface" class="clickable"></a-entity>
                 <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
                 <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
                 <a-entity id="left-cannon-fire" align-with-projection="offset: -0.25 -0.2 -0.5; rotation: 0 90 0; scale: 0.03 0.03 0.03" gltf-model="/meshes/Cannon.glb" class="clickable" select-cannon-side="selector: left-cannon"></a-entity>

@@ -25,7 +25,7 @@ process.title = "globular-marauders-server";
 // Get port or default to 8080
 const port = process.env.PORT || 8080;
 
-const maxOccupantsInRoom = 4;
+const maxOccupantsInRoom = 8;
 
 // setup and configure express http server.
 const app = express();
@@ -99,7 +99,7 @@ app.get('/api/room/:webrtcId', async (req, res) => {
             having: {
                 roomId: {
                     _count: {
-                        lt: 4,
+                        lt: maxOccupantsInRoom,
                     },
                 },
             },

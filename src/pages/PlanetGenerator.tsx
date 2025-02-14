@@ -58,7 +58,7 @@ export const PlanetGenerator = () => {
                         uniform mat4 uRotation;
             
                         void main() {
-                            gl_Position = uRotation * vec4(aPosition * 0.86, 1.0);
+                            gl_Position = uRotation * vec4(aPosition * 0.86 * vec3(-1.0, 1.0, 1.0), 1.0);
                         }
                     `;
                     const planetFragmentShader = `
@@ -96,8 +96,8 @@ export const PlanetGenerator = () => {
                         void main() {
                             vColor = aColor;
             
-                            gl_Position = uRotation * vec4(aPosition * 0.86, 1.0);
-                            vNormal = (uRotation * vec4(aNormal, 1.0)).xyz;
+                            gl_Position = uRotation * vec4(aPosition * 0.86 * vec3(-1.0, 1.0, 1.0), 1.0);
+                            vNormal = (uRotation * vec4(aNormal * vec3(-1.0, 1.0, 1.0), 1.0)).xyz;
                         }
                     `;
                     const planetFragmentShader = `
