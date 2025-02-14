@@ -1315,13 +1315,14 @@
             '68': 'KeyD',
             '81': 'KeyQ',
             '69': 'KeyE',
+            '70': 'KeyF',
         };
         // @ts-ignore
         const bind = AFRAME.utils.bind;
         // @ts-ignore
         const shouldCaptureKeyEvent = AFRAME.utils.shouldCaptureKeyEvent;
         const KEYS = [
-            'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE',
+            'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'KeyF',
             'ArrowUp', 'ArrowLeft', 'ArrowRight', 'ArrowDown',
         ];
 
@@ -1502,6 +1503,10 @@
                 if (code === "KeyQ") {
                     const rightCannonFire = document.querySelector("#right-cannon-fire");
                     rightCannonFire.components["select-cannon-side"].innerSelectCannonSide();
+                }
+                if (code === "KeyF") {
+                    const noneCannonFire = document.querySelector("#none-cannon-fire");
+                    noneCannonFire.components["select-cannon-side"].innerSelectCannonSide();
                 }
 
                 const scene = document.querySelector("a-scene");
@@ -3573,16 +3578,25 @@
                 this.el.setAttribute("visible", visible);
             },
             selectCannonSide: function () {
-                const cameraEl = document.querySelector("#camera-rig");
-                const selector = `.${scene.components['coin-purse'].getUnit()} .${this.data.selector}`;
-                const firstClick = cameraEl.getAttribute("look-at-box") !== selector;
-                if (firstClick) {
-                    cameraEl.setAttribute("look-at-box", selector);
+                if (this.data.selector === "none-cannon") {
+                    const cameraEl = document.querySelector("#camera-rig");
+                    const selector = `.${scene.components['coin-purse'].getUnit()}`;
+                    const firstClick = cameraEl.getAttribute("look-at-box") !== selector;
+                    if (firstClick) {
+                        cameraEl.setAttribute("look-at-box", selector);
+                    }
                 } else {
-                    const ships = document.querySelectorAll(`.${scene.components['coin-purse'].getUnit().split(":", 2)[0]}`);
-                    ships.forEach(s => {
-                        s.emit("fire-cannons", this.data.selector);
-                    });
+                    const cameraEl = document.querySelector("#camera-rig");
+                    const selector = `.${scene.components['coin-purse'].getUnit()} .${this.data.selector}`;
+                    const firstClick = cameraEl.getAttribute("look-at-box") !== selector;
+                    if (firstClick) {
+                        cameraEl.setAttribute("look-at-box", selector);
+                    } else {
+                        const ships = document.querySelectorAll(`.${scene.components['coin-purse'].getUnit().split(":", 2)[0]}`);
+                        ships.forEach(s => {
+                            s.emit("fire-cannons", this.data.selector);
+                        });
+                    }
                 }
             },
         });
@@ -4145,6 +4159,7 @@
                 <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
                 <a-entity id="left-cannon-fire" align-with-projection="offset: -0.25 -0.2 -0.5; rotation: 0 90 0; scale: 0.03 0.03 0.03" gltf-model="/meshes/Cannon.glb" class="clickable" select-cannon-side="selector: left-cannon"></a-entity>
                 <a-entity id="right-cannon-fire" align-with-projection="offset: 0.25 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03" gltf-model="/meshes/Cannon.glb" class="clickable" select-cannon-side="selector: right-cannon"></a-entity>
+                <a-entity id="none-cannon-fire" align-with-projection="offset: 0 -0.2 -0.5; rotation: 0 0 0; scale: 0.015 0.015 0.015" gltf-model="/meshes/Helm.glb" class="clickable" select-cannon-side="selector: none-cannon"></a-entity>
             </a-entity>
         </a-entity>
     </a-scene>
