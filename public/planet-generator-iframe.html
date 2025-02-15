@@ -3468,19 +3468,20 @@
                 // do nothing if it is mobile
                 const cameraLookControlsEl = document.querySelector('[globe-look-controls]');
                 object3D.position.set(finalPosition.x, finalPosition.y, finalPosition.z);
-                if (this.el.sceneEl?.renderer?.xr?.isPresenting || cameraLookControlsEl.components['globe-look-controls']?.magicWindowControls?.enabled) {
-                    return;
-                }
 
                 // align with camera in desktop
-                const position = new THREE.Vector3();
-                const rotation = new THREE.Quaternion();
-                const scale = new THREE.Vector3();
-                camera.projectionMatrix.decompose(position, rotation, scale);
+                const position = new THREE.Vector3(0, 0, 0);
+                const rotation = new THREE.Quaternion(0, 0, 0, 1);
+                const scale = new THREE.Vector3(1, 1, 1);
+                if (!(this.el.sceneEl?.renderer?.xr?.isPresenting || cameraLookControlsEl.components['globe-look-controls']?.magicWindowControls?.enabled)) {
+                    camera.projectionMatrix.decompose(position, rotation, scale);
+                }
                 const aspect = scene.canvas.width / scene.canvas.height;
                 const offset = new THREE.Vector3(aspect, 1, 1).multiply(this.data.offset);
                 position.add(offset).multiply(scale);
-                camera.getWorldQuaternion(rotation);
+                if (!(this.el.sceneEl?.renderer?.xr?.isPresenting || cameraLookControlsEl.components['globe-look-controls']?.magicWindowControls?.enabled)) {
+                    camera.getWorldQuaternion(rotation);
+                }
                 position.applyQuaternion(rotation);
                 this.el.object3D.position.copy(position);
                 this.el.object3D.quaternion.copy(rotation.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(
