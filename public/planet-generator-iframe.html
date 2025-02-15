@@ -3464,6 +3464,15 @@
             tick: function () {
                 const scene = document.querySelector("a-scene");
                 const camera = scene.camera;
+
+                // do nothing if it is mobile
+                const cameraLookControlsEl = document.querySelector('[globe-look-controls]');
+                object3D.position.set(finalPosition.x, finalPosition.y, finalPosition.z);
+                if (this.el.sceneEl?.renderer?.xr?.isPresenting || cameraLookControlsEl.components['globe-look-controls']?.magicWindowControls?.enabled) {
+                    return;
+                }
+
+                // align with camera in desktop
                 const position = new THREE.Vector3();
                 const rotation = new THREE.Quaternion();
                 const scale = new THREE.Vector3();
