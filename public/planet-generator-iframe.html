@@ -580,11 +580,9 @@
                 this.counter = 60;
 
                 const object3D = this.el.object3D;
-                // @ts-ignore
                 const pos = object3D.getWorldPosition(new THREE.Vector3());
 
                 const cameraEl = document.querySelector("#camera-rig");
-                // @ts-ignore
                 const cameraPos = cameraEl.object3D.getWorldPosition(new THREE.Vector3());
 
                 const distance = pos.distanceTo(cameraPos);
@@ -683,7 +681,6 @@
                 this.el.addEventListener('model-loaded', () => {
                     const obj = this.el.getObject3D('mesh');
                     const result = threeToCannon.getShapeParameters(obj, { type: threeToCannon.ShapeType.MESH });
-                    // @ts-ignore
                     const body = (this.el.components['static-body'].body);
                     body.shapes.splice(0, body.shapes.length);
                     body.shapeOffsets.splice(0, body.shapeOffsets.length)
@@ -693,14 +690,11 @@
                             offset,
                             orientation,
                             params: {
-                                // @ts-ignore
                                 vertices,
-                                // @ts-ignore
                                 indices,
                             },
                         } = result;
                         const shape = new CANNON.Trimesh(vertices, indices);
-                        // @ts-ignore
                         this.el.components['static-body'].addShape(shape, offset, orientation);
                     }
                 });
@@ -1317,9 +1311,7 @@
             '69': 'KeyE',
             '70': 'KeyF',
         };
-        // @ts-ignore
         const bind = AFRAME.utils.bind;
-        // @ts-ignore
         const shouldCaptureKeyEvent = AFRAME.utils.shouldCaptureKeyEvent;
         const KEYS = [
             'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'KeyF',
@@ -1354,7 +1346,6 @@
                         const scene = document.querySelector("a-scene");
                         const shipEls = Array.from(document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`));
                         shipEls.slice(1).forEach(shipEl => {
-                            // @ts-ignore
                             shipEl.setAttribute("globe-ocean-nav-agent", `active: false; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
                         });
                     }, 125);
@@ -1362,7 +1353,6 @@
                         const scene = document.querySelector("a-scene");
                         const shipEls = Array.from(document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`));
                         shipEls.slice(1).forEach(shipEl => {
-                            // @ts-ignore
                             shipEl.setAttribute("globe-ocean-nav-agent", `active: true; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
                         });
                     }, 250);
@@ -1573,7 +1563,6 @@
              * @param {THREE.Geometry} geometry
              */
             setNavMeshGeometry: function (geometry) {
-                // @ts-ignore
                 this.navMesh = new THREE.Mesh(geometry);
                 pathfinder.setZoneData(ZONE, threePathfinding.Pathfinding.createZone(geometry));
                 Array.from(this.agents).forEach((agent) => agent.updateNavLocation());
@@ -1685,13 +1674,9 @@
 
                 if (!navMesh) return;
 
-                // @ts-ignore
                 const navMeshGeometry = navMesh.geometry.clone();
-                // @ts-ignore
                 navMesh.updateWorldMatrix(true, false);
-                // @ts-ignore
                 navMeshGeometry.applyMatrix4(navMesh.matrixWorld);
-                // @ts-ignore
                 this.system.setNavMeshGeometry(navMeshGeometry);
                 this.hasLoadedNavMesh = true;
                 this.el.setAttribute("visible", "false");
@@ -1746,7 +1731,6 @@
                 if (!data.active) return;
 
                 const object3D = this.el.object3D;
-                // @ts-ignore
                 const pos = object3D.getWorldPosition(new THREE.Vector3());
 
                 const cameraEl = document.querySelector("#camera-rig");
@@ -1840,7 +1824,6 @@
              * @param {THREE.Geometry} geometry
              */
             setNavMeshGeometry: function (geometry) {
-                // @ts-ignore
                 this.navMesh = new THREE.Mesh(geometry);
                 oceanPathfinder.setZoneData(ZONE, threePathfinding.Pathfinding.createZone(geometry));
                 Array.from(this.agents).forEach((agent) => agent.updateNavLocation());
@@ -1952,13 +1935,9 @@
 
                 if (!navMesh) return;
 
-                // @ts-ignore
                 const navMeshGeometry = navMesh.geometry.clone();
-                // @ts-ignore
                 navMesh.updateWorldMatrix(true, false);
-                // @ts-ignore
                 navMeshGeometry.applyMatrix4(navMesh.matrixWorld);
-                // @ts-ignore
                 this.system.setNavMeshGeometry(navMeshGeometry);
                 this.hasLoadedNavMesh = true;
                 this.el.setAttribute("visible", "false");
@@ -2132,7 +2111,6 @@
         AFRAME.registerComponent('go-on-land', {
             init: function () {
                 this.system = this.el.sceneEl.systems['globe-nav'];
-                // @ts-ignore
                 this.el.addEventListener('click', (e) => {
                     const destination1 = e.detail.intersection.point.clone();
 
@@ -2155,7 +2133,6 @@
                         const scene = document.querySelector("a-scene");
                         const npcEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
                         npcEls.forEach(npcEl => {
-                            // @ts-ignore
                             npcEl.setAttribute("globe-nav-agent", `active: false; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
                         });
                     }, 500);
@@ -2226,7 +2203,6 @@
                         const scene = document.querySelector("a-scene");
                         const shipEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
                         shipEls.forEach(shipEl => {
-                            // @ts-ignore
                             shipEl.setAttribute("globe-ocean-nav-agent", `active: false; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
                         });
                     }, 500);
@@ -2234,7 +2210,6 @@
                         const scene = document.querySelector("a-scene");
                         const shipEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
                         shipEls.forEach(shipEl => {
-                            // @ts-ignore
                             shipEl.setAttribute("globe-ocean-nav-agent", `active: true; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
                         });
                     }, 1000);
@@ -2254,10 +2229,8 @@
                 }
 
                 const cameraEl = document.querySelector("#camera-rig");
-                // @ts-ignore
                 let cameraPos = cameraEl.object3D.getWorldPosition(new THREE.Vector3());
                 cameraPos = cameraPos.normalize();
-                // @ts-ignore
                 let tilePos = new THREE.Vector3();
                 tilePos = tilePos.set.apply(tilePos, this.data.split(" "));
                 tilePos = tilePos.normalize();
@@ -2725,13 +2698,6 @@
 
                 if (newHealth <= 0 && oldHealth > 0) {
                     this.el.emit('dead');
-                    // const sound = 'sound__scream';
-                    // this.el.components[sound].playSound();
-                    // const networkId = this.el.components['networked'].data.networkId;
-                    // NAF.connection.broadcastDataGuaranteed("networkedSound", {
-                    //     networkId,
-                    //     sound,
-                    // });
                     this.el.parentNode.removeChild(this.el);
                 }
             },
@@ -2938,14 +2904,12 @@
                 rootGoldCoin.setAttribute("npc-faction", "native");
                 rootGoldCoin.setAttribute("npc-finder", "active: false;");
                 rootGoldCoin.setAttribute("networked-health", "");
-                // rootGoldCoin.setAttribute("sound__scream", "src: #scream; poolSize: 40; volume: 5;");
             }
 
             if (charModelId === "WARRIOR") {
                 rootGoldCoin.setAttribute("npc-faction", "player");
                 rootGoldCoin.setAttribute("npc-finder", "active: false;");
                 rootGoldCoin.setAttribute("networked-health", "");
-                // rootGoldCoin.setAttribute("sound__scream", "src: #scream; poolSize: 40; volume: 5;");
             }
 
             const a = (() => {
