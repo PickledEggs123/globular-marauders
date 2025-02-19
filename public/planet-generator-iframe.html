@@ -2465,19 +2465,24 @@
                 if (npcId && npcId !== this.currentNpcId) {
                     return;
                 }
-                if (npcId && npcId === this.currentNpcId) {
-                    removeWalkingNpc(npcId);
-                }
                 if (this.isHome) {
                     const arr = Array.from(this.otherBuildings.values());
                     this.otherBuilding = arr[Math.floor(Math.random() * arr.length)];
                     if (this.otherBuilding) {
                         this.isHome = false;
-                        this.currentNpcId = addWalkingNpc(this.elId, this.el, this.otherBuilding);
+                        if (this.currentNpcId) {
+                            updateWalkingNpc(this.elId, this.otherBuilding);
+                        } else {
+                            this.currentNpcId = addWalkingNpc(this.elId, this.el, this.otherBuilding);
+                        }
                     }
                 } else {
                     this.isHome = true;
-                    this.currentNpcId = addWalkingNpc(this.elId, this.otherBuilding, this.el);
+                    if (this.currentNpcId) {
+                        updateWalkingNpc(this.elId, this.el);
+                    } else {
+                        this.currentNpcId = addWalkingNpc(this.elId, this.otherBuilding, this.el);
+                    }
                     this.otherBuilding = undefined;
                 }
             },
@@ -3163,6 +3168,15 @@
             scene.appendChild(rootNpc);
 
             return id;
+        }
+
+        function updateWalkingNpc(npcId, destinationEl) {
+            const rootNpc = document.querySelector(`#${npcId}`);
+            const destination2 = destinationEl.components['position'].data;
+            rootNpc.setAttribute("globe-nav-agent", `active: false;`);
+            setTimeout(() => {
+                rootNpc.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 1;`);
+            }, 2000);
         }
 
         function removeWalkingNpc(npcId) {
