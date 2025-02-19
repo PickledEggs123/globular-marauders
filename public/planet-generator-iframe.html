@@ -27,6 +27,7 @@
     <script src="/three-bvh.umd.cjs"></script>
     <script src="/aframe-html.js"></script>
     <script src="/Tone.js"></script>
+    <script src="/aframe-spe-particles-component.js"></script>
     <script type="application/javascript">
         class MusicPlayer {
             synth = null;
@@ -2738,11 +2739,11 @@
             },
             handleHit: function (evt) {
                 const hit = evt.detail;
+                const oldHealth = this.data.health;
                 const newHealth = this.data.health - hit;
                 this.el.setAttribute("ship-health", `health: ${newHealth}`);
-                this.el.components['sound__hit'].playSound();
 
-                if (newHealth <= 0) {
+                if (newHealth <= 0 && oldHealth > 0) {
                     this.el.emit('dead');
                 }
             },
@@ -2766,23 +2767,8 @@
                     networkId,
                     hit,
                 });
-
-                this.el.parentEl.components['sound__hit'].playSound();
             },
         });
-        AFRAME.registerComponent('networked-ship-cannonball', {
-            schema: {},
-            init: function () {
-                this.innerHandleFire = this.handleFire.bind(this);
-                this.el.addEventListener('firing', this.innerHandleFire);
-            },
-            remove: function () {
-                this.el.removeEventListener('firing', this.innerHandleFire);
-            },
-            handleFire: function (evt) {
-                this.el.components['sound__fire'].playSound();
-            }
-        })
         AFRAME.registerComponent("ship-death", {
             schema: {},
             init: function () {
@@ -2893,9 +2879,6 @@
                 dataEl.setAttribute("gltf-model", str);
                 dataEl.setAttribute("networked-ship-health", "");
                 dataEl.setAttribute("cannonball-collider", "");
-                rootGoldCoin.setAttribute("sound__fire", "src: #fire; poolSize: 40; volume: 5;");
-                rootGoldCoin.setAttribute("sound__hit", "src: #hit; poolSize: 40; volume: 5;");
-                rootGoldCoin.setAttribute("networked-ship-cannonball", "");
                 rootGoldCoin.appendChild(dataEl);
             } else {
                 rootGoldCoin.setAttribute("gltf-model", str);
@@ -3058,7 +3041,7 @@
             return id;
         }
 
-        function addCannonBall(pos, velocity) {
+        function addCannonBall(pos, velocity, el) {
             const scene = document.querySelector("a-scene");
 
             const rootProjectile = document.createElement("a-entity");
@@ -3088,6 +3071,8 @@
                 rootProjectile.appendChild(modelArrow);
             }
 
+            addCannonballFire(el);
+
             scene.appendChild(rootProjectile);
 
             return id;
@@ -3110,7 +3095,6 @@
             rootNpc.setAttribute("health", "");
             rootNpc.setAttribute("spawn-gold", "");
             rootNpc.setAttribute("globe-nav-agent", `active: false;`);
-            // rootNpc.setAttribute("sound__scream", "src: #scream; poolSize: 40; volume: 5;");
             rootNpc.setAttribute("shadow", "");
             setTimeout(() => {
                 rootNpc.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 1;`);
@@ -3163,7 +3147,6 @@
             rootNpc.setAttribute("npc-attack", `range: 10; melee: false;`);
             rootNpc.setAttribute("health", "");
             rootNpc.setAttribute("shadow", "");
-            // rootNpc.setAttribute("sound__scream", "src: #scream; poolSize: 40; volume: 5;");
             rootNpc.setAttribute("outline-pass", "");
 
             if (characterModels.has("WARRIOR")) {
@@ -3313,8 +3296,30 @@
             rootHouse.object3D.lookAt(new THREE.Vector3(lookAt[0], lookAt[1], lookAt[2]));
         }
 
+        function addCannonballFire(el) {
+            const position = el.object3D.getWorldPosition(new THREE.Vector3());
+            const scene = document.querySelector("a-scene");
+
+            const entity = document.createElement("a-entity");
+            entity.setAttribute("position", position);
+            entity.setAttribute("networked", "template: #cannonball-fire-template; attachTemplateToLocal: true;");
+            entity.setAttribute("despawn", "");
+            scene.appendChild(entity);
+        }
+
+        function addCannonballHit(el) {
+            const position = el.object3D.getWorldPosition(new THREE.Vector3());
+            const scene = document.querySelector("a-scene");
+
+            const entity = document.createElement("a-entity");
+            entity.setAttribute("position", position);
+            entity.setAttribute("networked", "template: #cannonball-hit-template; attachTemplateToLocal: true;");
+            entity.setAttribute("despawn", "");
+            scene.appendChild(entity);
+        }
+
         function addWilhelmScream(el) {
-            const position = new THREE.Vector3().copy(el.components['position'].data);
+            const position = el.object3D.getWorldPosition(new THREE.Vector3());
             const scene = document.querySelector("a-scene");
 
             const entity = document.createElement("a-entity");
@@ -3359,8 +3364,6 @@
             rootShip.setAttribute("position", `${point[0]} ${point[1]} ${point[2]}`);
             rootShip.setAttribute("rotation", "0 0 0");
             rootShip.setAttribute("outline-pass", "");
-            rootShip.setAttribute("sound__fire", "src: #fire; poolSize: 40; volume: 5;");
-            rootShip.setAttribute("sound__hit", "src: #hit; poolSize: 40; volume: 5;");
 
             const rootModel = document.createElement("a-entity");
             rootModel.setAttribute("class", "data");
@@ -3433,27 +3436,6 @@
                 const entity = NAF.entities.entities[networkId];
                 if (entity) {
                     entity.emit("hit", hit);
-                }
-            });
-
-            NAF.connection.subscribeToDataChannel('networkedShipCannonball', function (sender, dataType, data, targetId) {
-                const {
-                    networkId
-                } = data;
-                const entity = NAF.entities.entities[networkId];
-                if (entity) {
-                    entity.emit("firing");
-                }
-            });
-
-            NAF.connection.subscribeToDataChannel('networkedSound', function (sender, dataType, data, targetId) {
-                const {
-                    networkId,
-                    sound,
-                } = data;
-                const entity = NAF.entities.entities[networkId];
-                if (entity && entity.components[sound]) {
-                    entity.components[sound].playSound();
                 }
             });
 
@@ -3667,18 +3649,8 @@
                     const worldPosition = cannon.object3D.getWorldPosition(new THREE.Vector3());
                     const velocity = new THREE.Vector3(0, 0, e.detail.includes("left") ? -300 : 300).applyQuaternion(cannon.object3D.getWorldQuaternion(new THREE.Quaternion()));
 
-                    addCannonBall(worldPosition, velocity);
+                    addCannonBall(worldPosition, velocity, cannon);
                 });
-
-                // make sound for all 4 cannons.
-                for (let i = 0; i < 4; i++) {
-                    this.el.components['sound__fire'].playSound();
-
-                    const networkId = this.el.components['networked'].data.networkId;
-                    NAF.connection.broadcastDataGuaranteed("networkedShipCannonball", {
-                        networkId,
-                    });
-                }
             },
         });
 
@@ -3752,12 +3724,13 @@
                 cannonballs.forEach((cannonball) => {
                     const cannonballPosition = cannonball.object3D.getWorldPosition(new THREE.Vector3());
                     if (shipPosition.distanceTo(cannonballPosition) < 1.5) {
-                        this.innerCollision();
+                        this.innerCollision(cannonball);
                     }
                 });
             },
-            collision: function () {
+            collision: function (el) {
                 this.el.emit("hit", 10);
+                addCannonballHit(el);
             },
         });
 
@@ -4174,6 +4147,14 @@
             <template id="avatar-template">
                 <a-entity class="avatar" networked-audio-source>
                 </a-entity>
+            </template>
+            <template id="cannonball-fire-template">
+                <a-entity class="cannonball-fire" sound="src: #fire; poolSize: 40; volume: 5; autoplay: true;" position="0 0 100"
+                ></a-entity>
+            </template>
+            <template id="cannonball-hit-template">
+                <a-entity class="cannonball-hit" sound="src: #hit; poolSize: 40; volume: 5; autoplay: true;" position="0 0 100"
+                ></a-entity>
             </template>
             <template id="wilhelm-scream-template">
                 <a-entity class="wilhelm-scream" sound="src: #scream; poolSize: 40; volume: 5; autoplay: true;" position="0 0 100"></a-entity>
