@@ -2933,14 +2933,14 @@
                 rootGoldCoin.setAttribute("npc-faction", "native");
                 rootGoldCoin.setAttribute("npc-finder", "active: false;");
                 rootGoldCoin.setAttribute("networked-health", "");
-                rootGoldCoin.setAttribute("sound__scream", "src: #scream; poolSize: 40; volume: 5;");
+                // rootGoldCoin.setAttribute("sound__scream", "src: #scream; poolSize: 40; volume: 5;");
             }
 
             if (charModelId === "WARRIOR") {
                 rootGoldCoin.setAttribute("npc-faction", "player");
                 rootGoldCoin.setAttribute("npc-finder", "active: false;");
                 rootGoldCoin.setAttribute("networked-health", "");
-                rootGoldCoin.setAttribute("sound__scream", "src: #scream; poolSize: 40; volume: 5;");
+                // rootGoldCoin.setAttribute("sound__scream", "src: #scream; poolSize: 40; volume: 5;");
             }
 
             const a = (() => {
@@ -3140,7 +3140,7 @@
             rootNpc.setAttribute("health", "");
             rootNpc.setAttribute("spawn-gold", "");
             rootNpc.setAttribute("globe-nav-agent", `active: false;`);
-            rootNpc.setAttribute("sound__scream", "src: #scream; poolSize: 40; volume: 5;");
+            // rootNpc.setAttribute("sound__scream", "src: #scream; poolSize: 40; volume: 5;");
             rootNpc.setAttribute("shadow", "");
             setTimeout(() => {
                 rootNpc.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 1;`);
@@ -3184,7 +3184,7 @@
             rootNpc.setAttribute("npc-attack", `range: 10; melee: false;`);
             rootNpc.setAttribute("health", "");
             rootNpc.setAttribute("shadow", "");
-            rootNpc.setAttribute("sound__scream", "src: #scream; poolSize: 40; volume: 5;");
+            // rootNpc.setAttribute("sound__scream", "src: #scream; poolSize: 40; volume: 5;");
             rootNpc.setAttribute("outline-pass", "");
 
             if (characterModels.has("WARRIOR")) {
