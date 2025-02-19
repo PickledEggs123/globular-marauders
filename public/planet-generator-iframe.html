@@ -26,7 +26,7 @@
     <script src="/networked-aframe.js"></script>
     <script src="/three-bvh.umd.cjs"></script>
     <script src="/aframe-html.js"></script>
-    <script src="http://unpkg.com/tone"></script>
+    <script src="/Tone.js"></script>
     <script type="application/javascript">
         class MusicPlayer {
             synth = null;
@@ -2675,7 +2675,7 @@
                     vNext.copy(vCurrent);
                     gazeTarget = vWaypoint;
 
-                    this.data.target.emit('hit', 10);
+                    this.data.target.emit('hit', 40);
                     this.el.parentNode.removeChild(this.el);
                 } else {
                     // If still far away from next waypoint, find next position for
@@ -2714,11 +2714,19 @@
             },
             handleHit: function (evt) {
                 const hit = evt.detail;
+                const oldHealth = this.data.health;
                 const newHealth = this.data.health - hit;
                 this.el.setAttribute("health", `health: ${newHealth}`);
 
-                if (newHealth <= 0) {
+                if (newHealth <= 0 && oldHealth > 0) {
                     this.el.emit('dead');
+                    const sound = 'sound__scream';
+                    this.el.components[sound].playSound();
+                    const networkId = this.el.components['networked'].data.networkId;
+                    NAF.connection.broadcastDataGuaranteed("networkedSound", {
+                        networkId,
+                        sound,
+                    });
                     this.el.parentNode.removeChild(this.el);
                 }
             },
@@ -2925,6 +2933,7 @@
                 rootGoldCoin.setAttribute("npc-faction", "native");
                 rootGoldCoin.setAttribute("npc-finder", "active: false;");
                 rootGoldCoin.setAttribute("networked-health", "");
+                rootGoldCoin.setAttribute("sound__scream", "src: #scream; poolSize: 40; volume: 5;");
             }
 
             if (charModelId === "WARRIOR") {
@@ -3130,6 +3139,7 @@
             rootNpc.setAttribute("health", "");
             rootNpc.setAttribute("spawn-gold", "");
             rootNpc.setAttribute("globe-nav-agent", `active: false;`);
+            rootNpc.setAttribute("sound__scream", "src: #scream; poolSize: 40; volume: 5;");
             rootNpc.setAttribute("shadow", "");
             setTimeout(() => {
                 rootNpc.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 1;`);
@@ -3433,6 +3443,17 @@
                 const entity = NAF.entities.entities[networkId];
                 if (entity) {
                     entity.emit("firing");
+                }
+            });
+
+            NAF.connection.subscribeToDataChannel('networkedSound', function (sender, dataType, data, targetId) {
+                const {
+                    networkId,
+                    sound,
+                } = data;
+                const entity = NAF.entities.entities[networkId];
+                if (entity && entity.components[sound]) {
+                    entity.components[sound].playSound();
                 }
             });
 
@@ -4156,6 +4177,7 @@
             </template>
             <audio id="fire" src="/sounds/FireSFX.m4a" preload="auto"></audio>
             <audio id="hit" src="/sounds/WoodHitSFX.m4a" preload="auto"></audio>
+            <audio id="scream" src="/sounds/WilhelmScreamSFX.mp3" preload="auto"></audio>
         </a-assets>
         <a-sphere color="black" radius="0.01" id="cursor" port-show></a-sphere>
         <a-entity light="type: ambient; color: #CCC"></a-entity>

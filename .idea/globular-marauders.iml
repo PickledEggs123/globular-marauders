@@ -9,5 +9,6 @@
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="es-module-shims" level="application" />
+    <orderEntry type="library" name="tone" level="application" />
   </component>
 </module>
