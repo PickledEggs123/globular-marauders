@@ -2720,13 +2720,13 @@
 
                 if (newHealth <= 0 && oldHealth > 0) {
                     this.el.emit('dead');
-                    const sound = 'sound__scream';
-                    this.el.components[sound].playSound();
-                    const networkId = this.el.components['networked'].data.networkId;
-                    NAF.connection.broadcastDataGuaranteed("networkedSound", {
-                        networkId,
-                        sound,
-                    });
+                    // const sound = 'sound__scream';
+                    // this.el.components[sound].playSound();
+                    // const networkId = this.el.components['networked'].data.networkId;
+                    // NAF.connection.broadcastDataGuaranteed("networkedSound", {
+                    //     networkId,
+                    //     sound,
+                    // });
                     this.el.parentNode.removeChild(this.el);
                 }
             },
@@ -2940,6 +2940,7 @@
                 rootGoldCoin.setAttribute("npc-faction", "player");
                 rootGoldCoin.setAttribute("npc-finder", "active: false;");
                 rootGoldCoin.setAttribute("networked-health", "");
+                rootGoldCoin.setAttribute("sound__scream", "src: #scream; poolSize: 40; volume: 5;");
             }
 
             const a = (() => {
@@ -3183,6 +3184,7 @@
             rootNpc.setAttribute("npc-attack", `range: 10; melee: false;`);
             rootNpc.setAttribute("health", "");
             rootNpc.setAttribute("shadow", "");
+            rootNpc.setAttribute("sound__scream", "src: #scream; poolSize: 40; volume: 5;");
             rootNpc.setAttribute("outline-pass", "");
 
             if (characterModels.has("WARRIOR")) {
@@ -4175,9 +4177,9 @@
                 <a-entity class="avatar" networked-audio-source>
                 </a-entity>
             </template>
-            <audio id="fire" src="/sounds/FireSFX.m4a"></audio>
-            <audio id="hit" src="/sounds/WoodHitSFX.m4a"></audio>
-            <audio id="scream" src="/sounds/WilhelmScreamSFX.mp3"></audio>
+            <audio id="fire" src="/sounds/FireSFX.m4a" preload="auto"></audio>
+            <audio id="hit" src="/sounds/WoodHitSFX.m4a" preload="auto"></audio>
+<!--            <audio id="scream" src="/sounds/WilhelmScreamSFX.mp3"></audio>-->
         </a-assets>
         <a-sphere color="black" radius="0.01" id="cursor" port-show></a-sphere>
         <a-entity light="type: ambient; color: #CCC"></a-entity>
