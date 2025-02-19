@@ -2698,6 +2698,7 @@
 
                 if (newHealth <= 0 && oldHealth > 0) {
                     this.el.emit('dead');
+                    addWilhelmScream(this.el);
                     this.el.parentNode.removeChild(this.el);
                 }
             },
@@ -3312,10 +3313,21 @@
             rootHouse.object3D.lookAt(new THREE.Vector3(lookAt[0], lookAt[1], lookAt[2]));
         }
 
+        function addWilhelmScream(el) {
+            const position = new THREE.Vector3().copy(el.components['position'].data);
+            const scene = document.querySelector("a-scene");
+
+            const entity = document.createElement("a-entity");
+            entity.setAttribute("position", position);
+            entity.setAttribute("networked", "template: #wilhelm-scream-template; attachTemplateToLocal: true;");
+            entity.setAttribute("despawn", "");
+            scene.appendChild(entity);
+        }
+
         window.shipModelStr = "";
         window.shipSpawnPoint = new THREE.Vector3(0, 0, 100);
 
-        function addShip(item) {
+        async function addShip(item) {
             const scene = document.querySelector("a-scene");
 
             const {
@@ -3324,6 +3336,14 @@
 
             window.shipModelStr = str;
             window.shipSpawnPoint = new THREE.Vector3(point[0], point[1], point[2]);
+
+            while (!scene.components['coin-purse']) {
+                await new Promise((resolve) => {
+                    setTimeout(() => {
+                        resolve();
+                    }, 100);
+                });
+            }
 
             const rootShip = document.createElement("a-entity");
             rootShip.setAttribute("class", `${scene.components['coin-purse'].activeUnit} clickable`);
@@ -4155,9 +4175,12 @@
                 <a-entity class="avatar" networked-audio-source>
                 </a-entity>
             </template>
+            <template id="wilhelm-scream-template">
+                <a-entity class="wilhelm-scream" sound="src: #scream; poolSize: 40; volume: 5; autoplay: true;" position="0 0 100"></a-entity>
+            </template>
             <audio id="fire" src="/sounds/FireSFX.m4a" preload="auto"></audio>
             <audio id="hit" src="/sounds/WoodHitSFX.m4a" preload="auto"></audio>
-<!--            <audio id="scream" src="/sounds/WilhelmScreamSFX.mp3"></audio>-->
+            <audio id="scream" src="/sounds/WilhelmScreamSFX.mp3" preload="auto"></audio>
         </a-assets>
         <a-sphere color="black" radius="0.01" id="cursor" port-show></a-sphere>
         <a-entity light="type: ambient; color: #CCC"></a-entity>
