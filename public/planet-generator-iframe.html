@@ -27,6 +27,7 @@
     <script src="/three-bvh.umd.cjs"></script>
     <script src="/aframe-html.js"></script>
     <script src="/Tone.js"></script>
+    <script src="/aframe-particle-system-component.js"></script>
     <script type="application/javascript">
         class MusicPlayer {
             synth = null;
@@ -3302,6 +3303,8 @@
             const entity = document.createElement("a-entity");
             entity.setAttribute("position", position);
             entity.setAttribute("networked", "template: #cannonball-fire-template; attachTemplateToLocal: true;");
+            entity.object3D.lookAt(position.clone().add(
+                new THREE.Vector3(1, 0, 0).applyQuaternion(el.object3D.getWorldQuaternion(new THREE.Quaternion()))));
             entity.setAttribute("despawn", "");
             scene.appendChild(entity);
         }
@@ -4148,7 +4151,10 @@
                 </a-entity>
             </template>
             <template id="cannonball-fire-template">
-                <a-entity class="cannonball-fire" sound="src: #fire; poolSize: 1; volume: 5; autoplay: true;" position="0 0 100"></a-entity>
+                <a-entity class="cannonball-fire"
+                          sound="src: #fire; poolSize: 1; volume: 5; autoplay: true;"
+                          position="0 0 100"
+                ></a-entity>
             </template>
             <template id="cannonball-hit-template">
                 <a-entity class="cannonball-hit" sound="src: #hit; poolSize: 1; volume: 5; autoplay: true;" position="0 0 100"
