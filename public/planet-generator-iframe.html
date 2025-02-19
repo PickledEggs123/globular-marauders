@@ -27,7 +27,6 @@
     <script src="/three-bvh.umd.cjs"></script>
     <script src="/aframe-html.js"></script>
     <script src="/Tone.js"></script>
-    <script src="/aframe-spe-particles-component.js"></script>
     <script type="application/javascript">
         class MusicPlayer {
             synth = null;
@@ -4149,15 +4148,14 @@
                 </a-entity>
             </template>
             <template id="cannonball-fire-template">
-                <a-entity class="cannonball-fire" sound="src: #fire; poolSize: 40; volume: 5; autoplay: true;" position="0 0 100"
-                ></a-entity>
+                <a-entity class="cannonball-fire" sound="src: #fire; poolSize: 1; volume: 5; autoplay: true;" position="0 0 100"></a-entity>
             </template>
             <template id="cannonball-hit-template">
-                <a-entity class="cannonball-hit" sound="src: #hit; poolSize: 40; volume: 5; autoplay: true;" position="0 0 100"
+                <a-entity class="cannonball-hit" sound="src: #hit; poolSize: 1; volume: 5; autoplay: true;" position="0 0 100"
                 ></a-entity>
             </template>
             <template id="wilhelm-scream-template">
-                <a-entity class="wilhelm-scream" sound="src: #scream; poolSize: 40; volume: 5; autoplay: true;" position="0 0 100"></a-entity>
+                <a-entity class="wilhelm-scream" sound="src: #scream; poolSize: 1; volume: 5; autoplay: true;" position="0 0 100"></a-entity>
             </template>
             <audio id="fire" src="/sounds/FireSFX.m4a" preload="auto"></audio>
             <audio id="hit" src="/sounds/WoodHitSFX.m4a" preload="auto"></audio>
