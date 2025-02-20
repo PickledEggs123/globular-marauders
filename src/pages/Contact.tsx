@@ -11,7 +11,7 @@ export const Contact = () => {
                 <Typography variant="h3">
                     About the Developer
                 </Typography>
-                <Grid container xs={12} spacing={2}>
+                <Grid container spacing={2}>
                     <Grid item xs={6}>
                         <Card>
                             <CardMedia component="img" src="/mainImages/GitHub_Logo.png"></CardMedia>

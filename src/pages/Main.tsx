@@ -22,7 +22,7 @@ export const Main = () => {
         <Paper style={{width: "100vw", minHeight: "100vh", height: "fit-content", display: "flex", flexDirection: "column"}}>
             <WebsiteDrawer rightSide={null}/>
             <Container>
-                <Grid container xs={12} spacing={2}>
+                <Grid container spacing={2}>
                     <Grid item xs={12}>
                         <Card>
                             <CardMedia component="img" src="/mainImages/MainGameMedia.png"></CardMedia>
@@ -41,7 +41,7 @@ export const Main = () => {
                                     <Link to="/2d-game"><Button>Click here to play the latest version</Button></Link>
                                 </Typography>
                                 <br/>
-                                <Grid container xs={12} spacing={2}>
+                                <Grid container spacing={2}>
                                     <Grid item xs={4}>
                                         <Box component="img" alt="2d Game Image 1" src="/mainImages/MainGame1.png" sx={{width: "100%"}}/>
                                     </Grid>
@@ -87,7 +87,7 @@ export const Main = () => {
                                     <Link to="/planet-generator"><Button>Click here to play the 3d game</Button></Link>
                                 </Typography>
                                 <br/>
-                                <Grid container xs={12} spacing={2}>
+                                <Grid container spacing={2}>
                                     <Grid item xs={4}>
                                         <Box component="img" alt="3d Game Image 1" src="/mainImages/3dGame1.png"
                                              sx={{width: "100%"}}/>

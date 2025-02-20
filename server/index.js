@@ -40,7 +40,6 @@ const handleReactPage = (req, res) => {
         <React.StrictMode>
             <CacheProvider value={cache}>
                 <ThemeProvider theme={theme}>
-                    <CssBaseline/>
                     <StaticRouter location={req.url}>
                         <App/>
                     </StaticRouter>

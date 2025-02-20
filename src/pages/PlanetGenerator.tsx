@@ -381,7 +381,7 @@ export const PlanetGenerator = () => {
                 <Typography variant="h3">
                     Procedural Planet Generator
                 </Typography>
-                <Grid container xs={12} spacing={2}>
+                <Grid container spacing={2}>
                     <Grid item xs={12}>
                         <Card>
                             <CardHeader title="Planet Generator" subheader="Create unique random planets"></CardHeader>
@@ -389,14 +389,15 @@ export const PlanetGenerator = () => {
                                 <Typography>Load Status: {loadMessage}</Typography>
                                 <div ref={ref} style={{width: 256, height: 256}}>
                                 </div>
-                                {/* @ts-ignore */}
-                                <iframe title="3d game" width={256} height={256} ref={iframeRef} allowfullscreen="yes"
-                                        allowvr="yes"
-                                        src="/planet-generator-iframe.html"/>
                                 <Button onClick={() => {
                                     drawGraph();
                                 }}>Refresh</Button>
                                 <Button onClick={download}>Download</Button>
+                                <br/>
+                                {/* @ts-ignore */}
+                                <iframe title="3d game" width={256} height={256} ref={iframeRef} allowfullscreen="yes"
+                                        allowvr="yes"
+                                        src="/planet-generator-iframe.html"/>
                                 <Typography variant="body1">
                                     This page allows you to generate a random planet, using the generator package. This
                                     is a

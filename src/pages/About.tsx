@@ -11,7 +11,7 @@ export const About = () => {
                 <Typography variant="h3">
                     About the Game
                 </Typography>
-                <Grid container xs={12} spacing={2}>
+                <Grid container spacing={2}>
                     <Grid item xs={12}>
                         <Card>
                             <CardHeader title="Space Pirates" subheader="Asteroid style movement but you fire side ways">

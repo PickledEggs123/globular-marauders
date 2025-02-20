@@ -27,7 +27,7 @@
     <script src="/three-bvh.umd.cjs"></script>
     <script src="/aframe-html.js"></script>
     <script src="/Tone.js"></script>
-    <script src="/aframe-particle-system-component.js"></script>
+    <script src="https://rawgit.com/blairmacintyre/aframe-look-at-billboard-component/master/dist/aframe-look-at-billboard-component.min.js"></script>
     <script type="application/javascript">
         class MusicPlayer {
             synth = null;
@@ -3055,6 +3055,7 @@
             rootProjectile.setAttribute("globe-gravity", "");
             rootProjectile.setAttribute("collision-filter", "group: cannonball; collidesWith: default");
             rootProjectile.setAttribute("initial-velocity", velocity);
+            rootProjectile.setAttribute("cannonball-collider-ground", "");
             rootProjectile.setAttribute("despawn", "");
 
             if (characterModels.has("CANNONBALL")) {
@@ -3303,8 +3304,6 @@
             const entity = document.createElement("a-entity");
             entity.setAttribute("position", position);
             entity.setAttribute("networked", "template: #cannonball-fire-template; attachTemplateToLocal: true;");
-            entity.object3D.lookAt(position.clone().add(
-                new THREE.Vector3(1, 0, 0).applyQuaternion(el.object3D.getWorldQuaternion(new THREE.Quaternion()))));
             entity.setAttribute("despawn", "");
             scene.appendChild(entity);
         }
@@ -3736,6 +3735,49 @@
             },
         });
 
+        AFRAME.registerComponent('particle-emitter', {
+            schema: {
+                activate: {
+                    type: "boolean",
+                    default: true,
+                },
+            },
+            tick: function () {
+                if (!this.data.activate) {
+                    return;
+                }
+                for (let i = 0; i < 10; i++) {
+                    this.spawnParticle();
+                }
+                this.el.removeAttribute("particle-emitter");
+            },
+            spawnParticle: function () {
+                const worldPosition = this.el.object3D.getWorldPosition(new THREE.Vector3());
+                const random = () => (Math.random() * 2) - 1;
+                const randomOffset = new THREE.Vector3(random(), random(), random()).multiplyScalar(0.1);
+                const scene = document.querySelector("a-scene");
+
+                const entity = document.createElement("a-entity");
+                entity.setAttribute("geometry", "primitive: box");
+                entity.setAttribute("material", "src: #fog");
+                entity.setAttribute("position", worldPosition.clone().add(randomOffset.clone()));
+                entity.setAttribute("scale", "0.1 0.1 0.1");
+                entity.setAttribute("billboard", "");
+                entity.setAttribute("despawn", "");
+                scene.appendChild(entity);
+            },
+        });
+
+        AFRAME.registerComponent("cannonball-collider-ground", {
+            init: function () {
+                // let eventHandler = null;
+                // eventHandler = () => {
+                //     addCannonballHit(this.el);
+                // };
+                // this.el.body.addEventListener("collide", eventHandler);
+            },
+        });
+
         AFRAME.registerComponent('coin-purse', {
             schema: {},
             init: function () {
@@ -4153,19 +4195,24 @@
             <template id="cannonball-fire-template">
                 <a-entity class="cannonball-fire"
                           sound="src: #fire; poolSize: 1; volume: 5; autoplay: true;"
-                          position="0 0 100"
+                          particle-emitter
                 ></a-entity>
             </template>
             <template id="cannonball-hit-template">
-                <a-entity class="cannonball-hit" sound="src: #hit; poolSize: 1; volume: 5; autoplay: true;" position="0 0 100"
+                <a-entity class="cannonball-hit"
+                          sound="src: #hit; poolSize: 1; volume: 5; autoplay: true;"
+                          particle-emitter
                 ></a-entity>
             </template>
             <template id="wilhelm-scream-template">
-                <a-entity class="wilhelm-scream" sound="src: #scream; poolSize: 1; volume: 5; autoplay: true;" position="0 0 100"></a-entity>
+                <a-entity class="wilhelm-scream"
+                          sound="src: #scream; poolSize: 1; volume: 5; autoplay: true;"
+                ></a-entity>
             </template>
             <audio id="fire" src="/sounds/FireSFX.m4a" preload="auto"></audio>
             <audio id="hit" src="/sounds/WoodHitSFX.m4a" preload="auto"></audio>
             <audio id="scream" src="/sounds/WilhelmScreamSFX.mp3" preload="auto"></audio>
+            <img id="fog" src="/assets/fog.png" alt="fog"/>
         </a-assets>
         <a-sphere color="black" radius="0.01" id="cursor" port-show></a-sphere>
         <a-entity light="type: ambient; color: #CCC"></a-entity>

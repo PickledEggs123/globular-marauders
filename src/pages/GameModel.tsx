@@ -190,12 +190,12 @@ export const GameModel = () => {
                 <Typography variant="h3">
                     The Math of the Game
                 </Typography>
-                <Grid container xs={12} spacing={2}>
+                <Grid container spacing={2}>
                     <Grid item xs={12}>
                         <Card>
                             <CardHeader title="Straight Lines Along a Sphere" subheader="Flatten a pizza pie onto a beach ball"></CardHeader>
                             <CardContent>
-                                <Grid container xs={12} spacing={2}>
+                                <Grid container spacing={2}>
                                     <Grid item xs={12} md={6}>
                                         <Card>
                                             <CardHeader title="North Polar Chart">
