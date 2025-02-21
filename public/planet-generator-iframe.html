@@ -3055,6 +3055,7 @@
             rootProjectile.setAttribute("collision-filter", "group: cannonball; collidesWith: default");
             rootProjectile.setAttribute("initial-velocity", velocity);
             rootProjectile.setAttribute("cannonball-collider-ground", "");
+            rootProjectile.setAttribute("cannonball-collider-water", "");
             rootProjectile.setAttribute("despawn", "");
 
             if (characterModels.has("CANNONBALL")) {
@@ -3314,6 +3315,28 @@
             const entity = document.createElement("a-entity");
             entity.setAttribute("position", position);
             entity.setAttribute("networked", "template: #cannonball-hit-template; attachTemplateToLocal: true;");
+            entity.setAttribute("despawn", "");
+            scene.appendChild(entity);
+        }
+
+        function addCannonballThump(el) {
+            const position = el.object3D.getWorldPosition(new THREE.Vector3());
+            const scene = document.querySelector("a-scene");
+
+            const entity = document.createElement("a-entity");
+            entity.setAttribute("position", position);
+            entity.setAttribute("networked", "template: #cannonball-thump-template; attachTemplateToLocal: true;");
+            entity.setAttribute("despawn", "");
+            scene.appendChild(entity);
+        }
+
+        function addCannonballSplash(el) {
+            const position = el.object3D.getWorldPosition(new THREE.Vector3());
+            const scene = document.querySelector("a-scene");
+
+            const entity = document.createElement("a-entity");
+            entity.setAttribute("position", position);
+            entity.setAttribute("networked", "template: #cannonball-splash-template; attachTemplateToLocal: true;");
             entity.setAttribute("despawn", "");
             scene.appendChild(entity);
         }
@@ -3647,7 +3670,8 @@
                 const cannons = Array.from(document.querySelectorAll(selector));
                 cannons.forEach(cannon => {
                     const worldPosition = cannon.object3D.getWorldPosition(new THREE.Vector3());
-                    const velocity = new THREE.Vector3(0, 0, e.detail.includes("left") ? -300 : 300).applyQuaternion(cannon.object3D.getWorldQuaternion(new THREE.Quaternion()));
+                    const cannonBallOrientation = cannon.object3D.getWorldQuaternion(new THREE.Quaternion());
+                    const velocity = new THREE.Vector3(0, 30, e.detail.includes("left") ? -300 : 300).applyQuaternion(cannonBallOrientation);
 
                     addCannonBall(worldPosition, velocity, cannon);
                 });
@@ -3740,6 +3764,14 @@
                     type: "boolean",
                     default: true,
                 },
+                dirt: {
+                    type: "boolean",
+                    default: false,
+                },
+                water: {
+                    type: "boolean",
+                    default: false,
+                },
             },
             tick: function () {
                 if (!this.data.activate) {
@@ -3758,7 +3790,16 @@
 
                 const entity = document.createElement("a-entity");
                 entity.setAttribute("geometry", "primitive: box");
-                entity.setAttribute("material", "src: #fog");
+                if (this.data.water) {
+                    // water
+                    entity.setAttribute("material", "src: #fog; color: #5555ff; alphaTest: 0; transparent: true;");
+                } else if (this.data.dirt) {
+                    // dirt
+                    entity.setAttribute("material", "src: #blob; color: #9B7653; alphaTest: 0; transparent: true;");
+                } else {
+                    // smoke
+                    entity.setAttribute("material", "src: #fog; alphaTest: 0; transparent: true;");
+                }
                 entity.setAttribute("position", worldPosition.clone().add(randomOffset.clone()));
                 entity.setAttribute("scale", "0.1 0.1 0.1");
                 entity.setAttribute("billboard", "");
@@ -3769,12 +3810,38 @@
 
         AFRAME.registerComponent("cannonball-collider-ground", {
             init: function () {
-                // let eventHandler = null;
-                // eventHandler = () => {
-                //     addCannonballHit(this.el);
-                // };
-                // this.el.body.addEventListener("collide", eventHandler);
+                let eventHandler = null;
+                eventHandler = (e) => {
+                    if (e.body.el.components["go-on-land"]) {
+                        addCannonballThump(this.el);
+                        this.el.removeAttribute("cannonball-collider-water");
+                    }
+                };
+                this.el.body.addEventListener("collide", eventHandler);
             },
+        });
+
+        AFRAME.registerComponent("cannonball-collider-water", {
+            init: function () {
+                this.emitSound = false;
+                this.startTime = +new Date();
+            },
+            tick: function () {
+                const time = +new Date();
+                if (time < this.startTime + 500) {
+                    return;
+                }
+                if (this.emitSound) {
+                    return;
+                }
+
+                const center = new THREE.Vector3(0, 0, 0);
+                const worldPosition = this.el.object3D.getWorldPosition(new THREE.Vector3());
+                if (center.distanceTo(worldPosition) < PLANET_SIZE + 0.2) {
+                    addCannonballSplash(this.el);
+                    this.emitSound = true;
+                }
+            }
         });
 
         AFRAME.registerComponent('coin-purse', {
@@ -4193,25 +4260,40 @@
             </template>
             <template id="cannonball-fire-template">
                 <a-entity class="cannonball-fire"
-                          sound="src: #fire; poolSize: 1; volume: 5; autoplay: true;"
+                          sound="src: #fire; poolSize: 1; volume: 1; autoplay: true;"
                           particle-emitter
                 ></a-entity>
             </template>
             <template id="cannonball-hit-template">
                 <a-entity class="cannonball-hit"
-                          sound="src: #hit; poolSize: 1; volume: 5; autoplay: true;"
+                          sound="src: #hit; poolSize: 1; volume: 1; autoplay: true;"
                           particle-emitter
+                ></a-entity>
+            </template>
+            <template id="cannonball-thump-template">
+                <a-entity class="cannonball-thump"
+                          sound="src: #thump; poolSize: 1; volume: 1; autoplay: true;"
+                          particle-emitter="dirt: true;"
+                ></a-entity>
+            </template>
+            <template id="cannonball-splash-template">
+                <a-entity class="cannonball-splash"
+                          sound="src: #splash; poolSize: 1; volume: 1; autoplay: true;"
+                          particle-emitter="water: true;"
                 ></a-entity>
             </template>
             <template id="wilhelm-scream-template">
                 <a-entity class="wilhelm-scream"
-                          sound="src: #scream; poolSize: 1; volume: 5; autoplay: true;"
+                          sound="src: #scream; poolSize: 1; volume: 1; autoplay: true;"
                 ></a-entity>
             </template>
             <audio id="fire" src="/sounds/FireSFX.m4a" preload="auto"></audio>
             <audio id="hit" src="/sounds/WoodHitSFX.m4a" preload="auto"></audio>
             <audio id="scream" src="/sounds/WilhelmScreamSFX.mp3" preload="auto"></audio>
+            <audio id="thump" src="/sounds/ThumpSFX.mp3" preload="auto"></audio>
+            <audio id="splash" src="/sounds/SplashSFX.mp3" preload="auto"></audio>
             <img id="fog" src="/assets/fog.png" alt="fog"/>
+            <img id="blob" src="/assets/blob.png" alt="blob"/>
         </a-assets>
         <a-sphere color="black" radius="0.01" id="cursor" port-show></a-sphere>
         <a-entity light="type: ambient; color: #CCC"></a-entity>
