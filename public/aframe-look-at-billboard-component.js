@@ -143,10 +143,10 @@
 	    var object3D = self.el.object3D;
 	    var targetEl;
 
-	    // Track target object position. Depends on parent object keeping 
-	    // global transforms up to state with updateMatrixWorld(). 
-	    // In practice, this is handled by the renderer, but will result in 
-	    // 
+	    // Track target object position. Depends on parent object keeping
+	    // global transforms up to state with updateMatrixWorld().
+	    // In practice, this is handled by the renderer, but will result in
+	    //
 
 	    if (typeof self.data.target === 'string' && self.data.checkSrcEveryFrame) {
 	      targetEl = self.el.sceneEl.querySelector(target);
@@ -164,7 +164,7 @@
 	      }
 	    }
 
-	    if (this.target3D) { 
+	    if (this.target3D) {
 	      this.vector.setFromMatrixPosition(this.target3D.matrixWorld);
 	      if (object3D.parent) {
 	        if (this.data.updateWorldTransform) {
@@ -184,7 +184,7 @@
 	/**
 	 * Billboard component.
 	 *
-	 * Modifies rotation to track the current camera, keeping the entity facing it 
+	 * Modifies rotation to track the current camera, keeping the entity facing it
 	 *
 	 */
 	AFRAME.registerComponent('billboard', {
@@ -198,13 +198,13 @@
 	    var object3D = self.el.object3D;
 
 	    // make sure camera is set
-	    if (target) { 
-	      target.updateMatrixWorld();
+	    if (target) {
+	      // target.updateMatrixWorld();
 	      this.vector.setFromMatrixPosition(target.matrixWorld);
-	      if (object3D.parent) {
-	        object3D.parent.updateMatrixWorld();
-	        object3D.parent.worldToLocal(this.vector);
-	      }
+	      // if (object3D.parent) {
+	      //   object3D.parent.updateMatrixWorld();
+	      //   object3D.parent.worldToLocal(this.vector);
+	      // }
 	      return object3D.lookAt(this.vector);
 	    }
 	  }
