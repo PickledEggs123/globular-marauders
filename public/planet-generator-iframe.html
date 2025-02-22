@@ -3741,14 +3741,27 @@
             schema: {},
             init: function () {
                 this.innerCollision = this.collision.bind(this);
+                this.cannonballHits = new Map();
             },
             tick: function () {
                 const shipPosition = this.el.object3D.getWorldPosition(new THREE.Vector3());
                 const cannonballs = Array.from(document.querySelectorAll(".cannonball"));
                 cannonballs.forEach((cannonball) => {
                     const cannonballPosition = cannonball.object3D.getWorldPosition(new THREE.Vector3());
-                    if (shipPosition.distanceTo(cannonballPosition) < 1.5) {
-                        this.innerCollision(cannonball);
+                    const distance = shipPosition.distanceTo(cannonballPosition);
+                    if (distance < 1.5 && !this.cannonballHits.has(cannonball)) {
+                        this.cannonballHits.set(cannonball, distance);
+                    }
+                    if (this.cannonballHits.has(cannonball)) {
+                        const oldDistance = this.cannonballHits.get(cannonball);
+                        if (oldDistance >= distance) {
+                            // entering closer to sphere
+                            this.cannonballHits.set(cannonball, distance);
+                        } else {
+                            // leaving sphere, now hit
+                            this.innerCollision(cannonball);
+                            this.cannonballHits.delete(cannonball);
+                        }
                     }
                 });
             },
