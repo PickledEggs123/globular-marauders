@@ -14,8 +14,8 @@ import {
     Avatar,
     CardMedia
 } from "@mui/material";
-import {Image} from "@mui/icons-material";
 import {Link} from "react-router-dom";
+import Carousel from "react-material-ui-carousel";
 
 export const Main = () => {
     return (
@@ -23,7 +23,7 @@ export const Main = () => {
             <WebsiteDrawer rightSide={null}/>
             <Container>
                 <Grid container spacing={2}>
-                    <Grid item xs={12}>
+                    <Grid item xs={6}>
                         <Card>
                             <CardMedia component="img" src="/mainImages/MainGameMedia.png"></CardMedia>
                             <CardHeader title="The Early Prototype" subheader="Asteroid style movement but you fire side ways">
@@ -41,21 +41,25 @@ export const Main = () => {
                                     <Link to="/2d-game"><Button>Click here to play the latest version</Button></Link>
                                 </Typography>
                                 <br/>
-                                <Grid container spacing={2}>
-                                    <Grid item xs={4}>
-                                        <Box component="img" alt="2d Game Image 1" src="/mainImages/MainGame1.png" sx={{width: "100%"}}/>
-                                    </Grid>
-                                    <Grid item xs={4}>
-                                        <Box component="img" alt="2d Game Image 2" src="/mainImages/MainGame2.png" sx={{width: "100%"}}/>
-                                    </Grid>
-                                    <Grid item xs={4}>
-                                        <Box component="img" alt="2d Game Image 3" src="/mainImages/MainGame3.png" sx={{width: "100%"}}/>
-                                    </Grid>
-                                </Grid>
+                                <div style={{width: 256, margin: '0 auto'}}>
+                                    <Carousel>
+                                        {
+                                            [{
+                                                url: '/mainImages/MainGame1.png',
+                                            }, {
+                                                url: '/mainImages/MainGame2.png',
+                                            }, {
+                                                url: '/mainImages/MainGame3.png',
+                                            }].map(item => (
+                                                <Box component="img" alt="2d Game Image 1" src={item.url} sx={{width: "100%"}}/>
+                                            ))
+                                        }
+                                    </Carousel>
+                                </div>
                             </CardContent>
                         </Card>
                     </Grid>
-                    <Grid item xs={12}>
+                    <Grid item xs={6}>
                         <Card>
                             <CardMedia component="img" src="/mainImages/3dGameMedia.png"></CardMedia>
                             <CardHeader title="More Reasonable Planet with Ocean" subheader="Ocean pathfinding is harder than space with no obstacles">
@@ -87,20 +91,21 @@ export const Main = () => {
                                     <Link to="/planet-generator"><Button>Click here to play the 3d game</Button></Link>
                                 </Typography>
                                 <br/>
-                                <Grid container spacing={2}>
-                                    <Grid item xs={4}>
-                                        <Box component="img" alt="3d Game Image 1" src="/mainImages/3dGame1.png"
-                                             sx={{width: "100%"}}/>
-                                    </Grid>
-                                    <Grid item xs={4}>
-                                        <Box component="img" alt="3d Game Image 2" src="/mainImages/3dGame2.png"
-                                             sx={{width: "100%"}}/>
-                                    </Grid>
-                                    <Grid item xs={4}>
-                                        <Box component="img" alt="3d Game Image 3" src="/mainImages/3dGame3.png"
-                                             sx={{width: "100%"}}/>
-                                    </Grid>
-                                </Grid>
+                                <div style={{width: 256, margin: '0 auto'}}>
+                                    <Carousel>
+                                        {
+                                            [{
+                                                url: '/mainImages/3dGame1.png',
+                                            }, {
+                                                url: '/mainImages/3dGame2.png',
+                                            }, {
+                                                url: '/mainImages/3dGame3.png',
+                                            }].map(item => (
+                                                <Box component="img" alt="3d Game Image 1" src={item.url} sx={{width: "100%"}}/>
+                                            ))
+                                        }
+                                    </Carousel>
+                                </div>
                             </CardContent>
                         </Card>
                     </Grid>
