@@ -3742,6 +3742,7 @@
             init: function () {
                 this.innerCollision = this.collision.bind(this);
                 this.cannonballHits = new Map();
+                this.cannonballAlreadyHit = new Set();
             },
             tick: function () {
                 const shipPosition = this.el.object3D.getWorldPosition(new THREE.Vector3());
@@ -3749,7 +3750,7 @@
                 cannonballs.forEach((cannonball) => {
                     const cannonballPosition = cannonball.object3D.getWorldPosition(new THREE.Vector3());
                     const distance = shipPosition.distanceTo(cannonballPosition);
-                    if (distance < 1.5 && !this.cannonballHits.has(cannonball)) {
+                    if (distance < 1.5 && !this.cannonballHits.has(cannonball) && !this.cannonballAlreadyHit.has(cannonball)) {
                         this.cannonballHits.set(cannonball, distance);
                     }
                     if (this.cannonballHits.has(cannonball)) {
@@ -3761,6 +3762,10 @@
                             // leaving sphere, now hit
                             this.innerCollision(cannonball);
                             this.cannonballHits.delete(cannonball);
+                            this.cannonballAlreadyHit.add(cannonball);
+                            setTimeout(() => {
+                                this.cannonballAlreadyHit.remove(cannonball);
+                            }, 10_000);
                         }
                     }
                 });
