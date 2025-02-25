@@ -3754,7 +3754,7 @@
                 cannonballs.forEach((cannonball) => {
                     const cannonballPosition = cannonball.object3D.getWorldPosition(new THREE.Vector3());
                     const distance = shipPosition.distanceTo(cannonballPosition);
-                    if (distance < 1.5 && !this.cannonballHits.has(cannonball) && !this.cannonballAlreadyHit.has(cannonball)) {
+                    if (distance < 1.5 && !this.cannonballHits.has(cannonball)) {
                         this.cannonballHits.set(cannonball, distance);
                     }
                     if (this.cannonballHits.has(cannonball)) {
@@ -3831,15 +3831,17 @@
 
         AFRAME.registerComponent("cannonball-collider-ground", {
             init: function () {
-                let eventHandler = null;
-                eventHandler = (e) => {
+                this.eventHandler = (e) => {
                     if (e.body.el.components["go-on-land"]) {
                         addCannonballThump(this.el);
                         this.el.removeAttribute("cannonball-collider-water");
                     }
                 };
-                this.el.body.addEventListener("collide", eventHandler);
+                this.el.body.addEventListener("collide", this.eventHandler);
             },
+            remove: function () {
+                this.el.body.removeEventListener("collide", this.eventHandler);
+            }
         });
 
         AFRAME.registerComponent("cannonball-collider-water", {
