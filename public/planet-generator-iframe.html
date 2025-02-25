@@ -3056,6 +3056,7 @@
             rootProjectile.setAttribute("initial-velocity", velocity);
             rootProjectile.setAttribute("cannonball-collider-ground", "");
             rootProjectile.setAttribute("cannonball-collider-water", "");
+            rootProjectile.setAttribute("cannonball-hit-ready", "");
             rootProjectile.setAttribute("despawn", "");
 
             if (characterModels.has("CANNONBALL")) {
@@ -3737,16 +3738,19 @@
             },
         });
 
+        AFRAME.registerComponent("cannonball-hit-ready", {
+            schema: {},
+        });
+
         AFRAME.registerComponent("cannonball-collider", {
             schema: {},
             init: function () {
                 this.innerCollision = this.collision.bind(this);
                 this.cannonballHits = new Map();
-                this.cannonballAlreadyHit = new Set();
             },
             tick: function () {
                 const shipPosition = this.el.object3D.getWorldPosition(new THREE.Vector3());
-                const cannonballs = Array.from(document.querySelectorAll(".cannonball"));
+                const cannonballs = Array.from(document.querySelectorAll("[cannonball-hit-ready]"));
                 cannonballs.forEach((cannonball) => {
                     const cannonballPosition = cannonball.object3D.getWorldPosition(new THREE.Vector3());
                     const distance = shipPosition.distanceTo(cannonballPosition);
@@ -3762,10 +3766,7 @@
                             // leaving sphere, now hit
                             this.innerCollision(cannonball);
                             this.cannonballHits.delete(cannonball);
-                            this.cannonballAlreadyHit.add(cannonball);
-                            setTimeout(() => {
-                                this.cannonballAlreadyHit.remove(cannonball);
-                            }, 10_000);
+                            cannonball.removeAttribute("cannonball-hit-ready");
                         }
                     }
                 });
