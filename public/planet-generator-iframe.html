@@ -3767,6 +3767,8 @@
                             this.innerCollision(cannonball);
                             this.cannonballHits.delete(cannonball);
                             cannonball.removeAttribute("cannonball-hit-ready");
+                            cannonball.removeAttribute("cannonball-collider-ground");
+                            cannonball.removeAttribute("cannonball-collider-water");
                         }
                     }
                 });
