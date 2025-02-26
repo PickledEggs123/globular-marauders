@@ -3825,13 +3825,13 @@
                 entity.setAttribute("geometry", "primitive: box");
                 if (this.data.water) {
                     // water
-                    entity.setAttribute("material", "src: #fog; color: #5555ff; alphaTest: 0; transparent: true;");
+                    entity.setAttribute("material", "src: #fog; color: #5555ff; alphaTest: 0.01; transparent: true;");
                 } else if (this.data.dirt) {
                     // dirt
-                    entity.setAttribute("material", "src: #blob; color: #9B7653; alphaTest: 0; transparent: true;");
+                    entity.setAttribute("material", "src: #blob; color: #9B7653; alphaTest: 0.01; transparent: true;");
                 } else {
                     // smoke
-                    entity.setAttribute("material", "src: #fog; alphaTest: 0; transparent: true;");
+                    entity.setAttribute("material", "src: #fog; alphaTest: 0.01; transparent: true;");
                 }
                 entity.setAttribute("position", worldPosition.clone().add(randomOffset.clone()));
                 entity.setAttribute("scale", "0.1 0.1 0.1");
