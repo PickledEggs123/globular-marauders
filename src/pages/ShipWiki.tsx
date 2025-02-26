@@ -248,7 +248,7 @@ export const ShipWiki = () => {
     };
 
     return (
-        <Paper style={{width: "100vw", minHeight: "100vh", height: "fit-content", display: "flex", flexDirection: "column"}}>
+        <Paper style={{width: "100%", minHeight: "100vh", height: "fit-content", display: "flex", flexDirection: "column"}}>
             <WebsiteDrawer rightSide={null}/>
             <Container>
                 <Typography variant="h3">

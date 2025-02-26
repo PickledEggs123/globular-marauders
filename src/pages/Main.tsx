@@ -11,7 +11,6 @@ import {
     Typography,
     Box,
     Button,
-    Avatar,
     CardMedia
 } from "@mui/material";
 import {Link} from "react-router-dom";
@@ -19,11 +18,11 @@ import Carousel from "react-material-ui-carousel";
 
 export const Main = () => {
     return (
-        <Paper style={{width: "100vw", minHeight: "100vh", height: "fit-content", display: "flex", flexDirection: "column"}}>
+        <Paper style={{width: "100%", minHeight: "100vh", height: "fit-content", display: "flex", flexDirection: "column"}}>
             <WebsiteDrawer rightSide={null}/>
             <Container>
                 <Grid container spacing={2}>
-                    <Grid item xs={6}>
+                    <Grid item xs={12} md={6}>
                         <Card>
                             <CardMedia component="img" src="/mainImages/MainGameMedia.png"></CardMedia>
                             <CardHeader title="The Early Prototype" subheader="Asteroid style movement but you fire side ways">
@@ -51,7 +50,7 @@ export const Main = () => {
                                             }, {
                                                 url: '/mainImages/MainGame3.png',
                                             }].map(item => (
-                                                <Box component="img" alt="2d Game Image 1" src={item.url} sx={{width: "100%"}}/>
+                                                <Box key={item.url} component="img" alt="2d Game Image 1" src={item.url} sx={{width: "100%"}}/>
                                             ))
                                         }
                                     </Carousel>
@@ -59,7 +58,7 @@ export const Main = () => {
                             </CardContent>
                         </Card>
                     </Grid>
-                    <Grid item xs={6}>
+                    <Grid item xs={12} md={6}>
                         <Card>
                             <CardMedia component="img" src="/mainImages/3dGameMedia.png"></CardMedia>
                             <CardHeader title="More Reasonable Planet with Ocean" subheader="Ocean pathfinding is harder than space with no obstacles">
@@ -101,7 +100,7 @@ export const Main = () => {
                                             }, {
                                                 url: '/mainImages/3dGame3.png',
                                             }].map(item => (
-                                                <Box component="img" alt="3d Game Image 1" src={item.url} sx={{width: "100%"}}/>
+                                                <Box key={item.url} component="img" alt="3d Game Image 1" src={item.url} sx={{width: "100%"}}/>
                                             ))
                                         }
                                     </Carousel>

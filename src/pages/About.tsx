@@ -5,14 +5,14 @@ import {Paper, Card, CardContent, CardHeader, Container, Grid, Typography} from 
 
 export const About = () => {
     return (
-        <Paper style={{width: "100vw", minHeight: "100vh", height: "fit-content", display: "flex", flexDirection: "column"}}>
+        <Paper style={{width: "100%", minHeight: "100vh", height: "fit-content", display: "flex", flexDirection: "column"}}>
             <WebsiteDrawer rightSide={null}/>
             <Container>
                 <Typography variant="h3">
                     About the Game
                 </Typography>
                 <Grid container spacing={2}>
-                    <Grid item xs={12}>
+                    <Grid item xs={12} md={6}>
                         <Card>
                             <CardHeader title="Space Pirates" subheader="Asteroid style movement but you fire side ways">
                             </CardHeader>
@@ -36,7 +36,7 @@ export const About = () => {
                             </CardContent>
                         </Card>
                     </Grid>
-                    <Grid item xs={12}>
+                    <Grid item xs={12} md={6}>
                         <Card>
                             <CardHeader title="Wizards TBD" subheader="Must replace bland colonial pirate theme with magic">
                             </CardHeader>
@@ -63,7 +63,7 @@ export const About = () => {
                             </CardContent>
                         </Card>
                     </Grid>
-                    <Grid item xs={12}>
+                    <Grid item xs={12} md={6}>
                         <Card>
                             <CardHeader title="Math" subheader="This is a math resume project, look at the spherical math!">
                             </CardHeader>
@@ -86,7 +86,7 @@ export const About = () => {
                             </CardContent>
                         </Card>
                     </Grid>
-                    <Grid item xs={12}>
+                    <Grid item xs={12} md={6}>
                         <Card>
                             <CardHeader title="Known Bugs" subheader="The final math bug before this is perfect">
                             </CardHeader>
