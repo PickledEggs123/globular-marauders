@@ -1687,7 +1687,11 @@
             schema: {
                 destination: {type: 'vec3'},
                 active: {default: false},
-                speed: {default: 2}
+                speed: {default: 2},
+                razeTarget: {
+                    type: 'selector',
+                    default: null,
+                },
             },
             system: null,
             group: null,
@@ -1785,6 +1789,9 @@
                     // After discarding the last waypoint, exit pathfinding.
                     if (!this.path.length) {
                         this.el.setAttribute("globe-nav-agent", "active: false;");
+                        if (this.data.razeTarget) {
+                            this.data.razeTarget.emit("raze");
+                        }
                         el.emit('navigation-end');
                         return;
                     }
@@ -2109,6 +2116,12 @@
         });
 
         AFRAME.registerComponent('go-on-land', {
+            schema: {
+                raze: {
+                    type: 'boolean',
+                    default: false,
+                },
+            },
             init: function () {
                 this.system = this.el.sceneEl.systems['globe-nav'];
                 this.el.addEventListener('click', (e) => {
@@ -2133,7 +2146,7 @@
                         const scene = document.querySelector("a-scene");
                         const npcEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
                         npcEls.forEach(npcEl => {
-                            npcEl.setAttribute("globe-nav-agent", `active: false; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
+                            npcEl.setAttribute("globe-nav-agent", `active: false; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2; razeTarget: #${this.el.id};`);
                         });
                     }, 500);
                     setTimeout(() => {
@@ -2146,7 +2159,7 @@
                             const intersections = raycaster.intersectObject(this.system.getNavMesh());
                             if (intersections[0]) {
                                 const destination2 = intersections[0].point.clone();
-                                npcEl.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2;`);
+                                npcEl.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2; razeTarget: #${this.el.id};`);
                             }
                         });
                     }, 750);
@@ -2160,21 +2173,12 @@
                             const intersections = raycaster.intersectObject(this.system.getNavMesh());
                             if (intersections[0]) {
                                 const destination2 = intersections[0].point.clone();
-                                npcEl.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2;`);
+                                npcEl.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2; razeTarget: #${this.el.id};`);
                             }
                         });
                     }, 1000);
                 });
             }
-        });
-
-        AFRAME.registerComponent('raze-target', {
-            schema: {},
-            init: function () {
-                this.el.addEventListener("click", () => {
-                    this.el.emit("raze");
-                });
-            },
         });
 
         AFRAME.registerComponent('go-to-sea', {
@@ -2384,6 +2388,13 @@
         });
 
         window.spawnNpcsFlag = false;
+        AFRAME.registerComponent('set-building-id', {
+            schema: {},
+            init: function () {
+                this.elId = "id" + Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(36);
+                this.el.setAttribute("id", this.elId);
+            },
+        });
         AFRAME.registerComponent('npc-spawner', {
             schema: {},
             multiple: true,
@@ -2801,7 +2812,8 @@
                 }
             },
             handleRaze: function () {
-                for (let i = 0; i < 10; i++) {
+                for (let i = 0; i < 1; i++) {
+                    addPirateArr(this.el);
                     addGoldCoin(this.el);
                 }
             },
@@ -2832,7 +2844,7 @@
                     bPosOffset.normalize();
                     bPosOffset.scale(0.5, bPosOffset);
                     this.el.body.applyImpulse(impulse, bPosOffset);
-                    this.interval = setTimeout(this.removeGoldCoin.bind(this), 30_000);
+                    this.interval = setTimeout(this.removeGoldCoin.bind(this), 10_000);
                 } else {
                     this.interval = setTimeout(this.applyImpulse.bind(this), 100);
                 }
@@ -3272,22 +3284,31 @@
 
             const lod0 = document.createElement("a-entity");
             lod0.setAttribute("class", `lod0 clickable${type === "PORT" ? " port" : ""}`);
-            lod0.setAttribute("raze-target", "");
-            lod0.setAttribute("spawn-gold", "");
+            if (type !== "PORT") {
+                lod0.setAttribute("go-on-land", "raze: true");
+                lod0.setAttribute("spawn-gold", "");
+                lod0.setAttribute("set-building-id", "");
+            }
             lod0.setAttribute("shadow", "");
             rootModel.appendChild(lod0);
 
             const lod1 = document.createElement("a-entity");
             lod1.setAttribute("class", `lod1 clickable${type === "PORT" ? " port" : ""}`);
-            lod1.setAttribute("raze-target", "");
-            lod1.setAttribute("spawn-gold", "");
+            if (type !== "PORT") {
+                lod0.setAttribute("go-on-land", "raze: true");
+                lod1.setAttribute("spawn-gold", "");
+                lod0.setAttribute("set-building-id", "");
+            }
             lod1.setAttribute("shadow", "");
             rootModel.appendChild(lod1);
 
             const lod2 = document.createElement("a-entity");
             lod2.setAttribute("class", `lod2 clickable${type === "PORT" ? " port" : ""}`);
-            lod2.setAttribute("raze-target", "");
-            lod2.setAttribute("spawn-gold", "");
+            if (type !== "PORT") {
+                lod0.setAttribute("go-on-land", "raze: true");
+                lod2.setAttribute("spawn-gold", "");
+                lod0.setAttribute("set-building-id", "");
+            }
             lod2.setAttribute("shadow", "");
             rootModel.appendChild(lod2);
 
@@ -3349,6 +3370,17 @@
             const entity = document.createElement("a-entity");
             entity.setAttribute("position", position);
             entity.setAttribute("networked", "template: #wilhelm-scream-template; attachTemplateToLocal: true;");
+            entity.setAttribute("despawn", "");
+            scene.appendChild(entity);
+        }
+
+        function addPirateArr(el) {
+            const position = el.object3D.getWorldPosition(new THREE.Vector3());
+            const scene = document.querySelector("a-scene");
+
+            const entity = document.createElement("a-entity");
+            entity.setAttribute("position", position);
+            entity.setAttribute("networked", "template: #arr-template; attachTemplateToLocal: true;");
             entity.setAttribute("despawn", "");
             scene.appendChild(entity);
         }
@@ -4323,11 +4355,17 @@
                           sound="src: #scream; poolSize: 1; volume: 1; autoplay: true;"
                 ></a-entity>
             </template>
+            <template id="arr-template">
+                <a-entity class="arr"
+                          sound="src: #arr; poolSize: 1; volume: 1; autoplay: true;"
+                ></a-entity>
+            </template>
             <audio id="fire" src="/sounds/FireSFX.m4a" preload="auto"></audio>
             <audio id="hit" src="/sounds/WoodHitSFX.m4a" preload="auto"></audio>
             <audio id="scream" src="/sounds/WilhelmScreamSFX.mp3" preload="auto"></audio>
             <audio id="thump" src="/sounds/ThumpSFX.mp3" preload="auto"></audio>
             <audio id="splash" src="/sounds/SplashSFX.mp3" preload="auto"></audio>
+            <audio id="arr" src="/sounds/PirateArrSFX.mp3" preload="auto"></audio>
             <img id="fog" src="/assets/fog.png" alt="fog"/>
             <img id="blob" src="/assets/blob.png" alt="blob"/>
         </a-assets>
