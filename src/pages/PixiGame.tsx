@@ -102,7 +102,7 @@ import {ReactComponent as Pirate} from "../icons/pirate.svg";
 import {ReactComponent as Attack} from "../icons/attack.svg";
 import {ReactComponent as WasdImage} from "../icons/wasd.svg";
 import {ReactComponent as MouseImage} from "../icons/mouse.svg";
-import {WebsiteDrawer} from "../Drawer";
+import {WebsiteDrawer2} from "../Drawer";
 import {ITutorialScriptContext, tutorialScript} from "../scripts/tutorial";
 import {CardRenderer} from "../forms/CardRenderer";
 import {PixiGameNetworking} from "./PixiGameNetworking";
@@ -2076,7 +2076,7 @@ export class PixiGame extends PixiGameNetworking {
 
         return (
             <Paper style={{width: "100%", minHeight: "100vh", height: "fit-content", display: "flex", flexDirection: "column"}}>
-                <WebsiteDrawer rightSide={
+                <WebsiteDrawer2 rightSide={
                     <React.Fragment>
                         <Tooltip title="Settings">
                             <IconButton
@@ -2127,502 +2127,504 @@ export class PixiGame extends PixiGameNetworking {
                             </IconButton>
                         </Tooltip>
                     </React.Fragment>
-                }/>
-                <div className="AppMain" ref={this.measureAppBodyRef}>
-                    <div style={{position: "absolute", top: this.state.marginTop, left: this.state.marginLeft, bottom: this.state.marginBottom, right: this.state.marginRight}}>
-                        <div style={{width: this.state.width, height: this.state.height}} ref={this.showAppBodyRef}/>
-                    </div>
-                    <div className="AppMainContent">
-                        {
-                            !this.state.showLoginMenu && !this.state.showMainMenu && !this.state.showPlanetMenu && !this.state.showSpawnMenu && this.state.width < 768 ? (
-                                <div className="MobileGameUi">
-                                    <div style={{position: "absolute", top: 0, left: this.state.marginLeft, bottom: this.state.marginBottom + this.state.height, right: this.state.marginRight}}>
-                                        <RenderMobileGameUiTop width={this.state.width} bannerTopHeight={this.state.bannerTopHeight}/>
-                                        {this.renderGameUiTop()}
-                                    </div>
-                                    <div style={{position: "absolute", top: this.state.marginTop + this.state.height, left: this.state.marginLeft, bottom: 0, right: this.state.marginRight}}>
-                                        <RenderMobileGameUiBottom width={this.state.width} bannerBottomHeight={this.state.bannerBottomHeight}/>
-                                        {this.renderGameUiBottom()}
-                                        <Grid container spacing={2} columns={{
-                                            xs: 6,
-                                            lg: 12,
-                                        }}>
-                                            {
-                                                this.forms.cards.map(card => {
-                                                    return (
-                                                        <Grid item xs={12} key={card.title} justifyContent="center" alignItems="center">
-                                                            <CardRenderer card={card} submitForm={this.submitForm.bind(this)}/>
-                                                        </Grid>
-                                                    );
-                                                })
-                                            }
-                                        </Grid>
-                                    </div>
-                                </div>
-                            ): null
-                        }
+                }
+                content={
+                    <div className="AppMain" ref={this.measureAppBodyRef}>
                         <div style={{position: "absolute", top: this.state.marginTop, left: this.state.marginLeft, bottom: this.state.marginBottom, right: this.state.marginRight}}>
-                            <Grid container direction="column" justifyContent="center" alignItems="center" spacing={2} xs={12} paddingTop={12}>
-                                {
-                                    this.state.mouseImageClass ? (
-                                        <Grid item xs={12} justifyContent="center" alignItems="center">
-                                            <Card>
-                                                <CardHeader title="Use Mouse"/>
-                                                <CardContent>
-                                                    <MouseImage className={`mouse-image-${this.state.mouseImageClass}`}/>
-                                                </CardContent>
-                                            </Card>
-                                        </Grid>
-                                    ) : null
-                                }
-                                {
-                                    this.state.keyboardImageClass ? (
-                                        <Grid item xs={12} justifyContent="center" alignItems="center">
-                                            <Card>
-                                                <CardHeader title="Press Keyboard"/>
-                                                <CardContent>
-                                                    <WasdImage className={`wasd-image-${this.state.keyboardImageClass}`}/>
-                                                </CardContent>
-                                            </Card>
-                                        </Grid>
-                                    ) : null
-                                }
-                                {
-                                    this.state.width >= 768 ? (
-                                        <Grid item xs={12} justifyContent="center" alignItems="center">
-                                            <Paper style={{maxHeight: "40vh", maxWidth: "80vw", overflow: "auto", backgroundColor: "none"}}>
-                                                <Grid container spacing={2} columns={{
-                                                    xs: 6,
-                                                    lg: 12,
-                                                }}>
+                            <div style={{width: this.state.width, height: this.state.height}} ref={this.showAppBodyRef}/>
+                        </div>
+                        <div className="AppMainContent">
+                            {
+                                !this.state.showLoginMenu && !this.state.showMainMenu && !this.state.showPlanetMenu && !this.state.showSpawnMenu && this.state.width < 768 ? (
+                                    <div className="MobileGameUi">
+                                        <div style={{position: "absolute", top: 0, left: this.state.marginLeft, bottom: this.state.marginBottom + this.state.height, right: this.state.marginRight}}>
+                                            <RenderMobileGameUiTop width={this.state.width} bannerTopHeight={this.state.bannerTopHeight}/>
+                                            {this.renderGameUiTop()}
+                                        </div>
+                                        <div style={{position: "absolute", top: this.state.marginTop + this.state.height, left: this.state.marginLeft, bottom: 0, right: this.state.marginRight}}>
+                                            <RenderMobileGameUiBottom width={this.state.width} bannerBottomHeight={this.state.bannerBottomHeight}/>
+                                            {this.renderGameUiBottom()}
+                                            <Grid container spacing={2} columns={{
+                                                xs: 6,
+                                                lg: 12,
+                                            }}>
+                                                {
+                                                    this.forms.cards.map(card => {
+                                                        return (
+                                                            <Grid item xs={12} key={card.title} justifyContent="center" alignItems="center">
+                                                                <CardRenderer card={card} submitForm={this.submitForm.bind(this)}/>
+                                                            </Grid>
+                                                        );
+                                                    })
+                                                }
+                                            </Grid>
+                                        </div>
+                                    </div>
+                                ): null
+                            }
+                            <div style={{position: "absolute", top: this.state.marginTop, left: this.state.marginLeft, bottom: this.state.marginBottom, right: this.state.marginRight}}>
+                                <Grid container direction="column" justifyContent="center" alignItems="center" spacing={2} xs={12} paddingTop={12}>
+                                    {
+                                        this.state.mouseImageClass ? (
+                                            <Grid item xs={12} justifyContent="center" alignItems="center">
+                                                <Card>
+                                                    <CardHeader title="Use Mouse"/>
+                                                    <CardContent>
+                                                        <MouseImage className={`mouse-image-${this.state.mouseImageClass}`}/>
+                                                    </CardContent>
+                                                </Card>
+                                            </Grid>
+                                        ) : null
+                                    }
+                                    {
+                                        this.state.keyboardImageClass ? (
+                                            <Grid item xs={12} justifyContent="center" alignItems="center">
+                                                <Card>
+                                                    <CardHeader title="Press Keyboard"/>
+                                                    <CardContent>
+                                                        <WasdImage className={`wasd-image-${this.state.keyboardImageClass}`}/>
+                                                    </CardContent>
+                                                </Card>
+                                            </Grid>
+                                        ) : null
+                                    }
+                                    {
+                                        this.state.width >= 768 ? (
+                                            <Grid item xs={12} justifyContent="center" alignItems="center">
+                                                <Paper style={{maxHeight: "40vh", maxWidth: "80vw", overflow: "auto", backgroundColor: "none"}}>
+                                                    <Grid container spacing={2} columns={{
+                                                        xs: 6,
+                                                        lg: 12,
+                                                    }}>
+                                                        {
+                                                            this.forms.cards.map(card => {
+                                                                return (
+                                                                    <Grid item xs={12} key={card.title} justifyContent="center" alignItems="center">
+                                                                        <CardRenderer card={card} submitForm={this.submitForm.bind(this)}/>
+                                                                    </Grid>
+                                                                );
+                                                            })
+                                                        }
+                                                    </Grid>
+                                                </Paper>
+                                            </Grid>
+                                        ) : null
+                                    }
+                                    {
+                                        this.state.gameMode === EGameMode.MAIN_MENU ? (
+                                            <Grid item xs={12} justifyContent="center" alignItems="center" onWheel={(e) => {e.preventDefault();}}>
+                                                <Card>
+                                                    <CardHeader title="Globular Marauders"/>
+                                                    <CardContent>
+                                                        <List>
+                                                            <ListItem onClick={this.handleSwitchGameMode.bind(this, EGameMode.TUTORIAL)}>
+                                                                <ListItemAvatar>
+                                                                    <School/>
+                                                                </ListItemAvatar>
+                                                                <ListItemText>Tutorial</ListItemText>
+                                                            </ListItem>
+                                                            <ListItem onClick={this.handleSwitchGameMode.bind(this, EGameMode.SINGLE_PLAYER)}>
+                                                                <ListItemAvatar>
+                                                                    <SmartToy/>
+                                                                </ListItemAvatar>
+                                                                <ListItemText>Play Game</ListItemText>
+                                                            </ListItem>
+                                                        </List>
+                                                    </CardContent>
+                                                </Card>
+                                            </Grid>
+                                        ) : null
+                                    }
+                                    {
+                                        this.state.showLoginMenu ? (
+                                            <Grid item xs={12} justifyContent="center" alignItems="center">
+                                                <Card>
+                                                    <CardHeader title="Login"/>
+                                                    <CardContent>
+                                                        {
+                                                            this.state.init ? (
+                                                                <Fragment>
+                                                                    <TextField fullWidth value={this.state.userName} onChange={this.handleUserName.bind(this)} label={"Username"} placeholder="PirateDude" helperText="A fun name to sow dread into your enemies"/>
+                                                                    <Button fullWidth variant="contained"
+                                                                            onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.handleLogin.bind(this)}>Login</Button>
+                                                                </Fragment>
+                                                            ) : (
+                                                                <Typography>{this.state.matchMakerFailMessage || "Connecting to server..."}</Typography>
+                                                            )
+                                                        }
+                                                    </CardContent>
+                                                </Card>
+                                            </Grid>
+                                        ) : null
+                                    }
+                                    {
+                                        this.state.showMainMenu ? (
+                                            <Grid item xs={12} justifyContent="center" alignItems="center">
+                                                <Grid container>
+                                                    <Grid item xs={12}>
+                                                    </Grid>
+                                                    <Grid item xs={12}>
+                                                        <Button fullWidth variant="contained" disabled={!this.spawnFactions.length}
+                                                                onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.goToPlanetMenu.bind(this)}>Next</Button>
+                                                    </Grid>
+                                                </Grid>
+                                                <Box style={{display: "flex", flexWrap: "wrap", maxHeight: "40vh", maxWidth: "80vw", overflow: "auto", backgroundColor: "none"}}>
                                                     {
-                                                        this.forms.cards.map(card => {
+                                                        this.spawnFactions.map((f, _, arr) => {
+                                                            const faction = this.game.factions.get(f.factionId);
+                                                            if (!faction) {
+                                                                return null;
+                                                            }
                                                             return (
-                                                                <Grid item xs={12} key={card.title} justifyContent="center" alignItems="center">
-                                                                    <CardRenderer card={card} submitForm={this.submitForm.bind(this)}/>
-                                                                </Grid>
+                                                                <Card style={{minWidth: 192, maxWidth: 256}}>
+                                                                    <CardActionArea onClick={this.selectFaction.bind(this, faction.id)}>
+                                                                        <CardContent>
+                                                                            <Avatar variant="rounded" style={{width: 128, height: 128}} alt={GameFactionData.find(x => x.id === faction.id)?.name ?? faction.id} srcSet={this.renderCharacterUrl(GameFactionData.find(x => x.id === faction.id)?.races[0].id ?? ERaceData.HUMAN).url}>
+                                                                                {null}
+                                                                            </Avatar>
+                                                                        </CardContent>
+                                                                        <CardHeader title={<span>{this.state.faction === faction.id ? <CheckBoxIcon/> : <CheckBoxOutlineBlankIcon/>} {faction.id}</span>} subheader={GetFactionSubheader(faction.id)}>
+                                                                        </CardHeader>
+                                                                    </CardActionArea>
+                                                                    <CardActions>
+                                                                        <Tooltip title="Planets owned">
+                                                                            <Badge badgeContent={f.numPlanets} color={"primary"}>
+                                                                                <Public/>
+                                                                            </Badge>
+                                                                        </Tooltip>
+                                                                        <Tooltip title="Ships in play">
+                                                                            <Badge badgeContent={f.numShips} color={"primary"}>
+                                                                                <Sailing/>
+                                                                            </Badge>
+                                                                        </Tooltip>
+                                                                        <Tooltip title="Invasion events">
+                                                                            <Badge badgeContent={f.numInvasions} color={"primary"}>
+                                                                                <SvgIcon>
+                                                                                    <Attack/>
+                                                                                </SvgIcon>
+                                                                            </Badge>
+                                                                        </Tooltip>
+                                                                    </CardActions>
+                                                                </Card>
                                                             );
                                                         })
                                                     }
-                                                </Grid>
-                                            </Paper>
-                                        </Grid>
-                                    ) : null
-                                }
-                                {
-                                    this.state.gameMode === EGameMode.MAIN_MENU ? (
-                                        <Grid item xs={12} justifyContent="center" alignItems="center" onWheel={(e) => {e.preventDefault();}}>
-                                            <Card>
-                                                <CardHeader title="Globular Marauders"/>
-                                                <CardContent>
-                                                    <List>
-                                                        <ListItem onClick={this.handleSwitchGameMode.bind(this, EGameMode.TUTORIAL)}>
-                                                            <ListItemAvatar>
-                                                                <School/>
-                                                            </ListItemAvatar>
-                                                            <ListItemText>Tutorial</ListItemText>
-                                                        </ListItem>
-                                                        <ListItem onClick={this.handleSwitchGameMode.bind(this, EGameMode.SINGLE_PLAYER)}>
-                                                            <ListItemAvatar>
-                                                                <SmartToy/>
-                                                            </ListItemAvatar>
-                                                            <ListItemText>Play Game</ListItemText>
-                                                        </ListItem>
-                                                    </List>
-                                                </CardContent>
-                                            </Card>
-                                        </Grid>
-                                    ) : null
-                                }
-                                {
-                                    this.state.showLoginMenu ? (
-                                        <Grid item xs={12} justifyContent="center" alignItems="center">
-                                            <Card>
-                                                <CardHeader title="Login"/>
-                                                <CardContent>
-                                                    {
-                                                        this.state.init ? (
-                                                            <Fragment>
-                                                                <TextField fullWidth value={this.state.userName} onChange={this.handleUserName.bind(this)} label={"Username"} placeholder="PirateDude" helperText="A fun name to sow dread into your enemies"/>
-                                                                <Button fullWidth variant="contained"
-                                                                        onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.handleLogin.bind(this)}>Login</Button>
-                                                            </Fragment>
-                                                        ) : (
-                                                            <Typography>{this.state.matchMakerFailMessage || "Connecting to server..."}</Typography>
-                                                        )
-                                                    }
-                                                </CardContent>
-                                            </Card>
-                                        </Grid>
-                                    ) : null
-                                }
-                                {
-                                    this.state.showMainMenu ? (
-                                        <Grid item xs={12} justifyContent="center" alignItems="center">
-                                            <Grid container>
-                                                <Grid item xs={12}>
-                                                </Grid>
-                                                <Grid item xs={12}>
-                                                    <Button fullWidth variant="contained" disabled={!this.spawnFactions.length}
-                                                            onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.goToPlanetMenu.bind(this)}>Next</Button>
-                                                </Grid>
+                                                </Box>
                                             </Grid>
-                                            <Box style={{display: "flex", flexWrap: "wrap", maxHeight: "40vh", maxWidth: "80vw", overflow: "auto", backgroundColor: "none"}}>
-                                                {
-                                                    this.spawnFactions.map((f, _, arr) => {
-                                                        const faction = this.game.factions.get(f.factionId);
-                                                        if (!faction) {
-                                                            return null;
-                                                        }
-                                                        return (
-                                                            <Card style={{minWidth: 192, maxWidth: 256}}>
-                                                                <CardActionArea onClick={this.selectFaction.bind(this, faction.id)}>
-                                                                    <CardContent>
-                                                                        <Avatar variant="rounded" style={{width: 128, height: 128}} alt={GameFactionData.find(x => x.id === faction.id)?.name ?? faction.id} srcSet={this.renderCharacterUrl(GameFactionData.find(x => x.id === faction.id)?.races[0].id ?? ERaceData.HUMAN).url}>
-                                                                            {null}
-                                                                        </Avatar>
-                                                                    </CardContent>
-                                                                    <CardHeader title={<span>{this.state.faction === faction.id ? <CheckBoxIcon/> : <CheckBoxOutlineBlankIcon/>} {faction.id}</span>} subheader={GetFactionSubheader(faction.id)}>
-                                                                    </CardHeader>
-                                                                </CardActionArea>
-                                                                <CardActions>
-                                                                    <Tooltip title="Planets owned">
-                                                                        <Badge badgeContent={f.numPlanets} color={"primary"}>
-                                                                            <Public/>
-                                                                        </Badge>
-                                                                    </Tooltip>
-                                                                    <Tooltip title="Ships in play">
-                                                                        <Badge badgeContent={f.numShips} color={"primary"}>
-                                                                            <Sailing/>
-                                                                        </Badge>
-                                                                    </Tooltip>
-                                                                    <Tooltip title="Invasion events">
-                                                                        <Badge badgeContent={f.numInvasions} color={"primary"}>
-                                                                            <SvgIcon>
-                                                                                <Attack/>
-                                                                            </SvgIcon>
-                                                                        </Badge>
-                                                                    </Tooltip>
-                                                                </CardActions>
-                                                            </Card>
-                                                        );
-                                                    })
-                                                }
-                                            </Box>
-                                        </Grid>
-                                    ) : null
-                                }
-                                {
-                                    this.state.showPlanetMenu ? (
-                                        <Grid item xs={12} justifyContent="center" alignItems="center">
-                                            <Grid container>
-                                                <Grid item xs={12}>
-                                                    <Button fullWidth variant="contained"
-                                                            onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.returnToFactionMenu.bind(this)}>Back</Button>
-                                                </Grid>
-                                                <Grid item xs={12}>
-                                                    <Button fullWidth variant="contained" disabled={!this.spawnPlanets.length}
-                                                            onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.goToSpawnMenu.bind(this)}>Next</Button>
-                                                </Grid>
-                                            </Grid>
-                                            <Box style={{display: "flex", flexWrap: "wrap", maxHeight: "40vh", maxWidth: "80vw", overflow: "auto", backgroundColor: "none"}}>
-                                                {
-                                                    this.spawnPlanets.map((f, i, arr) => {
-                                                        const planet = this.game.planets.get(f.planetId);
-                                                        const planetName = planet?.name ?? f.planetId;
-                                                        return (
-                                                            <Card style={{minWidth: 192, maxWidth: 256}}>
-                                                                <CardActionArea onClick={this.selectPlanet.bind(this, f.planetId)}>
-                                                                    <CardContent>
-                                                                        <Avatar variant="rounded" style={{width: 128, height: 128}} alt={planetName} srcSet={this.planetThumbnails.get(f.planetId) ?? undefined}>
-                                                                        </Avatar>
-                                                                    </CardContent>
-                                                                    <CardHeader title={<span>{this.state.planetId === f.planetId ? <CheckBoxIcon/> : <CheckBoxOutlineBlankIcon/>} {planetName}</span>} subheader={`(${f.numShipsAvailable} ships)`}>
-                                                                    </CardHeader>
-                                                                </CardActionArea>
-                                                                <CardActions>
-                                                                    <Tooltip title="Settlers">
-                                                                        <Badge badgeContent={f.numSettlers} color={"primary"}>
-                                                                            <Public/>
-                                                                        </Badge>
-                                                                    </Tooltip>
-                                                                    <Tooltip title="Traders">
-                                                                        <Badge badgeContent={f.numTraders} color={"primary"}>
-                                                                            <Sailing/>
-                                                                        </Badge>
-                                                                    </Tooltip>
-                                                                    <Tooltip title="Pirates">
-                                                                        <Badge badgeContent={f.numPirates} color={"primary"}>
-                                                                            <SvgIcon>
-                                                                                <Pirate/>
-                                                                            </SvgIcon>
-                                                                        </Badge>
-                                                                    </Tooltip>
-                                                                    <Tooltip title="Invaders">
-                                                                        <Badge badgeContent={f.numInvaders} color={"primary"}>
-                                                                            <SvgIcon>
-                                                                                <Attack/>
-                                                                            </SvgIcon>
-                                                                        </Badge>
-                                                                    </Tooltip>
-                                                                </CardActions>
-                                                            </Card>
-                                                        );
-                                                    })
-                                                }
-                                            </Box>
-                                        </Grid>
-                                    ) : null
-                                }
-                                {
-                                    this.state.showSpawnMenu ? (
-                                        <Grid item xs={12} justifyContent="center" alignItems="center">
-                                            <Grid container>
-                                                <Grid item xs={12}>
-                                                    <Button fullWidth variant="contained"
-                                                            onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.returnToPlanetMenu.bind(this)}>Back</Button>
-                                                </Grid>
-                                                <Grid item xs={12}>
-                                                    <Button fullWidth variant="contained" disabled={!this.spawnLocations.results.length}
-                                                            onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.spawnShip.bind(this)}>Next</Button>
-                                                </Grid>
-                                            </Grid>
-                                            <Box style={{display: "flex", flexWrap: "wrap", maxHeight: "40vh", maxWidth: "80vw", overflow: "auto", backgroundColor: "none"}}>
-                                                {
-                                                    this.spawnLocations.message ? (
-                                                        <Card style={{minWidth: 192, maxWidth: 256}}>
-                                                            <CardContent>
-                                                                <Typography>{this.spawnLocations.message}</Typography>
-                                                            </CardContent>
-                                                        </Card>
-                                                    ) : null
-                                                }
-                                                {
-                                                    this.spawnLocations.results.map((f, i, arr) => {
-                                                        return (
-                                                            <Card style={{minWidth: 192, maxWidth: 256}}>
-                                                                <CardActionArea onClick={this.selectShip.bind(this, f.id, f.shipType)}>
-                                                                    <CardContent>
-                                                                        <Avatar variant="rounded" style={{width: 128, height: 128}} alt={f.shipType} srcSet={this.shipThumbnails.get(f.shipType) ?? undefined}>
-                                                                        </Avatar>
-                                                                    </CardContent>
-                                                                    <CardHeader title={<span>{this.state.planetId === f.id && this.state.spawnShipType === f.shipType ? <CheckBoxIcon/> : <CheckBoxOutlineBlankIcon/>} {f.shipType}</span>} subheader={`(${f.price}) (${f.numShipsAvailable} ships)`}>
-                                                                    </CardHeader>
-                                                                </CardActionArea>
-                                                            </Card>
-                                                        );
-                                                    })
-                                                }
-                                            </Box>
-                                        </Grid>
-                                    ) : null
-                                }
-                            </Grid>
-                            <div className="DesktopGameUi">
-                                {
-                                    !this.state.showLoginMenu && !this.state.showMainMenu && !this.state.showPlanetMenu && !this.state.showSpawnMenu && this.state.width >= 768 ? (
-                                        <React.Fragment>
-                                            {this.renderGameUiTop()}
-                                            {this.renderGameUiBottom()}
-                                        </React.Fragment>
-                                    ) : null
-                                }
-                                {
-                                    this.state.gameMode !== EGameMode.MAIN_MENU && !this.state.showLoginMenu && !this.state.showMainMenu && !this.state.showPlanetMenu && !this.state.showSpawnMenu && this.state.width < 768 ? (
-                                        this.renderMobileControls()
-                                    ) : null
-                                }
-                            </div>
-                            <Dialog open={this.state.showScoreboard} onClose={() => this.setState({showScoreboard: false})}>
-                                <DialogTitle title="Scoreboard"/>
-                                <DialogContent>
-                                    <Grid container spacing={2} xs={12}>
-                                        <Grid item xs={6}>
-                                            <Card>
-                                                <CardHeader title="Damage"/>
-                                                <CardContent>
-                                                    <List>
-                                                        {
-                                                            this.game.scoreBoard.damage.map(d => {
-                                                                return (
-                                                                    <ListItem key={d.playerId} dense>
-                                                                        <ListItemText primary={d.name} secondary={d.damage}/>
-                                                                    </ListItem>
-                                                                );
-                                                            })
-                                                        }
-                                                    </List>
-                                                </CardContent>
-                                            </Card>
-                                        </Grid>
-                                        <Grid item xs={6}>
-                                            <Card>
-                                                <CardHeader title="Loot"/>
-                                                <CardContent>
-                                                    <List>
-                                                        {
-                                                            this.game.scoreBoard.loot.map(d => {
-                                                                return (
-                                                                    <ListItem key={d.playerId} dense>
-                                                                        <ListItemText primary={d.name} secondary={d.count}/>
-                                                                    </ListItem>
-                                                                );
-                                                            })
-                                                        }
-                                                    </List>
-                                                </CardContent>
-                                            </Card>
-                                        </Grid>
-                                        <Grid item xs={6}>
-                                            <Card>
-                                                <CardHeader title="Money"/>
-                                                <CardContent>
-                                                    <List>
-                                                        {
-                                                            this.game.scoreBoard.money.map(d => {
-                                                                return (
-                                                                    <ListItem key={d.playerId} dense>
-                                                                        <ListItemText primary={d.name} secondary={d.amount}/>
-                                                                    </ListItem>
-                                                                );
-                                                            })
-                                                        }
-                                                    </List>
-                                                </CardContent>
-                                            </Card>
-                                        </Grid>
-                                        <Grid item xs={6}>
-                                            <Card>
-                                                <CardHeader title="Land"/>
-                                                <CardContent>
-                                                    <List>
-                                                        {
-                                                            this.game.scoreBoard.land.map(d => {
-                                                                return (
-                                                                    <ListItem key={d.playerId} dense>
-                                                                        <ListItemText primary={d.name} secondary={d.amount}/>
-                                                                    </ListItem>
-                                                                );
-                                                            })
-                                                        }
-                                                    </List>
-                                                </CardContent>
-                                            </Card>
-                                        </Grid>
-                                        <Grid item xs={6}>
-                                            <Card>
-                                                <CardHeader title="Bounty"/>
-                                                <CardContent>
-                                                    <List>
-                                                        {
-                                                            this.game.scoreBoard.bounty.map(d => {
-                                                                return (
-                                                                    <ListItem key={d.playerId} dense>
-                                                                        <ListItemText primary={d.name} secondary={d.bountyAmount}/>
-                                                                    </ListItem>
-                                                                );
-                                                            })
-                                                        }
-                                                    </List>
-                                                </CardContent>
-                                            </Card>
-                                        </Grid>
-                                        <Grid item xs={6}>
-                                            <Card>
-                                                <CardHeader title="Capture"/>
-                                                <CardContent>
-                                                    <List>
-                                                        {
-                                                            this.game.scoreBoard.capture.map(d => {
-                                                                return (
-                                                                    <ListItem key={d.playerId} dense>
-                                                                        <ListItemText primary={d.name} secondary={d.count}/>
-                                                                    </ListItem>
-                                                                );
-                                                            })
-                                                        }
-                                                    </List>
-                                                </CardContent>
-                                            </Card>
-                                        </Grid>
-                                    </Grid>
-                                </DialogContent>
-                            </Dialog>
-                            <Dialog open={this.state.showSettings} onClose={() => this.setState({showSettings: false})}>
-                                <DialogTitle title="Settings"/>
-                                <DialogContent>
-                                    <Grid container spacing={2}>
-                                        <Grid item>
-                                            <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.showItems}
-                                                                                 onKeyDown={PixiGame.cancelSpacebar.bind(this)} onChange={this.handleShowItems.bind(this)}/>} label="Show Items"/>
-                                        </Grid>
-                                        <Grid item>
-                                            <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.showVoronoi}
-                                                                                 onKeyDown={PixiGame.cancelSpacebar.bind(this)} onChange={this.handleShowVoronoi.bind(this)}/>} label="Show Voronoi"/>
-                                            <RadioGroup name="Voronoi Mode" value={this.state.voronoiMode} onChange={(e, value) => this.handleChangeVoronoi(value as EVoronoiMode)}>
-                                                <Grid container spacing={2}>
-                                                    <Grid item xs={4}>
-                                                        <FormControlLabel control={<Radio tabIndex={-1}/>} value={EVoronoiMode.KINGDOM} label="Kingdom"/>
-                                                    </Grid>
-                                                    <Grid item xs={4}>
-                                                        <FormControlLabel control={<Radio tabIndex={-1}/>} value={EVoronoiMode.DUCHY} label="Duchy"/>
-                                                    </Grid>
-                                                    <Grid item xs={4}>
-                                                        <FormControlLabel control={<Radio tabIndex={-1}/>} value={EVoronoiMode.COUNTY} label="County"/>
-                                                    </Grid>
-                                                </Grid>
-                                            </RadioGroup>
-                                        </Grid>
-                                    </Grid>
-                                </DialogContent>
-                            </Dialog>
-                            <Dialog open={!!(this.state.showCharacterSelection && this.state.faction)} onClose={() => this.setState({showCharacterSelection: false})}>
-                                <DialogTitle title="Character Selection"/>
-                                <DialogContent>
-                                    {this.renderCharacterSelection()}
-                                </DialogContent>
-                            </Dialog>
-                            <Dialog open={this.state.spellItems.length > 0} onClose={() => this.setState({spellItems: []})}>
-                                <DialogTitle title="Character Selection"/>
-                                <DialogContent>
+                                        ) : null
+                                    }
                                     {
-                                        this.state.spellItems.map(spellItem => {
-                                            return (
-                                                <Card key={spellItem.id} onClick={this.performSpell.bind(this, spellItem)} style={{width: 196}}>
-                                                    <CardHeader title={spellItem.name}/>
+                                        this.state.showPlanetMenu ? (
+                                            <Grid item xs={12} justifyContent="center" alignItems="center">
+                                                <Grid container>
+                                                    <Grid item xs={12}>
+                                                        <Button fullWidth variant="contained"
+                                                                onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.returnToFactionMenu.bind(this)}>Back</Button>
+                                                    </Grid>
+                                                    <Grid item xs={12}>
+                                                        <Button fullWidth variant="contained" disabled={!this.spawnPlanets.length}
+                                                                onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.goToSpawnMenu.bind(this)}>Next</Button>
+                                                    </Grid>
+                                                </Grid>
+                                                <Box style={{display: "flex", flexWrap: "wrap", maxHeight: "40vh", maxWidth: "80vw", overflow: "auto", backgroundColor: "none"}}>
+                                                    {
+                                                        this.spawnPlanets.map((f, i, arr) => {
+                                                            const planet = this.game.planets.get(f.planetId);
+                                                            const planetName = planet?.name ?? f.planetId;
+                                                            return (
+                                                                <Card style={{minWidth: 192, maxWidth: 256}}>
+                                                                    <CardActionArea onClick={this.selectPlanet.bind(this, f.planetId)}>
+                                                                        <CardContent>
+                                                                            <Avatar variant="rounded" style={{width: 128, height: 128}} alt={planetName} srcSet={this.planetThumbnails.get(f.planetId) ?? undefined}>
+                                                                            </Avatar>
+                                                                        </CardContent>
+                                                                        <CardHeader title={<span>{this.state.planetId === f.planetId ? <CheckBoxIcon/> : <CheckBoxOutlineBlankIcon/>} {planetName}</span>} subheader={`(${f.numShipsAvailable} ships)`}>
+                                                                        </CardHeader>
+                                                                    </CardActionArea>
+                                                                    <CardActions>
+                                                                        <Tooltip title="Settlers">
+                                                                            <Badge badgeContent={f.numSettlers} color={"primary"}>
+                                                                                <Public/>
+                                                                            </Badge>
+                                                                        </Tooltip>
+                                                                        <Tooltip title="Traders">
+                                                                            <Badge badgeContent={f.numTraders} color={"primary"}>
+                                                                                <Sailing/>
+                                                                            </Badge>
+                                                                        </Tooltip>
+                                                                        <Tooltip title="Pirates">
+                                                                            <Badge badgeContent={f.numPirates} color={"primary"}>
+                                                                                <SvgIcon>
+                                                                                    <Pirate/>
+                                                                                </SvgIcon>
+                                                                            </Badge>
+                                                                        </Tooltip>
+                                                                        <Tooltip title="Invaders">
+                                                                            <Badge badgeContent={f.numInvaders} color={"primary"}>
+                                                                                <SvgIcon>
+                                                                                    <Attack/>
+                                                                                </SvgIcon>
+                                                                            </Badge>
+                                                                        </Tooltip>
+                                                                    </CardActions>
+                                                                </Card>
+                                                            );
+                                                        })
+                                                    }
+                                                </Box>
+                                            </Grid>
+                                        ) : null
+                                    }
+                                    {
+                                        this.state.showSpawnMenu ? (
+                                            <Grid item xs={12} justifyContent="center" alignItems="center">
+                                                <Grid container>
+                                                    <Grid item xs={12}>
+                                                        <Button fullWidth variant="contained"
+                                                                onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.returnToPlanetMenu.bind(this)}>Back</Button>
+                                                    </Grid>
+                                                    <Grid item xs={12}>
+                                                        <Button fullWidth variant="contained" disabled={!this.spawnLocations.results.length}
+                                                                onKeyDown={PixiGame.cancelSpacebar.bind(this)} onClick={this.spawnShip.bind(this)}>Next</Button>
+                                                    </Grid>
+                                                </Grid>
+                                                <Box style={{display: "flex", flexWrap: "wrap", maxHeight: "40vh", maxWidth: "80vw", overflow: "auto", backgroundColor: "none"}}>
+                                                    {
+                                                        this.spawnLocations.message ? (
+                                                            <Card style={{minWidth: 192, maxWidth: 256}}>
+                                                                <CardContent>
+                                                                    <Typography>{this.spawnLocations.message}</Typography>
+                                                                </CardContent>
+                                                            </Card>
+                                                        ) : null
+                                                    }
+                                                    {
+                                                        this.spawnLocations.results.map((f, i, arr) => {
+                                                            return (
+                                                                <Card style={{minWidth: 192, maxWidth: 256}}>
+                                                                    <CardActionArea onClick={this.selectShip.bind(this, f.id, f.shipType)}>
+                                                                        <CardContent>
+                                                                            <Avatar variant="rounded" style={{width: 128, height: 128}} alt={f.shipType} srcSet={this.shipThumbnails.get(f.shipType) ?? undefined}>
+                                                                            </Avatar>
+                                                                        </CardContent>
+                                                                        <CardHeader title={<span>{this.state.planetId === f.id && this.state.spawnShipType === f.shipType ? <CheckBoxIcon/> : <CheckBoxOutlineBlankIcon/>} {f.shipType}</span>} subheader={`(${f.price}) (${f.numShipsAvailable} ships)`}>
+                                                                        </CardHeader>
+                                                                    </CardActionArea>
+                                                                </Card>
+                                                            );
+                                                        })
+                                                    }
+                                                </Box>
+                                            </Grid>
+                                        ) : null
+                                    }
+                                </Grid>
+                                <div className="DesktopGameUi">
+                                    {
+                                        !this.state.showLoginMenu && !this.state.showMainMenu && !this.state.showPlanetMenu && !this.state.showSpawnMenu && this.state.width >= 768 ? (
+                                            <React.Fragment>
+                                                {this.renderGameUiTop()}
+                                                {this.renderGameUiBottom()}
+                                            </React.Fragment>
+                                        ) : null
+                                    }
+                                    {
+                                        this.state.gameMode !== EGameMode.MAIN_MENU && !this.state.showLoginMenu && !this.state.showMainMenu && !this.state.showPlanetMenu && !this.state.showSpawnMenu && this.state.width < 768 ? (
+                                            this.renderMobileControls()
+                                        ) : null
+                                    }
+                                </div>
+                                <Dialog open={this.state.showScoreboard} onClose={() => this.setState({showScoreboard: false})}>
+                                    <DialogTitle title="Scoreboard"/>
+                                    <DialogContent>
+                                        <Grid container spacing={2} xs={12}>
+                                            <Grid item xs={6}>
+                                                <Card>
+                                                    <CardHeader title="Damage"/>
                                                     <CardContent>
-                                                        <Typography>{spellItem.description}</Typography>
+                                                        <List>
+                                                            {
+                                                                this.game.scoreBoard.damage.map(d => {
+                                                                    return (
+                                                                        <ListItem key={d.playerId} dense>
+                                                                            <ListItemText primary={d.name} secondary={d.damage}/>
+                                                                        </ListItem>
+                                                                    );
+                                                                })
+                                                            }
+                                                        </List>
                                                     </CardContent>
                                                 </Card>
-                                            );
-                                        })
-                                    }
-                                </DialogContent>
-                            </Dialog>
-                            <Dialog open={this.state.showItems} onClose={() => this.setState({showItems: false})}>
-                                <DialogTitle title="Items"/>
-                                <DialogContent>
-                                    {
-                                        this.state.showItems && (
-                                            ITEM_DATA.map(item => {
-                                                return (
-                                                    <Card key={`show-item-${item.resourceType}`}>
-                                                        <CardHeader title={item.resourceType}/>
-                                                        <CardContent>
+                                            </Grid>
+                                            <Grid item xs={6}>
+                                                <Card>
+                                                    <CardHeader title="Loot"/>
+                                                    <CardContent>
+                                                        <List>
                                                             {
-                                                                this.renderItem(item.resourceType)
+                                                                this.game.scoreBoard.loot.map(d => {
+                                                                    return (
+                                                                        <ListItem key={d.playerId} dense>
+                                                                            <ListItemText primary={d.name} secondary={d.count}/>
+                                                                        </ListItem>
+                                                                    );
+                                                                })
                                                             }
+                                                        </List>
+                                                    </CardContent>
+                                                </Card>
+                                            </Grid>
+                                            <Grid item xs={6}>
+                                                <Card>
+                                                    <CardHeader title="Money"/>
+                                                    <CardContent>
+                                                        <List>
+                                                            {
+                                                                this.game.scoreBoard.money.map(d => {
+                                                                    return (
+                                                                        <ListItem key={d.playerId} dense>
+                                                                            <ListItemText primary={d.name} secondary={d.amount}/>
+                                                                        </ListItem>
+                                                                    );
+                                                                })
+                                                            }
+                                                        </List>
+                                                    </CardContent>
+                                                </Card>
+                                            </Grid>
+                                            <Grid item xs={6}>
+                                                <Card>
+                                                    <CardHeader title="Land"/>
+                                                    <CardContent>
+                                                        <List>
+                                                            {
+                                                                this.game.scoreBoard.land.map(d => {
+                                                                    return (
+                                                                        <ListItem key={d.playerId} dense>
+                                                                            <ListItemText primary={d.name} secondary={d.amount}/>
+                                                                        </ListItem>
+                                                                    );
+                                                                })
+                                                            }
+                                                        </List>
+                                                    </CardContent>
+                                                </Card>
+                                            </Grid>
+                                            <Grid item xs={6}>
+                                                <Card>
+                                                    <CardHeader title="Bounty"/>
+                                                    <CardContent>
+                                                        <List>
+                                                            {
+                                                                this.game.scoreBoard.bounty.map(d => {
+                                                                    return (
+                                                                        <ListItem key={d.playerId} dense>
+                                                                            <ListItemText primary={d.name} secondary={d.bountyAmount}/>
+                                                                        </ListItem>
+                                                                    );
+                                                                })
+                                                            }
+                                                        </List>
+                                                    </CardContent>
+                                                </Card>
+                                            </Grid>
+                                            <Grid item xs={6}>
+                                                <Card>
+                                                    <CardHeader title="Capture"/>
+                                                    <CardContent>
+                                                        <List>
+                                                            {
+                                                                this.game.scoreBoard.capture.map(d => {
+                                                                    return (
+                                                                        <ListItem key={d.playerId} dense>
+                                                                            <ListItemText primary={d.name} secondary={d.count}/>
+                                                                        </ListItem>
+                                                                    );
+                                                                })
+                                                            }
+                                                        </List>
+                                                    </CardContent>
+                                                </Card>
+                                            </Grid>
+                                        </Grid>
+                                    </DialogContent>
+                                </Dialog>
+                                <Dialog open={this.state.showSettings} onClose={() => this.setState({showSettings: false})}>
+                                    <DialogTitle title="Settings"/>
+                                    <DialogContent>
+                                        <Grid container spacing={2}>
+                                            <Grid item>
+                                                <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.showItems}
+                                                                                     onKeyDown={PixiGame.cancelSpacebar.bind(this)} onChange={this.handleShowItems.bind(this)}/>} label="Show Items"/>
+                                            </Grid>
+                                            <Grid item>
+                                                <FormControlLabel control={<Checkbox tabIndex={-1} checked={this.state.showVoronoi}
+                                                                                     onKeyDown={PixiGame.cancelSpacebar.bind(this)} onChange={this.handleShowVoronoi.bind(this)}/>} label="Show Voronoi"/>
+                                                <RadioGroup name="Voronoi Mode" value={this.state.voronoiMode} onChange={(e, value) => this.handleChangeVoronoi(value as EVoronoiMode)}>
+                                                    <Grid container spacing={2}>
+                                                        <Grid item xs={4}>
+                                                            <FormControlLabel control={<Radio tabIndex={-1}/>} value={EVoronoiMode.KINGDOM} label="Kingdom"/>
+                                                        </Grid>
+                                                        <Grid item xs={4}>
+                                                            <FormControlLabel control={<Radio tabIndex={-1}/>} value={EVoronoiMode.DUCHY} label="Duchy"/>
+                                                        </Grid>
+                                                        <Grid item xs={4}>
+                                                            <FormControlLabel control={<Radio tabIndex={-1}/>} value={EVoronoiMode.COUNTY} label="County"/>
+                                                        </Grid>
+                                                    </Grid>
+                                                </RadioGroup>
+                                            </Grid>
+                                        </Grid>
+                                    </DialogContent>
+                                </Dialog>
+                                <Dialog open={!!(this.state.showCharacterSelection && this.state.faction)} onClose={() => this.setState({showCharacterSelection: false})}>
+                                    <DialogTitle title="Character Selection"/>
+                                    <DialogContent>
+                                        {this.renderCharacterSelection()}
+                                    </DialogContent>
+                                </Dialog>
+                                <Dialog open={this.state.spellItems.length > 0} onClose={() => this.setState({spellItems: []})}>
+                                    <DialogTitle title="Character Selection"/>
+                                    <DialogContent>
+                                        {
+                                            this.state.spellItems.map(spellItem => {
+                                                return (
+                                                    <Card key={spellItem.id} onClick={this.performSpell.bind(this, spellItem)} style={{width: 196}}>
+                                                        <CardHeader title={spellItem.name}/>
+                                                        <CardContent>
+                                                            <Typography>{spellItem.description}</Typography>
                                                         </CardContent>
                                                     </Card>
                                                 );
                                             })
-                                        )
-                                    }
-                                </DialogContent>
-                            </Dialog>
+                                        }
+                                    </DialogContent>
+                                </Dialog>
+                                <Dialog open={this.state.showItems} onClose={() => this.setState({showItems: false})}>
+                                    <DialogTitle title="Items"/>
+                                    <DialogContent>
+                                        {
+                                            this.state.showItems && (
+                                                ITEM_DATA.map(item => {
+                                                    return (
+                                                        <Card key={`show-item-${item.resourceType}`}>
+                                                            <CardHeader title={item.resourceType}/>
+                                                            <CardContent>
+                                                                {
+                                                                    this.renderItem(item.resourceType)
+                                                                }
+                                                            </CardContent>
+                                                        </Card>
+                                                    );
+                                                })
+                                            )
+                                        }
+                                    </DialogContent>
+                                </Dialog>
+                            </div>
                         </div>
                     </div>
-                </div>
+                }/>
             </Paper>
         );
     }

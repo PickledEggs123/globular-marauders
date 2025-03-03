@@ -1,6 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import '../App.scss';
-import {WebsiteDrawer} from "../Drawer";
+import {WebsiteDrawer2} from "../Drawer";
 import {Paper, Button, Card, CardContent, CardHeader, Container, Grid, Typography} from "@mui/material";
 import {DelaunayGraph, VoronoiGraph} from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
 import Quaternion from "quaternion";
@@ -185,106 +185,107 @@ export const GameModel = () => {
 
     return (
         <Paper style={{width: "100%", minHeight: "100vh", height: "fit-content", display: "flex", flexDirection: "column"}}>
-            <WebsiteDrawer rightSide={null}/>
-            <Container>
-                <Typography variant="h3">
-                    The Math of the Game
-                </Typography>
-                <Grid container spacing={2}>
-                    <Grid item xs={12}>
-                        <Card>
-                            <CardHeader title="Straight Lines Along a Sphere" subheader="Flatten a pizza pie onto a beach ball"></CardHeader>
-                            <CardContent>
-                                <Grid container spacing={2}>
-                                    <Grid item xs={12} md={6}>
-                                        <Card>
-                                            <CardHeader title="North Polar Chart">
-                                            </CardHeader>
-                                            <CardContent>
-                                                <canvas id="canvasNorth" width={256} height={256}></canvas>
-                                                <br/>
-                                                <Typography variant="caption">Big dot is the start of the path.</Typography>
-                                            </CardContent>
-                                        </Card>
+            <WebsiteDrawer2 rightSide={null} content={
+                <Container>
+                    <Typography variant="h3">
+                        The Math of the Game
+                    </Typography>
+                    <Grid container spacing={2}>
+                        <Grid item xs={12}>
+                            <Card>
+                                <CardHeader title="Straight Lines Along a Sphere" subheader="Flatten a pizza pie onto a beach ball"></CardHeader>
+                                <CardContent>
+                                    <Grid container spacing={2}>
+                                        <Grid item xs={12} md={6}>
+                                            <Card>
+                                                <CardHeader title="North Polar Chart">
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <canvas id="canvasNorth" width={256} height={256}></canvas>
+                                                    <br/>
+                                                    <Typography variant="caption">Big dot is the start of the path.</Typography>
+                                                </CardContent>
+                                            </Card>
+                                        </Grid>
+                                        <Grid item xs={12} md={6}>
+                                            <Card>
+                                                <CardHeader title="South Polar Chart">
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <canvas id="canvasSouth" width={256} height={256}></canvas>
+                                                    <br/>
+                                                    <Typography variant="caption">Big dot is the start of the path.</Typography>
+                                                </CardContent>
+                                            </Card>
+                                        </Grid>
+                                        <Grid item xs={12} md={6} style={{maxHeight: 500, overflowY: "scroll"}}>
+                                            <Card>
+                                                <CardHeader title="Theta Correction Chart">
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <table>
+                                                        <tr>
+                                                            <th>Step</th>
+                                                            <th>South Pole</th>
+                                                            <th>Theta v1</th>
+                                                            <th>TD v1</th>
+                                                            <th>RO</th>
+                                                            <th>RD</th>
+                                                        </tr>
+                                                        {
+                                                            thetaTable.map(({thetaNorth, deltaNorth, southPoleDistance, rotationOffset, rotationDelta}, i) => (
+                                                                <tr style={{fontWeight: southPoleDistance < 0.2 ? "bold" : southPoleDistance > 0.5 ? "100" : "500"}}>
+                                                                    <td>{i}</td>
+                                                                    <td>{southPoleDistance.toFixed(3)}</td>
+                                                                    <td>{thetaNorth.toFixed(3)}</td>
+                                                                    <td style={{color: Math.abs(deltaNorth) > 360 / (numPoints / 2) ? "red" : undefined}}>{deltaNorth.toFixed(3)}</td>
+                                                                    <td>{rotationOffset.toFixed(3)}</td>
+                                                                    <td style={{color: Math.abs(rotationDelta) > 360 / (numPoints / 2) ? "red" : undefined}}>{rotationDelta.toFixed(3)}</td>
+                                                                </tr>
+                                                            ))
+                                                        }
+                                                    </table>
+                                                    <Typography variant="caption">Bold is near the south pole which is problematic. Red is problematic data which causes positive or negative rotation. Depending on the clockwise or counter-clockwise movement around the pole, you drift left (clockwise) or right (counter-clockwise).</Typography>
+                                                </CardContent>
+                                            </Card>
+                                        </Grid>
                                     </Grid>
-                                    <Grid item xs={12} md={6}>
-                                        <Card>
-                                            <CardHeader title="South Polar Chart">
-                                            </CardHeader>
-                                            <CardContent>
-                                                <canvas id="canvasSouth" width={256} height={256}></canvas>
-                                                <br/>
-                                                <Typography variant="caption">Big dot is the start of the path.</Typography>
-                                            </CardContent>
-                                        </Card>
-                                    </Grid>
-                                    <Grid item xs={12} md={6} style={{maxHeight: 500, overflowY: "scroll"}}>
-                                        <Card>
-                                            <CardHeader title="Theta Correction Chart">
-                                            </CardHeader>
-                                            <CardContent>
-                                                <table>
-                                                    <tr>
-                                                        <th>Step</th>
-                                                        <th>South Pole</th>
-                                                        <th>Theta v1</th>
-                                                        <th>TD v1</th>
-                                                        <th>RO</th>
-                                                        <th>RD</th>
-                                                    </tr>
-                                                    {
-                                                        thetaTable.map(({thetaNorth, deltaNorth, southPoleDistance, rotationOffset, rotationDelta}, i) => (
-                                                            <tr style={{fontWeight: southPoleDistance < 0.2 ? "bold" : southPoleDistance > 0.5 ? "100" : "500"}}>
-                                                                <td>{i}</td>
-                                                                <td>{southPoleDistance.toFixed(3)}</td>
-                                                                <td>{thetaNorth.toFixed(3)}</td>
-                                                                <td style={{color: Math.abs(deltaNorth) > 360 / (numPoints / 2) ? "red" : undefined}}>{deltaNorth.toFixed(3)}</td>
-                                                                <td>{rotationOffset.toFixed(3)}</td>
-                                                                <td style={{color: Math.abs(rotationDelta) > 360 / (numPoints / 2) ? "red" : undefined}}>{rotationDelta.toFixed(3)}</td>
-                                                            </tr>
-                                                        ))
-                                                    }
-                                                </table>
-                                                <Typography variant="caption">Bold is near the south pole which is problematic. Red is problematic data which causes positive or negative rotation. Depending on the clockwise or counter-clockwise movement around the pole, you drift left (clockwise) or right (counter-clockwise).</Typography>
-                                            </CardContent>
-                                        </Card>
-                                    </Grid>
-                                </Grid>
-                                <Button onClick={() => {
-                                    drawGraph();
-                                }}>Refresh</Button>
-                                <Typography variant="body1">
-                                    This chart shows the great circle arcs across a sphere but mapped onto a pizza pie chart. Notice
-                                    that the forward direction follows the curve of the circle. Follow the curve with your finger and the direction of
-                                    the curve should also be the same direction. What's strange is how the curve bends and warps but the video game should
-                                    render that bendy curve as the same direction. We need to figure out how the direction of the curve changes relative to
-                                    the x y flat plane the game is projected onto. For example: notice how the middle of the chart is a straight line with very
-                                    little change in direction, that will result in the north pole having a small change in direction. The edge has a large
-                                    change of direction, that will result in the south pole having a large change in direction. I think the game renders
-                                    sprites in x y flat plane which contains the projection of a sphere, this is the source of the error. The AI and
-                                    physics works correctly so the root cause of the rotation bug is the projection. Projecting position works fine, Projecting
-                                    rotation does not. This is the most difficult part to make this game work, once this is solved, it's a matter of adding content.
-                                </Typography>
-                                <br/>
-                                <Typography variant="body1">
-                                    If we add the rotation/angular/orientation gradient/derivative to the angle, we might approximate
-                                    the rotation bug, this would require storing two positions. The two positions are projected onto this pizza pie chart and
-                                    the angle between the two points are computed. This correction value is then added to the angle.
-                                </Typography>
-                                <br/>
-                                <Typography variant="body1">
-                                    Added the Theta Correction Chart to experiment with multiple polar charts to make the transition
-                                    between hemispheres more smooth. The original code had an error where when you moved near
-                                    the south pole with a polar distance less than 0.1, it would throw values as large as 90 degrees.
-                                    That would force the spaceship to rotate 90 degrees side ways when approaching the south pole.
-                                    The goal is to avoid hard changes which are shown in red highlight. When you're near the poles, the
-                                    table will bold the text.
-                                </Typography>
-                            </CardContent>
-                        </Card>
+                                    <Button onClick={() => {
+                                        drawGraph();
+                                    }}>Refresh</Button>
+                                    <Typography variant="body1">
+                                        This chart shows the great circle arcs across a sphere but mapped onto a pizza pie chart. Notice
+                                        that the forward direction follows the curve of the circle. Follow the curve with your finger and the direction of
+                                        the curve should also be the same direction. What's strange is how the curve bends and warps but the video game should
+                                        render that bendy curve as the same direction. We need to figure out how the direction of the curve changes relative to
+                                        the x y flat plane the game is projected onto. For example: notice how the middle of the chart is a straight line with very
+                                        little change in direction, that will result in the north pole having a small change in direction. The edge has a large
+                                        change of direction, that will result in the south pole having a large change in direction. I think the game renders
+                                        sprites in x y flat plane which contains the projection of a sphere, this is the source of the error. The AI and
+                                        physics works correctly so the root cause of the rotation bug is the projection. Projecting position works fine, Projecting
+                                        rotation does not. This is the most difficult part to make this game work, once this is solved, it's a matter of adding content.
+                                    </Typography>
+                                    <br/>
+                                    <Typography variant="body1">
+                                        If we add the rotation/angular/orientation gradient/derivative to the angle, we might approximate
+                                        the rotation bug, this would require storing two positions. The two positions are projected onto this pizza pie chart and
+                                        the angle between the two points are computed. This correction value is then added to the angle.
+                                    </Typography>
+                                    <br/>
+                                    <Typography variant="body1">
+                                        Added the Theta Correction Chart to experiment with multiple polar charts to make the transition
+                                        between hemispheres more smooth. The original code had an error where when you moved near
+                                        the south pole with a polar distance less than 0.1, it would throw values as large as 90 degrees.
+                                        That would force the spaceship to rotate 90 degrees side ways when approaching the south pole.
+                                        The goal is to avoid hard changes which are shown in red highlight. When you're near the poles, the
+                                        table will bold the text.
+                                    </Typography>
+                                </CardContent>
+                            </Card>
+                        </Grid>
                     </Grid>
-                </Grid>
-            </Container>
+                </Container>
+            }/>
         </Paper>
     );
 }

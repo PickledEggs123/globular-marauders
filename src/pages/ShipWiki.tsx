@@ -1,6 +1,6 @@
 import React, {useCallback, useContext, useEffect, useRef, useState} from 'react';
 import '../App.scss';
-import {WebsiteDrawer} from "../Drawer";
+import {WebsiteDrawer2} from "../Drawer";
 import {
     Paper,
     Avatar,
@@ -249,60 +249,61 @@ export const ShipWiki = () => {
 
     return (
         <Paper style={{width: "100%", minHeight: "100vh", height: "fit-content", display: "flex", flexDirection: "column"}}>
-            <WebsiteDrawer rightSide={null}/>
-            <Container>
-                <Typography variant="h3">
-                    3D Ship Meshes
-                </Typography>
-                <Grid container spacing={2} columns={{
-                    xs: 4,
-                    lg: 12
-                }}>
-                    <Grid item xs={12}>
-                        <Card>
-                            <CardHeader title={`${selectedShipType} Render`} subheader="Preview and Download a Ship">
-                            </CardHeader>
-                            <CardContent>
-                                <div ref={ref}>
-                                </div>
-                                <Button onClick={download}>Download</Button>
-                                <Typography variant="body1">
-                                    {shipBody.get(selectedShipType) ?? undefined}
-                                </Typography>
-                            </CardContent>
-                        </Card>
+            <WebsiteDrawer2 rightSide={null} content={
+                <Container>
+                    <Typography variant="h3">
+                        3D Ship Meshes
+                    </Typography>
+                    <Grid container spacing={2} columns={{
+                        xs: 4,
+                        lg: 12
+                    }}>
+                        <Grid item xs={12}>
+                            <Card>
+                                <CardHeader title={`${selectedShipType} Render`} subheader="Preview and Download a Ship">
+                                </CardHeader>
+                                <CardContent>
+                                    <div ref={ref}>
+                                    </div>
+                                    <Button onClick={download}>Download</Button>
+                                    <Typography variant="body1">
+                                        {shipBody.get(selectedShipType) ?? undefined}
+                                    </Typography>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+                        <Grid item xs={12}>
+                            <Typography variant="h3">
+                                Available Ships
+                            </Typography>
+                        </Grid>
+                        {
+                            Object.values(EShipType).map(shipType => {
+                                return (
+                                    <Grid item xs={4}>
+                                        <Card>
+                                            <CardActionArea onClick={() => {
+                                                setSelectedShipType(shipType);
+                                            }}>
+                                                <CardMedia component="img" alt={shipType} src={shipThumbnails.get(shipType) ?? undefined}>
+                                                </CardMedia>
+                                                <CardHeader title={shipType}>
+                                                </CardHeader>
+                                                <CardContent>
+                                                    {shipType === selectedShipType ? <CheckBoxIcon/> : <CheckBoxOutlineBlank/>}
+                                                    <Typography variant="body1">
+                                                        {shipBody.get(shipType) ?? undefined}
+                                                    </Typography>
+                                                </CardContent>
+                                            </CardActionArea>
+                                        </Card>
+                                    </Grid>
+                                );
+                            })
+                        }
                     </Grid>
-                    <Grid item xs={12}>
-                        <Typography variant="h3">
-                            Available Ships
-                        </Typography>
-                    </Grid>
-                    {
-                        Object.values(EShipType).map(shipType => {
-                            return (
-                                <Grid item xs={4}>
-                                    <Card>
-                                        <CardActionArea onClick={() => {
-                                            setSelectedShipType(shipType);
-                                        }}>
-                                            <CardMedia component="img" alt={shipType} src={shipThumbnails.get(shipType) ?? undefined}>
-                                            </CardMedia>
-                                            <CardHeader title={shipType}>
-                                            </CardHeader>
-                                            <CardContent>
-                                                {shipType === selectedShipType ? <CheckBoxIcon/> : <CheckBoxOutlineBlank/>}
-                                                <Typography variant="body1">
-                                                    {shipBody.get(shipType) ?? undefined}
-                                                </Typography>
-                                            </CardContent>
-                                        </CardActionArea>
-                                    </Card>
-                                </Grid>
-                            );
-                        })
-                    }
-                </Grid>
-            </Container>
+                </Container>
+            }/>
         </Paper>
     );
 }

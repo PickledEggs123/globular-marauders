@@ -1,6 +1,6 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import '../App.scss';
-import {WebsiteDrawer} from "../Drawer";
+import {WebsiteDrawer2} from "../Drawer";
 import {Button, Card, CardContent, CardHeader, Container, Grid, Paper, Typography} from "@mui/material";
 // @ts-ignore
 import {generatePlanetGltf} from "@pickledeggs123/globular-marauders-generator/dist/helpers";
@@ -376,59 +376,60 @@ export const PlanetGenerator = () => {
 
     return (
         <Paper style={{width: "100%", minHeight: "100vh", height: "fit-content", display: "flex", flexDirection: "column"}}>
-            <WebsiteDrawer rightSide={null}/>
-            <Container>
-                <Typography variant="h3">
-                    Procedural Planet Generator
-                </Typography>
-                <Grid container spacing={2}>
-                    <Grid item xs={12}>
-                        <Card>
-                            <CardHeader title="Planet Generator" subheader="Create unique random planets"></CardHeader>
-                            <CardContent>
-                                <Typography>Load Status: {loadMessage}</Typography>
-                                <div ref={ref} style={{width: 256, height: 256}}>
-                                </div>
-                                <Button onClick={() => {
-                                    drawGraph();
-                                }}>Refresh</Button>
-                                <Button onClick={download}>Download</Button>
-                                <br/>
-                                {/* @ts-ignore */}
-                                <iframe title="3d game" width={256} height={256} ref={iframeRef} allowfullscreen="yes"
-                                        allowvr="yes"
-                                        src="/planet-generator-iframe.html"/>
-                                <Typography variant="body1">
-                                    This page allows you to generate a random planet, using the generator package. This
-                                    is a
-                                    package written by me which computes spherical voronoi tesselation. Voronoi
-                                    tesselation
-                                    is the drawing of polygons around a bunch of random points so that the area of each
-                                    polygon
-                                    is closest to that point. It's essentially a map with perfect borders. I color each
-                                    tile
-                                    blue or green randomly to create mini planets.
-                                </Typography>
-                                <br/>
-                                <Typography variant="body1">
-                                    Do not forget to download your custom planet so you can view it in full 3d with the
-                                    Windows 10 3D Viewer app.
-                                    Go to the Windows Store and download 3D Viewer so you can view the file from all
-                                    angles.
-                                </Typography>
-                                <br/>
-                                <Typography variant="body1">
-                                    Included on this page is a video game in the second window. Please use arrow keys or WASD
-                                    to move the ship. You can also click on the water to far away from the ship to move the ship.
-                                    Click on the cannons to fire cannon balls or use QE keys to aim and fire cannon balls.
-                                    Click on land to send a landing party of pirates/knights that will attack villagers for coins.
-                                    Coins can be used to purchase additional ships.
-                                </Typography>
-                            </CardContent>
-                        </Card>
+            <WebsiteDrawer2 rightSide={null} content={
+                <Container>
+                    <Typography variant="h3">
+                        Procedural Planet Generator
+                    </Typography>
+                    <Grid container spacing={2}>
+                        <Grid item xs={12}>
+                            <Card>
+                                <CardHeader title="Planet Generator" subheader="Create unique random planets"></CardHeader>
+                                <CardContent>
+                                    <Typography>Load Status: {loadMessage}</Typography>
+                                    <div ref={ref} style={{width: 256, height: 256}}>
+                                    </div>
+                                    <Button onClick={() => {
+                                        drawGraph();
+                                    }}>Refresh</Button>
+                                    <Button onClick={download}>Download</Button>
+                                    <br/>
+                                    {/* @ts-ignore */}
+                                    <iframe title="3d game" width={256} height={256} ref={iframeRef} allowfullscreen="yes"
+                                            allowvr="yes"
+                                            src="/planet-generator-iframe.html"/>
+                                    <Typography variant="body1">
+                                        This page allows you to generate a random planet, using the generator package. This
+                                        is a
+                                        package written by me which computes spherical voronoi tesselation. Voronoi
+                                        tesselation
+                                        is the drawing of polygons around a bunch of random points so that the area of each
+                                        polygon
+                                        is closest to that point. It's essentially a map with perfect borders. I color each
+                                        tile
+                                        blue or green randomly to create mini planets.
+                                    </Typography>
+                                    <br/>
+                                    <Typography variant="body1">
+                                        Do not forget to download your custom planet so you can view it in full 3d with the
+                                        Windows 10 3D Viewer app.
+                                        Go to the Windows Store and download 3D Viewer so you can view the file from all
+                                        angles.
+                                    </Typography>
+                                    <br/>
+                                    <Typography variant="body1">
+                                        Included on this page is a video game in the second window. Please use arrow keys or WASD
+                                        to move the ship. You can also click on the water to far away from the ship to move the ship.
+                                        Click on the cannons to fire cannon balls or use QE keys to aim and fire cannon balls.
+                                        Click on land to send a landing party of pirates/knights that will attack villagers for coins.
+                                        Coins can be used to purchase additional ships.
+                                    </Typography>
+                                </CardContent>
+                            </Card>
+                        </Grid>
                     </Grid>
-                </Grid>
-            </Container>
+                </Container>
+            }/>
         </Paper>
     );
 }
