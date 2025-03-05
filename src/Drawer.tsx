@@ -31,7 +31,7 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
     rightSide: React.ReactNode | null,
     content: React.ReactNode,
 }) => {
-
+    const ref = React.useRef<HTMLDivElement | null>(null);
     const [mobileOpen, setMobileOpen] = React.useState(false);
 
     const handleDrawerToggle = () => {
@@ -86,7 +86,7 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
 
     return (
         <div>
-            <AppBar position="fixed">
+            <AppBar position="fixed" ref={ref}>
                 <Toolbar>
                     <Grid container>
                         <Grid item xs={12} lg={6} display="flex">
@@ -134,8 +134,7 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
                     {drawer}
                 </Drawer>
             </nav>
-            <Toolbar />
-            <Box sx={{ marginLeft: { xs: 0, md: drawerWidth / 8}, padding: '20px' }}>
+            <Box sx={{ marginLeft: { xs: 0, md: drawerWidth / 8}, padding: '20px', display: 'flex', marginTop: (ref.current?.getBoundingClientRect().height ?? 40) / 8, height: `calc(100vh - ${ref.current?.getBoundingClientRect().height ?? 40}px)` }}>
                 {content}
             </Box>
         </div>
