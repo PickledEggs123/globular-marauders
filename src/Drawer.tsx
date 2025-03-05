@@ -43,7 +43,16 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
     const drawer = (
         <React.Fragment>
             <FormControl>
-                <FormControlLabel control={<Switch onClick={toggleTheme} checked={theme.palette.mode === 'dark'}/>} label="Toggle Theme"></FormControlLabel>
+                <FormControlLabel
+                    control={
+                        <Switch
+                            onClick={toggleTheme}
+                            checked={theme.palette.mode === 'dark'}
+                            onKeyDown={PixiGame.cancelSpacebar.bind(this)}
+                        />
+                    }
+                    label="Toggle Theme"
+                ></FormControlLabel>
             </FormControl>
             <List>
                 {[{
