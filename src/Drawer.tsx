@@ -1,12 +1,12 @@
-import React, {useState} from "react";
+import React, {useContext, useState} from "react";
 import {
     AppBar, Box,
-    Drawer,
+    Drawer, FormControl, FormControlLabel,
     Grid, IconButton,
     List,
     ListItem,
     ListItemIcon,
-    ListItemText,
+    ListItemText, Switch,
     Toolbar,
     Typography
 } from "@mui/material";
@@ -24,6 +24,7 @@ import {
 } from "@mui/icons-material";
 import PixiGame from "./pages/PixiGame";
 import {Link} from "react-router-dom";
+import {ThemeContext} from "./contextes/ThemeContext";
 
 const drawerWidth = 180;
 
@@ -31,6 +32,7 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
     rightSide: React.ReactNode | null,
     content: React.ReactNode,
 }) => {
+    const {theme, toggleTheme} = useContext(ThemeContext);
     const ref = React.useRef<HTMLDivElement | null>(null);
     const [mobileOpen, setMobileOpen] = React.useState(false);
 
@@ -38,50 +40,56 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
         setMobileOpen(!mobileOpen);
     };
 
-    const drawer = (<List>
-            {[{
-                link: "/",
-                icon: <Domain/>,
-                text: "Main"
-            }, {
-                link: "/2d-game",
-                icon: <PlayArrow/>,
-                text: "Play 2D"
-            }, {
-                link: "/game-model",
-                icon: <PieChart/>,
-                text: "Game Model"
-            }, {
-                link: "/planet-generator",
-                icon: <Public/>,
-                text: "Planet Generator"
-            }, {
-                link: "/ship-wiki",
-                icon: <Sailing/>,
-                text: "Ship Wiki"
-            }, {
-                link: "/character-wiki",
-                icon: <People/>,
-                text: "Character Wiki"
-            }, {
-                link: "/about",
-                icon: <QuestionMark/>,
-                text: "About"
-            }, {
-                link: "/contact",
-                icon: <Person/>,
-                text: "Contact"
-            }].map(({link, icon, text}) => (
-                <Link key={link} to={link} style={{textDecoration: "none", boxShadow: "none"}}>
-                    <ListItem>
-                        <ListItemIcon>
-                            {icon}
-                        </ListItemIcon>
-                        <ListItemText><Typography variant="h6">{text}</Typography></ListItemText>
-                    </ListItem>
-                </Link>
-            ))}
-        </List>
+    const drawer = (
+        <React.Fragment>
+            <FormControl>
+                <FormControlLabel control={<Switch onClick={toggleTheme} checked={theme.palette.mode === 'dark'}/>} label="Toggle Theme"></FormControlLabel>
+            </FormControl>
+            <List>
+                {[{
+                    link: "/",
+                    icon: <Domain/>,
+                    text: "Main"
+                }, {
+                    link: "/2d-game",
+                    icon: <PlayArrow/>,
+                    text: "Play 2D"
+                }, {
+                    link: "/game-model",
+                    icon: <PieChart/>,
+                    text: "Game Model"
+                }, {
+                    link: "/planet-generator",
+                    icon: <Public/>,
+                    text: "Planet Generator"
+                }, {
+                    link: "/ship-wiki",
+                    icon: <Sailing/>,
+                    text: "Ship Wiki"
+                }, {
+                    link: "/character-wiki",
+                    icon: <People/>,
+                    text: "Character Wiki"
+                }, {
+                    link: "/about",
+                    icon: <QuestionMark/>,
+                    text: "About"
+                }, {
+                    link: "/contact",
+                    icon: <Person/>,
+                    text: "Contact"
+                }].map(({link, icon, text}) => (
+                    <Link key={link} to={link} style={{textDecoration: "none", boxShadow: "none"}}>
+                        <ListItem>
+                            <ListItemIcon>
+                                {icon}
+                            </ListItemIcon>
+                            <ListItemText><Typography variant="h6">{text}</Typography></ListItemText>
+                        </ListItem>
+                    </Link>
+                ))}
+            </List>
+        </React.Fragment>
     );
 
     return (

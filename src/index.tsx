@@ -10,9 +10,7 @@ import {StarFieldQuaternionParticleBehavior} from "./resources/particles/StarFie
 import {BrowserRouter} from "react-router-dom";
 import {CacheProvider} from "@emotion/react";
 import createCache from "@emotion/cache";
-import {CssBaseline} from "@mui/material";
-import {theme} from "./theme";
-import {ThemeProvider} from "@mui/material/styles";
+import {ThemeConfig} from "./contextes/ThemeContext";
 
 particles.Emitter.registerBehavior(StaticQuaternionParticleBehavior);
 particles.Emitter.registerBehavior(MovementQuaternionParticleBehavior);
@@ -22,17 +20,16 @@ const key = 'css';
 const cache = createCache({key});
 
 ReactDOM.render(
-  <React.StrictMode>
-      <CacheProvider value={cache}>
-          <ThemeProvider theme={theme}>
-              <CssBaseline/>
-              <BrowserRouter>
-                  <App/>
-              </BrowserRouter>
-          </ThemeProvider>
-      </CacheProvider>
-  </React.StrictMode>,
-  document.getElementById('root')
+    <React.StrictMode>
+        <CacheProvider value={cache}>
+            <ThemeConfig>
+                <BrowserRouter>
+                    <App/>
+                </BrowserRouter>
+            </ThemeConfig>
+        </CacheProvider>
+    </React.StrictMode>,
+    document.getElementById('root')
 );
 
 // If you want to start measuring performance in your app, pass a function
