@@ -398,8 +398,8 @@ io.on("connection", (socket) => {
 
     // setup ping every 5 seconds for 4000 ms lag
     let pingTimeout = null;
-    let firstPing = true;
-    let pingInterval = setInterval(() => {
+    let pingInterval = null;
+    let firstPingTimeout = setTimeout(() => {
         eventEmitterOut.emit("send", {
             data: undefined,
             from: 'server',
@@ -407,24 +407,36 @@ io.on("connection", (socket) => {
             type: 'ping',
             msgType: 'send',
         });
-        pingTimeout = setTimeout(() => {
-            // clean up ping
-            clearInterval(pingInterval);
-            pingInterval = null;
+        pingInterval = setInterval(() => {
+            eventEmitterOut.emit("send", {
+                data: undefined,
+                from: 'server',
+                to: socket.id,
+                type: 'ping',
+                msgType: 'send',
+            });
+            pingTimeout = setTimeout(() => {
+                // clean up ping
+                clearInterval(pingInterval);
+                pingInterval = null;
+                pingTimeout = null;
+                disconnect();
+            }, 4000);
+        }, 5000);
+        eventEmitterIn.on("pong", () => {
+            clearTimeout(pingTimeout);
             pingTimeout = null;
-            disconnect();
-        }, firstPing ? 60_000 : 4000);
-        firstPing = false;
-    }, 5000);
-    eventEmitterIn.on("pong", () => {
-        clearTimeout(pingTimeout);
-        pingTimeout = null;
-    });
+        });
+    }, 61_000);
 
     function disconnect() {
         // clean up ping
         clearInterval(pingInterval);
         pingInterval = null;
+        if (firstPingTimeout) {
+            clearTimeout(firstPingTimeout);
+            firstPingTimeout = null;
+        }
         if (pingTimeout) {
             clearTimeout(pingTimeout);
             pingTimeout = null;
