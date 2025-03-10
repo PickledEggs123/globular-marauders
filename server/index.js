@@ -398,6 +398,7 @@ io.on("connection", (socket) => {
 
     // setup ping every 5 seconds for 4000 ms lag
     let pingTimeout = null;
+    let firstPing = true;
     let pingInterval = setInterval(() => {
         eventEmitterOut.emit("send", {
             data: undefined,
@@ -412,7 +413,8 @@ io.on("connection", (socket) => {
             pingInterval = null;
             pingTimeout = null;
             disconnect();
-        }, 4000);
+        }, firstPing ? 60_000 : 4000);
+        firstPing = false;
     }, 5000);
     eventEmitterIn.on("pong", () => {
         clearTimeout(pingTimeout);
