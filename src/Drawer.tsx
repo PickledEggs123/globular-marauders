@@ -9,12 +9,12 @@ import {
     ListItemText, Modal, Paper, Switch,
     Toolbar,
     Typography,
-    TextField,
+    TextField, Tabs, Tab, InputAdornment, FormGroup
 } from "@mui/material";
 import {
-    Domain, Google,
+    Domain, Email, Google,
     Menu,
-    MenuOpen,
+    MenuOpen, Password,
     People,
     Person,
     PieChart,
@@ -26,7 +26,12 @@ import {
 import PixiGame from "./pages/PixiGame";
 import {Link} from "react-router-dom";
 import {ThemeContext} from "./contextes/ThemeContext";
-import {doSignInWIthGoogle, doSignOut} from "./contextes/auth/auth";
+import {
+    doCreateUserWithEmailAndPassword,
+    doSignInWithEmailAndPassword,
+    doSignInWIthGoogle,
+    doSignOut
+} from "./contextes/auth/auth";
 import {useAuth} from "./contextes/auth";
 
 const drawerWidth = 180;
@@ -40,6 +45,10 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
     const ref = useRef<HTMLDivElement | null>(null);
     const [mobileOpen, setMobileOpen] = useState<boolean>(false);
     const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
+    const [tabValue, setTabValue] = useState(0);
+    const [email, setEmail] = useState("");
+    const [currentPassword, setCurrentPassword] = useState("");
+    const [newPassword, setNewPassword] = useState("");
 
     const handleDrawerToggle = () => {
         setMobileOpen(!mobileOpen);
@@ -47,6 +56,25 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
 
     const toggleLoginModal = () => {
         setShowLoginModal(!showLoginModal);
+    };
+
+    const handleTabChange = (event: React.SyntheticEvent, tab: number) => {
+        setTabValue(tab);
+    };
+
+    const emailAccountSubmit = async (event: React.SyntheticEvent) => {
+        event.preventDefault();
+
+        switch (tabValue) {
+            case 0: {
+                await doSignInWithEmailAndPassword(email, currentPassword);
+                break;
+            }
+            case 1: {
+                await doCreateUserWithEmailAndPassword(email, newPassword);
+                break;
+            }
+        }
     };
 
     const drawer = (
@@ -128,19 +156,50 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
                             ) : (
                                 <React.Fragment>
                                     <Typography variant="h3">Login Types</Typography>
-                                    <FormControl>
-                                        <FormControlLabel control={<TextField/>} label="Email"></FormControlLabel>
-                                        <FormControlLabel control={<TextField/>} label="Password"></FormControlLabel>
-                                        <Button variant="contained">Sign In</Button>
-                                        <Grid container>
-                                            <Grid item xs={12} md={6}>
-                                                <Typography>Sign In With Google</Typography>
-                                            </Grid>
-                                            <Grid item xs={12} md={6}>
-                                                <IconButton onClick={doSignInWIthGoogle}><Google/></IconButton>
-                                            </Grid>
+                                    <Tabs centered
+                                        variant="fullWidth"
+                                        value={tabValue}
+                                        onChange={handleTabChange}
+                                    >
+                                        <Tab label="Sign In" />
+                                        <Tab label="Create Account" />
+                                    </Tabs>
+                                    <form onSubmit={emailAccountSubmit}>
+                                        <TextField value={email} onChange={(event) => setEmail(event.target.value)} name="email" label="Email" variant="outlined" margin="normal" fullWidth type="email" autoComplete="email" InputProps={{
+                                            startAdornment: (
+                                                <InputAdornment position="start"><Email/></InputAdornment>
+                                            )
+                                        }} />
+                                        {
+                                            tabValue === 0 ? (
+                                                <React.Fragment key={0}>
+                                                    <TextField value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} name="password" label="Password" variant="outlined" margin="normal" fullWidth type="password" autoComplete="current-password" InputProps={{
+                                                        startAdornment: (
+                                                            <InputAdornment position="start"><Password/></InputAdornment>
+                                                        )
+                                                    }} />
+                                                    <Button type="submit" variant="contained">Sign In With Email</Button>
+                                                </React.Fragment>
+                                            ) : (
+                                                <React.Fragment key={1}>
+                                                    <TextField value={newPassword} onChange={(event) => setNewPassword(event.target.value)} name="password" label="New Password" variant="outlined" margin="normal" fullWidth type="password" autoComplete="new-password" InputProps={{
+                                                        startAdornment: (
+                                                            <InputAdornment position="start"><Password/></InputAdornment>
+                                                        )
+                                                    }} />
+                                                    <Button type="submit" variant="contained">Create Email Account</Button>
+                                                </React.Fragment>
+                                            )
+                                        }
+                                    </form>
+                                    <Grid container>
+                                        <Grid item xs={12} md={6}>
+                                            <Typography>Sign In With Google</Typography>
                                         </Grid>
-                                    </FormControl>
+                                        <Grid item xs={12} md={6}>
+                                            <IconButton onClick={doSignInWIthGoogle}><Google/></IconButton>
+                                        </Grid>
+                                    </Grid>
                                 </React.Fragment>
                             )
                         }
