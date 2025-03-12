@@ -1,17 +1,18 @@
-import React, {useContext} from "react";
+import React, {useContext, useRef, useState} from "react";
 import {
-    AppBar, Box,
+    AppBar, Box, Button, Container,
     Drawer, FormControl, FormControlLabel,
     Grid, IconButton,
     List,
     ListItem,
     ListItemIcon,
-    ListItemText, Switch,
+    ListItemText, Modal, Paper, Switch,
     Toolbar,
-    Typography
+    Typography,
+    TextField,
 } from "@mui/material";
 import {
-    Domain,
+    Domain, Google,
     Menu,
     MenuOpen,
     People,
@@ -25,6 +26,8 @@ import {
 import PixiGame from "./pages/PixiGame";
 import {Link} from "react-router-dom";
 import {ThemeContext} from "./contextes/ThemeContext";
+import {doSignInWIthGoogle, doSignOut} from "./contextes/auth/auth";
+import {useAuth} from "./contextes/auth";
 
 const drawerWidth = 180;
 
@@ -32,16 +35,23 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
     rightSide: React.ReactNode | null,
     content: React.ReactNode,
 }) => {
+    const {userLoggedIn, currentUser} = useAuth();
     const {theme, toggleTheme} = useContext(ThemeContext);
-    const ref = React.useRef<HTMLDivElement | null>(null);
-    const [mobileOpen, setMobileOpen] = React.useState(false);
+    const ref = useRef<HTMLDivElement | null>(null);
+    const [mobileOpen, setMobileOpen] = useState<boolean>(false);
+    const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
 
     const handleDrawerToggle = () => {
         setMobileOpen(!mobileOpen);
     };
 
+    const toggleLoginModal = () => {
+        setShowLoginModal(!showLoginModal);
+    };
+
     const drawer = (
         <React.Fragment>
+            <Button variant="contained" onClick={toggleLoginModal}>Login</Button>
             <FormControl>
                 <FormControlLabel
                     control={
@@ -103,6 +113,40 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
 
     return (
         <div>
+            <Modal open={showLoginModal} onClose={toggleLoginModal} aria-labelledby="login screen" aria-describedby="A list of login providers">
+                <Container>
+                    <Paper sx={{margin: '24px 24px', textAlign: 'center'}}>
+                        {
+                            userLoggedIn ? (
+                                <React.Fragment>
+                                    <Typography variant="h3">Login Info</Typography>
+                                    <Typography>Display Name: {currentUser?.displayName ?? "N/A"}</Typography>
+                                    <Typography>Email: {currentUser?.email ?? "N/A"}</Typography>
+                                    <Typography>Phone Number: {currentUser?.phoneNumber ?? "N/A"}</Typography>
+                                    <Button variant="contained" onClick={doSignOut}>Sign Out</Button>
+                                </React.Fragment>
+                            ) : (
+                                <React.Fragment>
+                                    <Typography variant="h3">Login Types</Typography>
+                                    <FormControl>
+                                        <FormControlLabel control={<TextField/>} label="Email"></FormControlLabel>
+                                        <FormControlLabel control={<TextField/>} label="Password"></FormControlLabel>
+                                        <Button variant="contained">Sign In</Button>
+                                        <Grid container>
+                                            <Grid item xs={12} md={6}>
+                                                <Typography>Sign In With Google</Typography>
+                                            </Grid>
+                                            <Grid item xs={12} md={6}>
+                                                <IconButton onClick={doSignInWIthGoogle}><Google/></IconButton>
+                                            </Grid>
+                                        </Grid>
+                                    </FormControl>
+                                </React.Fragment>
+                            )
+                        }
+                    </Paper>
+                </Container>
+            </Modal>
             <AppBar position="fixed" ref={ref}>
                 <Toolbar>
                     <Grid container>

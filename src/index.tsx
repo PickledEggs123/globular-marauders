@@ -11,6 +11,7 @@ import {BrowserRouter} from "react-router-dom";
 import {CacheProvider} from "@emotion/react";
 import createCache from "@emotion/cache";
 import {ThemeConfig} from "./contextes/ThemeContext";
+import {AuthProvider} from "./contextes/auth";
 
 particles.Emitter.registerBehavior(StaticQuaternionParticleBehavior);
 particles.Emitter.registerBehavior(MovementQuaternionParticleBehavior);
@@ -21,13 +22,15 @@ const cache = createCache({key});
 
 ReactDOM.render(
     <React.StrictMode>
-        <CacheProvider value={cache}>
-            <ThemeConfig>
-                <BrowserRouter>
-                    <App/>
-                </BrowserRouter>
-            </ThemeConfig>
-        </CacheProvider>
+        <AuthProvider>
+            <CacheProvider value={cache}>
+                <ThemeConfig>
+                    <BrowserRouter>
+                        <App/>
+                    </BrowserRouter>
+                </ThemeConfig>
+            </CacheProvider>
+        </AuthProvider>
     </React.StrictMode>,
     document.getElementById('root')
 );

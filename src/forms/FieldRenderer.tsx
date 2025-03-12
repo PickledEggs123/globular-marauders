@@ -26,7 +26,7 @@ export const FieldRenderer = ({data, field, onChange, submit}: {
         }
         case EFormFieldType.BUTTON: {
             return (
-                <Button onClick={() => {
+                <Button variant="contained" onClick={() => {
                     if (field.buttonPath) {
                         submit(field.buttonPath);
                     }

@@ -389,10 +389,10 @@ export const PlanetGenerator = () => {
                                     <Typography>Load Status: {loadMessage}</Typography>
                                     <div ref={ref} style={{width: 256, height: 256}}>
                                     </div>
-                                    <Button onClick={() => {
+                                    <Button variant="contained" onClick={() => {
                                         drawGraph();
                                     }}>Refresh</Button>
-                                    <Button onClick={download}>Download</Button>
+                                    <Button variant="contained" onClick={download}>Download</Button>
                                     <br/>
                                     {/* @ts-ignore */}
                                     <iframe title="3d game" width={256} height={256} ref={iframeRef} allowfullscreen="yes"

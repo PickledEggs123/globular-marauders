@@ -250,7 +250,7 @@ export const GameModel = () => {
                                             </Card>
                                         </Grid>
                                     </Grid>
-                                    <Button onClick={() => {
+                                    <Button variant="contained" onClick={() => {
                                         drawGraph();
                                     }}>Refresh</Button>
                                     <Typography variant="body1">

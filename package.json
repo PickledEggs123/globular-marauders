@@ -25,6 +25,7 @@
     "@types/react": "^17.0.3",
     "@types/react-dom": "^17.0.3",
     "compression": "^1.7.4",
+    "firebase": "^11.4.0",
     "octree-es": "^1.0.0",
     "open-easyrtc": "^2.0.20",
     "pixi.js": "^7.3.1",

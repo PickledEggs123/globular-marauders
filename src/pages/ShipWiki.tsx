@@ -265,7 +265,7 @@ export const ShipWiki = () => {
                                 <CardContent>
                                     <div ref={ref}>
                                     </div>
-                                    <Button onClick={download}>Download</Button>
+                                    <Button variant="contained" onClick={download}>Download</Button>
                                     <Typography variant="body1">
                                         {shipBody.get(selectedShipType) ?? undefined}
                                     </Typography>
