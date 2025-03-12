@@ -5,15 +5,6 @@
     <title>Planet Generator</title>
     <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
 
-    <!-- Import ThreeJS 0.164.0 and our Octree lib-->
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.164.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.164.0/examples/jsm/"
-            }
-        }
-    </script>
     <script src="/aframe-v1.6.0.min.js"></script>
     <script src="/aframe-physics-system.js"></script>
     <script src="/aframe-extras.min.js"></script>
@@ -3161,7 +3152,6 @@
             rootNpc.setAttribute("npc-attack", `range: 10; melee: false;`);
             rootNpc.setAttribute("health", "");
             rootNpc.setAttribute("shadow", "");
-            rootNpc.setAttribute("outline-pass", "");
 
             if (characterModels.has("WARRIOR")) {
                 const str = characterModels.get("WARRIOR");
@@ -3419,7 +3409,6 @@
             rootShip.setAttribute("shadow", "");
             rootShip.setAttribute("position", `${point[0]} ${point[1]} ${point[2]}`);
             rootShip.setAttribute("rotation", "0 0 0");
-            rootShip.setAttribute("outline-pass", "");
 
             const rootModel = document.createElement("a-entity");
             rootModel.setAttribute("class", "data");
@@ -4062,12 +4051,6 @@
             const scene = document.querySelector("a-scene");
             scene.components['coin-purse'].buyShips();
         }
-    </script>
-    <script type="module">
-        import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
-        import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
-        import { OutlinePass } from "three/addons/postprocessing/OutlinePass.js";
-        import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 
         AFRAME.registerSystem('npc-finder', {
             schema: {},
@@ -4177,121 +4160,6 @@
                 this.system.registerMe(this.el);
             },
         });
-
-        AFRAME.registerSystem('outline-pass', {
-            schema: {
-                edgeStrength: { type: 'number', default: 2 },
-                edgeGlow: { type: 'number', default: 1 },
-            },
-            init: function () {
-                this.t = 0;
-                this.dt = 0;
-                this.selectedObjects = [];
-                // this.outlinePassFactory();
-
-                // this.innerResizeOutlinePass = this.resizeOutlinePass.bind(this);
-                // window.addEventListener("resize", this.innerResizeOutlinePass);
-            },
-            remove: function () {
-                // window.removeEventListener("resize", this.innerResizeOutlinePass);
-            },
-            resizeOutlinePass: function () {
-                const sceneEl = document.querySelector("a-scene");
-                if (!sceneEl.renderer || !sceneEl.camera) {
-                    const cameraActiveHandler = function () {
-                        sceneEl.removeEventListener('camera-set-active', cameraActiveHandler);
-                        this.resizeOutlinePass.call(this);
-                    }.bind(this);
-                    sceneEl.addEventListener('camera-set-active', cameraActiveHandler);
-                    return;
-                }
-
-                const renderer = sceneEl.renderer;
-                const size = renderer.getDrawingBufferSize(new THREE.Vector2());
-                this.composer.setSize(size.x, size.y);
-                this.outlinePass.setSize(size.x, size.y);
-            },
-            outlinePassFactory: function () {
-                const sceneEl = document.querySelector("a-scene");
-                if (!sceneEl.renderer || !sceneEl.camera) {
-                    const cameraActiveHandler = function () {
-                        sceneEl.removeEventListener('camera-set-active', cameraActiveHandler);
-                        this.outlinePassFactory.call(this);
-                    }.bind(this);
-                    sceneEl.addEventListener('camera-set-active', cameraActiveHandler);
-                    return;
-                }
-
-                const scene = sceneEl.object3D;
-                const renderer = sceneEl.renderer;
-                const camera = sceneEl.camera;
-
-                const compose = new EffectComposer(renderer);
-                this.composer = compose;
-
-                const renderPass = new RenderPass(scene, camera);
-                compose.addPass(renderPass);
-
-                const outlinePass = new OutlinePass(renderer.getDrawingBufferSize(new THREE.Vector2()), scene, camera, this.selectedObjects);
-                outlinePass.selectedObjects = this.selectedObjects;
-                compose.addPass(outlinePass);
-
-                const params = this.data;
-                outlinePass.edgeStrength = params.edgeStrength;
-                outlinePass.edgeGlow = params.edgeGlow;
-                outlinePass.visibleEdgeColor.set(0x00ff00);
-                outlinePass.hiddenEdgeColor.set(0x00ff00);
-                this.outlinePass = outlinePass;
-
-                const outputPass = new OutputPass();
-                compose.addPass(outputPass);
-
-                this.bind();
-            },
-            /**
-             * Record the timestamp for the current frame.
-             * @param {number} t
-             * @param {number} dt
-             */
-            tick: function (t, dt) {
-                this.t = t;
-                this.dt = dt;
-            },
-            /**
-             * Binds the EffectComposer to the A-Frame render loop.
-             * (This is the hacky bit.)
-             */
-            bind: function () {
-                const renderer = this.sceneEl.renderer;
-                const render = renderer.render;
-                const system = this;
-                let isDigest = false;
-
-                renderer.render = function () {
-                    if (isDigest) {
-                        render.apply(this, arguments);
-                    } else {
-                        isDigest = true;
-                        system.composer.render(system.dt);
-                        isDigest = false;
-                    }
-                };
-            },
-        });
-
-        AFRAME.registerComponent('outline-pass', {
-            schema: {},
-            init: function () {
-                this.system = this.el.sceneEl.systems['outline-pass'];
-                this.system.selectedObjects.push(this.el.object3D);
-            },
-            remove: function () {
-                const idx = this.system.selectedObjects.indexOf(this.el.object3D);
-                if (idx >= 0) {
-                    this.system.selectedObjects.splice(idx, 1);
-                }
-            },
-        });
     </script>
     <style>
         a-scene {
@@ -4320,7 +4188,7 @@
     </style>
 </head>
 <body>
-    <a-scene onclick="window.musicPlayer.start();" coin-purse respawn physics="driver: local; gravity: 0 0 0;" globe-nav globe-ocean-nav embedded fog shadow="enabled: true" outline-pass id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
+    <a-scene onclick="window.musicPlayer.start();" coin-purse respawn physics="driver: local; gravity: 0 0 0;" globe-nav globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
         <a-assets>
             <template id="avatar-template">
                 <a-entity class="avatar" networked-audio-source>
