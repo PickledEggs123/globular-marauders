@@ -145,8 +145,8 @@ export abstract class PixiGameBase extends React.Component<IPixiGameProps, IPixi
     public playerId: string | null = null;
 
     // ui ref
-    protected showAppBodyRef: React.RefObject<HTMLDivElement> = React.createRef<HTMLDivElement>();
-    protected measureAppBodyRef: React.RefObject<HTMLDivElement> = React.createRef<HTMLDivElement>();
+    protected showAppBodyRef: React.RefObject<HTMLDivElement | null> = React.createRef<HTMLDivElement | null>();
+    protected measureAppBodyRef: React.RefObject<HTMLDivElement | null> = React.createRef<HTMLDivElement | null>();
 
     // pixi.js renderer
     public abstract application: PIXI.Application;

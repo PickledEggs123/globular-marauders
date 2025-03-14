@@ -14,7 +14,7 @@ import {
     CardMedia
 } from "@mui/material";
 import {Link} from "react-router-dom";
-import Carousel from "react-material-ui-carousel";
+import {Carousel} from "nuka-carousel";
 
 export const Main = () => {
     return (
@@ -41,7 +41,7 @@ export const Main = () => {
                                     </Typography>
                                     <br/>
                                     <div style={{width: 256, margin: '0 auto'}}>
-                                        <Carousel>
+                                        <Carousel autoplay showDots>
                                             {
                                                 [{
                                                     url: '/mainImages/MainGame1.png',
@@ -91,7 +91,7 @@ export const Main = () => {
                                     </Typography>
                                     <br/>
                                     <div style={{width: 256, margin: '0 auto'}}>
-                                        <Carousel>
+                                        <Carousel autoplay showDots>
                                             {
                                                 [{
                                                     url: '/mainImages/3dGame1.png',
