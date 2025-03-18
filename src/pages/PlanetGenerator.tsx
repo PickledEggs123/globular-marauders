@@ -8,6 +8,7 @@ import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interfa
 import * as PIXI from "pixi.js";
 import {BLEND_MODES} from "pixi.js";
 import Quaternion from "quaternion";
+import {createStyles, makeStyles} from "@mui/styles";
 
 interface IGameSpawnPoint {
     point: [number, number, number];
@@ -21,10 +22,23 @@ interface IGameBuilding {
 
 const PLANET_SIZE = 100;
 
+const useStyles = makeStyles((theme) =>
+    createStyles({
+        responsiveIframe: {
+            width: "100%",
+            aspectRatio: "1 / 1",
+            border: "none",
+            margin: 0,
+            padding: 0,
+        }
+    })
+);
+
 export const PlanetGenerator = () => {
     const [context] = useState<{ app: PIXI.Application | null, preview: IGameMesh | null, gameData: IGameMesh[] } | null>({ app: null, preview: null, gameData: [] });
     const [clientSecret] = useState(Math.random().toString(36).substring(2, 9));
     const [loadMessage, setLoadMessage] = useState<string>("No data loaded...");
+    const classes = useStyles();
     const ref = useRef<HTMLDivElement | null>(null);
     const iframeRef = useRef<HTMLIFrameElement | null>(null);
     const drawGraph = useCallback(() => {
@@ -47,6 +61,7 @@ export const PlanetGenerator = () => {
                 for (const attribute of d.attributes) {
                     planetGeometry.addAttribute(attribute.id, attribute.buffer, attribute.size);
                 }
+                // @ts-ignore
                 planetGeometry.addIndex(new Uint32Array(d.index));
 
                 if (d.ocean) {
@@ -389,13 +404,19 @@ export const PlanetGenerator = () => {
                                     <Typography>Load Status: {loadMessage}</Typography>
                                     <div ref={ref} style={{width: 256, height: 256}}>
                                     </div>
-                                    <Button variant="contained" onClick={() => {
-                                        drawGraph();
-                                    }}>Refresh</Button>
-                                    <Button variant="contained" onClick={download}>Download</Button>
+                                    <Grid container>
+                                        <Grid item xs={6}>
+                                            <Button variant="contained" fullWidth onClick={() => {
+                                                drawGraph();
+                                            }}>Refresh</Button>
+                                        </Grid>
+                                        <Grid item xs={6}>
+                                            <Button variant="contained" fullWidth onClick={download}>Download</Button>
+                                        </Grid>
+                                    </Grid>
                                     <br/>
                                     {/* @ts-ignore */}
-                                    <iframe title="3d game" width={256} height={256} ref={iframeRef} allowfullscreen="yes"
+                                    <iframe title="3d game" className={classes.responsiveIframe} ref={iframeRef} allowfullscreen="yes"
                                             allowvr="yes"
                                             src="/planet-generator-iframe.html"/>
                                     <Typography variant="body1">

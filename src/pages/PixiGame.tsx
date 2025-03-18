@@ -1764,9 +1764,9 @@ export class PixiGame extends PixiGameNetworking {
                 </Card>
                 <div className="Top">
                     <svg style={{width: gaugeWidth, height: 44}}>
-                        <rect x={0} y={0} width={((this.findPlayerShip()?.health ?? 100) + (this.findPlayerShip()?.repairTicks.reduce((acc, i) => acc + i, 0) ?? 0) ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (gaugeWidth)} height={44} fill="green" stroke="none"/>
-                        <rect x={0} y={0} width={(this.findPlayerShip()?.health ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (gaugeWidth)} height={44} fill="yellow" stroke="none"/>
-                        <rect x={0} y={0} width={((this.findPlayerShip()?.health ?? 100) - (this.findPlayerShip()?.burnTicks.reduce((acc, i) => acc + i, 0) ?? 0) ?? 100) / (this.findPlayerShip()?.maxHealth ?? 100) * (gaugeWidth)} height={44} fill="red" stroke="none"/>
+                        <rect x={0} y={0} width={((this.findPlayerShip()?.health ?? 0) + (this.findPlayerShip()?.repairTicks.reduce((acc, i) => acc + i, 0) ?? 0)) / (this.findPlayerShip()?.maxHealth ?? 0) * (gaugeWidth)} height={44} fill="green" stroke="none"/>
+                        <rect x={0} y={0} width={(this.findPlayerShip()?.health ?? 0) / (this.findPlayerShip()?.maxHealth ?? 0) * (gaugeWidth)} height={44} fill="yellow" stroke="none"/>
+                        <rect x={0} y={0} width={((this.findPlayerShip()?.health ?? 0) - (this.findPlayerShip()?.burnTicks.reduce((acc, i) => acc + i, 0) ?? 0)) / (this.findPlayerShip()?.maxHealth ?? 0) * (gaugeWidth)} height={44} fill="red" stroke="none"/>
                         <text x={(gaugeWidth) * (1 / 4)} y={18} fill="white" stroke="none" textAnchor="middle">Damage {(this.playerId && this.game.scoreBoard.damage.find(x => x.playerId === this.playerId)?.damage) ?? 0}</text>
                         <text x={(gaugeWidth) * (2 / 4)} y={18} fill="white" stroke="none" textAnchor="middle">Loot {(this.playerId && this.game.scoreBoard.loot.find(x => x.playerId === this.playerId)?.count) ?? 0}</text>
                         <text x={(gaugeWidth) * (3 / 4)} y={18} fill="white" stroke="none" textAnchor="middle">Money {(this.playerId && this.game.scoreBoard.money.find(x => x.playerId === this.playerId)?.amount) ?? 0}</text>
@@ -1863,12 +1863,12 @@ export class PixiGame extends PixiGameNetworking {
                     <Box style={{display: "flex", flexWrap: "wrap", visibility: otherShip ? "visible" : "hidden"}}>
                         <Typography variant="h1" color="white">Enemies</Typography>
                         {
-                            new Array(otherShip?.characters.length ?? 0).fill(0).map((v, i) => this.renderCharacterInUi(otherShip!, v, i, false))
+                            new Array(otherShip?.characters.length).fill(0).map((v, i) => this.renderCharacterInUi(otherShip!, v, i, false))
                         }
                     </Box>
                     <Box style={{display: "flex", flexWrap: "wrap"}}>
                         {
-                            new Array(playerShip?.characters.length ?? 0).fill(0).map((v, i) => this.renderCharacterInUi(playerShip!, v, i, true))
+                            new Array(playerShip?.characters.length).fill(0).map((v, i) => this.renderCharacterInUi(playerShip!, v, i, true))
                         }
                         {
                             new Array(GetShipData(playerShip?.shipType ?? EShipType.CUTTER, this.game.worldScale).cargoSize).fill(0).map((v, i) => {
