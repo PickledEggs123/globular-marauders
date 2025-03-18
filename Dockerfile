@@ -1,4 +1,4 @@
-FROM node:16-alpine as builder
+FROM node:22-alpine as builder
 
 WORKDIR /app
 
@@ -13,7 +13,7 @@ RUN npm run build
 RUN npm run build-server
 RUN rm -f ~/.npmrc
 
-FROM node:16-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
