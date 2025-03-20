@@ -3,7 +3,6 @@ import '../App.scss';
 import {WebsiteDrawer2} from "../Drawer";
 import {
     Paper,
-    Avatar,
     Button,
     Card,
     CardActionArea,
@@ -11,7 +10,7 @@ import {
     CardHeader,
     Container,
     Grid,
-    Typography, CardMedia, Icon
+    Typography, CardMedia
 } from "@mui/material";
 import {EShipType} from "@pickledeggs123/globular-marauders-game/lib/src/ShipType";
 import * as PIXI from "pixi.js";
