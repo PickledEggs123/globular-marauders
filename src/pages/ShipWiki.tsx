@@ -279,7 +279,7 @@ export const ShipWiki = () => {
                         {
                             Object.values(EShipType).map(shipType => {
                                 return (
-                                    <Grid item xs={4}>
+                                    <Grid key={shipType} item xs={4}>
                                         <Card>
                                             <CardActionArea onClick={() => {
                                                 setSelectedShipType(shipType);

@@ -107,7 +107,7 @@ export const CharacterWiki = () => {
                         {
                             classDatas.map(classData => {
                                 return (
-                                    <Grid item xs={4}>
+                                    <Grid key={classData[1].name} item xs={4}>
                                         <Card>
                                             <CardActionArea onClick={() => {
                                                 setSelectedCharacterClass(classData);
