@@ -399,13 +399,6 @@ io.on("connection", (socket) => {
     let pingTimeout = null;
     let pingInterval = null;
     let firstPingTimeout = setTimeout(() => {
-        eventEmitterOut.emit("send", {
-            data: undefined,
-            from: 'server',
-            to: socket.id,
-            type: 'ping',
-            msgType: 'send',
-        });
         pingInterval = setInterval(() => {
             eventEmitterOut.emit("send", {
                 data: undefined,

@@ -1783,7 +1783,11 @@ export class PixiGame extends PixiGameNetworking {
     }
 
     renderCharacterInUi(ship: Ship, v: number, i: number, ownShip: boolean) {
-        const character = ship?.characters[i] as Character;
+        const character = ship?.characters[i] as Character | undefined;
+        if (!character) {
+            return null;
+        }
+
         const characterData = character.getClassData();
         const badgeContent = character.hp;
         let caption: string = "";
