@@ -6,7 +6,6 @@ import {StaticRouter} from "react-router-dom/server";
 import {CacheProvider} from "@emotion/react";
 import createEmotionServer from "@emotion/server/create-instance";
 import createCache from "@emotion/cache";
-import {CssBaseline} from "@mui/material";
 import {theme} from "../src/theme";
 import {ThemeProvider} from "@mui/material/styles";
 import {PrismaClient} from "@prisma/client";
