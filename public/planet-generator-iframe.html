@@ -2881,9 +2881,11 @@
                 dataEl.setAttribute("gltf-model", str);
                 dataEl.setAttribute("networked-ship-health", "");
                 dataEl.setAttribute("cannonball-collider", "");
+                dataEl.setAttribute("shadow", "");
                 rootGoldCoin.appendChild(dataEl);
             } else {
                 rootGoldCoin.setAttribute("gltf-model", str);
+                rootGoldCoin.setAttribute("shadow", "");
             }
 
             if (charModelId === "PERSON") {
