@@ -73,7 +73,7 @@ export const PlanetGenerator = () => {
                         uniform mat4 uRotation;
             
                         void main() {
-                            gl_Position = uRotation * vec4(aPosition * 0.86 * vec3(-1.0, 1.0, 1.0), 1.0);
+                            gl_Position = uRotation * vec4(aPosition * 0.86 * vec3(-1.0/100.0, 1.0/100.0, 1.0/100.0), 1.0);
                         }
                     `;
                     const planetFragmentShader = `
@@ -111,7 +111,7 @@ export const PlanetGenerator = () => {
                         void main() {
                             vColor = aColor;
             
-                            gl_Position = uRotation * vec4(aPosition * 0.86 * vec3(-1.0, 1.0, 1.0), 1.0);
+                            gl_Position = uRotation * vec4(aPosition * 0.86 * vec3(-1.0/100.0, 1.0/100.0, 1.0/100.0), 1.0);
                             vNormal = (uRotation * vec4(aNormal * vec3(-1.0, 1.0, 1.0), 1.0)).xyz;
                         }
                     `;
@@ -145,25 +145,68 @@ export const PlanetGenerator = () => {
                 app.stage.addChild(mesh as unknown as any);
             }
         };
-        const handleData = (inputData: {meshes: IGameMesh[], spawnPoints: IGameSpawnPoint[], buildings: IGameBuilding[]}, {roomId}: {roomId: string}) => {
-            const {
-                meshes,
-                spawnPoints,
-                buildings,
-            } = inputData;
-            const data: IGameMesh[] = meshes;
+        const Uint8ToBase64 = (u8Arr: Uint8Array): string => {
+            const CHUNK_SIZE = 0x8000;
+            let index = 0;
+            const length = u8Arr.length;
+            let result = '';
+            while (index < length) {
+                const slice = u8Arr.subarray(index, Math.min(index + CHUNK_SIZE, length));
+                result += String.fromCharCode.apply(null, Array.from(slice));
+                index += CHUNK_SIZE;
+            }
+            return btoa(result);
+        };
+
+        const addCharacterModel = (iframe: HTMLIFrameElement, type: string, data: string) => {
+            // @ts-ignore
+            iframe.contentWindow?.addCharacterModel(JSON.stringify({ type, data }));
+        };
+
+        const addBuildings = (iframe: HTMLIFrameElement, buildings: IGameBuilding[], dataUris: string[]) => {
+            const houseArray = buildings.map(building => {
+                const { point, lookAt, type } = building;
+                return JSON.stringify({
+                    type: type.toUpperCase(),
+                    point: point.map(x => x * PLANET_SIZE),
+                    lookAt: lookAt.map(x => x * PLANET_SIZE)
+                });
+            });
+
+            const buildingTypeMap: Record<string, string[]> = {
+                PORT: [dataUris[0], dataUris[1], dataUris[2]],
+                HOUSE: [dataUris[3], dataUris[4], dataUris[5]],
+                TEMPLE: [dataUris[6], dataUris[7], dataUris[8]]
+            };
+
+            Object.entries(buildingTypeMap).forEach(([type, uris]) => {
+                addCharacterModel(iframe, type, uris.join("|"));
+            });
+
+            houseArray.forEach(house => {
+                // @ts-ignore
+                iframe.contentWindow?.addHouse(house);
+            });
+        };
+
+        const handleData = (
+            inputData: { meshes: IGameMesh[], spawnPoints: IGameSpawnPoint[], buildings: IGameBuilding[] },
+            { roomId }: { roomId: string }
+        ) => {
+            const { meshes, spawnPoints, buildings } = inputData;
+            const data: IGameMesh[] = meshes.map((mesh: IGameMesh) => ({
+                ...mesh,
+                attributes: mesh.attributes.map(attr =>
+                    attr.id === "aPosition"
+                        ? { ...attr, buffer: attr.buffer.map(x => x * PLANET_SIZE) }
+                        : attr
+                )
+            }));
+
             setLoadMessage("Data Loaded");
             context.gameData = data;
-            const data2: IGameMesh[] = data.map((d: IGameMesh) => ({
-                ...d,
-                attributes: [{
-                    ...d.attributes.find(x => x.id === "aPosition")!,
-                    buffer: [...d.attributes.find(x => x.id === "aPosition")!.buffer.map(x => x * PLANET_SIZE)],
-                }, ...d.attributes.filter(x => x.id !== "aPosition"),
-                ]
-            } as IGameMesh));
-            Promise.all<Uint8Array | string>([
-                ...data2.map(m => generatePlanetGltf(m, m.ocean, m.navmesh || m.oceanNavmesh)),
+
+            const staticMeshPaths = [
                 "/meshes/Helm.glb",
                 "/meshes/CannonBall.glb",
                 "/meshes/GoldCoin.glb",
@@ -180,115 +223,73 @@ export const PlanetGenerator = () => {
                 "/meshes/Temple1-0.glb",
                 "/meshes/Temple1-1.glb",
                 "/meshes/Temple1-2.glb"
+            ];
+
+            Promise.all<Uint8Array | string>([
+                ...data.map(m => generatePlanetGltf(m, m.ocean, m.navmesh || m.oceanNavmesh)),
+                ...staticMeshPaths
             ]).then((gltf) => {
-                const Uint8ToBase64 = (u8Arr: Uint8Array) => {
-                    const CHUNK_SIZE = 0x8000; //arbitrary number
-                    let index = 0;
-                    const length = u8Arr.length;
-                    let result = '';
-                    let slice: any;
-                    while (index < length) {
-                        slice = u8Arr.subarray(index, Math.min(index + CHUNK_SIZE, length));
-                        result += String.fromCharCode.apply(null, slice);
-                        index += CHUNK_SIZE;
-                    }
-                    return btoa(result);
+                const worldMeshes: [string, boolean?, boolean?, boolean?, boolean?, [number, number, number]?][] = [];
+                for (let i = 0; i < data.length; i++) {
+                    const dataUri = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[i] as Uint8Array)}`;
+                    worldMeshes.push([
+                        dataUri,
+                        data[i].collidable,
+                        data[i].navmesh,
+                        data[i].ocean,
+                        data[i].oceanNavmesh,
+                        data[i].vertex
+                    ]);
                 }
-                const worldMeshes: [string, boolean, boolean, boolean, boolean, [number, number, number]][] = [];
-                for (let i = 0; i < gltf.length - 16; i++) {
-                    const dataUri1 = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[i] as Uint8Array)}`;
-                    worldMeshes.push([dataUri1, data2[i].collidable, data2[i].navmesh, data2[i].ocean, data2[i].oceanNavmesh, data2[i].vertex] as [string, boolean, boolean, boolean, boolean, [number, number, number]]);
-                }
+
                 if (iframeRef.current) {
                     // @ts-ignore
-                    iframeRef.current.contentWindow.clearTerrain();
+                    iframeRef.current.contentWindow?.clearTerrain();
                     worldMeshes.forEach(w => {
                         // @ts-ignore
-                        iframeRef.current.contentWindow.addTerrain(JSON.stringify(w));
+                        iframeRef.current.contentWindow?.addTerrain(JSON.stringify(w));
                     });
-                }
 
-                const dataUri2 = gltf[gltf.length - 13];
-                if (iframeRef.current && spawnPoints[0]) {
-                    const spawnPoint = spawnPoints[0];
-                    const {
-                        point,
-                    } = spawnPoint;
-                    // @ts-ignore
-                    iframeRef.current.contentWindow.addCharacterModel(JSON.stringify({type: "SHIP", data: dataUri2}));
-                    // @ts-ignore
-                    iframeRef.current.contentWindow.addShip(JSON.stringify({data: dataUri2, point: point.map(x => x * PLANET_SIZE)}));
-                }
-
-                const dataUri315 = gltf[gltf.length - 16];
-                const dataUri314 = gltf[gltf.length - 15];
-                const dataUri313 = gltf[gltf.length - 14];
-                const dataUri312 = gltf[gltf.length - 12];
-                const dataUri311 = gltf[gltf.length - 11];
-                const dataUri3 = gltf[gltf.length - 10];
-                const dataUri39 = gltf[gltf.length - 9];
-                const dataUri38 = gltf[gltf.length - 8];
-                const houseArray = [];
-                if (iframeRef.current && buildings.length) {
-                    for (const spawnPoint of buildings) {
-                        const {
-                            point,
-                            lookAt,
-                        } = spawnPoint;
-                        if (spawnPoint.type === "PORT") {
-                            houseArray.push(JSON.stringify({type: "PORT", point: point.map(x => x * PLANET_SIZE), lookAt: lookAt.map(x => x * PLANET_SIZE)}));
-                        } else if (spawnPoint.type === "HOUSE") {
-                            houseArray.push(JSON.stringify({type: "HOUSE", point: point.map(x => x * PLANET_SIZE), lookAt: lookAt.map(x => x * PLANET_SIZE)}));
-                        } else if (spawnPoint.type === "TEMPLE") {
-                            houseArray.push(JSON.stringify({type: "TEMPLE", point: point.map(x => x * PLANET_SIZE), lookAt: lookAt.map(x => x * PLANET_SIZE)}));
-                        }
-                    }
-                }
-
-                const dataUri4 = gltf[gltf.length - 7];
-                if (iframeRef.current) {
-                    // @ts-ignore
-                    iframeRef.current.contentWindow.addCharacterModel(JSON.stringify({type: "WARRIOR", data: dataUri4}));
-                    // @ts-ignore
-                    iframeRef.current.contentWindow.addCharacterModel(JSON.stringify({type: "PERSON", data: dataUri311}));
-                    // @ts-ignore
-                    iframeRef.current.contentWindow.addCharacterModel(JSON.stringify({type: "ARROW", data: dataUri312}));
-                    // @ts-ignore
-                    iframeRef.current.contentWindow.addCharacterModel(JSON.stringify({type: "GOLD_COIN", data: dataUri313}));
-                    // @ts-ignore
-                    iframeRef.current.contentWindow.addCharacterModel(JSON.stringify({type: "CANNONBALL", data: dataUri314}));
-                    // @ts-ignore
-                    iframeRef.current.contentWindow.addCharacterModel(JSON.stringify({type: "HELM", data: dataUri315}));
-                }
-
-                const dataUri5 = gltf[gltf.length - 6];
-                const dataUri6 = gltf[gltf.length - 5];
-                const dataUri7 = gltf[gltf.length - 4];
-                const dataUri8 = gltf[gltf.length - 3];
-                const dataUri9 = gltf[gltf.length - 2];
-                const dataUri10 = gltf[gltf.length - 1];
-                if (iframeRef.current) {
-                    // @ts-ignore
-                    iframeRef.current.contentWindow.addCharacterModel(JSON.stringify({type: "PORT", data: [dataUri3, dataUri39, dataUri38].join("|")}));
-                    // @ts-ignore
-                    iframeRef.current.contentWindow.addCharacterModel(JSON.stringify({type: "HOUSE", data: [dataUri5, dataUri6, dataUri7].join("|")}));
-                    // @ts-ignore
-                    iframeRef.current.contentWindow.addCharacterModel(JSON.stringify({type: "TEMPLE", data: [dataUri8, dataUri9, dataUri10].join("|")}));
-                    for (const house of houseArray) {
+                    const shipDataUri = gltf[gltf.length - 13] as string;
+                    if (spawnPoints[0]) {
+                        const spawnPoint = spawnPoints[0];
+                        addCharacterModel(iframeRef.current, "SHIP", shipDataUri);
                         // @ts-ignore
-                        iframeRef.current.contentWindow.addHouse(house);
+                        iframeRef.current.contentWindow?.addShip(JSON.stringify({
+                            data: shipDataUri,
+                            point: spawnPoint.point.map(x => x * PLANET_SIZE)
+                        }));
                     }
-                }
 
-                // load client secret for connection purposes
-                if (iframeRef.current) {
+                    const warriorDataUri = gltf[gltf.length - 7] as string;
+                    addCharacterModel(iframeRef.current, "WARRIOR", warriorDataUri);
+                    addCharacterModel(iframeRef.current, "PERSON", gltf[gltf.length - 11] as string);
+                    addCharacterModel(iframeRef.current, "ARROW", gltf[gltf.length - 12] as string);
+                    addCharacterModel(iframeRef.current, "GOLD_COIN", gltf[gltf.length - 14] as string);
+                    addCharacterModel(iframeRef.current, "CANNONBALL", gltf[gltf.length - 15] as string);
+                    addCharacterModel(iframeRef.current, "HELM", gltf[gltf.length - 16] as string);
+
+                    if (buildings.length) {
+                        addBuildings(iframeRef.current, buildings, [
+                            gltf[gltf.length - 10] as string,
+                            gltf[gltf.length - 9] as string,
+                            gltf[gltf.length - 8] as string,
+                            gltf[gltf.length - 6] as string,
+                            gltf[gltf.length - 5] as string,
+                            gltf[gltf.length - 4] as string,
+                            gltf[gltf.length - 3] as string,
+                            gltf[gltf.length - 2] as string,
+                            gltf[gltf.length - 1] as string
+                        ]);
+                    }
+
                     // @ts-ignore
-                    iframeRef.current.contentWindow.addClientSecret(JSON.stringify({roomId, clientSecret}));
+                    iframeRef.current.contentWindow?.addClientSecret(JSON.stringify({ roomId, clientSecret }));
                 }
             });
 
             handlePixiRender(data);
-        }
+        };
 
         (async () => {
             // get room which contains map
@@ -416,7 +417,7 @@ export const PlanetGenerator = () => {
                                     </Grid>
                                     <br/>
                                     {/* @ts-ignore */}
-                                    <iframe title="3d game" className={classes.responsiveIframe} ref={iframeRef} allowfullscreen="yes"
+                                    <iframe title="3d game" className={classes.responsiveIframe} ref={iframeRef} allowFullScreen="yes"
                                             allowvr="yes"
                                             src="/planet-generator-iframe.html"/>
                                     <Typography variant="body1">
