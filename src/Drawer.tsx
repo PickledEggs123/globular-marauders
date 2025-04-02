@@ -79,7 +79,7 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
 
     const drawer = (
         <React.Fragment>
-            <Button variant="contained" onClick={toggleLoginModal}>Login</Button>
+            <Button variant="contained" onClick={toggleLoginModal}>{userLoggedIn ? "Logout" : "Login"}</Button>
             <FormControl>
                 <FormControlLabel
                     control={
