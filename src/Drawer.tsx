@@ -1,6 +1,6 @@
 import React, {useContext, useRef, useState} from "react";
 import {
-    AppBar, Box, Button, Container,
+    AppBar, Button, Container,
     Drawer, FormControl, FormControlLabel,
     Grid, IconButton,
     List,
@@ -9,9 +9,10 @@ import {
     ListItemText, Modal, Paper, Switch,
     Toolbar,
     Typography,
-    TextField, Tabs, Tab, InputAdornment, FormGroup
+    TextField, Tabs, Tab, InputAdornment
 } from "@mui/material";
 import {
+    Chat,
     Domain, Email, Google,
     Menu,
     MenuOpen, Password,
@@ -97,6 +98,10 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
                     link: "/",
                     icon: <Domain/>,
                     text: "Main"
+                }, {
+                    link: "/chat",
+                    icon: <Chat/>,
+                    text: "Chat"
                 }, {
                     link: "/2d-game",
                     icon: <PlayArrow/>,
@@ -254,9 +259,9 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
                     {drawer}
                 </Drawer>
             </nav>
-            <Box sx={{ marginLeft: { xs: 0, md: drawerWidth / 8}, padding: '20px', display: 'flex', marginTop: (ref.current?.getBoundingClientRect().height ?? 40) / 8, height: `calc(100vh - ${ref.current?.getBoundingClientRect().height ?? 40}px)` }}>
+            <Paper style={{display: 'flex', flexDirection: 'column'}}  sx={{ marginLeft: { xs: 0, md: drawerWidth / 8}, padding: '20px', display: 'flex', marginTop: (ref.current?.getBoundingClientRect().height ?? 40) / 8, height: `calc(100vh - ${ref.current?.getBoundingClientRect().height ?? 40}px)` }}>
                 {content}
-            </Box>
+            </Paper>
         </div>
     );
-}
+};

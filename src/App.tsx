@@ -10,12 +10,14 @@ import {CharacterWiki} from "./pages/CharacterWiki";
 import {ShipContext, ShipMeshLoader} from "./contextes/ShipContext";
 import {PlanetContext, PlanetMeshLoader} from "./contextes/PlanetContext";
 import {Main} from "./pages/Main";
+import {ChatRoom} from "./pages/ChatRoom";
 
 
 export const App = () => {
     return (
         <Routes>
             <Route path="/" element={<Main/>}/>
+            <Route path="/chat" element={<ChatRoom/>}/>
             <Route path="/2d-game" element={
                 // @ts-ignore
                 global.use_ssr ? (

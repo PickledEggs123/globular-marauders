@@ -4,6 +4,7 @@ import React from "react";
 export const AppRoutes = () => (
     <Routes>
         <Route path="/"/>
+        <Route path="/chat"/>
         <Route path="/2d-game"/>
         <Route path="/game-model"/>
         <Route path="/planet-generator"/>
