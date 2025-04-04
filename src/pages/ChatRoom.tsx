@@ -26,6 +26,7 @@ export const ChatRoom = () => {
     const {userLoggedIn, currentUser} = useAuth();
     const [chatValue, setChatValue] = useState("");
     const [chatHistory, setChatHistory] = useState<IChatMessage[]>([]);
+    const [chatDisabled, setChatDisabled] = useState<boolean>(false);
     const [context] = useState({
         chat: model.startChat({})
     });
@@ -38,25 +39,43 @@ export const ChatRoom = () => {
     const handleSendChat = async (e: React.SyntheticEvent) => {
         e.preventDefault();
 
-        const msg = chatValue;
-        setChatValue("");
-        const response = await context.chat.sendMessage(msg);
-        const text = response.response.text();
-        setChatHistory([
-            ...chatHistory,
-            {
-                sender: true,
-                name: currentUser?.displayName ?? undefined,
-                message: msg,
-                photoURL: currentUser?.photoURL ?? undefined,
-            },
-            {
-                sender: false,
-                name: "Gemini",
-                message: text,
-                photoURL: undefined,
+        try {
+            const msg = chatValue;
+            setChatValue("");
+            setChatDisabled(true);
+            setChatHistory([
+                ...chatHistory,
+                {
+                    sender: true,
+                    name: currentUser?.displayName ?? undefined,
+                    message: msg,
+                    photoURL: currentUser?.photoURL ?? undefined,
+                },
+            ]);
+            const res = await context.chat.sendMessageStream(msg);
+            let text = '';
+            for await (const chunk of res.stream) {
+                const chunkText = chunk.text();
+                text += chunkText;
+                setChatHistory([
+                    ...chatHistory,
+                    {
+                        sender: true,
+                        name: currentUser?.displayName ?? undefined,
+                        message: msg,
+                        photoURL: currentUser?.photoURL ?? undefined,
+                    },
+                    {
+                        sender: false,
+                        name: "Gemini",
+                        message: text,
+                        photoURL: undefined,
+                    },
+                ]);
             }
-        ]);
+        } finally {
+            setChatDisabled(false);
+        }
     };
 
     const chatRoom = userLoggedIn ? (
@@ -72,7 +91,7 @@ export const ChatRoom = () => {
                     />;
                 })
             }
-            <TextField value={chatValue} onChange={handleChatChange} label="Chat" fullWidth sx={{paddingTop: 1}} InputProps={{
+            <TextField value={chatValue} disabled={chatDisabled} onChange={handleChatChange} label="Chat" fullWidth sx={{paddingTop: 1}} InputProps={{
                 startAdornment: (
                     <InputAdornment position="start">
                         <Tooltip title={currentUser?.displayName ?? undefined}>
@@ -81,7 +100,7 @@ export const ChatRoom = () => {
                     </InputAdornment>
                 )
             }}></TextField>
-            <Button fullWidth variant="contained" onClick={handleSendChat}>Send</Button>
+            <Button fullWidth variant="contained" disabled={chatDisabled} onClick={handleSendChat}>Send</Button>
         </Paper>
     ) : (
         <Paper sx={{padding: 2, mt: 2}}>
