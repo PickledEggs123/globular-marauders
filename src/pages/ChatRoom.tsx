@@ -3,6 +3,7 @@ import {Avatar, Box, Button, Container, InputAdornment, Paper, Skeleton, TextFie
 import {useAuth} from "../contextes/auth";
 import { WebsiteDrawer2 } from "../Drawer";
 import {model} from "../firebase/firebase";
+import Markdown from "react-markdown";
 
 interface IChatMessage {
     sender: boolean;
@@ -17,7 +18,7 @@ const ChatBubble = (props: IChatMessage) => {
             <Tooltip title={props.name}>
                 <Avatar sx={{width: 24, height: 24}} srcSet={props.photoURL} />
             </Tooltip>
-            <Typography>{props.message}</Typography>
+            <Markdown>{props.message}</Markdown>
         </Box>
     );
 };
