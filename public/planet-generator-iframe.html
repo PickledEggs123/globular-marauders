@@ -3571,14 +3571,20 @@
                     type: "vec3",
                     default: "1 1 1",
                 },
+                portShow: {
+                    type: "boolean",
+                    default: false,
+                },
             },
             tick: function () {
                 const scene = document.querySelector("a-scene");
-                if (isDemoMode) {
-                    this.el.object3D.visible = false;
-                    return;
-                } else {
-                    this.el.object3D.visible = true;
+                if (!this.data.portShow) {
+                    if (isDemoMode) {
+                        this.el.object3D.visible = false;
+                        return;
+                    } else {
+                        this.el.object3D.visible = true;
+                    }
                 }
 
                 const camera = scene.camera;
@@ -4317,7 +4323,7 @@
         </a-entity>
         <a-entity id="camera-rig" position="0 105 5" networked="template: #avatar-template; attachTemplateToLocal: false;">
             <a-entity camera globe-look-controls="mouseEnabled: false; touchEnabled: false;" position="0 1.6 0" cursor-updater cursor="rayOrigin: mouse" raycaster="far: 50; interval: 100; objects: .clickable">
-                <a-entity id="port-menu" align-with-projection="offset: 0.25 0.2 -0.5; rotation: 0 0 0" port-show html="cursor:#cursor;html:#my-interface" class="clickable"></a-entity>
+                <a-entity id="port-menu" align-with-projection="offset: 0.25 0.2 -0.5; rotation: 0 0 0; portShow: true" port-show html="cursor:#cursor;html:#my-interface" class="clickable"></a-entity>
                 <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
                 <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
                 <a-entity id="left-cannon-fire" align-with-projection="offset: -0.25 -0.2 -0.5; rotation: 0 90 0; scale: 0.03 0.03 0.03" gltf-model="/meshes/Cannon.glb" class="clickable" select-cannon-side="selector: left-cannon"></a-entity>
