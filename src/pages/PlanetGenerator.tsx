@@ -244,6 +244,8 @@ export const PlanetGenerator = () => {
 
                 if (iframeRef.current) {
                     // @ts-ignore
+                    iframeRef.current.contentWindow?.setDemo(false);
+                    // @ts-ignore
                     iframeRef.current.contentWindow?.clearTerrain();
                     worldMeshes.forEach(w => {
                         // @ts-ignore

@@ -299,6 +299,49 @@
         }
         window.musicPlayer = new MusicPlayer();
 
+        let isDemoMode = true;
+        function setDemo(b) {
+            isDemoMode = b;
+            if (document.querySelector("#port-menu")) {
+                document.querySelector("a-scene").setAttribute("xr-mode-ui", "enabled: false");
+            } else {
+                setTimeout(() => {
+                    setDemo(b);
+                }, 10);
+            }
+        }
+        function addMovingCamera() {
+            const scene = document.querySelector("a-scene");
+            if (scene) {
+                const cameraRig = scene.querySelector("#camera-rig");
+                const demoNode = scene.querySelector("#demo-node");
+                const demoNodePosition = scene.querySelector("#demo-node-position");
+                if (cameraRig && demoNode && demoNodePosition) {
+                    cameraRig.setAttribute("look-at-box", "#demo-node");
+                    demoNode.setAttribute("moving-camera", "");
+                    demoNode.setAttribute("dynamic-body", "shape: sphere; sphereRadius: 1; mass: 100");
+                    demoNode.setAttribute("collision-filter", "group: ship; collidesWith: default");
+                    demoNode.setAttribute("globe-gravity", "ship: true;");
+                    return;
+                }
+            }
+            setTimeout(() => {
+                addMovingCamera();
+            }, 10);
+        }
+
+        AFRAME.registerComponent("moving-camera", {
+            schema: {
+            },
+            tick: function (t, dt) {
+
+                this.el.object3D.position.copy(new THREE.Vector3(0, Math.cos(t * 0.000_033), Math.sin(t * 0.000_033)).multiplyScalar(PLANET_SIZE + 10));
+                console.log(this.el.object3D.position)
+            },
+        });
+
+        setDemo(isDemoMode);
+
         const PLANET_SIZE = 100;
 
         // Add the extension functions
@@ -672,7 +715,12 @@
                 this.el.addEventListener('model-loaded', () => {
                     const obj = this.el.getObject3D('mesh');
                     const result = threeToCannon.getShapeParameters(obj, { type: threeToCannon.ShapeType.MESH });
-                    const body = (this.el.components['static-body'].body);
+                    const body = this.el.components['static-body'].body;
+                    this.addShapes.call(this, body, result);
+                });
+            },
+            addShapes: function (body, result) {
+                if (body) {
                     body.shapes.splice(0, body.shapes.length);
                     body.shapeOffsets.splice(0, body.shapeOffsets.length)
                     body.shapeOrientations.splice(0, body.shapeOrientations.length)
@@ -688,8 +736,12 @@
                         const shape = new CANNON.Trimesh(vertices, indices);
                         this.el.components['static-body'].addShape(shape, offset, orientation);
                     }
-                });
-            }
+                    return;
+                }
+                setTimeout(() => {
+                    this.addShapes.call(this, body, result);
+                }, 10);
+            },
         });
 
         AFRAME.registerComponent('cursor-updater', {
@@ -2116,9 +2168,15 @@
             init: function () {
                 this.system = this.el.sceneEl.systems['globe-nav'];
                 this.el.addEventListener('click', (e) => {
+                    const scene = document.querySelector("a-scene");
+                    const activeUnit = scene.components['coin-purse'].activeUnit;
+                    const ship = scene.querySelector(`.${activeUnit}`);
+                    if (!ship) {
+                        return;
+                    }
+
                     const destination1 = e.detail.intersection.point.clone();
 
-                    const scene = document.querySelector("a-scene");
                     scene.components['coin-purse'].setUnit(unitMap.get(scene.components['coin-purse'].activeUnit));
                     const checkBox = document.querySelector(`#unit-selection-${scene.components['coin-purse'].activeUnit}`);
                     checkBox.click();
@@ -3441,8 +3499,11 @@
 
             window.gmRoomId = roomId;
 
-            const scene = document.querySelector("a-scene");
+            if (roomId === "demo") {
+                return;
+            }
 
+            const scene = document.querySelector("a-scene");
             scene.setAttribute("networked-scene", `room: ${roomId}; adapter: ws; debug: true;`);
         }
 
@@ -3513,6 +3574,13 @@
             },
             tick: function () {
                 const scene = document.querySelector("a-scene");
+                if (isDemoMode) {
+                    this.el.object3D.visible = false;
+                    return;
+                } else {
+                    this.el.object3D.visible = true;
+                }
+
                 const camera = scene.camera;
 
                 // do nothing if it is mobile
@@ -3694,6 +3762,7 @@
                 const cannons = Array.from(document.querySelectorAll(selector));
                 cannons.forEach(cannon => {
                     const worldPosition = cannon.object3D.getWorldPosition(new THREE.Vector3());
+                    worldPosition.add(worldPosition.clone().normalize().multiplyScalar(1.2));
                     const cannonBallOrientation = cannon.object3D.getWorldQuaternion(new THREE.Quaternion());
                     const velocity = new THREE.Vector3(0, 30, e.detail.includes("left") ? -300 : 300).applyQuaternion(cannonBallOrientation);
 
@@ -3896,7 +3965,7 @@
 
                 const center = new THREE.Vector3(0, 0, 0);
                 const worldPosition = this.el.object3D.getWorldPosition(new THREE.Vector3());
-                if (center.distanceTo(worldPosition) < PLANET_SIZE + 0.2) {
+                if (center.distanceTo(worldPosition) < PLANET_SIZE - 0.2) {
                     addCannonballSplash(this.el);
                     this.emitSound = true;
                 }
@@ -4190,7 +4259,7 @@
     </style>
 </head>
 <body>
-    <a-scene onclick="window.musicPlayer.start();" coin-purse respawn physics="driver: local; gravity: 0 0 0;" globe-nav globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
+    <a-scene onclick="isDemoMode === false ? window.musicPlayer.start() : undefined" coin-purse respawn physics="driver: local; gravity: 0 0 0;" globe-nav globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
         <a-assets>
             <template id="avatar-template">
                 <a-entity class="avatar" networked-audio-source>
@@ -4243,9 +4312,12 @@
         <a-entity light="type: ambient; color: #CCC"></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.8; castShadow: true; shadowCameraBottom: -150; shadowCameraTop: 150; shadowCameraLeft: -150; shadowCameraRight: 150; shadowCameraNear: -150; shadowCameraFar: 150; shadowMapWidth: 1024; shadowMapHeight: 1024;" position="0 1 0" handle-shadow-parameter></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.15" position="0 -1 0"></a-entity>
+        <a-entity id="demo-node" position="0 105 5">
+            <a-entity id="demo-node-position" position="0 0 -5"></a-entity>
+        </a-entity>
         <a-entity id="camera-rig" position="0 105 5" networked="template: #avatar-template; attachTemplateToLocal: false;">
             <a-entity camera globe-look-controls="mouseEnabled: false; touchEnabled: false;" position="0 1.6 0" cursor-updater cursor="rayOrigin: mouse" raycaster="far: 50; interval: 100; objects: .clickable">
-                <a-entity align-with-projection="offset: 0.25 0.2 -0.5; rotation: 0 0 0" port-show html="cursor:#cursor;html:#my-interface" class="clickable"></a-entity>
+                <a-entity id="port-menu" align-with-projection="offset: 0.25 0.2 -0.5; rotation: 0 0 0" port-show html="cursor:#cursor;html:#my-interface" class="clickable"></a-entity>
                 <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
                 <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
                 <a-entity id="left-cannon-fire" align-with-projection="offset: -0.25 -0.2 -0.5; rotation: 0 90 0; scale: 0.03 0.03 0.03" gltf-model="/meshes/Cannon.glb" class="clickable" select-cannon-side="selector: left-cannon"></a-entity>
