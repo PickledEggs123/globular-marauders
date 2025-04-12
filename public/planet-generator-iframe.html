@@ -606,12 +606,12 @@
                 lod1.addEventListener("model-loaded", buildBoundsTree);
                 lod2.addEventListener("model-loaded", buildBoundsTree);
             },
-            tick: function () {
+            tick: function (t, dt) {
                 if (this.counter > 0) {
-                    this.counter -= 1;
+                    this.counter -= dt / 1000;
                     return;
                 }
-                this.counter = 60;
+                this.counter = 1;
 
                 const object3D = this.el.object3D;
                 const pos = object3D.getWorldPosition(new THREE.Vector3());
@@ -660,7 +660,7 @@
                 ship: {type: 'boolean', default: false},
                 buoyancy: {type: 'boolean', default: true},
             },
-            tick: function () {
+            tick: function (t, dt) {
                 const object3D = this.el.object3D;
                 const trueUpDistance = object3D.getWorldPosition(new THREE.Vector3());
                 const trueUp = trueUpDistance.clone().normalize();
@@ -671,7 +671,7 @@
 
                 // apply gravity force
                 const gravityForce = this.el.body.mass * 10;
-                this.el.body.applyForce(new CANNON.Vec3(-trueUp.x, -trueUp.y, -trueUp.z).scale(gravityForce), new CANNON.Vec3(0, 0, 0));
+                this.el.body.applyForce(new CANNON.Vec3(-trueUp.x, -trueUp.y, -trueUp.z).scale(gravityForce * 60 * dt / 1000), new CANNON.Vec3(0, 0, 0));
 
                 // apply drag
                 this.el.body.applyForce(this.el.body.velocity.clone().scale(-25), new CANNON.Vec3(0, 0, 0));
@@ -682,16 +682,16 @@
                         const sidewaysTilt = this.el.body.velocity.clone().scale(100).dot(currentRight.clone());
                         const tiltForce = new CANNON.Vec3(currentRight.x, currentRight.y, currentRight.z).scale(sidewaysTilt);
                         const tiltPoint = new CANNON.Vec3(currentUp.x, currentUp.y, currentUp.z);
-                        this.el.body.applyForce(tiltForce.clone(), tiltPoint.clone());
-                        this.el.body.applyForce(tiltForce.clone().scale(-1), tiltPoint.clone().scale(-1));
+                        this.el.body.applyForce(tiltForce.clone().scale(60 * dt / 1000), tiltPoint.clone());
+                        this.el.body.applyForce(tiltForce.clone().scale(-60 * dt / 1000), tiltPoint.clone().scale(-1));
 
                         // apply up right force
                         const springForce = 300;
                         const rotateForce = new CANNON.Vec3(diffUp.x, diffUp.y, diffUp.z).scale(springForce);
                         const rotatePoint = new CANNON.Vec3(currentUp.x, currentUp.y, currentUp.z);
                         const dragForce = this.el.body.angularVelocity.clone().cross(rotatePoint.clone()).scale(100);
-                        this.el.body.applyForce(rotateForce.clone().vsub(dragForce), rotatePoint.clone());
-                        this.el.body.applyForce(rotateForce.clone().vsub(dragForce).scale(-1), rotatePoint.clone().scale(-1));
+                        this.el.body.applyForce(rotateForce.clone().vsub(dragForce).scale(60 * dt / 1000), rotatePoint.clone());
+                        this.el.body.applyForce(rotateForce.clone().vsub(dragForce).scale(-60 * dt / 1000), rotatePoint.clone().scale(-1));
 
                         // apply horizontal drag
                         const horizontalRotatePoint = new CANNON.Vec3(currentForward.x, currentForward.y, currentForward.z);
@@ -703,7 +703,7 @@
                     if (trueUpDistance.length() < PLANET_SIZE + 1) {
                         const trueUpMagnitude = -(trueUpDistance.length() - PLANET_SIZE - 1);
                         const trueUpForce = new CANNON.Vec3(trueUp.x, trueUp.y, trueUp.z).scale(trueUpMagnitude * (this.data.buoyancy ? 1000 : 10));
-                        this.el.body.applyForce(trueUpForce, new CANNON.Vec3(0, 0, 0));
+                        this.el.body.applyForce(trueUpForce.scale(60 * dt / 1000), new CANNON.Vec3(0, 0, 0));
                     }
                 }
             }
@@ -832,7 +832,7 @@
 
                 // update info
                 const quaternion = new THREE.Quaternion().setFromUnitVectors(objectWorldPos.clone().normalize(), boxPosWorldPos.clone().normalize());
-                const slerp = new THREE.Quaternion().slerp(quaternion, 0.03);
+                const slerp = new THREE.Quaternion().slerp(quaternion, 0.03 * 60 * dt / 1000);
                 let destination1 = objectWorldPos.clone().normalize().multiplyScalar(height + 5).applyQuaternion(slerp);
 
                 // compute raycast towards ground
@@ -958,7 +958,7 @@
                 }
             },
 
-            tick: function (t) {
+            tick: function (t, dt) {
                 var data = this.data;
                 if (!data.enabled) { return; }
                 this.updateOrientation();
@@ -1402,20 +1402,20 @@
                 });
             },
 
-            tick: function (time, delta) {
+            tick: function (t, dt) {
                 const body = this.el.body;
 
                 // Update velocity.
-                delta = delta / 1000;
-                this.updateVelocity(delta);
+                dt = dt / 1000;
+                this.updateVelocity(dt);
 
                 // Get movement vector and translate position.
-                body.applyForce(this.getMovementVector(delta).clone(), new CANNON.Vec3(0, 0, 0));
+                body.applyForce(this.getMovementVector(dt).clone(), new CANNON.Vec3(0, 0, 0));
 
                 if (this.rotation.clone().y) {
                     // apply rotation force
-                    body.applyLocalForce(new CANNON.Vec3(this.rotation.clone().y, 0, 0), new CANNON.Vec3(0, 0, 1));
-                    body.applyLocalForce(new CANNON.Vec3(-this.rotation.clone().y, 0, 0), new CANNON.Vec3(0, 0, -1));
+                    body.applyLocalForce(new CANNON.Vec3(this.rotation.clone().y * 60 * dt, 0, 0), new CANNON.Vec3(0, 0, 1));
+                    body.applyLocalForce(new CANNON.Vec3(-this.rotation.clone().y * 60 * dt, 0, 0), new CANNON.Vec3(0, 0, -1));
                 }
 
                 if (Object.keys(this.mainKeys).length) {
@@ -2276,7 +2276,7 @@
             },
             init: function () {
             },
-            tick: function () {
+            tick: function (t, dt) {
                 if (!this.data) {
                     return;
                 }
@@ -2592,7 +2592,7 @@
                 }
 
                 this.tickCounter = 0;
-                this.findTickCount = 120;
+                this.findTickCount = 2;
                 this.charge = false;
                 this.immediateCharge = false;
                 this.chargeOrigin = this.el.object3D.position.clone();
@@ -2608,9 +2608,9 @@
                 }
                 this.attackEls = [];
             },
-            tick: function () {
+            tick: function (t, dt) {
                 if (this.tickCounter < this.findTickCount) {
-                    this.tickCounter += 1;
+                    this.tickCounter += dt / 1000;
                     return;
                 }
                 this.tickCounter = 0;
@@ -2905,7 +2905,7 @@
 
         AFRAME.registerComponent("handle-shadow-parameter", {
             schema: {},
-            tick: function () {
+            tick: function (t, dt) {
                 const cameraEl = document.querySelector("#camera-rig");
                 const cameraPos = cameraEl.object3D.getWorldPosition(new THREE.Vector3());
 
@@ -3576,7 +3576,7 @@
                     default: false,
                 },
             },
-            tick: function () {
+            tick: function (t, dt) {
                 const scene = document.querySelector("a-scene");
                 if (!this.data.portShow) {
                     if (isDemoMode) {
@@ -3619,10 +3619,10 @@
         AFRAME.registerComponent('respawn', {
             schema: {},
             init: function () {
-                this.respawnTick = +new Date() + 10_000;
+                this.respawnTick = +new Date() + 20_000;
                 this.activeRespawn = false;
             },
-            tick: function () {
+            tick: function (t, dt) {
                 // respawn 5 seconds after no more ships
                 const time = +new Date();
                 if (this.activeRespawn) {
@@ -3704,7 +3704,7 @@
             remove: function () {
                 this.el.removeEventListener("click", this.innerSelectCannonSide);
             },
-            tick: function () {
+            tick: function (t, dt) {
                 const scene = document.querySelector("a-scene");
                 const unit = scene.components['coin-purse'].getUnit();
                 const visible = unit.startsWith("ship");
@@ -3797,7 +3797,7 @@
             init: function () {
                 this.deleteTime = +new Date() + this.data * 1000;
             },
-            tick: function () {
+            tick: function (t, dt) {
                 if (+new Date() > this.deleteTime) {
                     this.el.parentElement.removeChild(this.el);
                 }
@@ -3806,7 +3806,7 @@
 
         AFRAME.registerComponent("port-show", {
             schema: {},
-            tick: function () {
+            tick: function (t, dt) {
                 const scene = document.querySelector("a-scene");
                 const activeUnit = scene.components['coin-purse'].activeUnit;
                 const ship = scene.querySelector(`.${activeUnit}`);
@@ -3846,7 +3846,7 @@
                 this.innerCollision = this.collision.bind(this);
                 this.cannonballHits = new Map();
             },
-            tick: function () {
+            tick: function (t, dt) {
                 const shipPosition = this.el.object3D.getWorldPosition(new THREE.Vector3());
                 const cannonballs = Array.from(document.querySelectorAll("[cannonball-hit-ready]"));
                 cannonballs.forEach((cannonball) => {
@@ -3904,7 +3904,7 @@
                     default: false,
                 },
             },
-            tick: function () {
+            tick: function (t, dt) {
                 if (!this.data.activate) {
                     return;
                 }
@@ -3960,7 +3960,7 @@
                 this.emitSound = false;
                 this.startTime = +new Date();
             },
-            tick: function () {
+            tick: function (t, dt) {
                 const time = +new Date();
                 if (time < this.startTime + 500) {
                     return;
@@ -4203,19 +4203,19 @@
                 this.system = this.el.sceneEl.systems['npc-finder'];
                 this.system.registerMe(this.el);
                 this.tickCounter = 0;
-                this.findTickCount = 120;
+                this.findTickCount = 2;
                 this.innerHandleNavigationGroupChange = this.navigationGroupChange.bind(this);
                 this.innerHandleNavigationGroupChanged = this.navigationGroupChanged.bind(this);
                 this.el.addEventListener("navigation-group-change", this.innerHandleNavigationGroupChange);
                 this.el.addEventListener("navigation-group-changed", this.innerHandleNavigationGroupChanged);
             },
-            tick: function () {
+            tick: function (t, dt) {
                 if (!this.data.active) {
                     return;
                 }
 
                 if (this.tickCounter < this.findTickCount) {
-                    this.tickCounter += 1;
+                    this.tickCounter += dt / 1000;
                     return;
                 }
                 this.tickCounter = 0;
