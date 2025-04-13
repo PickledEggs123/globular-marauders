@@ -671,7 +671,7 @@
 
                 // apply gravity force
                 const gravityForce = this.el.body.mass * 10;
-                this.el.body.applyForce(new CANNON.Vec3(-trueUp.x, -trueUp.y, -trueUp.z).scale(gravityForce * 60 * dt / 1000), new CANNON.Vec3(0, 0, 0));
+                this.el.body.applyForce(new CANNON.Vec3(-trueUp.x, -trueUp.y, -trueUp.z).scale(gravityForce), new CANNON.Vec3(0, 0, 0));
 
                 // apply drag
                 this.el.body.applyForce(this.el.body.velocity.clone().scale(-25), new CANNON.Vec3(0, 0, 0));
@@ -682,16 +682,16 @@
                         const sidewaysTilt = this.el.body.velocity.clone().scale(100).dot(currentRight.clone());
                         const tiltForce = new CANNON.Vec3(currentRight.x, currentRight.y, currentRight.z).scale(sidewaysTilt);
                         const tiltPoint = new CANNON.Vec3(currentUp.x, currentUp.y, currentUp.z);
-                        this.el.body.applyForce(tiltForce.clone().scale(60 * dt / 1000), tiltPoint.clone());
-                        this.el.body.applyForce(tiltForce.clone().scale(-60 * dt / 1000), tiltPoint.clone().scale(-1));
+                        this.el.body.applyForce(tiltForce.clone().scale(1), tiltPoint.clone());
+                        this.el.body.applyForce(tiltForce.clone().scale(-1), tiltPoint.clone().scale(-1));
 
                         // apply up right force
                         const springForce = 300;
                         const rotateForce = new CANNON.Vec3(diffUp.x, diffUp.y, diffUp.z).scale(springForce);
                         const rotatePoint = new CANNON.Vec3(currentUp.x, currentUp.y, currentUp.z);
                         const dragForce = this.el.body.angularVelocity.clone().cross(rotatePoint.clone()).scale(100);
-                        this.el.body.applyForce(rotateForce.clone().vsub(dragForce).scale(60 * dt / 1000), rotatePoint.clone());
-                        this.el.body.applyForce(rotateForce.clone().vsub(dragForce).scale(-60 * dt / 1000), rotatePoint.clone().scale(-1));
+                        this.el.body.applyForce(rotateForce.clone().vsub(dragForce).scale(1), rotatePoint.clone());
+                        this.el.body.applyForce(rotateForce.clone().vsub(dragForce).scale(-1), rotatePoint.clone().scale(-1));
 
                         // apply horizontal drag
                         const horizontalRotatePoint = new CANNON.Vec3(currentForward.x, currentForward.y, currentForward.z);
@@ -703,7 +703,7 @@
                     if (trueUpDistance.length() < PLANET_SIZE + 1) {
                         const trueUpMagnitude = -(trueUpDistance.length() - PLANET_SIZE - 1);
                         const trueUpForce = new CANNON.Vec3(trueUp.x, trueUp.y, trueUp.z).scale(trueUpMagnitude * (this.data.buoyancy ? 1000 : 10));
-                        this.el.body.applyForce(trueUpForce.scale(60 * dt / 1000), new CANNON.Vec3(0, 0, 0));
+                        this.el.body.applyForce(trueUpForce.scale(1), new CANNON.Vec3(0, 0, 0));
                     }
                 }
             }
@@ -1414,8 +1414,8 @@
 
                 if (this.rotation.clone().y) {
                     // apply rotation force
-                    body.applyLocalForce(new CANNON.Vec3(this.rotation.clone().y * 60 * dt, 0, 0), new CANNON.Vec3(0, 0, 1));
-                    body.applyLocalForce(new CANNON.Vec3(-this.rotation.clone().y * 60 * dt, 0, 0), new CANNON.Vec3(0, 0, -1));
+                    body.applyLocalForce(new CANNON.Vec3(this.rotation.clone().y, 0, 0), new CANNON.Vec3(0, 0, 1));
+                    body.applyLocalForce(new CANNON.Vec3(-this.rotation.clone().y, 0, 0), new CANNON.Vec3(0, 0, -1));
                 }
 
                 if (Object.keys(this.mainKeys).length) {
@@ -1464,7 +1464,7 @@
             getMovementVector: (function () {
                 var directionVector = new THREE.Vector3(0, 0, 0);
 
-                return function (delta) {
+                return function (dt) {
                     var velocity = this.velocity;
                     var rotation = this.el.object3D.getWorldQuaternion(new THREE.Quaternion());
 
@@ -3619,7 +3619,7 @@
         AFRAME.registerComponent('respawn', {
             schema: {},
             init: function () {
-                this.respawnTick = +new Date() + 20_000;
+                this.respawnTick = +new Date() + 30_000;
                 this.activeRespawn = false;
             },
             tick: function (t, dt) {
@@ -3764,13 +3764,14 @@
                 this.el.removeEventListener("firing-cannons", this.innerFiringCannons);
             },
             firingCannons: function (e) {
-                const selector = `.${scene.components['coin-purse'].getUnit().split(":", 2)[0]} .${e.detail}`;
-                const cannons = Array.from(document.querySelectorAll(selector));
+                const selector = `.${e.detail}`;
+                const cannons = Array.from(this.el.querySelectorAll(selector));
                 cannons.forEach(cannon => {
                     const worldPosition = cannon.object3D.getWorldPosition(new THREE.Vector3());
                     worldPosition.add(worldPosition.clone().normalize().multiplyScalar(1.2));
                     const cannonBallOrientation = cannon.object3D.getWorldQuaternion(new THREE.Quaternion());
                     const velocity = new THREE.Vector3(0, 30, e.detail.includes("left") ? -300 : 300).applyQuaternion(cannonBallOrientation);
+                    console.log("ADD_CANNON", worldPosition, selector);
 
                     addCannonBall(worldPosition, velocity, cannon);
                 });
