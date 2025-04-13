@@ -3771,7 +3771,6 @@
                     worldPosition.add(worldPosition.clone().normalize().multiplyScalar(1.2));
                     const cannonBallOrientation = cannon.object3D.getWorldQuaternion(new THREE.Quaternion());
                     const velocity = new THREE.Vector3(0, 30, e.detail.includes("left") ? -300 : 300).applyQuaternion(cannonBallOrientation);
-                    console.log("ADD_CANNON", worldPosition, selector);
 
                     addCannonBall(worldPosition, velocity, cannon);
                 });
