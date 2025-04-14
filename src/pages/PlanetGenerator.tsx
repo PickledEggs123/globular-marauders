@@ -243,21 +243,19 @@ export const PlanetGenerator = () => {
                 }
 
                 if (iframeRef.current) {
-                    // @ts-ignore
-                    iframeRef.current.contentWindow?.setDemo(false);
-                    // @ts-ignore
-                    iframeRef.current.contentWindow?.clearTerrain();
+                    const contentWindow = iframeRef.current.contentWindow as IFrameWindow;
+                    contentWindow?.setDemo(false);
+                    contentWindow?.clearTerrain();
+
                     worldMeshes.forEach(w => {
-                        // @ts-ignore
-                        iframeRef.current.contentWindow?.addTerrain(JSON.stringify(w));
+                        contentWindow?.addTerrain(JSON.stringify(w));
                     });
 
                     const shipDataUri = gltf[gltf.length - 13] as string;
                     if (spawnPoints[0]) {
                         const spawnPoint = spawnPoints[0];
                         addCharacterModel(iframeRef.current, "SHIP", shipDataUri);
-                        // @ts-ignore
-                        iframeRef.current.contentWindow?.addShip(JSON.stringify({
+                        contentWindow?.addShip(JSON.stringify({
                             data: shipDataUri,
                             point: spawnPoint.point.map(x => x * PLANET_SIZE)
                         }));
@@ -285,8 +283,7 @@ export const PlanetGenerator = () => {
                         ]);
                     }
 
-                    // @ts-ignore
-                    iframeRef.current.contentWindow?.addClientSecret(JSON.stringify({ roomId, clientSecret }));
+                    contentWindow?.addClientSecret(JSON.stringify({ roomId, clientSecret }));
                 }
             });
 
