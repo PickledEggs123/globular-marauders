@@ -1,7 +1,18 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import '../App.scss';
 import {WebsiteDrawer2} from "../Drawer";
-import {Button, Card, CardContent, CardHeader, Container, Grid, Paper, Typography} from "@mui/material";
+import {
+    Button,
+    Card,
+    CardContent,
+    CardHeader, Checkbox,
+    Container,
+    Grid,
+    IconButton,
+    Paper,
+    Tooltip,
+    Typography
+} from "@mui/material";
 // @ts-ignore
 import {generatePlanetGltf} from "@pickledeggs123/globular-marauders-generator/dist/helpers";
 import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
@@ -9,6 +20,7 @@ import * as PIXI from "pixi.js";
 import {BLEND_MODES} from "pixi.js";
 import Quaternion from "quaternion";
 import {createStyles, makeStyles} from "@mui/styles";
+import {MusicNote, MusicOff} from "@mui/icons-material";
 
 interface IGameSpawnPoint {
     point: [number, number, number];
@@ -36,6 +48,7 @@ const useStyles = makeStyles((theme) =>
 
 export const PlanetGenerator = () => {
     const [context] = useState<{ app: PIXI.Application | null, preview: IGameMesh | null, gameData: IGameMesh[] } | null>({ app: null, preview: null, gameData: [] });
+    const [playMusic, setPlayMusic] = useState<boolean>(true);
     const [clientSecret] = useState(Math.random().toString(36).substring(2, 9));
     const [loadMessage, setLoadMessage] = useState<string>("No data loaded...");
     const classes = useStyles();
@@ -391,7 +404,24 @@ export const PlanetGenerator = () => {
 
     return (
         <Paper style={{width: "100%", minHeight: "100vh", height: "fit-content", display: "flex", flexDirection: "column"}}>
-            <WebsiteDrawer2 rightSide={null} content={
+            <WebsiteDrawer2 rightSide={
+                <React.Fragment>
+                    <Tooltip title="Audio">
+                        <Checkbox tabIndex={-1}
+                                  checked={playMusic}
+                                  onChange={() => {
+                                      setPlayMusic(!playMusic);
+                                      if (iframeRef.current) {
+                                          // @ts-ignore
+                                          iframeRef.current.contentWindow.setPlayMusic(!setPlayMusic);
+                                      }
+                                  }}
+                                  icon={<MusicOff/>}
+                                  checkedIcon={<MusicNote/>}
+                                  color="default" />
+                    </Tooltip>
+                </React.Fragment>
+            } content={
                 <Container>
                     <Typography variant="h3">
                         Procedural Planet Generator

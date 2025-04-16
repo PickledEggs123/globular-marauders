@@ -299,6 +299,16 @@
         }
         window.musicPlayer = new MusicPlayer();
 
+        let playMusic = true;
+        function setPlayMusic(p) {
+            playMusic = p;
+            if (playMusic) {
+                window.musicPlayer.start();
+            } else {
+                window.musicPlayer.stop();
+            }
+        }
+
         let isDemoMode = true;
         function setDemo(b) {
             isDemoMode = b;
@@ -3783,9 +3793,15 @@
                 default: "0 0 0",
             },
             init: function () {
-                setTimeout(() => {
-                    this.el.body.applyImpulse(new CANNON.Vec3(this.data.x, this.data.y, this.data.z), new CANNON.Vec3(0, 0, 0));
-                }, 10);
+                let applyImpulse = null;
+                applyImpulse = () => {
+                    if (this.el.body) {
+                        this.el.body.applyImpulse(new CANNON.Vec3(this.data.x, this.data.y, this.data.z), new CANNON.Vec3(0, 0, 0));
+                    } else {
+                        setTimeout(applyImpusle, 10);
+                    }
+                };
+                applyImpulse();
             },
         });
 
@@ -4265,7 +4281,7 @@
     </style>
 </head>
 <body>
-    <a-scene onclick="isDemoMode === false ? window.musicPlayer.start() : undefined" coin-purse respawn physics="driver: local; gravity: 0 0 0;" globe-nav globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
+    <a-scene onclick="isDemoMode === false && playMusic === true ? window.musicPlayer.start() : undefined" coin-purse respawn physics="driver: local; gravity: 0 0 0;" globe-nav globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
         <a-assets>
             <template id="avatar-template">
                 <a-entity class="avatar" networked-audio-source>
