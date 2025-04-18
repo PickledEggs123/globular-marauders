@@ -264,6 +264,7 @@ const io = new WebSocketServer({
     server: webServer,
     path: '/socket',
 });
+global.io = io;
 
 const rooms = new Map();
 
@@ -475,7 +476,7 @@ io.on("connection", (socket) => {
 
             // delete room
             if (roomInfo.occupantsCount === 0) {
-                console.log("everybody left room");
+                console.log("everybody left room: " + curRoom);
                 rooms.delete(curRoom);
             }
         }
