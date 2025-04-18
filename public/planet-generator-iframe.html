@@ -3126,7 +3126,7 @@
             rootProjectile.setAttribute("dynamic-body", "shape: sphere; sphereRadius: 0.5; mass: 5");
             rootProjectile.setAttribute("globe-gravity", "");
             rootProjectile.setAttribute("collision-filter", "group: cannonball; collidesWith: default");
-            rootProjectile.setAttribute("initial-velocity", velocity);
+            rootProjectile.setAttribute("initial-velocity", `${velocity.x} ${velocity.y} ${velocity.z}`);
             rootProjectile.setAttribute("cannonball-collider-ground", "");
             rootProjectile.setAttribute("cannonball-collider-water", "");
             rootProjectile.setAttribute("cannonball-hit-ready", "");
@@ -3455,8 +3455,11 @@
                 data: str, point
             } = JSON.parse(item);
 
-            window.shipModelStr = str;
-            window.shipSpawnPoint = new THREE.Vector3(point[0], point[1], point[2]);
+            if (!window.shipModelStr) {
+                window.shipModelStr = str;
+                window.shipSpawnPoint = new THREE.Vector3(point[0], point[1], point[2]);
+                return;
+            }
 
             while (!scene.components['coin-purse']) {
                 await new Promise((resolve) => {
@@ -3629,33 +3632,35 @@
         AFRAME.registerComponent('respawn', {
             schema: {},
             init: function () {
-                this.respawnTick = +new Date() + 30_000;
-                this.activeRespawn = false;
+                this.respawnTick = +new Date();
+                this.activeRespawn = true;
+                this.respawnTime = 30_000;
             },
             tick: function (t, dt) {
                 // respawn 5 seconds after no more ships
                 const time = +new Date();
-                if (this.activeRespawn) {
-                    if (this.respawnTick < time) {
+                if (this.respawnTick < time) {
+                    if (this.activeRespawn) {
+                        this.respawnTick = time + this.respawnTime;
                         this.activeRespawn = false;
                         const scene = document.querySelector("a-scene");
                         scene.components['coin-purse'].shipCount = 1;
                         scene.components['coin-purse'].buyShips();
-                    }
-                } else {
-                    const ships = [];
-                    const activeUnits = [
-                        'ship-1',
-                        'ship-2',
-                        'ship-3',
-                    ];
-                    for (const activeUnit of activeUnits) {
-                        const s = Array.from(document.querySelectorAll(`.${activeUnit}`));
-                        ships.push(...s);
-                    }
-                    if (ships.length === 0 && !!window.shipModelStr) {
-                        this.respawnTick = time + 5_000;
-                        this.activeRespawn = true;
+                    } else {
+                        const ships = [];
+                        const activeUnits = [
+                            'ship-1',
+                            'ship-2',
+                            'ship-3',
+                        ];
+                        for (const activeUnit of activeUnits) {
+                            const s = Array.from(document.querySelectorAll(`.${activeUnit}`));
+                            ships.push(...s);
+                        }
+                        if (ships.length === 0 && !!window.shipModelStr) {
+                            this.respawnTick = time + this.respawnTime;
+                            this.activeRespawn = true;
+                        }
                     }
                 }
             },
@@ -3780,7 +3785,7 @@
                     const worldPosition = cannon.object3D.getWorldPosition(new THREE.Vector3());
                     worldPosition.add(worldPosition.clone().normalize().multiplyScalar(1.2));
                     const cannonBallOrientation = cannon.object3D.getWorldQuaternion(new THREE.Quaternion());
-                    const velocity = new THREE.Vector3(0, 30, e.detail.includes("left") ? -300 : 300).applyQuaternion(cannonBallOrientation);
+                    const velocity = new THREE.Vector3(0, 100, e.detail.includes("left") ? -300 : 300).applyQuaternion(cannonBallOrientation);
 
                     addCannonBall(worldPosition, velocity, cannon);
                 });
@@ -3792,16 +3797,23 @@
                 type: "vec3",
                 default: "0 0 0",
             },
+            tickSum: 1,
             init: function () {
-                let applyImpulse = null;
-                applyImpulse = () => {
+                let a;
+                a = () => {
                     if (this.el.body) {
-                        this.el.body.applyImpulse(new CANNON.Vec3(this.data.x, this.data.y, this.data.z), new CANNON.Vec3(0, 0, 0));
+                        this.el.body.applyForce(new CANNON.Vec3(this.data.x, this.data.y, this.data.z), new CANNON.Vec3(0, 0, 0));
                     } else {
-                        setTimeout(applyImpusle, 10);
+                        setTimeout(a, 10);
                     }
                 };
-                applyImpulse();
+                a();
+            },
+            tick: function (t, dt) {
+                if (this.el.body && this.tickSum >= 0) {
+                    this.el.body.applyForce(new CANNON.Vec3(this.data.x, this.data.y, this.data.z), new CANNON.Vec3(0, 0, 0));
+                }
+                this.tickSum -= dt / 1000;
             },
         });
 
