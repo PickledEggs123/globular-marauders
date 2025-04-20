@@ -103,6 +103,10 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
                     icon: <Chat/>,
                     text: "Chat"
                 }, {
+                    link: "/planet-generator",
+                    icon: <Public/>,
+                    text: "Play 3D"
+                }, {
                     link: "/2d-game",
                     icon: <PlayArrow/>,
                     text: "Play 2D"
@@ -110,10 +114,6 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
                     link: "/game-model",
                     icon: <PieChart/>,
                     text: "Game Model"
-                }, {
-                    link: "/planet-generator",
-                    icon: <Public/>,
-                    text: "Planet Generator"
                 }, {
                     link: "/ship-wiki",
                     icon: <Sailing/>,

@@ -108,6 +108,37 @@ export const Main = () => {
                                 </CardContent>
                             </Card>
                         </Grid>
+                        <Grid item xs={12} md={6}>
+                            <Card>
+                                <CardMedia component="img" src="/mainImages/ChatMedia.png"></CardMedia>
+                                <CardHeader title="Gemini Powered Chatbot" subheader="Have fun chatting with AI">
+                                </CardHeader>
+                                <CardContent>
+                                    <Typography variant="body1">
+                                        I added an AI chatbot powered by Google Gemini. The AI is advanced enough to write poetry
+                                        or code. You can ask it any question such as science, physics, legal advice, ect...
+                                        <br/>
+                                        <Link to="/chat"><Button variant="contained">Click here to Chat with AI</Button></Link>
+                                    </Typography>
+                                    <br/>
+                                    <div style={{width: 256, margin: '0 auto'}}>
+                                        <Carousel autoplay showDots>
+                                            {
+                                                [{
+                                                    url: '/mainImages/Chat1.png',
+                                                }, {
+                                                    url: '/mainImages/Chat2.png',
+                                                }, {
+                                                    url: '/mainImages/Chat3.png',
+                                                }].map(item => (
+                                                    <Box key={item.url} component="img" alt="Chat Image 1" src={item.url} sx={{width: "100%"}}/>
+                                                ))
+                                            }
+                                        </Carousel>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </Grid>
                     </Grid>
                 </Container>
             }/>
