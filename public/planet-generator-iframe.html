@@ -2579,6 +2579,83 @@
             },
         });
 
+        AFRAME.registerComponent('npc-melee', {
+            schema: {
+                origin: { type: 'vec3', default: '0 0 0' },
+                target: { type: 'selector', default: null },
+                speed: { type: 'number', default: 6 },
+            },
+            init: function () {
+                this.tickCounter = 0;
+                this.findTickCount = 2;
+            },
+            goToTarget: function (t, dt) {
+                const vDelta = new THREE.Vector3();
+                const vNext = new THREE.Vector3();
+
+                const el = this.el;
+                const data = this.data;
+                const speed = data.speed * dt / 1000;
+
+                // Current segment is a vector from current position to next waypoint.
+                const vCurrent = el.object3D.position;
+                let vWaypoint = this.data.target.object3D.position.clone();
+                vWaypoint = vWaypoint.add(vWaypoint.clone().normalize());
+                vDelta.subVectors(vWaypoint, vCurrent);
+
+                const distance = vDelta.length();
+                let gazeTarget;
+
+                if (distance <= speed) {
+                    vNext.copy(vCurrent);
+                    gazeTarget = vWaypoint;
+                } else {
+                    // If still far away from next waypoint, find next position for
+                    // the current frame.
+                    vNext.copy(vDelta.setLength(speed)).add(vCurrent);
+                    gazeTarget = vWaypoint;
+                }
+
+                // Look at the next waypoint.
+                // gazeTarget.y = vCurrent.y;
+                el.object3D.up = new THREE.Vector3().copy(vCurrent).normalize();
+                el.object3D.lookAt(gazeTarget);
+
+                vCurrent.copy(vNext);
+            },
+            tick: function (t, dt) {
+                if (this.data.target && this.data.target.components['health'].data.health > 0) {
+                    // go to target
+                    this.goToTarget.call(this, t, dt);
+
+                    // every 2 seconds
+                    if (this.tickCounter < this.findTickCount) {
+                        this.tickCounter += dt / 1000;
+                        return;
+                    }
+                    this.tickCounter = 0;
+
+                    // melee attack
+                    const pos = this.el.object3D.position;
+                    const p = this.data.target.object3D.position;
+                    const distance = pos.distanceTo(p);
+                    if (distance < 1) {
+                        this.el.emit('npc-begin-melee', this.data.target);
+                    }
+                } else {
+                    // return to origin
+                    const destination1 = this.data.origin;
+                    setTimeout(() => {
+                        this.el.setAttribute("globe-nav-agent", `active: false; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
+                    }, 250);
+                    setTimeout(() => {
+                        this.el.setAttribute("globe-nav-agent", `active: true; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
+                    }, 500);
+                    this.el.removeAttribute("npc-melee");
+                }
+            }
+        });
+
         AFRAME.registerComponent('npc-attack', {
             schema: {
                 range: {type: 'number', default: 10},
@@ -2588,34 +2665,18 @@
                 this.attackEls = [];
                 this.innerAttack = this.attack.bind(this);
                 this.innerBeginAttack = this.beginAttack.bind(this);
-                this.innerMeleeCharge = this.meleeCharge.bind(this);
-                this.innerMeleeReturn = this.meleeReturn.bind(this);
-                this.innerNavigationBegin = this.navigationBegin.bind(this);
-                this.innerNavigationEnd = this.navigationEnd.bind(this);
+                this.innerBeginMelee = this.beginMelee.bind(this);
                 this.el.addEventListener('npc-attack', this.innerAttack);
                 this.el.addEventListener('npc-begin-attack', this.innerBeginAttack);
-                this.el.addEventListener('npc-melee-charge', this.innerMeleeCharge);
-                this.el.addEventListener('npc-melee-return', this.innerMeleeReturn);
-                if (this.data.melee) {
-                    this.el.addEventListener('navigation-start', this.innerNavigationBegin);
-                    this.el.addEventListener('navigation-end', this.innerNavigationEnd);
-                }
+                this.el.addEventListener('npc-begin-melee', this.innerBeginMelee);
 
                 this.tickCounter = 0;
                 this.findTickCount = 2;
-                this.charge = false;
-                this.immediateCharge = false;
-                this.chargeOrigin = this.el.object3D.position.clone();
             },
             remove: function () {
                 this.el.removeEventListener('npc-attack', this.innerAttack);
                 this.el.removeEventListener('npc-begin-attack', this.innerBeginAttack);
-                this.el.removeEventListener('npc-melee-charge', this.innerMeleeCharge);
-                this.el.removeEventListener('npc-melee-return', this.innerMeleeReturn);
-                if (this.data.melee) {
-                    this.el.removeEventListener('navigation-start', this.innerNavigationBegin);
-                    this.el.removeEventListener('navigation-end', this.innerNavigationEnd);
-                }
+                this.el.removeEventListener('npc-begin-melee', this.innerBeginMelee);
                 this.attackEls = [];
             },
             tick: function (t, dt) {
@@ -2630,19 +2691,9 @@
                     const p = el.object3D.position;
                     const distance = pos.distanceTo(p);
                     if (distance < this.data.range) {
-                        if (this.data.melee && distance > 1) {
-                            if (this.chargeOrigin.distanceTo(p) < this.data.range) {
-                                this.el.emit('npc-melee-charge', el);
-                                return;
-                            }
-                        } else {
-                            this.el.emit('npc-begin-attack', el);
-                            return;
-                        }
+                        this.el.emit('npc-begin-attack', el);
+                        return;
                     }
-                }
-                if (this.data.melee) {
-                    this.el.emit('npc-melee-return', this.chargeOrigin.clone());
                 }
             },
             attack: function (evt) {
@@ -2650,39 +2701,19 @@
             },
             beginAttack: function (evt) {
                 const target = evt.detail;
-                addProjectile(this.el, target);
+                if (this.data.melee && !this.el.hasAttribute('npc-melee')) {
+                    const p = this.el.components['globe-nav-agent'].data.destination;
+                    const pv = new THREE.Vector3().copy(p);
+                    if (pv.distanceTo(this.el.object3D.position) < this.data.range) {
+                        this.el.setAttribute("npc-melee", `origin: ${p.x} ${p.y} ${p.z}; target: #${target.id}`);
+                    }
+                } else {
+                    addProjectile(this.el, target);
+                }
             },
-            meleeCharge: function (evt) {
+            beginMelee: function (evt) {
                 const target = evt.detail;
-                const destination2 = target.object3D.position.clone();
-                this.el.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2;`);
-                this.charge = true;
-                this.immediateCharge = true;
-            },
-            meleeReturn: function (evt) {
-                const destination2 = evt.detail.clone();
-                this.el.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2;`);
-                this.charge = true;
-                this.immediateCharge = true;
-            },
-            navigationBegin: function () {
-                if (this.data.melee && this.charge && this.immediateCharge) {
-                    this.immediateCharge = false;
-                    return;
-                }
-                if (this.data.melee && this.charge && !this.immediateCharge) {
-                    this.charge = false;
-                }
-            },
-            navigationEnd: function () {
-                if (this.data.melee && this.charge && !this.immediateCharge) {
-                    this.tickCounter = this.findTickCount;
-                    this.charge = false;
-                    return;
-                }
-                if (this.data.melee && !this.charge && !this.immediateCharge) {
-                    this.chargeOrigin = this.el.object3D.position.clone();
-                }
+                addProjectile(this.el, target);
             },
         });
 
@@ -2706,9 +2737,6 @@
                     this.el.parentNode.removeChild(this.el);
                     return;
                 }
-
-                const object3D = this.el.object3D;
-
 
                 // Current segment is a vector from current position to next waypoint.
                 const vCurrent = el.object3D.position;
@@ -3219,7 +3247,7 @@
             rootNpc.setAttribute("rotation", "0 0 0");
             rootNpc.setAttribute("npc-faction", "player");
             rootNpc.setAttribute("npc-finder", "active: true;");
-            rootNpc.setAttribute("npc-attack", `range: 10; melee: false;`);
+            rootNpc.setAttribute("npc-attack", `range: 10; melee: true`);
             rootNpc.setAttribute("health", "");
             rootNpc.setAttribute("shadow", "");
 
@@ -3522,6 +3550,12 @@
 
         function spawnNpcsNow() {
             window.spawnNpcsFlag = true;
+        }
+
+        if (window.location.href.includes("localhost:3000")) {
+            setTimeout(() => {
+                spawnNpcsNow();
+            }, 10_000);
         }
 
         function onConnect() {
