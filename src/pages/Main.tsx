@@ -15,6 +15,7 @@ import {
 } from "@mui/material";
 import {Link} from "react-router-dom";
 import {Carousel} from "nuka-carousel";
+import {ImageExpander} from "./Main/ImageExpander";
 
 export const Main = () => {
     return (
@@ -24,7 +25,7 @@ export const Main = () => {
                     <Grid container spacing={2}>
                         <Grid item xs={12} md={6}>
                             <Card>
-                                <CardMedia component="img" src="/mainImages/MainGameMedia.png"></CardMedia>
+                                <ImageExpander src="/mainImages/MainGameMedia.png" alt="/mainImages/MainGameMedia.png"/>
                                 <CardHeader title="The Early Prototype" subheader="Asteroid style movement but you fire side ways">
                                 </CardHeader>
                                 <CardContent>
@@ -50,7 +51,7 @@ export const Main = () => {
                                                 }, {
                                                     url: '/mainImages/MainGame3.png',
                                                 }].map(item => (
-                                                    <Box key={item.url} component="img" alt="2d Game Image 1" src={item.url} sx={{width: "100%"}}/>
+                                                    <ImageExpander src={item.url} alt={item.url}/>
                                                 ))
                                             }
                                         </Carousel>
@@ -60,7 +61,7 @@ export const Main = () => {
                         </Grid>
                         <Grid item xs={12} md={6}>
                             <Card>
-                                <CardMedia component="img" src="/mainImages/3dGameMedia.png"></CardMedia>
+                                <ImageExpander src="/mainImages/3dGameMedia.png" alt="/mainImages/3dGameMedia.png"/>
                                 <CardHeader title="More Reasonable Planet with Ocean" subheader="Ocean pathfinding is harder than space with no obstacles">
                                 </CardHeader>
                                 <CardContent>
@@ -100,7 +101,7 @@ export const Main = () => {
                                                 }, {
                                                     url: '/mainImages/3dGame3.png',
                                                 }].map(item => (
-                                                    <Box key={item.url} component="img" alt="3d Game Image 1" src={item.url} sx={{width: "100%"}}/>
+                                                    <ImageExpander src={item.url} alt={item.url}/>
                                                 ))
                                             }
                                         </Carousel>
@@ -110,7 +111,7 @@ export const Main = () => {
                         </Grid>
                         <Grid item xs={12} md={6}>
                             <Card>
-                                <CardMedia component="img" src="/mainImages/ChatMedia.png"></CardMedia>
+                                <ImageExpander src="/mainImages/ChatMedia.png" alt="/mainImages/ChatMedia.png"/>
                                 <CardHeader title="Gemini Powered Chatbot" subheader="Have fun chatting with AI">
                                 </CardHeader>
                                 <CardContent>
@@ -131,7 +132,7 @@ export const Main = () => {
                                                 }, {
                                                     url: '/mainImages/Chat3.png',
                                                 }].map(item => (
-                                                    <Box key={item.url} component="img" alt="Chat Image 1" src={item.url} sx={{width: "100%"}}/>
+                                                    <ImageExpander src={item.url} alt={item.url}/>
                                                 ))
                                             }
                                         </Carousel>

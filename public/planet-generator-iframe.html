@@ -2645,12 +2645,21 @@
                 } else {
                     // return to origin
                     const destination1 = this.data.origin;
+                    const destination2 = this.el.object3D.position.clone();
                     setTimeout(() => {
-                        this.el.setAttribute("globe-nav-agent", `active: false; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
+                        const raycaster = new THREE.Raycaster(destination2.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), destination2.clone().negate());
+                        const intersections = raycaster.intersectObject(this.el.sceneEl.systems['globe-nav'].getNavMesh());
+                        if (intersections[0]) {
+                            const destination2 = intersections[0].point.clone();
+                            this.el.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2;`);
+                        }
                     }, 250);
                     setTimeout(() => {
-                        this.el.setAttribute("globe-nav-agent", `active: true; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
+                        this.el.setAttribute("globe-nav-agent", `active: false; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
                     }, 500);
+                    setTimeout(() => {
+                        this.el.setAttribute("globe-nav-agent", `active: true; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
+                    }, 1000);
                     this.el.removeAttribute("npc-melee");
                 }
             }
