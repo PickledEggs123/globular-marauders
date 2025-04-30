@@ -2599,8 +2599,7 @@
 
                 // Current segment is a vector from current position to next waypoint.
                 const vCurrent = el.object3D.position;
-                let vWaypoint = this.data.target.object3D.position.clone();
-                vWaypoint = vWaypoint.add(vWaypoint.clone().normalize());
+                const vWaypoint = this.data.target.object3D.position.clone();
                 vDelta.subVectors(vWaypoint, vCurrent);
 
                 const distance = vDelta.length();
