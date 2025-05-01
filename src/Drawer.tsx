@@ -103,11 +103,11 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
                     icon: <Chat/>,
                     text: "Chat"
                 }, {
-                    link: "/planet-generator",
+                    link: "/3d",
                     icon: <Public/>,
                     text: "Play 3D"
                 }, {
-                    link: "/2d-game",
+                    link: "/2d",
                     icon: <PlayArrow/>,
                     text: "Play 2D"
                 }, {

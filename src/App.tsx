@@ -35,27 +35,64 @@ export const App = () => {
                         }
                     </ShipContext.Consumer>
                 ) : (
-                        <PlanetMeshLoader>
-                            <ShipMeshLoader>
-                                <ShipContext.Consumer>
+                    <PlanetMeshLoader>
+                        <ShipMeshLoader>
+                            <ShipContext.Consumer>
+                                {
+                                    shipContext => (
+                                        <PlanetContext.Consumer>
+                                            {
+                                                planetContext => (
+                                                    <PixiGame shipContext={shipContext} planetContext={planetContext}/>
+                                                )
+                                            }
+                                        </PlanetContext.Consumer>
+                                    )
+                                }
+                            </ShipContext.Consumer>
+                        </ShipMeshLoader>
+                    </PlanetMeshLoader>
+                )
+            }/>
+            <Route path="/2d" element={
+                // @ts-ignore
+                global.use_ssr ? (
+                    <ShipContext.Consumer>
+                        {
+                            shipContext => (
+                                <PlanetContext.Consumer>
                                     {
-                                        shipContext => (
-                                            <PlanetContext.Consumer>
-                                                {
-                                                    planetContext => (
-                                                        <PixiGame shipContext={shipContext} planetContext={planetContext}/>
-                                                    )
-                                                }
-                                            </PlanetContext.Consumer>
+                                        planetContext => (
+                                            <PixiGame shipContext={shipContext} planetContext={planetContext}/>
                                         )
                                     }
-                                </ShipContext.Consumer>
-                            </ShipMeshLoader>
-                        </PlanetMeshLoader>
-                    )
+                                </PlanetContext.Consumer>
+                            )
+                        }
+                    </ShipContext.Consumer>
+                ) : (
+                    <PlanetMeshLoader>
+                        <ShipMeshLoader>
+                            <ShipContext.Consumer>
+                                {
+                                    shipContext => (
+                                        <PlanetContext.Consumer>
+                                            {
+                                                planetContext => (
+                                                    <PixiGame shipContext={shipContext} planetContext={planetContext}/>
+                                                )
+                                            }
+                                        </PlanetContext.Consumer>
+                                    )
+                                }
+                            </ShipContext.Consumer>
+                        </ShipMeshLoader>
+                    </PlanetMeshLoader>
+                )
             }/>
             <Route path="/game-model" element={<GameModel/>}/>
             <Route path="/planet-generator" element={<PlanetGenerator/>}/>
+            <Route path="/3d" element={<PlanetGenerator/>}/>
             <Route path="/ship-wiki" element={
                 // @ts-ignore
                 global.use_ssr ? (

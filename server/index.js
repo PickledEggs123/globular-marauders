@@ -67,8 +67,10 @@ const handleReactPage = (req, res) => {
 app.get('/', handleReactPage);
 app.get('/chat', handleReactPage);
 app.get('/2d-game', handleReactPage);
+app.get('/2d', handleReactPage);
 app.get('/game-model', handleReactPage);
 app.get('/planet-generator', handleReactPage);
+app.get('/3d', handleReactPage);
 app.get('/ship-wiki', handleReactPage);
 app.get('/character-wiki', handleReactPage);
 app.get('/about', handleReactPage);

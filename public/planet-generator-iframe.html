@@ -2579,6 +2579,40 @@
             },
         });
 
+        const NPC_MELEE_STATE_ENUM = {
+            IDLE: 0,
+            BEGIN_ATTACK: 1,
+            END_ATTACK: 2,
+        };
+        AFRAME.registerComponent('npc-melee-state', {
+            init: function () {
+                this.npcState = NPC_MELEE_STATE_ENUM.IDLE;
+                this.innerNpcBeginAttack = this.npcBeginAttack.bind(this);
+                this.innerNpcNavigationEnd = this.npcNavigationEnd.bind(this);
+                this.el.addEventListener('npc-begin-attack', this.innerNpcBeginAttack);
+                this.el.addEventListener('navigation-end', this.innerNpcNavigationEnd);
+            },
+            remove: function () {
+                this.el.removeEventListener('npc-begin-attack', this.innerNpcBeginAttack);
+                this.el.removeEventListener('navigation-end', this.innerNpcNavigationEnd);
+            },
+            npcBeginAttack: function () {
+                if (this.npcState === NPC_MELEE_STATE_ENUM.IDLE) {
+                    // detected begin attack event, block AI
+                    this.npcState = NPC_MELEE_STATE_ENUM.BEGIN_ATTACK;
+                }
+            },
+            npcNavigationEnd: function () {
+                if (this.npcState === NPC_MELEE_STATE_ENUM.BEGIN_ATTACK) {
+                    // detected end attack event, block AI
+                    this.npcState = NPC_MELEE_STATE_ENUM.END_ATTACK;
+                } else if (this.npcState === NPC_MELEE_STATE_ENUM.END_ATTACK) {
+                    // detected second end attack event, unbLOCK AI
+                    this.npcState = NPC_MELEE_STATE_ENUM.IDLE;
+                }
+            }
+        });
+
         AFRAME.registerComponent('npc-melee', {
             schema: {
                 origin: { type: 'vec3', default: '0 0 0' },
@@ -2710,10 +2744,12 @@
             beginAttack: function (evt) {
                 const target = evt.detail;
                 if (this.data.melee && !this.el.hasAttribute('npc-melee')) {
-                    const p = this.el.components['globe-nav-agent'].data.destination;
-                    const pv = new THREE.Vector3().copy(p);
-                    if (pv.distanceTo(this.el.object3D.position) < this.data.range) {
-                        this.el.setAttribute("npc-melee", `origin: ${p.x} ${p.y} ${p.z}; target: #${target.id}`);
+                    if (this.el.components['npc-melee-state'].npcState === NPC_MELEE_STATE_ENUM.IDLE) {
+                        const p = this.el.components['globe-nav-agent'].data.destination;
+                        const pv = new THREE.Vector3().copy(p);
+                        if (pv.distanceTo(this.el.object3D.position) < this.data.range) {
+                            this.el.setAttribute("npc-melee", `origin: ${p.x} ${p.y} ${p.z}; target: #${target.id}`);
+                        }
                     }
                 } else {
                     addProjectile(this.el, target);
@@ -3256,6 +3292,7 @@
             rootNpc.setAttribute("npc-faction", "player");
             rootNpc.setAttribute("npc-finder", "active: true;");
             rootNpc.setAttribute("npc-attack", `range: 10; melee: true`);
+            rootNpc.setAttribute("npc-melee-state", "");
             rootNpc.setAttribute("health", "");
             rootNpc.setAttribute("shadow", "");
 

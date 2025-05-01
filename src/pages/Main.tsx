@@ -38,7 +38,7 @@ export const Main = () => {
                                         the
                                         beginning of the project.
                                         <br/>
-                                        <Link to="/2d-game"><Button variant="contained">Click here to play the latest version</Button></Link>
+                                        <Link to="/2d"><Button variant="contained">Click here to play the latest version</Button></Link>
                                     </Typography>
                                     <br/>
                                     <div style={{width: 256, margin: '0 auto'}}>
