@@ -3752,7 +3752,7 @@
                 this.el.addEventListener("model-loaded", (e) => {
                     const meshes = [];
                     e.detail.model.traverse((x) => {
-                        if (x.isGroup && x.name.includes("Canon")) {
+                        if (x.isObject3D && x.name.includes("Canon")) {
                             meshes.push(x);
                         }
                     });
@@ -3876,7 +3876,7 @@
                 type: "vec3",
                 default: "0 0 0",
             },
-            tickSum: 1,
+            tickSum: 2,
             init: function () {
                 let a;
                 a = () => {
@@ -4433,9 +4433,9 @@
                 <a-entity id="port-menu" align-with-projection="offset: 0.25 0.2 -0.5; rotation: 0 0 0; portShow: true" port-show html="cursor:#cursor;html:#my-interface" class="clickable"></a-entity>
                 <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
                 <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
-                <a-entity id="left-cannon-fire" align-with-projection="offset: -0.25 -0.2 -0.5; rotation: 0 90 0; scale: 0.03 0.03 0.03" gltf-model="/meshes/Cannon.glb" class="clickable" select-cannon-side="selector: left-cannon"></a-entity>
-                <a-entity id="right-cannon-fire" align-with-projection="offset: 0.25 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03" gltf-model="/meshes/Cannon.glb" class="clickable" select-cannon-side="selector: right-cannon"></a-entity>
-                <a-entity id="none-cannon-fire" align-with-projection="offset: 0 -0.2 -0.5; rotation: 0 0 0; scale: 0.015 0.015 0.015" gltf-model="/meshes/Helm.glb" class="clickable" select-cannon-side="selector: none-cannon"></a-entity>
+                <a-entity id="left-cannon-fire" align-with-projection="offset: -0.25 -0.2 -0.5; rotation: 0 90 0; scale: 0.03 0.03 0.03" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" class="clickable" select-cannon-side="selector: left-cannon"></a-entity>
+                <a-entity id="right-cannon-fire" align-with-projection="offset: 0.25 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" class="clickable" select-cannon-side="selector: right-cannon"></a-entity>
+                <a-entity id="none-cannon-fire" align-with-projection="offset: 0 -0.2 -0.5; rotation: 0 0 0; scale: 0.015 0.015 0.015" gltf-model="/meshes/Model_Redo/Ship Wheel/ShipWheel.glb" class="clickable" select-cannon-side="selector: none-cannon"></a-entity>
             </a-entity>
         </a-entity>
     </a-scene>

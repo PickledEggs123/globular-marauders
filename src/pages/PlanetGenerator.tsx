@@ -220,11 +220,11 @@ export const PlanetGenerator = () => {
             context.gameData = data;
 
             const staticMeshPaths = [
-                "/meshes/Helm.glb",
-                "/meshes/CannonBall.glb",
-                "/meshes/GoldCoin.glb",
+                "/meshes/Model_Redo/Ship Wheel/ShipWheel.glb",
+                "/meshes/Model_Redo/Cannon_Ball/CannonBall.glb",
+                "/meshes/Model_Redo/Gold Coin/GoldCoin.glb",
                 "/meshes/ships/sloop.glb",
-                "/meshes/WoodenArrow2.glb",
+                "/meshes/Model_Redo/Arrow/Arrow.glb",
                 "/meshes/MaleAnatomy.glb",
                 "/meshes/Port1-0.glb",
                 "/meshes/Port1-1.glb",
