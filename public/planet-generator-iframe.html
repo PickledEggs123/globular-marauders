@@ -2279,6 +2279,99 @@
                 });
             }
         });
+        function getRandomPointsOnMesh(mesh, origin, count) {
+            const geometry = mesh.geometry;
+            const positionAttribute = geometry.attributes.position;
+            const vertices = positionAttribute.array;
+            const indices = geometry.index ? geometry.index.array : null;
+
+            const randomPoints = [];
+            const faceCount = indices ? indices.length / 3 : vertices.length / 9;
+
+            for (let i = 0; i < count; i++) {
+                const faceIndex = Math.floor(Math.random() * faceCount);
+
+                let vA, vB, vC;
+                if (indices) {
+                    const offset = positionAttribute.offset;
+                    const itemSize = positionAttribute.data.stride;
+                    const i1 = indices[faceIndex * 3];
+                    const i2 = indices[faceIndex * 3 + 1];
+                    const i3 = indices[faceIndex * 3 + 2];
+                    vA = new THREE.Vector3().fromArray(vertices, i1 * itemSize + offset);
+                    vB = new THREE.Vector3().fromArray(vertices, i2 * itemSize + offset);
+                    vC = new THREE.Vector3().fromArray(vertices, i3 * itemSize + offset);
+                } else {
+                    vA = new THREE.Vector3().fromArray(vertices, faceIndex * 9);
+                    vB = new THREE.Vector3().fromArray(vertices, faceIndex * 9 + 3);
+                    vC = new THREE.Vector3().fromArray(vertices, faceIndex * 9 + 6);
+                }
+
+                // Generate a random point inside the triangle
+                const randomPoint = new THREE.Vector3();
+                let r1 = Math.random();
+                let r2 = Math.random();
+                if (r1 + r2 > 1) {
+                    r1 = 1 - r1;
+                    r2 = 1 - r2;
+                }
+                randomPoint.add(vA);
+                randomPoint.add(vB.clone().sub(vA).multiplyScalar(r1));
+                randomPoint.add(vC.clone().sub(vA).multiplyScalar(r2));
+
+                const randomNormal = new THREE.Vector3();
+                randomNormal.crossVectors(vB.clone().sub(vA), vC.clone().sub(vA)).normalize();
+
+                randomPoints.push({point: randomPoint, normal: randomNormal});
+            }
+
+            return randomPoints;
+        }
+        AFRAME.registerComponent('grass-particles', {
+            schema: {
+                origin: { type: 'vec3', default: {x: 0, y: 0, z: 0} },
+            },
+            init: function () {
+                this.innerAddGrass = this.addGrass.bind(this);
+                this.innerRemoveGrass = this.removeGrass.bind(this);
+                this.el.addEventListener('add-grass', this.innerAddGrass);
+                this.el.addEventListener('remove-grass', this.innerRemoveGrass);
+            },
+            addGrass: function () {
+                const meshes = [];
+                this.el.object3D.traverse((node) => {
+                    if (node.isMesh) {
+                        meshes.push(node);
+                    }
+                });
+                const mesh = meshes[0];
+                if (mesh) {
+                    const randomPoints = getRandomPointsOnMesh(mesh, this.data.origin, 100);
+
+                    for (const {point, normal} of randomPoints) {
+                        const particle = document.createElement('a-entity');
+                        particle.setAttribute('class', 'grass');
+                        particle.setAttribute('terrain-tile', '');
+                        particle.setAttribute('go-on-land', '');
+                        particle.setAttribute('position', `${point.x} ${point.y} ${point.z}`);
+                        particle.setAttribute('instanced-mesh-member', 'mesh: #grass-mesh;');
+                        particle.object3D.up = normal;
+                        particle.object3D.lookAt(new THREE.Vector3().copy(point).add(new THREE.Vector3().random().multiplyScalar(0.01)));
+                        this.el.appendChild(particle);
+                    }
+                }
+            },
+            removeGrass: function () {
+                const grasses = Array.from(this.el.querySelectorAll('.grass'));
+                for (const grass of grasses) {
+                    grass.parentNode.removeChild(grass);
+                }
+            },
+            remove: function () {
+                this.el.removeEventListener('add-grass', this.innerAddGrass);
+                this.el.removeEventListener('remove-grass', this.innerRemoveGrass);
+            },
+        });
         AFRAME.registerComponent('terrain-tile', {
             schema: {
                 type: "string",
@@ -2309,8 +2402,14 @@
                 const className = "clickable";
                 if (cameraPos.dot(tilePos) > cos45 && !this.el.classList.contains(className)) {
                     this.el.classList.add(className);
+                    if (this.el.components['grass-particles']) {
+                        this.el.emit("add-grass");
+                    }
                 } else if (!(cameraPos.dot(tilePos) > cos45) && this.el.classList.contains(className)) {
                     this.el.classList.remove(className);
+                    if (this.el.components['grass-particles']) {
+                        this.el.emit("remove-grass");
+                    }
                 }
             }
         });
@@ -3324,7 +3423,6 @@
         function addTerrain(item) {
             const [str, collidable, navmesh, ocean, oceanNavmesh, vertex] = JSON.parse(item);
             const rootTerrain = document.createElement("a-entity");
-            rootTerrain.setAttribute("class", "clickable");
             rootTerrain.setAttribute("gltf-model", str);
             rootTerrain.addEventListener("model-loaded", buildBoundsTree);
             rootTerrain.setAttribute("position", "0 0 0");
@@ -3341,6 +3439,7 @@
                 rootTerrain.setAttribute("static-body", "shape: none;");
                 rootTerrain.setAttribute("globe-trimesh", "");
                 rootTerrain.setAttribute("go-on-land", "");
+                rootTerrain.setAttribute("grass-particles", `origin: ${vertex[0] * 100} ${vertex[1] * 100} ${vertex[2] * 100}`);
             } else {
                 rootTerrain.setAttribute("static-body", "shape: none;");
                 rootTerrain.setAttribute("globe-trimesh", "");
@@ -4428,6 +4527,7 @@
         <a-entity id="demo-node" position="0 105 5">
             <a-entity id="demo-node-position" position="0 0 -5"></a-entity>
         </a-entity>
+        <a-entity id="grass-mesh" gltf-model="/meshes/Model_Redo/Grass/Grass.glb" instanced-mesh="capacity: 10240; positioning: world; updateMode: auto;"></a-entity>
         <a-entity id="camera-rig" position="0 105 5" networked="template: #avatar-template; attachTemplateToLocal: false;">
             <a-entity camera globe-look-controls="mouseEnabled: false; touchEnabled: false;" position="0 1.6 0" cursor-updater cursor="rayOrigin: mouse" raycaster="far: 50; interval: 100; objects: .clickable">
                 <a-entity id="port-menu" align-with-projection="offset: 0.25 0.2 -0.5; rotation: 0 0 0; portShow: true" port-show html="cursor:#cursor;html:#my-interface" class="clickable"></a-entity>
