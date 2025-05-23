@@ -2354,14 +2354,20 @@
                             particle.setAttribute('class', 'grass');
                             particle.setAttribute('position', `${point.x} ${point.y} ${point.z}`);
                             const model = document.createElement('a-entity');
-                            model.setAttribute('instanced-mesh-member', 'mesh: #grass-mesh;');
                             model.setAttribute('rotation', '90 0 0');
+                            model.setAttribute('instanced-mesh-member', 'mesh: #grass-mesh;');
                             particle.appendChild(model);
                             particle.object3D.up = normal;
                             particle.object3D.lookAt(new THREE.Vector3().copy(point).add(new THREE.Vector3().random()));
                             this.el.appendChild(particle);
+                            model.object3D.matrixAutoUpdate = false;
+                            model.components.rotation.update({x: 0, y: 0, z: 0});
+                            model.object3D.updateMatrix();
+                            particle.object3D.matrixAutoUpdate = false;
+                            particle.components.position.update({x: 0, y: 0, z: 0});
+                            particle.object3D.updateMatrix();
                         }
-                        this.el.object3D.updateMatrixWorld(true);
+                        this.el.object3D.updateWorldMatrix(false, true);
                     };
                     const grassMesh = document.querySelector("#grass-mesh");
                     if (grassMesh.getObject3D("mesh")) {
