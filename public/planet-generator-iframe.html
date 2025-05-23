@@ -3540,6 +3540,11 @@
                 rootModel.setAttribute("rotation", "90 0 0");
                 rootModel.setAttribute("position", "0 0 0");
             }
+            rootModel.object3D.matrixAutoUpdate = false;
+            rootModel.components.scale.update({x: 1, y: 1, z: 1});
+            rootModel.components.rotation.update({x: 0, y: 0, z: 0});
+            rootModel.components.position.update({x: 0, y: 0, z: 0});
+            rootModel.object3D.updateMatrix();
             rootHouse.appendChild(rootModel);
 
             const lod0 = document.createElement("a-entity");
@@ -3550,26 +3555,29 @@
                 lod0.setAttribute("set-building-id", "");
             }
             lod0.setAttribute("shadow", "");
+            lod0.object3D.matrixAutoUpdate = false;
             rootModel.appendChild(lod0);
 
             const lod1 = document.createElement("a-entity");
             lod1.setAttribute("class", `lod1 clickable${type === "PORT" ? " port" : ""}`);
             if (type !== "PORT") {
-                lod0.setAttribute("go-on-land", "raze: true");
+                lod1.setAttribute("go-on-land", "raze: true");
                 lod1.setAttribute("spawn-gold", "");
-                lod0.setAttribute("set-building-id", "");
+                lod1.setAttribute("set-building-id", "");
             }
             lod1.setAttribute("shadow", "");
+            lod1.object3D.matrixAutoUpdate = false;
             rootModel.appendChild(lod1);
 
             const lod2 = document.createElement("a-entity");
             lod2.setAttribute("class", `lod2 clickable${type === "PORT" ? " port" : ""}`);
             if (type !== "PORT") {
-                lod0.setAttribute("go-on-land", "raze: true");
+                lod2.setAttribute("go-on-land", "raze: true");
                 lod2.setAttribute("spawn-gold", "");
-                lod0.setAttribute("set-building-id", "");
+                lod2.setAttribute("set-building-id", "");
             }
             lod2.setAttribute("shadow", "");
+            lod2.object3D.matrixAutoUpdate = false;
             rootModel.appendChild(lod2);
 
             const scene = document.querySelector("a-scene");
@@ -3577,6 +3585,9 @@
 
             rootHouse.object3D.up = new THREE.Vector3(point[0], point[1], point[2]).normalize();
             rootHouse.object3D.lookAt(new THREE.Vector3(lookAt[0], lookAt[1], lookAt[2]));
+            rootHouse.object3D.matrixAutoUpdate = false;
+            rootHouse.components.position.update({x: 0, y: 0, z: 0});
+            rootHouse.object3D.updateMatrix();
         }
 
         function addCannonballFire(el) {
