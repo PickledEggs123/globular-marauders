@@ -2346,7 +2346,7 @@
                 });
                 const mesh = meshes[0];
                 if (mesh) {
-                    const randomPoints = getRandomPointsOnMesh(mesh, this.data.origin, 512);
+                    const randomPoints = getRandomPointsOnMesh(mesh, this.data.origin, 256);
 
                     const updateTerrainWithGrass = () => {
                         for (const {point, normal} of randomPoints) {
@@ -2361,9 +2361,11 @@
                             particle.object3D.lookAt(new THREE.Vector3().copy(point).add(new THREE.Vector3().random()));
                             this.el.appendChild(particle);
                             model.object3D.matrixAutoUpdate = false;
+                            model.object3D.matrixWorldAutoUpdate = false;
                             model.components.rotation.update({x: 0, y: 0, z: 0});
                             model.object3D.updateMatrix();
                             particle.object3D.matrixAutoUpdate = false;
+                            particle.object3D.matrixWorldAutoUpdate = false;
                             particle.components.position.update({x: 0, y: 0, z: 0});
                             particle.object3D.updateMatrix();
                         }
@@ -2399,7 +2401,9 @@
             },
             init: function () {
                 this.el.object3D.matrixAutoUpdate = false;
+                this.el.object3D.matrixWorldAutoUpdate = false;
                 this.el.object3D.updateMatrix();
+                this.el.object3D.updateWorldMatrix(false, true);
             },
             tick: function (t, dt) {
                 if (!this.data) {
@@ -4566,7 +4570,7 @@
         <a-entity id="demo-node" position="0 105 5">
             <a-entity id="demo-node-position" position="0 0 -5"></a-entity>
         </a-entity>
-        <a-entity id="grass-mesh" gltf-model="/meshes/Model_Redo/Grass/Grass.glb" instanced-mesh="capacity: 20480; positioning: world;"></a-entity>
+        <a-entity id="grass-mesh" gltf-model="/meshes/Model_Redo/Grass/Grass.glb" instanced-mesh="capacity: 10240; positioning: world;"></a-entity>
         <a-entity id="camera-rig" position="0 105 5" networked="template: #avatar-template; attachTemplateToLocal: false;">
             <a-entity camera globe-look-controls="mouseEnabled: false; touchEnabled: false;" position="0 1.6 0" cursor-updater cursor="rayOrigin: mouse" raycaster="far: 50; interval: 100; objects: .clickable">
                 <a-entity id="port-menu" align-with-projection="offset: 0.25 0.2 -0.5; rotation: 0 0 0; portShow: true" port-show html="cursor:#cursor;html:#my-interface" class="clickable"></a-entity>
