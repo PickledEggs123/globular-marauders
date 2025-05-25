@@ -595,6 +595,26 @@
             return wrapper;
         }
 
+        const buildingLodHashmap = new Map();
+        function getBuildingLodHash(url) {
+            const randomString = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+            if (buildingLodHashmap.has(url)) {
+                return buildingLodHashmap.get(url);
+            } else {
+                buildingLodHashmap.set(url, randomString);
+
+                const scene = document.querySelector("a-scene");
+                const entity = document.createElement("a-entity");
+                entity.setAttribute("id", randomString);
+                entity.setAttribute("gltf-model", url);
+                entity.setAttribute("instanced-mesh", "capacity: 10240; positioning: world;");
+                entity.addEventListener("model-loaded", buildBoundsTree);
+                scene.appendChild(entity);
+
+                return randomString;
+            }
+        }
+
         AFRAME.registerComponent('globe-lod', {
             schema: {
                 default: "",
@@ -609,12 +629,9 @@
                 if (!lod0 || !lod1 || !lod2) {
                     return;
                 }
-                lod0.setAttribute("gltf-model", data[0]);
-                lod1.setAttribute("gltf-model", data[1]);
-                lod2.setAttribute("gltf-model", data[2]);
-                lod0.addEventListener("model-loaded", buildBoundsTree);
-                lod1.addEventListener("model-loaded", buildBoundsTree);
-                lod2.addEventListener("model-loaded", buildBoundsTree);
+                lod0.setAttribute("instanced-mesh-member", `mesh: #${getBuildingLodHash(data[0])}; memberMesh: true;`);
+                lod1.setAttribute("instanced-mesh-member", `mesh: #${getBuildingLodHash(data[1])}; memberMesh: true;`);
+                lod2.setAttribute("instanced-mesh-member", `mesh: #${getBuildingLodHash(data[2])}; memberMesh: true;`);
             },
             tick: function (t, dt) {
                 if (this.counter > 0) {
@@ -3545,6 +3562,7 @@
                 rootModel.setAttribute("position", "0 0 0");
             }
             rootModel.object3D.matrixAutoUpdate = false;
+            rootModel.object3D.matrixWorldAutoUpdate = false;
             rootModel.components.scale.update({x: 1, y: 1, z: 1});
             rootModel.components.rotation.update({x: 0, y: 0, z: 0});
             rootModel.components.position.update({x: 0, y: 0, z: 0});
@@ -3560,6 +3578,7 @@
             }
             lod0.setAttribute("shadow", "");
             lod0.object3D.matrixAutoUpdate = false;
+            lod0.object3D.matrixWorldAutoUpdate = false;
             rootModel.appendChild(lod0);
 
             const lod1 = document.createElement("a-entity");
@@ -3571,6 +3590,7 @@
             }
             lod1.setAttribute("shadow", "");
             lod1.object3D.matrixAutoUpdate = false;
+            lod1.object3D.matrixWorldAutoUpdate = false;
             rootModel.appendChild(lod1);
 
             const lod2 = document.createElement("a-entity");
@@ -3582,6 +3602,7 @@
             }
             lod2.setAttribute("shadow", "");
             lod2.object3D.matrixAutoUpdate = false;
+            lod2.object3D.matrixWorldAutoUpdate = false;
             rootModel.appendChild(lod2);
 
             const scene = document.querySelector("a-scene");
@@ -3590,6 +3611,7 @@
             rootHouse.object3D.up = new THREE.Vector3(point[0], point[1], point[2]).normalize();
             rootHouse.object3D.lookAt(new THREE.Vector3(lookAt[0], lookAt[1], lookAt[2]));
             rootHouse.object3D.matrixAutoUpdate = false;
+            rootHouse.object3D.matrixWorldAutoUpdate = false;
             rootHouse.components.position.update({x: 0, y: 0, z: 0});
             rootHouse.object3D.updateMatrix();
         }
