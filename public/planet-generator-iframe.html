@@ -658,18 +658,39 @@
                     lod0.setAttribute("visible", "false");
                     lod1.setAttribute("visible", "false");
                     lod2.setAttribute("visible", "false");
+                    lod0.components.visible.update();
+                    lod1.components.visible.update();
+                    lod2.components.visible.update();
+                    lod0.emit("object3DUpdated");
+                    lod1.emit("object3DUpdated");
+                    lod2.emit("object3DUpdated");
                 } else if (distance >= 20) {
                     lod0.setAttribute("visible", "false");
                     lod1.setAttribute("visible", "false");
                     lod2.setAttribute("visible", "true");
+                    lod0.components.visible.update();
+                    lod1.components.visible.update();
+                    lod2.components.visible.update();
+                    lod0.emit("object3DUpdated");
+                    lod1.emit("object3DUpdated");
+                    lod2.emit("object3DUpdated");
                 } else if (distance >= 10) {
                     lod0.setAttribute("visible", "false");
                     lod1.setAttribute("visible", "true");
                     lod2.setAttribute("visible", "false");
+                    lod0.components.visible.update();
+                    lod1.components.visible.update();
+                    lod2.components.visible.update();
+                    lod0.emit("object3DUpdated");
+                    lod1.emit("object3DUpdated");
+                    lod2.emit("object3DUpdated");
                 } else if (distance >= 0) {
                     lod0.setAttribute("visible", "true");
                     lod1.setAttribute("visible", "false");
                     lod2.setAttribute("visible", "false");
+                    lod0.emit("object3DUpdated");
+                    lod1.emit("object3DUpdated");
+                    lod2.emit("object3DUpdated");
                 }
 
                 // auto update clickable
