@@ -606,8 +606,8 @@
                 const scene = document.querySelector("a-scene");
                 const entity = document.createElement("a-entity");
                 entity.setAttribute("id", randomString);
-                entity.setAttribute("gltf-model", url);
                 entity.setAttribute("instanced-mesh", `capacity: ${capacity}; positioning: world; updateMode: ${updateMode};`);
+                entity.setAttribute("gltf-model", url);
                 entity.addEventListener("model-loaded", buildBoundsTree);
                 scene.appendChild(entity);
 
@@ -4079,7 +4079,7 @@
             tickSum: 2,
             tick: function (t, dt) {
                 if (this.el.body && this.tickSum >= 0) {
-                    this.el.body.applyForce(new CANNON.Vec3(this.data.x, this.data.y, this.data.z), new CANNON.Vec3(0, 0, 0));
+                    this.el.body.applyForce(new CANNON.Vec3(this.data.x, this.data.y, this.data.z).scale(dt / 1000 * (1000 / 60)), new CANNON.Vec3(0, 0, 0));
                     this.tickSum -= dt / 1000;
                 }
                 if (this.el.body && this.tickSum < 0) {
