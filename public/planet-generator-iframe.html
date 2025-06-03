@@ -597,7 +597,7 @@
 
         const buildingLodHashmap = new Map();
         function getBuildingLodHash(url, capacity, updateMode) {
-            const randomString = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+            const randomString = 'a' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
             if (buildingLodHashmap.has(url)) {
                 return buildingLodHashmap.get(url);
             } else {
@@ -606,8 +606,8 @@
                 const scene = document.querySelector("a-scene");
                 const entity = document.createElement("a-entity");
                 entity.setAttribute("id", randomString);
-                entity.setAttribute("instanced-mesh", `capacity: ${capacity}; positioning: world; updateMode: ${updateMode};`);
                 entity.setAttribute("gltf-model", url);
+                entity.setAttribute("instanced-mesh", `capacity: ${capacity}; positioning: world; updateMode: ${updateMode};`);
                 entity.addEventListener("model-loaded", buildBoundsTree);
                 scene.appendChild(entity);
 
@@ -620,12 +620,30 @@
                 memberMesh: {type: 'boolean', default: false},
             },
             init: function () {
-                const data = this.data;
-                const mesh = document.querySelector(data.mesh);
-                if (!mesh) {
-                    return;
-                }
-                this.el.setAttribute("instanced-mesh-member", `mesh: #${mesh.id}; memberMesh: ${data.memberMesh};`);
+                let func;
+                func = () => {
+                    const data = this.data;
+                    let mesh;
+                    try {
+                        const scene = document.querySelector("a-scene");
+                        mesh = scene.querySelector(data.mesh);
+                    } catch {}
+                    if (!mesh) {
+                        setTimeout(() => {
+                            func();
+                        }, 10);
+                        return;
+                    }
+                    const gltf = mesh.getObject3D("mesh");
+                    if (!gltf) {
+                        setTimeout(() => {
+                            func();
+                        }, 10);
+                        return;
+                    }
+                    this.el.setAttribute("instanced-mesh-member", `mesh: #${mesh.id}; memberMesh: ${data.memberMesh};`);
+                };
+                func();
             },
         });
 

@@ -228,13 +228,13 @@ export const PlanetGenerator = () => {
                 "/meshes/Port1-0.glb",
                 "/meshes/Port1-1.glb",
                 "/meshes/Port1-2.glb",
-                "/meshes/golden+worier+glb+black+dull+gold.glb",
-                "/meshes/House1-0.glb",
-                "/meshes/House1-1.glb",
-                "/meshes/House1-2.glb",
-                "/meshes/Temple1-0.glb",
-                "/meshes/Temple1-1.glb",
-                "/meshes/Temple1-2.glb"
+                "/meshes/Model_Redo/Warrior/Warrior.glb",
+                "/meshes/Model_Redo/House/House.glb",
+                "/meshes/Model_Redo/House/House.glb",
+                "/meshes/Model_Redo/House/House.glb",
+                "/meshes/Model_Redo/Temple/Temple.glb",
+                "/meshes/Model_Redo/Temple/Temple.glb",
+                "/meshes/Model_Redo/Temple/Temple.glb"
             ];
 
             Promise.all<Uint8Array | string>([
