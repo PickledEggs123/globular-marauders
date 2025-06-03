@@ -620,31 +620,29 @@
                 memberMesh: {type: 'boolean', default: false},
             },
             init: function () {
-                let func;
-                func = () => {
-                    const data = this.data;
-                    let mesh;
-                    try {
-                        const scene = document.querySelector("a-scene");
-                        mesh = scene.querySelector(data.mesh);
-                    } catch {}
-                    if (!mesh) {
-                        setTimeout(() => {
-                            func();
-                        }, 10);
-                        return;
-                    }
-                    const gltf = mesh.getObject3D("mesh");
-                    if (!gltf) {
-                        setTimeout(() => {
-                            func();
-                        }, 10);
-                        return;
-                    }
-                    this.el.setAttribute("instanced-mesh-member", `mesh: #${mesh.id}; memberMesh: ${data.memberMesh};`);
-                };
-                func();
+                this.done = false;
             },
+            tick: function () {
+                if (this.done) {
+                    return;
+                }
+
+                const data = this.data;
+                let mesh;
+                try {
+                    const scene = document.querySelector("a-scene");
+                    mesh = scene.querySelector(data.mesh);
+                } catch {}
+                if (!mesh) {
+                    return;
+                }
+                const gltf = mesh.getObject3D("mesh");
+                if (!gltf) {
+                    return;
+                }
+                this.el.setAttribute("instanced-mesh-member", `mesh: #${mesh.id}; memberMesh: ${data.memberMesh};`);
+                this.done = true;
+            }
         });
 
         AFRAME.registerComponent('globe-lod', {
