@@ -644,6 +644,36 @@
                 this.done = true;
             }
         });
+        AFRAME.registerComponent('globe-networked-instanced-mesh-member', {
+            schema: {
+                mesh: {type: 'string', default: ""},
+                memberMesh: {type: 'boolean', default: false},
+            },
+            init: function () {
+                this.done = false;
+            },
+            tick: function () {
+                if (this.done) {
+                    return;
+                }
+
+                const data = this.data;
+                let mesh;
+                try {
+                    const scene = document.querySelector("a-scene");
+                    mesh = scene.querySelector(data.mesh);
+                } catch {}
+                if (!mesh) {
+                    return;
+                }
+                const gltf = mesh.getObject3D("mesh");
+                if (!gltf) {
+                    return;
+                }
+                this.el.setAttribute("instanced-mesh-member", `mesh: #${mesh.id}; memberMesh: ${data.memberMesh};`);
+                this.done = true;
+            }
+        });
 
         AFRAME.registerComponent('globe-lod', {
             schema: {
@@ -3211,13 +3241,13 @@
                 dataEl.setAttribute("class", "data");
                 dataEl.setAttribute("scale", "0.1 0.1 0.1");
                 dataEl.setAttribute("rotation", "0 -90 0");
-                dataEl.setAttribute("globe-instanced-mesh-member", `mesh: #${getBuildingLodHash(str, 100, "auto")}; memberMesh: ${memberMesh};`);
+                dataEl.setAttribute("globe-networked-instanced-mesh-member", `mesh: #${getBuildingLodHash(str, 100, "auto")}; memberMesh: ${memberMesh};`);
                 dataEl.setAttribute("networked-ship-health", "");
                 dataEl.setAttribute("cannonball-collider", "");
                 dataEl.setAttribute("shadow", "");
                 rootGoldCoin.appendChild(dataEl);
             } else {
-                rootGoldCoin.setAttribute("globe-instanced-mesh-member", `mesh: #${getBuildingLodHash(str, 1000, "auto")}; memberMesh: ${memberMesh};`);
+                rootGoldCoin.setAttribute("globe-networked-instanced-mesh-member", `mesh: #${getBuildingLodHash(str, 1000, "auto")}; memberMesh: ${memberMesh};`);
                 rootGoldCoin.setAttribute("shadow", "");
             }
 
