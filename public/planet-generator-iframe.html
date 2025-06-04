@@ -3203,6 +3203,20 @@
             },
         });
 
+        AFRAME.registerComponent("update-npc-position-entity", {
+            schema: {},
+            tick: function (t, dt) {
+                const parent = this.el.parentElement;
+                const center = this.el.parentElement.parentElement;
+                const centerHeight = center.object3D.getWorldPosition(new THREE.Vector3()).length();
+
+                const scene = document.querySelector("a-scene");
+                scene.object3D.attach(this.el.object3D);
+                this.el.object3D.position.copy(this.el.object3D.getWorldPosition(new THREE.Vector3()).normalize().multiplyScalar(centerHeight));
+                parent.object3D.attach(this.el.object3D);
+            },
+        });
+
         function addTemplate(templateId, charModelId, instanceModelId, memberMesh) {
             const scene = document.querySelector("a-scene");
 
@@ -3505,10 +3519,14 @@
                 rootNpc.appendChild(modelNpc);
             }
 
+            const positionCenterNpc = document.createElement("a-entity");
+            positionCenterNpc.setAttribute("position", "0 0 -5");
+            rootNpc.appendChild(positionCenterNpc);
+
             const positionNpc = document.createElement("a-entity");
             positionNpc.setAttribute("class", `${scene.components['coin-purse'].activeUnit}-position`);
-            positionNpc.setAttribute("position", "0 0 -5");
-            rootNpc.appendChild(positionNpc);
+            positionNpc.setAttribute("update-npc-position-entity", "");
+            positionCenterNpc.appendChild(positionNpc);
 
             scene.appendChild(rootNpc);
         }
