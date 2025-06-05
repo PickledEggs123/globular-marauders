@@ -275,6 +275,7 @@ export const PlanetGenerator = () => {
 
                     const warriorDataUri = gltf[gltf.length - 7] as string;
                     addCharacterModel(iframeRef.current, "WARRIOR", warriorDataUri);
+                    addCharacterModel(iframeRef.current, "PIRATE_SHIP", shipDataUri);
                     addCharacterModel(iframeRef.current, "PERSON", gltf[gltf.length - 11] as string);
                     addCharacterModel(iframeRef.current, "ARROW", gltf[gltf.length - 12] as string);
                     addCharacterModel(iframeRef.current, "GOLD_COIN", gltf[gltf.length - 14] as string);

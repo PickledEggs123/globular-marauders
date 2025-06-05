@@ -3223,7 +3223,7 @@
             const str = characterModels.get(charModelId);
 
             const rootGoldCoin = document.createElement("a-entity");
-            if (charModelId === "SHIP") {
+            if (charModelId === "SHIP" || charModelId === "PIRATE_SHIP") {
                 const dataEl = document.createElement("a-entity");
                 dataEl.setAttribute("class", "data");
                 dataEl.setAttribute("scale", "0.1 0.1 0.1");
@@ -3276,7 +3276,7 @@
                 t[0].content.appendChild(rootGoldCoin);
                 a.appendChild(t[0]);
 
-                if (charModelId === "SHIP") {
+                if (charModelId === "SHIP" || charModelId === "PIRATE_SHIP") {
                     if (!NAF.schemas.hasTemplate(`#${templateId}`)) {
                         NAF.schemas.add({
                             template: `#${templateId}`,
@@ -3611,6 +3611,10 @@
                     addTemplate("ship-template", "SHIP", "ship-model", false);
                     break;
                 }
+                case "PIRATE_SHIP": {
+                    addTemplate("pirate-ship-template", "PIRATE_SHIP", "pirate-ship-model", false);
+                    break;
+                }
             }
         }
 
@@ -3629,7 +3633,7 @@
             if (type === "PORT") {
                 rootModel.setAttribute("scale", "0.1 0.1 0.1");
                 rootModel.setAttribute("rotation", "90 0 0");
-                rootModel.setAttribute("position", "1.35 -1.1 -0.5");
+                rootModel.setAttribute("position", "0 -1.35 -0.5");
             } else {
                 rootModel.setAttribute("scale", "1 1 1");
                 rootModel.setAttribute("rotation", "90 0 0");
