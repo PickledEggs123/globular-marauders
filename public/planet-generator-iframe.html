@@ -2747,6 +2747,13 @@
             },
         });
 
+        AFRAME.registerComponent('pirate-spawner', {
+            schema: {},
+            init: function () {
+                addPirateShip(this.el.id, this.el, this.el);
+            },
+        });
+
         AFRAME.registerComponent('npc-agent', {
             schema: {
                 building: {type: 'selector'}
@@ -3494,6 +3501,70 @@
             scene.removeChild(a);
         }
 
+        function addPirateShipSpawnPoint(data) {
+            const scene = document.querySelector("a-scene");
+            const terrain = scene.querySelector("#terrain");
+
+            const {
+                point
+            } = JSON.parse(data);
+
+            const entity = document.createElement("a-entity");
+            entity.setAttribute("class", "pirate-ship-spawn");
+            entity.setAttribute("building-id", "");
+            entity.setAttribute("position", `${point[0]} ${point[1]} ${point[2]}`);
+            entity.setAttribute("pirate-spawner", "");
+            terrain.appendChild(entity);
+
+
+        }
+
+        function addPirateShip(buildingId, buildingEl, destinationEl) {
+            const scene = document.querySelector("a-scene");
+
+            const str = characterModels.get("PIRATE_SHIP");
+
+            const rootShip = document.createElement("a-entity");
+            const id = "id" + Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(36);
+            rootShip.setAttribute("id", id);
+            rootShip.setAttribute("class", "pirate-ship");
+            const destination2 = destinationEl.components['position'].data;
+            const pos = buildingEl.components['position'].data;
+
+            rootShip.setAttribute("dynamic-body", "shape: sphere; sphereRadius: 1; mass: 100");
+            rootShip.setAttribute("collision-filter", "group: ship; collidesWith: default");
+            rootShip.setAttribute("globe-gravity", "ship: true;");
+            rootShip.setAttribute("ship-health", "");
+            rootShip.setAttribute("ship-death", "");
+            rootShip.setAttribute("fire-cannons", "");
+            rootShip.setAttribute("firing-cannons", "");
+            rootShip.setAttribute("shadow", "");
+            rootShip.setAttribute("ship-health", "");
+            rootShip.setAttribute("cannonball-collider", "");
+            rootShip.setAttribute("position", `${pos.x} ${pos.y} ${pos.z}`);
+            rootShip.setAttribute("rotation", "0 0 0");
+
+            const rootModel = document.createElement("a-entity");
+            rootModel.setAttribute("class", "data");
+            rootModel.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; capacity: 100; memberMesh: true`);
+            rootModel.setAttribute("scale", "0.1 0.1 0.1");
+            rootModel.setAttribute("rotation", "0 -90 0");
+            rootModel.setAttribute("setup-cannons", "");
+            rootShip.appendChild(rootModel);
+            rootShip.setAttribute("networked", "template: #pirate-ship-template; attachTemplateToLocal: false;");
+
+            scene.appendChild(rootShip);
+        }
+
+        function updatePirateShip(npcId, destinationEl) {
+            const rootNpc = document.querySelector(`#${npcId}`);
+            const destination2 = destinationEl.components['position'].data;
+            rootNpc.setAttribute("globe-ocean-nav-agent", `active: false;`);
+            setTimeout(() => {
+                rootNpc.setAttribute("globe-ocean-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2;`);
+            }, 2000);
+        }
+
         function addNpc(i) {
             const scene = document.querySelector("a-scene");
 
@@ -3562,7 +3633,7 @@
                 rootTerrain.setAttribute("static-body", "shape: none;");
                 rootTerrain.setAttribute("globe-trimesh", "");
                 rootTerrain.setAttribute("go-on-land", "");
-                rootTerrain.setAttribute("grass-particles", `origin: ${vertex[0] * 100} ${vertex[1] * 100} ${vertex[2] * 100}`);
+                rootTerrain.setAttribute("grass-particles", `origin: ${vertex[0] * PLANET_SIZE} ${vertex[1] * PLANET_SIZE} ${vertex[2] * PLANET_SIZE}`);
             } else {
                 // physics ocean bottom
                 rootTerrain.setAttribute("static-body", "shape: none;");
@@ -3585,7 +3656,7 @@
         function clearTerrain() {
             const scene = document.querySelector("a-scene");
             const arr = Array.from(document.querySelectorAll("[terrain-tile]"));
-            arr.forEach(a => scene.removeChild(a));
+            arr.forEach(a => a.parentElement.removeChild(a));
         }
 
         var characterModels = new Map();
@@ -3772,7 +3843,7 @@
         }
 
         window.shipModelStr = "";
-        window.shipSpawnPoint = new THREE.Vector3(0, 0, 100);
+        window.shipSpawnPoint = new THREE.Vector3(0, 0, PLANET_SIZE);
 
         async function addShip(item) {
             const scene = document.querySelector("a-scene");

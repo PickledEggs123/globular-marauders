@@ -5,5 +5,6 @@ interface IFrameWindow extends Window {
     clearTerrain: () => void;
     addTerrain: (terrain: string) => void;
     addShip: (ship: string) => void;
+    addPirateShipSpawnPoint: (data: string) => void;
     addClientSecret: (secret: string) => void;
 }
