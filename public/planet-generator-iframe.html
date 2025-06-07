@@ -1448,6 +1448,7 @@
                 acceleration: {default: 100},
                 enabled: {default: true},
                 fly: {default: false},
+                npc: {default: false},
             },
 
             init: function () {
@@ -2515,15 +2516,15 @@
         AFRAME.registerSystem('building', {
             schema: {},
             init: function () {
-                this.islandBuildings = new Map();
-                this.buildings = [];
-                this.updateBuildings = debounce(this.innerUpdateBuildings.bind(this), 1000);
+                this.seaPorts = new Map();
+                this.ports = [];
+                this.updatePorts = debounce(this.innerUpdatePorts.bind(this), 1000);
             },
-            innerUpdateBuildings: function () {
-                this.buildings.forEach(el => {
+            innerUpdatePorts: function () {
+                this.ports.forEach(el => {
                     const building = el.components['building'];
                     const group = this.el.sceneEl.systems['globe-nav'].getGroup(el.components['position'].data);
-                    const arr = this.islandBuildings.get(group);
+                    const arr = this.seaPorts.get(group);
                     if (arr) {
                         building.locateNearestBuilding(arr);
                     }
@@ -2532,28 +2533,28 @@
             registerMe: function (el) {
                 if (this.el.sceneEl.systems['globe-nav'].navMesh) {
                     const group = this.el.sceneEl.systems['globe-nav'].getGroup(el.components['position'].data);
-                    if (this.islandBuildings.has(group)) {
-                        this.islandBuildings.get(group).push(el);
+                    if (this.seaPorts.has(group)) {
+                        this.seaPorts.get(group).push(el);
                     } else {
-                        this.islandBuildings.set(group, [el]);
+                        this.seaPorts.set(group, [el]);
                     }
-                    this.buildings.push(el);
-                    this.updateBuildings();
+                    this.ports.push(el);
+                    this.updatePorts();
                 } else {
                     setTimeout(this.registerMe.bind(this, el), 100);
                 }
             },
             unregisterMe: function (el) {
                 const group = this.el.sceneEl.systems['globe-nav'].getGroup(el.components['position'].data);
-                if (this.islandBuildings.has(group)) {
-                    const arr = this.islandBuildings.get(group);
+                if (this.seaPorts.has(group)) {
+                    const arr = this.seaPorts.get(group);
                     const idx = arr.indexOf(el);
                     if (idx >= 0) {
                         arr.splice(idx, 1);
                     }
                 }
                 {
-                    const arr = this.buildings;
+                    const arr = this.ports;
                     const idx = arr.indexOf(el);
                     if (idx >= 0) {
                         arr.splice(idx, 1);
@@ -2622,9 +2623,9 @@
                             return v;
                         }
 
-                        const start = new THREE.Vector3().set(this.el.components['position'].data);
-                        const endNew = new THREE.Vector3().set(v.components['position'].data);
-                        const endOld = new THREE.Vector3().set(el.components['position'].data);
+                        const start = new THREE.Vector3().copy(this.el.components['position'].data);
+                        const endNew = new THREE.Vector3().copy(v.components['position'].data);
+                        const endOld = new THREE.Vector3().copy(el.components['position'].data);
                         const distanceNew = start.distanceTo(endNew);
                         const distanceOld = start.distanceTo(endOld);
                         if (distanceNew < distanceOld) {
@@ -2634,6 +2635,101 @@
                     }, undefined);
                     if (nearestBuilding) {
                         this.nearestBuildingType.set(buildingType, nearestBuilding);
+                    }
+                }
+                this.el.emit("found-nearest-building");
+            },
+            remove: function () {
+                this.system.unregisterMe(this.el);
+            },
+        });
+
+        AFRAME.registerSystem('pirate-port', {
+            schema: {},
+            init: function () {
+                this.seaPorts = new Map();
+                this.ports = [];
+                this.updatePorts = debounce(this.innerUpdatePorts.bind(this), 1000);
+            },
+            innerUpdatePorts: function () {
+                this.ports.forEach(el => {
+                    const port = el.components['pirate-port'];
+                    const group = this.el.sceneEl.systems['globe-ocean-nav'].getGroup(el.components['position'].data);
+                    const arr = this.seaPorts.get(group);
+                    if (arr) {
+                        port.locateNearestPort(arr);
+                    }
+                });
+            },
+            registerMe: function (el) {
+                if (this.el.sceneEl.systems['globe-ocean-nav'].navMesh) {
+                    const group = this.el.sceneEl.systems['globe-nav'].getGroup(el.components['position'].data);
+                    if (this.seaPorts.has(group)) {
+                        this.seaPorts.get(group).push(el);
+                    } else {
+                        this.seaPorts.set(group, [el]);
+                    }
+                    this.ports.push(el);
+                    this.updatePorts();
+                } else {
+                    setTimeout(this.registerMe.bind(this, el), 100);
+                }
+            },
+            unregisterMe: function (el) {
+                const group = this.el.sceneEl.systems['globe-ocean-nav'].getGroup(el.components['position'].data);
+                if (this.seaPorts.has(group)) {
+                    const arr = this.seaPorts.get(group);
+                    const idx = arr.indexOf(el);
+                    if (idx >= 0) {
+                        arr.splice(idx, 1);
+                    }
+                }
+                {
+                    const arr = this.ports;
+                    const idx = arr.indexOf(el);
+                    if (idx >= 0) {
+                        arr.splice(idx, 1);
+                    }
+                }
+            },
+        });
+
+        AFRAME.registerComponent('pirate-port', {
+            schema: {},
+            init: function () {
+                this.system.registerMe(this.el);
+                this.el.setAttribute(`pirate-spawner__1`, "");
+            },
+            locateNearestPort: function (ports) {
+                const els = [];
+                for (const el of ports) {
+                    els.push(el);
+                }
+
+                this.nearestPorts = [];
+                for (let i = 0; i < 5; i++) {
+                    const nearestBuilding = els.reduce((el, v) => {
+                        if (!el) {
+                            return v;
+                        }
+                        if (this.nearestPorts.includes(el) || el === this.el) {
+                            return v;
+                        }
+
+                        const start = new THREE.Vector3().copy(this.el.components['position'].data);
+                        const endNew = new THREE.Vector3().copy(v.components['position'].data);
+                        const endOld = new THREE.Vector3().copy(el.components['position'].data);
+                        const distanceNew = start.distanceTo(endNew);
+                        const distanceOld = start.distanceTo(endOld);
+                        if (distanceNew < distanceOld) {
+                            return v;
+                        }
+                        return el;
+                    }, undefined);
+                    if (nearestBuilding) {
+                        this.nearestPorts.push(
+                            nearestBuilding
+                        );
                     }
                 }
                 this.el.emit("found-nearest-building");
@@ -2685,7 +2781,7 @@
                 }
                 this.isReady = true;
                 setTimeout(() => {
-                    this.transition();
+                    this.innerTransition();
                 }, 10_000);
             },
             transition: function (evt) {
@@ -2711,7 +2807,7 @@
                     if (this.otherBuilding) {
                         this.isHome = false;
                         if (this.currentNpcId) {
-                            updateWalkingNpc(this.elId, this.otherBuilding);
+                            updateWalkingNpc(this.currentNpcId, this.otherBuilding);
                         } else {
                             this.currentNpcId = addWalkingNpc(this.elId, this.el, this.otherBuilding);
                         }
@@ -2719,7 +2815,7 @@
                 } else {
                     this.isHome = true;
                     if (this.currentNpcId) {
-                        updateWalkingNpc(this.elId, this.el);
+                        updateWalkingNpc(this.currentNpcId, this.el);
                     } else {
                         this.currentNpcId = addWalkingNpc(this.elId, this.otherBuilding, this.el);
                     }
@@ -2744,13 +2840,98 @@
             remove: function () {
                 this.el.removeEventListener('found-nearest-building', this.innerInitFiniteStateMachine);
                 this.el.removeEventListener('transition', this.innerTransition);
+                this.el.removeEventListener('dead', this.innerHandleDead);
             },
         });
 
         AFRAME.registerComponent('pirate-spawner', {
             schema: {},
+            multiple: true,
             init: function () {
-                addPirateShip(this.el.id, this.el, this.el);
+                if (this.el.id) {
+                    this.elId = this.el.id;
+                } else {
+                    this.elId = "id" + Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(36);
+                    this.el.setAttribute("id", this.elId);
+                }
+                this.currentNpcId = null;
+                this.initFiniteStateMachine();
+                this.innerInitFiniteStateMachine = this.initFiniteStateMachine.bind(this)
+                this.innerTransition = this.transition.bind(this);
+                this.innerHandleDead = this.handleDead.bind(this);
+                this.el.addEventListener('found-nearest-building', this.innerInitFiniteStateMachine);
+                this.el.addEventListener('transition', this.innerTransition);
+                this.el.addEventListener('dead', this.innerHandleDead);
+            },
+            initFiniteStateMachine: function () {
+                const building = this.el.components['pirate-port'];
+                if (!building.nearestPorts || this.isReady) {
+                    return;
+                }
+                this.isHome = true;
+                this.otherPorts = [...building.nearestPorts];
+                this.isReady = true;
+                setTimeout(() => {
+                    this.innerTransition();
+                }, 10_000);
+            },
+            transition: function (evt) {
+                const npcId = evt?.detail ?? null;
+                if (!this.isReady) {
+                    setTimeout(() => {
+                        this.innerTransition(evt);
+                    }, 10_000);
+                    return;
+                }
+                if (!window.spawnNpcsFlag) {
+                    setTimeout(() => {
+                        this.innerTransition(evt);
+                    }, 10_000);
+                    return;
+                }
+                if (npcId && npcId !== this.currentNpcId) {
+                    return;
+                }
+                if (this.isHome) {
+                    const arr = this.otherPorts;
+                    this.otherPort = arr[Math.floor(Math.random() * arr.length)];
+                    if (this.otherPort) {
+                        this.isHome = false;
+                        if (this.currentNpcId) {
+                            updatePirateShip(this.currentNpcId, this.otherPort);
+                        } else {
+                            this.currentNpcId = addPirateShip(this.elId, this.el, this.otherPort);
+                        }
+                    }
+                } else {
+                    this.isHome = true;
+                    if (this.currentNpcId) {
+                        updatePirateShip(this.currentNpcId, this.el);
+                    } else {
+                        this.currentNpcId = addPirateShip(this.elId, this.otherPort, this.el);
+                    }
+                    this.otherPort = undefined;
+                }
+            },
+            handleDead: function (evt) {
+                const npcId = evt?.detail ?? null;
+                if (!this.isReady) {
+                    setTimeout(() => {
+                        this.innerHandleDead(evt);
+                    }, 10_000);
+                    return;
+                }
+                if (npcId && npcId !== this.currentNpcId) {
+                    return;
+                }
+                if (npcId && npcId === this.currentNpcId) {
+                    this.el.removeAttribute(`pirate-spawner__${this.id}`);
+                }
+            },
+            remove: function () {
+                this.el.removeEventListener('found-nearest-building', this.innerInitFiniteStateMachine);
+                this.el.removeEventListener('transition', this.innerTransition);
+                this.el.removeEventListener('dead', this.innerHandleDead);
             },
         });
 
@@ -3495,12 +3676,6 @@
             }, 2000);
         }
 
-        function removeWalkingNpc(npcId) {
-            const scene = document.querySelector("a-scene");
-            const a = document.querySelector(`#${npcId}`);
-            scene.removeChild(a);
-        }
-
         function addPirateShipSpawnPoint(data) {
             const scene = document.querySelector("a-scene");
             const terrain = scene.querySelector("#terrain");
@@ -3513,7 +3688,7 @@
             entity.setAttribute("class", "pirate-ship-spawn");
             entity.setAttribute("building-id", "");
             entity.setAttribute("position", `${point[0]} ${point[1]} ${point[2]}`);
-            entity.setAttribute("pirate-spawner", "");
+            entity.setAttribute("pirate-port", "");
             terrain.appendChild(entity);
 
 
@@ -3538,6 +3713,9 @@
             rootShip.setAttribute("ship-death", "");
             rootShip.setAttribute("fire-cannons", "");
             rootShip.setAttribute("firing-cannons", "");
+            rootShip.setAttribute("globe-keyboard-controls", "enabled: true; fly: true; npc: true;");
+            rootShip.setAttribute("globe-ocean-nav-agent", `active: false;`);
+            rootShip.setAttribute("npc-agent", `building: #${buildingId}`);
             rootShip.setAttribute("shadow", "");
             rootShip.setAttribute("ship-health", "");
             rootShip.setAttribute("cannonball-collider", "");
@@ -3554,6 +3732,12 @@
             rootShip.setAttribute("networked", "template: #pirate-ship-template; attachTemplateToLocal: false;");
 
             scene.appendChild(rootShip);
+
+            setTimeout(() => {
+                rootShip.setAttribute("globe-ocean-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 1;`);
+            }, 2000);
+
+            return id;
         }
 
         function updatePirateShip(npcId, destinationEl) {
