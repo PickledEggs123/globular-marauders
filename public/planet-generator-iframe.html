@@ -2807,7 +2807,7 @@
                     if (this.otherBuilding) {
                         this.isHome = false;
                         if (this.currentNpcId) {
-                            updateWalkingNpc(this.elId, this.otherBuilding);
+                            updateWalkingNpc(this.currentNpcId, this.otherBuilding);
                         } else {
                             this.currentNpcId = addWalkingNpc(this.elId, this.el, this.otherBuilding);
                         }
@@ -2815,7 +2815,7 @@
                 } else {
                     this.isHome = true;
                     if (this.currentNpcId) {
-                        updateWalkingNpc(this.elId, this.el);
+                        updateWalkingNpc(this.currentNpcId, this.el);
                     } else {
                         this.currentNpcId = addWalkingNpc(this.elId, this.otherBuilding, this.el);
                     }
