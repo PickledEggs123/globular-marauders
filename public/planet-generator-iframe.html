@@ -1613,16 +1613,28 @@
                 code = event.code || KEYCODE_TO_CODE[event.keyCode];
 
                 if (code === "KeyE") {
-                    const leftCannonFire = document.querySelector("#left-cannon-fire");
-                    leftCannonFire.components["select-cannon-side"].innerSelectCannonSide();
+                    if (event.synthetic) {
+                        this.el.emit("fire-cannons", "left-cannon");
+                    } else {
+                        const leftCannonFire = document.querySelector("#left-cannon-fire");
+                        leftCannonFire.components["select-cannon-side"].innerSelectCannonSide();
+                    }
                 }
                 if (code === "KeyQ") {
-                    const rightCannonFire = document.querySelector("#right-cannon-fire");
-                    rightCannonFire.components["select-cannon-side"].innerSelectCannonSide();
+                    if (event.synthetic) {
+                        this.el.emit("fire-cannons", "right-cannon");
+                    } else {
+                        const rightCannonFire = document.querySelector("#right-cannon-fire");
+                        rightCannonFire.components["select-cannon-side"].innerSelectCannonSide();
+                    }
                 }
                 if (code === "KeyF") {
-                    const noneCannonFire = document.querySelector("#none-cannon-fire");
-                    noneCannonFire.components["select-cannon-side"].innerSelectCannonSide();
+                    if (event.synthetic) {
+                        this.el.emit("fire-cannons", "none-cannon");
+                    } else {
+                        const noneCannonFire = document.querySelector("#none-cannon-fire");
+                        noneCannonFire.components["select-cannon-side"].innerSelectCannonSide();
+                    }
                 }
 
                 const scene = document.querySelector("a-scene");
@@ -2663,7 +2675,7 @@
             },
             registerMe: function (el) {
                 if (this.el.sceneEl.systems['globe-ocean-nav'].navMesh) {
-                    const group = this.el.sceneEl.systems['globe-nav'].getGroup(el.components['position'].data);
+                    const group = this.el.sceneEl.systems['globe-ocean-nav'].getGroup(el.components['position'].data);
                     if (this.seaPorts.has(group)) {
                         this.seaPorts.get(group).push(el);
                     } else {
@@ -2961,6 +2973,174 @@
             schema: {
                 type: 'string',
                 default: ''
+            },
+        });
+
+        AFRAME.registerComponent('pirate-aim', {
+            schema: {},
+            init: function () {
+                this.target = null;
+                this.prevTarget = null;
+            },
+            tick: function (t, dt) {
+                const el = this.el;
+                if (!this.target) {
+                    if (this.prevTarget) {
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyW", synthetic: true});
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD", synthetic: true});
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA", synthetic: true});
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyE", synthetic: true});
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyQ", synthetic: true});
+                    }
+                    this.prevTarget = this.target;
+                    return;
+                }
+                this.prevTarget = this.target;
+
+                const vPos = new THREE.Vector3().copy(el.components['dynamic-body'].body.position);
+                const vForward = new THREE.Vector3(0, 0, -1).applyQuaternion(new THREE.Quaternion().copy(el.components['dynamic-body'].body.quaternion));
+                const vTargetPos = new THREE.Vector3().copy(this.target.components['dynamic-body'].body.position);
+
+                // Look at the next waypoint.
+                // gazeTarget.y = vCurrent.y;
+                // |  x  y  z |
+                // | ax ay az |
+                // | bx by bz |
+                const getDeterminant = (vCurrent, forward, gazeTarget) => {
+                    const a = vCurrent.clone().normalize();
+                    const v1 = forward.clone().normalize();
+                    const v2 = gazeTarget.clone().sub(vCurrent.clone()).normalize();
+
+                    // make two vectors for determinant
+                    let ax = v1.x;
+                    let ay = v1.y;
+                    let az = v1.z;
+                    let bx = v2.x;
+                    let by = v2.y;
+                    let bz = v2.z;
+
+                    // make basis matrix for sphere
+                    let aVec = new THREE.Vector3().set(ax, ay, az).normalize();
+                    let bVec = new THREE.Vector3().set(bx, by, bz).normalize();
+                    const basisY = aVec.clone().normalize();
+                    const basisZ = a.clone().normalize();
+                    const basisX = new THREE.Vector3().crossVectors(basisY, basisZ);
+                    const basis = new THREE.Matrix4().makeBasis(basisX, basisY, basisZ).invert();
+
+                    // apply basis matrix
+                    aVec = aVec.applyMatrix4(basis);
+                    bVec = bVec.applyMatrix4(basis);
+                    ax = aVec.x;
+                    ay = aVec.y;
+                    az = aVec.z;
+                    bx = bVec.x;
+                    by = bVec.y;
+                    bz = bVec.z;
+
+                    let det = ax * by + ay * bz + az * bx - ay * bx - az * by - ax * bz;
+                    if (isNaN(det)) {
+                        return 0;
+                    }
+                    if (aVec.dot(bVec) < 0) {
+                        det += Math.sign(det);
+                    }
+                    return det;
+                };
+                const det2 = getDeterminant(vPos, vForward, vTargetPos);
+
+                // get direction or side of boat target is on
+                const vSide = new THREE.Vector3(det2 <= 0 ? 1 : -1, 0, 0)
+                    .applyQuaternion(new THREE.Quaternion().copy(el.components['dynamic-body'].body.quaternion));
+                const det3 = getDeterminant(vPos, vSide, vTargetPos);
+                if (det3 < 0) {
+                    if (Math.random() * 0.5 < Math.abs(det3)) {
+                        el.components['globe-keyboard-controls'].onKeyDown({code: "KeyD", synthetic: true});
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA", synthetic: true});
+                    } else {
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA", synthetic: true});
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD", synthetic: true});
+                    }
+                } else if (det3 > 0) {
+                    if (Math.random() * 0.33 < Math.abs(det3)) {
+                        el.components['globe-keyboard-controls'].onKeyDown({code: "KeyA", synthetic: true});
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD", synthetic: true});
+                    } else {
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD", synthetic: true});
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA", synthetic: true});
+                    }
+                } else {
+                    el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA", synthetic: true});
+                    el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD", synthetic: true});
+                }
+
+                if (Math.abs(det3) < 0.1) {
+                    if (Math.random() < 0.5) {
+                        el.components['globe-keyboard-controls'].onKeyDown({code: det2 >= 0 ? "KeyQ" : "KeyE", synthetic: true});
+                    } else {
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyQ", synthetic: true});
+                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyE", synthetic: true});
+                    }
+                } else {
+                    el.components['globe-keyboard-controls'].onKeyUp({code: "KeyQ", synthetic: true});
+                    el.components['globe-keyboard-controls'].onKeyUp({code: "KeyE", synthetic: true});
+                }
+            },
+        });
+        AFRAME.registerComponent('pirate-attack', {
+            schema: {
+                range: {type: 'number', default: 5},
+            },
+            init: function () {
+                this.attackEls = [];
+                this.innerAttack = this.attack.bind(this);
+                this.innerBeginAttack = this.beginAttack.bind(this);
+                this.innerEndAttack = this.endAttack.bind(this);
+                this.el.addEventListener('pirate-attack', this.innerAttack);
+                this.el.addEventListener('pirate-begin-attack', this.innerBeginAttack);
+                this.el.addEventListener('pirate-end-attack', this.innerEndAttack);
+
+                this.tickCounter = 0;
+                this.findTickCount = 2;
+                this.wasAttacking = false;
+            },
+            remove: function () {
+                this.el.removeEventListener('pirate-attack', this.innerAttack);
+                this.el.removeEventListener('pirate-begin-attack', this.innerBeginAttack);
+                this.el.removeEventListener('pirate-end-attack', this.innerEndAttack);
+                this.attackEls = [];
+            },
+            tick: function (t, dt) {
+                if (this.tickCounter < this.findTickCount) {
+                    this.tickCounter += dt / 1000;
+                    return;
+                }
+                this.tickCounter = 0;
+
+                const pos = this.el.object3D.position;
+                for (const el of this.attackEls) {
+                    const p = el.object3D.position;
+                    const distance = pos.distanceTo(p);
+                    if (distance < this.data.range) {
+                        this.el.emit('pirate-begin-attack', el);
+                        this.wasAttacking = true;
+                        return;
+                    }
+                }
+                if (this.wasAttacking) {
+                    this.wasAttacking = false;
+                    this.el.emit('pirate-end-attack');
+                }
+            },
+            attack: function (evt) {
+                this.attackEls = evt.detail;
+            },
+            beginAttack: function (evt) {
+                this.el.components['pirate-aim'].target = evt.detail;
+                this.el.setAttribute('globe-ocean-nav-agent', { enabled: false });
+            },
+            endAttack: function (evt) {
+                this.el.components['pirate-aim'].target = null;
+                this.el.setAttribute('globe-ocean-nav-agent', { enabled: true });
             },
         });
 
@@ -3427,6 +3607,16 @@
                 rootGoldCoin.setAttribute("shadow", "");
             }
 
+            if (charModelId === "SHIP") {
+                rootGoldCoin.setAttribute("npc-faction", "other-players");
+                rootGoldCoin.setAttribute("npc-finder", "active: false;");
+            }
+
+            if (charModelId === "PIRATE_SHIP") {
+                rootGoldCoin.setAttribute("npc-faction", "pirate");
+                rootGoldCoin.setAttribute("npc-finder", "active: false;");
+            }
+
             if (charModelId === "PERSON") {
                 rootGoldCoin.setAttribute("npc-faction", "native");
                 rootGoldCoin.setAttribute("npc-finder", "active: false;");
@@ -3434,7 +3624,7 @@
             }
 
             if (charModelId === "WARRIOR") {
-                rootGoldCoin.setAttribute("npc-faction", "player");
+                rootGoldCoin.setAttribute("npc-faction", "other-players");
                 rootGoldCoin.setAttribute("npc-finder", "active: false;");
                 rootGoldCoin.setAttribute("networked-health", "");
             }
@@ -3603,6 +3793,7 @@
             rootProjectile.setAttribute("cannonball-collider-ground", "");
             rootProjectile.setAttribute("cannonball-collider-water", "");
             rootProjectile.setAttribute("cannonball-hit-ready", "");
+            rootProjectile.setAttribute("npc-faction", el.parentElement.parentElement.components["npc-faction"].data);
             rootProjectile.setAttribute("despawn", "");
 
             if (characterModels.has("CANNONBALL")) {
@@ -3687,11 +3878,10 @@
             const entity = document.createElement("a-entity");
             entity.setAttribute("class", "pirate-ship-spawn");
             entity.setAttribute("building-id", "");
+            entity.setAttribute("terrain-tile", `${point[0]} ${point[1]} ${point[2]}`);
             entity.setAttribute("position", `${point[0]} ${point[1]} ${point[2]}`);
             entity.setAttribute("pirate-port", "");
             terrain.appendChild(entity);
-
-
         }
 
         function addPirateShip(buildingId, buildingEl, destinationEl) {
@@ -3721,13 +3911,17 @@
             rootShip.setAttribute("cannonball-collider", "");
             rootShip.setAttribute("position", `${pos.x} ${pos.y} ${pos.z}`);
             rootShip.setAttribute("rotation", "0 0 0");
+            rootShip.setAttribute("npc-faction", "pirate");
+            rootShip.setAttribute("pirate-finder", "active: true;");
+            rootShip.setAttribute("pirate-attack", "range: 10");
+            rootShip.setAttribute("pirate-aim", "");
 
             const rootModel = document.createElement("a-entity");
             rootModel.setAttribute("class", "data");
             rootModel.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; capacity: 100; memberMesh: true`);
             rootModel.setAttribute("scale", "0.1 0.1 0.1");
             rootModel.setAttribute("rotation", "0 -90 0");
-            rootModel.setAttribute("setup-cannons", "");
+            rootModel.setAttribute("setup-cannons", `url: ${str};`);
             rootShip.appendChild(rootModel);
             rootShip.setAttribute("networked", "template: #pirate-ship-template; attachTemplateToLocal: false;");
 
@@ -4063,6 +4257,9 @@
             rootShip.setAttribute("shadow", "");
             rootShip.setAttribute("position", `${point[0]} ${point[1]} ${point[2]}`);
             rootShip.setAttribute("rotation", "0 0 0");
+            rootShip.setAttribute("npc-faction", "player");
+            rootShip.setAttribute("cannonball-collider", "");
+            rootShip.setAttribute("pirate-finder", "active: false;");
 
             const rootModel = document.createElement("a-entity");
             rootModel.setAttribute("class", "data");
@@ -4070,7 +4267,7 @@
             rootModel.setAttribute("go-to-sea", "");
             rootModel.setAttribute("scale", "0.1 0.1 0.1");
             rootModel.setAttribute("rotation", "0 -90 0");
-            rootModel.setAttribute("setup-cannons", "");
+            rootModel.setAttribute("setup-cannons", `url: ${str}`);
             rootShip.appendChild(rootModel);
             rootShip.setAttribute("networked", "template: #ship-template; attachTemplateToLocal: false;");
 
@@ -4100,8 +4297,12 @@
             scene.setAttribute("networked-scene", `room: ${roomId}; adapter: ws; debug: true;`);
         }
 
+        window.didSpawnNpcsFlag = false;
         function spawnNpcsNow() {
-            window.spawnNpcsFlag = true;
+            if (!window.didSpawnNpcsFlag) {
+                window.spawnNpcsFlag = true;
+                window.didSpawnNpcsFlag = true;
+            }
         }
 
         if (window.location.href.includes("localhost:3000")) {
@@ -4220,7 +4421,7 @@
             init: function () {
                 this.respawnTick = +new Date();
                 this.activeRespawn = true;
-                this.respawnTime = 10_000;
+                this.respawnTime = 15_000;
             },
             tick: function (t, dt) {
                 // respawn 5 seconds after no more ships
@@ -4253,7 +4454,9 @@
         });
 
         AFRAME.registerComponent('setup-cannons', {
-            schema: {},
+            schema: {
+                url: {type: 'string'},
+            },
             init: function () {
                 const updateMesh = (e) => {
                     const meshes = [];
@@ -4287,7 +4490,7 @@
                         this.el.appendChild(positionEntity);
                     });
                 };
-                const shipMesh = document.querySelector(`#${getBuildingLodHash(window.shipModelStr, 100, "auto")}`);
+                const shipMesh = document.querySelector(`#${getBuildingLodHash(this.data.url, 100, "auto")}`);
                 const m = shipMesh.getObject3D("mesh");
                 if (m) {
                     updateMesh(m);
@@ -4374,7 +4577,10 @@
             },
             firingCannons: function (e) {
                 const selector = `.${e.detail}`;
-                const cannons = Array.from(this.el.querySelectorAll(selector));
+                let cannons = Array.from(this.el.querySelectorAll(selector));
+                if (!cannons.length) {
+                    cannons = Array.from(this.el.object3D.el.querySelectorAll(selector));
+                }
                 cannons.forEach(cannon => {
                     const worldPosition = cannon.object3D.getWorldPosition(new THREE.Vector3());
                     worldPosition.add(worldPosition.clone().normalize().multiplyScalar(1.2));
@@ -4463,7 +4669,9 @@
             tick: function (t, dt) {
                 const shipPosition = this.el.object3D.getWorldPosition(new THREE.Vector3());
                 const cannonballs = Array.from(document.querySelectorAll("[cannonball-hit-ready]"));
-                cannonballs.forEach((cannonball) => {
+                cannonballs.filter(x => {
+                    return x.components['npc-faction'].data !== this.el.components['npc-faction'].data;
+                }).forEach((cannonball) => {
                     const cannonballPosition = cannonball.object3D.getWorldPosition(new THREE.Vector3());
                     const distance = shipPosition.distanceTo(cannonballPosition);
                     if (distance < 1.5 && !this.cannonballHits.has(cannonball)) {
@@ -4836,6 +5044,113 @@
 
                 const els = this.system.findNpc(this.el);
                 this.el.emit('npc-attack', els);
+            },
+            remove: function () {
+                this.system.unregisterMe(this.el);
+                this.tickCounter = null;
+                this.findTickCount = null;
+                this.el.removeEventListener("navigation-group-change", this.innerHandleNavigationGroupChange);
+                this.el.removeEventListener("navigation-group-changed", this.innerHandleNavigationGroupChanged);
+            },
+            navigationGroupChange: function () {
+                this.system.unregisterMe(this.el);
+            },
+            navigationGroupChanged: function () {
+                this.system.registerMe(this.el);
+            },
+        });
+
+        AFRAME.registerSystem('pirate-finder', {
+            schema: {},
+            init: function () {
+                this.seaNpcList = new Map();
+                this.npcs = [];
+                this.findNpc = this.findNpc.bind(this);
+            },
+            registerMe: function (el) {
+                const pos = el.object3D.position;
+                if (pos.length() === 0) {
+                    setTimeout(this.registerMe.bind(this, el), 1000);
+                    return;
+                }
+
+                if (this.el.sceneEl.systems['globe-ocean-nav'].navMesh) {
+                    const group = this.el.sceneEl.systems['globe-ocean-nav'].getGroup(pos);
+                    if (this.seaNpcList.has(group)) {
+                        this.seaNpcList.get(group).push(el);
+                    } else {
+                        this.seaNpcList.set(group, [el]);
+                    }
+                    this.npcs.push(el);
+                } else {
+                    setTimeout(this.registerMe.bind(this, el), 100);
+                }
+            },
+            unregisterMe: function (el) {
+                const group = this.el.sceneEl.systems['globe-ocean-nav'].getGroup(el.object3D.position);
+                if (this.seaNpcList.has(group)) {
+                    const arr = this.seaNpcList.get(group);
+                    const idx = arr.indexOf(el);
+                    if (idx >= 0) {
+                        arr.splice(idx, 1);
+                    }
+                }
+                {
+                    const arr = this.npcs;
+                    const idx = arr.indexOf(el);
+                    if (idx >= 0) {
+                        arr.splice(idx, 1);
+                    }
+                }
+            },
+            findNpc: function (checkingNpc) {
+                const factionName = checkingNpc.components['npc-faction'].data;
+                const position = new THREE.Vector3().copy(checkingNpc.object3D.position);
+                const radius = 20;
+                const group = this.el.sceneEl.systems['globe-ocean-nav'].getGroup(position);
+                if (this.seaNpcList.has(group)) {
+                    const list = this.seaNpcList.get(group);
+                    const els = list.filter(x => {
+                        const pos = x.object3D.position;
+                        const dist = position.distanceTo(pos);
+                        return dist <= radius;
+                    });
+                    const filtered = els.filter(x => x && x.components['npc-faction'].data !== factionName);
+                    return filtered.sort((a, b) => {
+                        const distA = new THREE.Vector3().copy(a.object3D.position).distanceTo(position);
+                        const distB = new THREE.Vector3().copy(b.object3D.position).distanceTo(position);
+                        return distA - distB;
+                    })
+                }
+                return [];
+            },
+        });
+
+        AFRAME.registerComponent('pirate-finder', {
+            schema: {
+                active: {type: 'boolean', default: false},
+            },
+            init: function () {
+                this.system = this.el.sceneEl.systems['pirate-finder'];
+                this.system.registerMe(this.el);
+                this.tickCounter = Math.random() * 10;
+                this.tickFindCount = 10;
+                this.innerHandleNavigationGroupChange = this.navigationGroupChange.bind(this);
+                this.innerHandleNavigationGroupChanged = this.navigationGroupChanged.bind(this);
+            },
+            tick: function (t, dt) {
+                if (!this.data.active) {
+                    return;
+                }
+
+                if (this.tickCounter < this.tickFindCount) {
+                    this.tickCounter += dt / 1000;
+                    return;
+                }
+                this.tickCounter = 0;
+
+                const els = this.system.findNpc(this.el);
+                this.el.emit('pirate-attack', els);
             },
             remove: function () {
                 this.system.unregisterMe(this.el);
