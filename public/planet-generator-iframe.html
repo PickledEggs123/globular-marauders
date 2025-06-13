@@ -3793,7 +3793,16 @@
             rootProjectile.setAttribute("cannonball-collider-ground", "");
             rootProjectile.setAttribute("cannonball-collider-water", "");
             rootProjectile.setAttribute("cannonball-hit-ready", "");
-            rootProjectile.setAttribute("npc-faction", el.parentElement.parentElement.components["npc-faction"].data);
+            function findParentAttribute(el, attribute) {
+                if (!el) {
+                    return "";
+                }
+                if (el.components[attribute]) {
+                    return el.components[attribute].data;
+                }
+                return findParentAttribute(el.parentElement, attribute);
+            }
+            rootProjectile.setAttribute("npc-faction", findParentAttribute(el, "npc-faction"));
             rootProjectile.setAttribute("despawn", "");
 
             if (characterModels.has("CANNONBALL")) {
