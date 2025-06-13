@@ -3467,8 +3467,8 @@
             },
             handleHit: function (evt) {
                 const hit = evt.detail;
-                const senderId = this.el.parentEl.components['networked'].data.owner;
-                const networkId = this.el.parentEl.components['networked'].data.networkId;
+                const senderId = this.el.components['networked'].data.owner;
+                const networkId = this.el.components['networked'].data.networkId;
                 NAF.connection.sendDataGuaranteed(senderId, "networkedShipHealth", {
                     networkId,
                     hit,
@@ -4474,8 +4474,20 @@
                             meshes.push(x);
                         }
                     });
-                    const leftCannons = meshes.filter(x => x.position.z <= 0);
-                    const rightCannons = meshes.filter(x => x.position.z > 0);
+                    let leftCannons;
+                    let rightCannons;
+                    if (meshes.length) {
+                        leftCannons = meshes.filter(x => x.position.z <= 0);
+                        rightCannons = meshes.filter(x => x.position.z > 0);
+                    } else {
+                        e.el.components['instanced-mesh'].originalMesh.traverse((x) => {
+                            if (x.isObject3D && x.name.includes("Canon")) {
+                                meshes.push(x);
+                            }
+                        });
+                        leftCannons = meshes.filter(x => x.position.z <= 0);
+                        rightCannons = meshes.filter(x => x.position.z > 0);
+                    }
                     leftCannons.forEach(x => {
                         const entity = document.createElement("a-entity");
                         entity.setAttribute("position", x.position);
