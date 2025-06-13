@@ -3598,9 +3598,9 @@
                 dataEl.setAttribute("scale", "0.1 0.1 0.1");
                 dataEl.setAttribute("rotation", "0 -90 0");
                 dataEl.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; memberMesh: ${memberMesh};`);
-                dataEl.setAttribute("networked-ship-health", "");
-                dataEl.setAttribute("cannonball-collider", "");
                 dataEl.setAttribute("shadow", "");
+                rootGoldCoin.setAttribute("networked-ship-health", "");
+                rootGoldCoin.setAttribute("cannonball-collider", "");
                 rootGoldCoin.appendChild(dataEl);
             } else {
                 rootGoldCoin.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; capacity: 1000; memberMesh: ${memberMesh};`);
