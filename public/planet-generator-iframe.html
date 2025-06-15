@@ -4028,7 +4028,10 @@
             const destination2 = destinationEl.components['position'].data;
             rootNpc.setAttribute("networked-globe-nav-agent", {active: false});
             setTimeout(() => {
-                const start = rootNpc.components['networked-globe-nav-agent'].data.destination;
+                const start = new THREE.Vector3().copy(rootNpc.components['networked-globe-nav-agent'].data.destination);
+                if (start.length() <= 0) {
+                    start.copy(destination2);
+                }
                 rootNpc.setAttribute("networked-globe-nav-agent", `active: true; start: ${start.x} ${start.y} ${start.z}; startTime: ${+new Date()}; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 1;`);
             }, 2000);
         }
