@@ -1821,6 +1821,148 @@
             }
         });
 
+        AFRAME.registerComponent('networked-globe-nav-agent', {
+            schema: {
+                start: {type: 'vec3'},
+                destination: {type: 'vec3'},
+                startTime: {type: 'number'},
+                active: {default: false},
+                speed: {default: 2},
+                razeTarget: {
+                    type: 'selector',
+                    default: null,
+                },
+            },
+            system: null,
+            group: null,
+            path: [],
+            pathDistance: 0,
+            init: function () {
+                this.system = this.el.sceneEl.systems['globe-nav'];
+                this.system.addAgent(this);
+                this.group = null;
+                this.path = [];
+                this.material = new THREE.LineBasicMaterial({ color: 0xffffff });
+                this.geometry = new THREE.BufferGeometry().setFromPoints([]);
+                this.line = new THREE.Line(this.geometry, this.material);
+                this.debugId = "id" + Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(36);
+            },
+            remove: function () {
+                const scene = document.querySelector("a-scene");
+                this.system.removeAgent(this);
+                const el = this.el;
+                if (el.classList.contains(`${scene.components['coin-purse'].activeUnit}`)) {
+                    if (this.el.sceneEl.object3DMap[`line-debug-${this.debugId}`]) {
+                        this.el.sceneEl.removeObject3D(`line-debug-${this.debugId}`);
+                    }
+                }
+            },
+            update: function () {
+                this.path.length = 0;
+                this.pathDistance = 0;
+            },
+            updateNavLocation: function () {
+                this.group = null;
+                this.path = [];
+                this.pathDistance = 0;
+            },
+            tick: function (t, dt) {
+                const vDest = new THREE.Vector3();
+                const vDelta = new THREE.Vector3();
+                const vNext = new THREE.Vector3();
+
+                const el = this.el;
+                const data = this.data;
+                const speed = data.speed * dt / 1000;
+                const time = (+new Date() - data.startTime) / 1000;
+                const pathDistance = data.speed * time;
+
+                if (!data.active) return;
+
+                const object3D = this.el.object3D;
+                const pos = object3D.getWorldPosition(new THREE.Vector3());
+
+                const cameraEl = document.querySelector("#camera-rig");
+                const cameraPos = cameraEl.object3D.getWorldPosition(new THREE.Vector3());
+
+                const cameraDistance = pos.distanceTo(cameraPos);
+                object3D.visible = cameraDistance < 20;
+
+                // Use PatrolJS pathfinding system to get the shortest path to target.
+                if (!this.path.length) {
+                    const position = new THREE.Vector3().copy(data.start);
+                    this.group = this.group || this.system.getGroup(position);
+                    this.path = this.system.getPath(position, vDest.copy(data.destination), this.group) || [];
+                    el.emit('navigation-start');
+                }
+
+                // If no path is found, exit.
+                if (!this.path.length) {
+                    // console.warn('[nav] Unable to find path to %o.', data.destination);
+                    this.el.setAttribute("globe-nav-agent", "active: false;");
+                    el.emit('navigation-end');
+                    el.emit('navigation-group-change');
+                    el.object3D.position.copy(vDest);
+                    this.group = null;
+                    el.emit('navigation-group-changed');
+                    return;
+                }
+
+                while (this.path.length && pathDistance - this.pathDistance >= 0) {
+                    // Current segment is a vector from current position to next waypoint.
+                    const vCurrent = el.object3D.position;
+                    const vWaypoint = this.path[0];
+                    vDelta.subVectors(vWaypoint, vCurrent);
+
+                    const distance = vDelta.length();
+                    let gazeTarget;
+
+                    if (distance <= pathDistance - this.pathDistance) {
+                        // If <1 step from current waypoint, discard it and move toward next.
+                        this.path.shift();
+                        this.pathDistance += distance;
+
+                        // After discarding the last waypoint, exit pathfinding.
+                        if (!this.path.length) {
+                            this.el.setAttribute("globe-nav-agent", "active: false;");
+                            if (this.data.razeTarget) {
+                                this.data.razeTarget.emit("raze");
+                            }
+                            el.emit('navigation-end');
+                            return;
+                        }
+
+                        vNext.copy(vDelta.clone().add(vCurrent));
+                        gazeTarget = this.path[0];
+                    } else {
+                        // If still far away from next waypoint, find next position for
+                        // the current frame.
+                        this.pathDistance += speed;
+                        vNext.copy(vDelta.setLength(speed)).add(vCurrent);
+                        gazeTarget = vWaypoint;
+                    }
+
+                    // Look at the next waypoint.
+                    // gazeTarget.y = vCurrent.y;
+                    el.object3D.up = new THREE.Vector3().copy(vCurrent).normalize();
+                    el.object3D.lookAt(gazeTarget);
+
+                    vCurrent.copy(vNext);
+                }
+
+                const scene = document.querySelector("a-scene");
+                if (el.classList.contains(`${scene.components['coin-purse'].activeUnit}`)) {
+                    if (this.el.sceneEl.object3DMap[`line-debug-${this.debugId}`]) {
+                        this.el.sceneEl.removeObject3D(`line-debug-${this.debugId}`);
+                    }
+                    this.geometry.setFromPoints([this.el.object3D.position, ...this.path].map(x => new THREE.Vector3().addVectors(x, x.clone().normalize())));
+                    this.geometry.computeBoundingSphere();
+                    this.line = new THREE.Line(this.geometry, this.material);
+                    this.el.sceneEl.setObject3D(`line-debug-${this.debugId}`, this.line);
+                }
+            },
+        });
+
         AFRAME.registerComponent('globe-nav-agent', {
             schema: {
                 destination: {type: 'vec3'},
@@ -1934,7 +2076,7 @@
                         return;
                     }
 
-                    vNext.copy(vCurrent);
+                    vNext.copy(vDelta.clone().add(vCurrent));
                     gazeTarget = this.path[0];
                 } else {
                     // If still far away from next waypoint, find next position for
@@ -3683,6 +3825,20 @@
                             ]
                         });
                     }
+                } else if (charModelId === "PERSON") {
+                    if (!NAF.schemas.hasTemplate(`#${templateId}`)) {
+                        NAF.schemas.add({
+                            template: `#${templateId}`,
+                            components: [
+                                {
+                                    component: 'networked-globe-nav-agent',
+                                },
+                                {
+                                    component: 'globe-networked-instanced-mesh-member',
+                                },
+                            ]
+                        });
+                    }
                 } else {
                     if (!NAF.schemas.hasTemplate(`#${templateId}`)) {
                         NAF.schemas.add({
@@ -3842,10 +3998,10 @@
             rootNpc.setAttribute("npc-finder", "active: false;");
             rootNpc.setAttribute("health", "");
             rootNpc.setAttribute("spawn-gold", "");
-            rootNpc.setAttribute("globe-nav-agent", `active: false;`);
+            rootNpc.setAttribute("networked-globe-nav-agent", `active: false;`);
             rootNpc.setAttribute("shadow", "");
             setTimeout(() => {
-                rootNpc.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 1;`);
+                rootNpc.setAttribute("networked-globe-nav-agent", `active: true; start: ${pos.x} ${pos.y} ${pos.z}; startTime: ${+new Date()}; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 1;`);
             }, 2000);
 
             if (characterModels.has("PERSON")) {
@@ -3870,9 +4026,10 @@
         function updateWalkingNpc(npcId, destinationEl) {
             const rootNpc = document.querySelector(`#${npcId}`);
             const destination2 = destinationEl.components['position'].data;
-            rootNpc.setAttribute("globe-nav-agent", `active: false;`);
+            rootNpc.setAttribute("networked-globe-nav-agent", {active: false});
             setTimeout(() => {
-                rootNpc.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 1;`);
+                const start = rootNpc.components['networked-globe-nav-agent'].data.destination;
+                rootNpc.setAttribute("networked-globe-nav-agent", `active: true; start: ${start.x} ${start.y} ${start.z}; startTime: ${+new Date()}; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 1;`);
             }, 2000);
         }
 
@@ -3916,7 +4073,6 @@
             rootShip.setAttribute("globe-ocean-nav-agent", `active: false;`);
             rootShip.setAttribute("npc-agent", `building: #${buildingId}`);
             rootShip.setAttribute("shadow", "");
-            rootShip.setAttribute("ship-health", "");
             rootShip.setAttribute("cannonball-collider", "");
             rootShip.setAttribute("position", `${pos.x} ${pos.y} ${pos.z}`);
             rootShip.setAttribute("rotation", "0 0 0");
