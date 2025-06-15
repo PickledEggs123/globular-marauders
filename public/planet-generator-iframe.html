@@ -3364,7 +3364,7 @@
                 vCurrent.copy(vNext);
             },
             tick: function (t, dt) {
-                if (this.data.target && this.data.target.components['health'].data.health > 0) {
+                if (this.data.target && this.data.target.components['health'] && this.data.target.components['health'].data.health > 0) {
                     // go to target
                     this.goToTarget.call(this, t, dt);
 
