@@ -1901,7 +1901,9 @@
                 // If no path is found, exit.
                 if (!this.path.length) {
                     // console.warn('[nav] Unable to find path to %o.', data.destination);
-                    this.el.setAttribute("globe-nav-agent", "active: false;");
+                    this.el.setAttribute("networked-globe-nav-agent", {
+                        active: false,
+                    });
                     el.emit('navigation-end');
                     el.emit('navigation-group-change');
                     el.object3D.position.copy(vDest);
@@ -1927,7 +1929,9 @@
 
                         // After discarding the last waypoint, exit pathfinding.
                         if (!this.path.length) {
-                            this.el.setAttribute("globe-nav-agent", "active: false;");
+                            this.el.setAttribute("networked-globe-nav-agent", {
+                                active: false,
+                            });
                             if (this.data.razeTarget) {
                                 this.data.razeTarget.emit("raze");
                             }
