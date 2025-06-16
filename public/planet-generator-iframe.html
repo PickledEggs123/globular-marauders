@@ -1861,7 +1861,7 @@
             update: function () {
                 this.path.length = 0;
                 this.pathDistance = 0;
-                this.el.components['position'].data = new THREE.Vector3().copy(this.data.start);
+                this.el.object3D.position.copy(this.data.start || new THREE.Vector3());
             },
             updateNavLocation: function () {
                 this.group = null;
