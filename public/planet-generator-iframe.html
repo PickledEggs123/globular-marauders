@@ -4006,7 +4006,7 @@
             rootNpc.setAttribute("shadow", "");
             setTimeout(() => {
                 rootNpc.setAttribute("networked-globe-nav-agent", {
-                    active: false,
+                    active: true,
                     start: pos,
                     startTime: +new Date(),
                     destination: destination2,
@@ -4044,7 +4044,7 @@
                     rootNpc.components['position'].data = start.clone();
                 }
                 rootNpc.setAttribute("networked-globe-nav-agent", {
-                    active: false,
+                    active: true,
                     start,
                     startTime: +new Date(),
                     destination: destination2,
