@@ -1923,7 +1923,7 @@
                     let gazeTarget;
 
                     const tickSpeed = pathDistance - this.pathDistance;
-                    if (distance > tickSpeed) {
+                    if (distance < tickSpeed) {
                         // If <1 step from current waypoint, discard it and move toward next.
                         this.path.shift();
                         this.pathDistance += distance;
