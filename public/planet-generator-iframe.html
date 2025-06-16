@@ -3718,11 +3718,14 @@
             schema: {},
             tick: function (t, dt) {
                 const parent = this.el.parentElement;
+                const center = this.el.parentElement.parentElement;
                 const centerHeight = parent.object3D.getWorldPosition(new THREE.Vector3()).length();
 
                 const scene = document.querySelector("a-scene");
                 scene.object3D.attach(this.el.object3D);
                 this.el.object3D.position.copy(this.el.object3D.getWorldPosition(new THREE.Vector3()).normalize().multiplyScalar(centerHeight));
+                this.el.object3D.up = this.el.object3D.getWorldPosition(new THREE.Vector3()).normalize();
+                this.el.object3D.lookAt(center.object3D.getWorldPosition(new THREE.Vector3()));
                 parent.object3D.attach(this.el.object3D);
             },
         });
@@ -4120,7 +4123,7 @@
             rootNpc.setAttribute("rotation", "0 0 0");
             rootNpc.setAttribute("npc-faction", "player");
             rootNpc.setAttribute("npc-finder", "active: true;");
-            rootNpc.setAttribute("npc-attack", `range: 10; melee: true`);
+            rootNpc.setAttribute("npc-attack", `range: 5; melee: true`);
             rootNpc.setAttribute("npc-melee-state", "");
             rootNpc.setAttribute("health", "");
             rootNpc.setAttribute("shadow", "");
