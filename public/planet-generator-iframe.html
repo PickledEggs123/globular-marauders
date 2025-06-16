@@ -3718,8 +3718,7 @@
             schema: {},
             tick: function (t, dt) {
                 const parent = this.el.parentElement;
-                const center = this.el.parentElement.parentElement;
-                const centerHeight = center.object3D.getWorldPosition(new THREE.Vector3()).length();
+                const centerHeight = parent.object3D.getWorldPosition(new THREE.Vector3()).length();
 
                 const scene = document.querySelector("a-scene");
                 scene.object3D.attach(this.el.object3D);
