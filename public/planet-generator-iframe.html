@@ -2304,7 +2304,7 @@
                 }
 
                 // Current segment is a vector from current position to next waypoint.
-                const vCurrent = new THREE.Vector3().copy(el.components['dynamic-body'].body.position);
+                const vCurrent = new THREE.Vector3().copy(el.components['dynamic-body']?.body.position ?? el.object3D.position);
                 const vWaypoint = this.path[0];
                 vDelta.subVectors(vWaypoint, vCurrent);
 
@@ -3155,7 +3155,7 @@
 
                 const vPos = new THREE.Vector3().copy(el.components['dynamic-body'].body.position);
                 const vForward = new THREE.Vector3(0, 0, -1).applyQuaternion(new THREE.Quaternion().copy(el.components['dynamic-body'].body.quaternion));
-                const vTargetPos = new THREE.Vector3().copy(this.target.components['dynamic-body'].body.position);
+                const vTargetPos = new THREE.Vector3().copy(this.target.components['dynamic-body']?.body.position ?? this.target.object3D.position);
 
                 // Look at the next waypoint.
                 // gazeTarget.y = vCurrent.y;
