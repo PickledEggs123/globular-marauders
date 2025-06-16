@@ -1875,7 +1875,6 @@
 
                 const el = this.el;
                 const data = this.data;
-                const speed = data.speed * dt / 1000;
                 const time = (+new Date() - data.startTime) / 1000;
                 const pathDistance = data.speed * time;
 
@@ -1946,8 +1945,8 @@
                     } else {
                         // If still far away from next waypoint, find next position for
                         // the current frame.
-                        this.pathDistance += speed;
-                        vNext.copy(vDelta.setLength(speed)).add(vCurrent);
+                        this.pathDistance += tickDistance;
+                        vNext.copy(vDelta.setLength(tickDistance)).add(vCurrent);
                         gazeTarget = vWaypoint;
                         shouldBreak = true;
                     }
