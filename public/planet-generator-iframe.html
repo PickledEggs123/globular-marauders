@@ -1841,6 +1841,7 @@
                 this.system = this.el.sceneEl.systems['globe-nav'];
                 this.system.addAgent(this);
                 this.group = null;
+                this.pathDistance = 0;
                 this.path = [];
                 this.material = new THREE.LineBasicMaterial({ color: 0xffffff });
                 this.geometry = new THREE.BufferGeometry().setFromPoints([]);
@@ -1903,6 +1904,7 @@
                     el.emit('navigation-end');
                     el.emit('navigation-group-change');
                     el.object3D.position.copy(vDest);
+                    this.pathDistance = pathDistance;
                     this.group = null;
                     el.emit('navigation-group-changed');
                     return;
@@ -4000,10 +4002,16 @@
             rootNpc.setAttribute("npc-finder", "active: false;");
             rootNpc.setAttribute("health", "");
             rootNpc.setAttribute("spawn-gold", "");
-            rootNpc.setAttribute("networked-globe-nav-agent", `active: false;`);
+            rootNpc.setAttribute("networked-globe-nav-agent", {active: false});
             rootNpc.setAttribute("shadow", "");
             setTimeout(() => {
-                rootNpc.setAttribute("networked-globe-nav-agent", `active: true; start: ${pos.x} ${pos.y} ${pos.z}; startTime: ${+new Date()}; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 1;`);
+                rootNpc.setAttribute("networked-globe-nav-agent", {
+                    active: false,
+                    start: pos,
+                    startTime: +new Date(),
+                    destination: destination2,
+                    speed: 1,
+                });
             }, 2000);
 
             if (characterModels.has("PERSON")) {
@@ -4035,7 +4043,13 @@
                     start.copy(destination2);
                     rootNpc.components['position'].data = start.clone();
                 }
-                rootNpc.setAttribute("networked-globe-nav-agent", `active: true; start: ${start.x} ${start.y} ${start.z}; startTime: ${+new Date()}; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 1;`);
+                rootNpc.setAttribute("networked-globe-nav-agent", {
+                    active: false,
+                    start,
+                    startTime: +new Date(),
+                    destination: destination2,
+                    speed: 1,
+                });
             }, 2000);
         }
 
