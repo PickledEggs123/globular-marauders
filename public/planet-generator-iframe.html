@@ -1926,7 +1926,7 @@
                     if (distance > tickSpeed) {
                         // If <1 step from current waypoint, discard it and move toward next.
                         this.path.shift();
-                        this.pathDistance += tickSpeed;
+                        this.pathDistance += distance;
 
                         // After discarding the last waypoint, exit pathfinding.
                         if (!this.path.length) {
