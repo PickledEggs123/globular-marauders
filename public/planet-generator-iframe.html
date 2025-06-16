@@ -1921,9 +1921,10 @@
 
                     const distance = vDelta.length();
                     let gazeTarget;
+                    let shouldBreak = false;
 
-                    const tickSpeed = pathDistance - this.pathDistance;
-                    if (distance <= tickSpeed) {
+                    const tickDistance = pathDistance - this.pathDistance;
+                    if (distance <= tickDistance) {
                         // If <1 step from current waypoint, discard it and move toward next.
                         this.path.shift();
                         this.pathDistance += distance;
@@ -1948,6 +1949,7 @@
                         this.pathDistance += speed;
                         vNext.copy(vDelta.setLength(speed)).add(vCurrent);
                         gazeTarget = vWaypoint;
+                        shouldBreak = true;
                     }
 
                     // Look at the next waypoint.
@@ -1956,6 +1958,10 @@
                     el.object3D.lookAt(gazeTarget);
 
                     vCurrent.copy(vNext);
+
+                    if (shouldBreak) {
+                        break;
+                    }
                 }
 
                 const scene = document.querySelector("a-scene");
