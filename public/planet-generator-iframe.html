@@ -3154,7 +3154,7 @@
 
                 const vPos = new THREE.Vector3().copy(el.components['dynamic-body'].body.position);
                 const vForward = new THREE.Vector3(0, 0, -1).applyQuaternion(new THREE.Quaternion().copy(el.components['dynamic-body'].body.quaternion));
-                const vTargetPos = new THREE.Vector3().copy(this.target.components['dynamic-body']?.body.position ?? this.target.object3D.position);
+                const vTargetPos = new THREE.Vector3().copy(this.target.components['dynamic-body']?.body?.position ?? this.target.object3D.position);
 
                 // Look at the next waypoint.
                 // gazeTarget.y = vCurrent.y;
