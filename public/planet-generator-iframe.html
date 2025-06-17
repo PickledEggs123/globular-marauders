@@ -1892,6 +1892,7 @@
                 // Use PatrolJS pathfinding system to get the shortest path to target.
                 if (!this.path.length) {
                     const position = new THREE.Vector3().copy(data.start);
+                    object3D.position.copy(position);
                     this.group = this.group || this.system.getGroup(position);
                     this.path = this.system.getPath(position, vDest.copy(data.destination), this.group) || [];
                     el.emit('navigation-start');
@@ -1940,7 +1941,7 @@
                             return;
                         }
 
-                        vNext.copy(vDelta.clone().add(vCurrent));
+                        vNext.copy(vWaypoint);
                         gazeTarget = this.path[0];
                     } else {
                         // If still far away from next waypoint, find next position for
@@ -1951,12 +1952,12 @@
                         shouldBreak = true;
                     }
 
+                    vCurrent.copy(vNext);
+
                     // Look at the next waypoint.
                     // gazeTarget.y = vCurrent.y;
                     el.object3D.up = new THREE.Vector3().copy(vCurrent).normalize();
                     el.object3D.lookAt(gazeTarget);
-
-                    vCurrent.copy(vNext);
 
                     if (shouldBreak) {
                         break;
