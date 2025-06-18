@@ -2635,6 +2635,73 @@
                 this.el.removeEventListener('remove-grass', this.innerRemoveGrass);
             },
         });
+        AFRAME.registerComponent('tree-particles', {
+            schema: {
+                origin: { type: 'vec3', default: {x: 0, y: 0, z: 0} },
+            },
+            init: function () {
+                this.innerAddGrass = this.addGrass.bind(this);
+                this.innerRemoveGrass = this.removeGrass.bind(this);
+                this.el.addEventListener('add-tree', this.innerAddGrass);
+                this.el.addEventListener('remove-tree', this.innerRemoveGrass);
+            },
+            addGrass: function () {
+                const meshes = [];
+                this.el.object3D.traverse((node) => {
+                    if (node.isMesh) {
+                        meshes.push(node);
+                    }
+                });
+                const mesh = meshes[0];
+                if (mesh) {
+                    const randomPoints = getRandomPointsOnMesh(mesh, this.data.origin, 16);
+
+                    const updateTerrainWithGrass = () => {
+                        for (const {point, normal} of randomPoints) {
+                            const particle = document.createElement('a-entity');
+                            particle.setAttribute('class', 'tree');
+                            particle.setAttribute('position', `${point.x} ${point.y} ${point.z}`);
+                            const model = document.createElement('a-entity');
+                            model.setAttribute('rotation', '90 0 0');
+                            model.setAttribute('instanced-mesh-member', 'mesh: #tree-mesh;');
+                            particle.appendChild(model);
+                            particle.object3D.up = normal;
+                            particle.object3D.lookAt(new THREE.Vector3().copy(point).add(new THREE.Vector3().random()));
+                            this.el.appendChild(particle);
+                            model.object3D.matrixAutoUpdate = false;
+                            model.object3D.matrixWorldAutoUpdate = false;
+                            model.components.rotation.update({x: 0, y: 0, z: 0});
+                            model.object3D.updateMatrix();
+                            particle.object3D.matrixAutoUpdate = false;
+                            particle.object3D.matrixWorldAutoUpdate = false;
+                            particle.components.position.update({x: 0, y: 0, z: 0});
+                            particle.object3D.updateMatrix();
+                        }
+                        this.el.object3D.updateWorldMatrix(false, true);
+                    };
+                    const treeMesh = document.querySelector("#tree-mesh");
+                    if (treeMesh.getObject3D("mesh")) {
+                        updateTerrainWithGrass();
+                    } else {
+                        treeMesh.addEventListener("model-loaded", () => {
+                            updateTerrainWithGrass();
+                        });
+                    }
+                } else {
+                    this.el.addEventListener('model-loaded', this.innerAddGrass);
+                }
+            },
+            removeGrass: function () {
+                const trees = Array.from(this.el.querySelectorAll('.tree'));
+                for (const tree of trees) {
+                    tree.parentNode.removeChild(tree);
+                }
+            },
+            remove: function () {
+                this.el.removeEventListener('add-tree', this.innerAddGrass);
+                this.el.removeEventListener('remove-tree', this.innerRemoveGrass);
+            },
+        });
         AFRAME.registerComponent('terrain-tile', {
             schema: {
                 type: "string",
@@ -2672,10 +2739,16 @@
                     if (this.el.components['grass-particles']) {
                         this.el.emit("add-grass");
                     }
+                    if (this.el.components['tree-particles']) {
+                        this.el.emit("add-tree");
+                    }
                 } else if (!(cameraPos.dot(tilePos) > cos45) && this.el.classList.contains(className)) {
                     this.el.classList.remove(className);
                     if (this.el.components['grass-particles']) {
                         this.el.emit("remove-grass");
+                    }
+                    if (this.el.components['tree-particles']) {
+                        this.el.emit("remove-tree");
                     }
                 }
             }
@@ -4212,6 +4285,7 @@
                 rootTerrain.setAttribute("globe-trimesh", "");
                 rootTerrain.setAttribute("go-on-land", "");
                 rootTerrain.setAttribute("grass-particles", `origin: ${vertex[0] * PLANET_SIZE} ${vertex[1] * PLANET_SIZE} ${vertex[2] * PLANET_SIZE}`);
+                rootTerrain.setAttribute("tree-particles", `origin: ${vertex[0] * PLANET_SIZE} ${vertex[1] * PLANET_SIZE} ${vertex[2] * PLANET_SIZE}`);
             } else {
                 // physics ocean bottom
                 rootTerrain.setAttribute("static-body", "shape: none;");
@@ -5464,6 +5538,7 @@
         </a-entity>
         <a-entity id="terrain" terrain-folder-optimization></a-entity>
         <a-entity id="grass-mesh" gltf-model="/meshes/Model_Redo/Grass/Grass.glb" instanced-mesh="capacity: 10240; positioning: world;"></a-entity>
+        <a-entity id="tree-mesh" gltf-model="/meshes/Model_Redo/stylished_fir/Tree.glb" instanced-mesh="capacity: 1024; positioning: world;"></a-entity>
         <a-entity id="camera-rig" position="0 105 5" networked="template: #avatar-template; attachTemplateToLocal: false;">
             <a-entity camera globe-look-controls="mouseEnabled: false; touchEnabled: false;" position="0 1.6 0" cursor-updater cursor="rayOrigin: mouse" raycaster="far: 50; interval: 100; objects: .clickable">
                 <a-entity id="port-menu" align-with-projection="offset: 0.25 0.2 -0.5; rotation: 0 0 0; portShow: true" port-show html="cursor:#cursor;html:#my-interface" class="clickable"></a-entity>
