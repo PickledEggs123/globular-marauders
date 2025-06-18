@@ -2529,7 +2529,7 @@
 
             const randomPoints = [];
             const faceCount = indices ? indices.length / 3 : vertices.length / 9;
-            const rng = new Math.seedrandom(`${origin.x} ${origin.y} ${origin.z} ${faceCount}`);
+            const rng = new Math.seedrandom(`${origin.x} ${origin.y} ${origin.z} ${faceCount} ${count}`);
 
             for (let i = 0; i < count; i++) {
                 const faceIndex = Math.floor(rng() * faceCount);
