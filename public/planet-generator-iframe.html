@@ -2427,6 +2427,10 @@
                         return;
                     }
 
+                    if (!e.detail.intersection) {
+                        return;
+                    }
+
                     const destination1 = e.detail.intersection.point.clone();
 
                     scene.components['coin-purse'].setUnit(unitMap.get(scene.components['coin-purse'].activeUnit));
@@ -2485,6 +2489,10 @@
         AFRAME.registerComponent('go-to-sea', {
             init: function () {
                 this.el.addEventListener('click', function (e) {
+                    if (!e.detail.intersection) {
+                        return;
+                    }
+
                     const destination1 = e.detail.intersection.point.clone();
 
                     const scene = document.querySelector("a-scene");
