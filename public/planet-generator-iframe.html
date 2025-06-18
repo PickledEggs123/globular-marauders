@@ -18,6 +18,7 @@
     <script src="/three-bvh.umd.cjs"></script>
     <script src="/aframe-html.js"></script>
     <script src="/Tone.js"></script>
+    <script src="/seedrandom.min.js"></script>
     <script type="application/javascript">
         class MusicPlayer {
             synth = null;
@@ -2528,9 +2529,10 @@
 
             const randomPoints = [];
             const faceCount = indices ? indices.length / 3 : vertices.length / 9;
+            const rng = new Math.seedrandom(`${origin.x} ${origin.y} ${origin.z} ${faceCount}`);
 
             for (let i = 0; i < count; i++) {
-                const faceIndex = Math.floor(Math.random() * faceCount);
+                const faceIndex = Math.floor(rng() * faceCount);
 
                 let vA, vB, vC;
                 if (indices) {
@@ -2550,8 +2552,8 @@
 
                 // Generate a random point inside the triangle
                 const randomPoint = new THREE.Vector3();
-                let r1 = Math.random();
-                let r2 = Math.random();
+                let r1 = rng();
+                let r2 = rng();
                 if (r1 + r2 > 1) {
                     r1 = 1 - r1;
                     r2 = 1 - r2;
