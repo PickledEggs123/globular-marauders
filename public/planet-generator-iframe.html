@@ -2410,6 +2410,76 @@
             },
         });
 
+        AFRAME.registerComponent('draw-npc-indicator', {
+            schema: {},
+            currentIndicator: null,
+            dataEntity: null,
+            init: function () {
+                this.currentIndicator = null;
+                this.dataEntity = null;
+                this.setNpcIndicator = (e) => {
+                    const p = e.detail;
+                    if (this.currentIndicator) {
+                        this.updateIndicator(p);
+                    } else {
+                        this.createIndicator(p);
+                    }
+                };
+                this.clearNpcIndicator = () => {
+                    this.removeIndicator();
+                };
+                this.el.addEventListener('set-npc-indicator', this.setNpcIndicator);
+                this.el.addEventListener('clear-npc-indicator', this.clearNpcIndicator);
+            },
+            remove: function () {
+                this.el.removeEventListener('set-npc-indicator', this.setNpcIndicator);
+                this.el.removeEventListener('clear-npc-indicator', this.clearNpcIndicator);
+                if (this.currentIndicator) {
+                    this.removeIndicator();
+                }
+            },
+            createIndicator: function (p) {
+                const str = characterModels.get("NPC_DESTINATION");
+                if (str) {
+                    const scene = document.querySelector("a-scene");
+                    const entity = document.createElement("a-entity");
+                    const data = document.createElement("a-entity");
+                    data.setAttribute("gltf-model", str);
+                    data.setAttribute("rotation", "90 0 0");
+                    entity.appendChild(data);
+                    entity.object3D.position.copy(p.clone().normalize().setLength(p.clone().length() + 1));
+                    entity.object3D.up = p.clone().normalize();
+                    this.currentIndicator = entity;
+                    this.dataEntity = data;
+                    scene.appendChild(entity);
+                }
+            },
+            updateIndicator: function (p) {
+                if (this.currentIndicator) {
+                    const entity = this.currentIndicator;
+                    entity.object3D.position.copy(p.clone().normalize().setLength(p.clone().length() + 1));
+                    entity.object3D.up = p.clone().normalize();
+                    const up = new THREE.Vector3(0, 1, 0);
+                    const forward = new THREE.Vector3().crossVectors(entity.object3D.up.clone().normalize(), up.clone().normalize());
+                    entity.lookAt(entity.object3D.position.clone().add(forward));
+                }
+            },
+            removeIndicator: function () {
+                if (this.currentIndicator) {
+                    const entity = this.currentIndicator;
+                    entity.parentElement.removeChild(this.currentIndicator);
+                    this.currentIndicator = null;
+                    this.dataEntity = null;
+                }
+            },
+            tick: function (t, dt) {
+                if (this.dataEntity) {
+                    this.dataEntity.object3D.rotation.set(0, Math.PI / 2, 0, 'YXZ');
+                    this.dataEntity.object3D.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), (Math.PI * t / 1000) % (Math.PI * 2)));
+                }
+            }
+        });
+
         AFRAME.registerComponent('go-on-land', {
             schema: {
                 raze: {
@@ -2481,6 +2551,7 @@
                                 npcEl.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2; razeTarget: #${this.el.id};`);
                             }
                         });
+                        scene.emit("set-npc-indicator", destination1.clone());
                     }, 1000);
                 });
             }
@@ -2511,6 +2582,7 @@
                         if (npcs.length !== 0) {
                             removeNpc();
                         }
+                        scene.emit("clear-npc-indicator");
                     }, 1000);
                     setTimeout(() => {
                         const scene = document.querySelector("a-scene");
@@ -5490,7 +5562,7 @@
     </style>
 </head>
 <body>
-    <a-scene onclick="isDemoMode === false && playMusic === true ? window.musicPlayer.start() : undefined" coin-purse respawn physics="driver: local; gravity: 0 0 0;" globe-nav globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
+    <a-scene onclick="isDemoMode === false && playMusic === true ? window.musicPlayer.start() : undefined" draw-npc-indicator coin-purse respawn physics="driver: local; gravity: 0 0 0;" globe-nav globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
         <a-assets>
             <template id="avatar-template">
                 <a-entity class="avatar" networked-audio-source>
