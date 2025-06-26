@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {useCallback, useRef, useState} from 'react';
 import '../App.scss';
 import {WebsiteDrawer2} from "../Drawer";
 import {
