@@ -15,9 +15,6 @@ import {
 // @ts-ignore
 import {generatePlanetGltf} from "@pickledeggs123/globular-marauders-generator/dist/helpers";
 import {IGameMesh} from "@pickledeggs123/globular-marauders-game/lib/src/Interface";
-import * as PIXI from "pixi.js";
-import {BLEND_MODES} from "pixi.js";
-import Quaternion from "quaternion";
 import {createStyles, makeStyles} from "@mui/styles";
 import {MusicNote, MusicOff} from "@mui/icons-material";
 
@@ -46,12 +43,11 @@ const useStyles = makeStyles((theme) =>
 );
 
 export const PlanetGenerator = () => {
-    const [context] = useState<{ app: PIXI.Application | null, preview: IGameMesh | null, gameData: IGameMesh[] } | null>({ app: null, preview: null, gameData: [] });
+    const [context] = useState<{ preview: IGameMesh | null, gameData: IGameMesh[] } | null>({ preview: null, gameData: [] });
     const [playMusic, setPlayMusic] = useState<boolean>(true);
     const [clientSecret] = useState(Math.random().toString(36).substring(2, 9));
     const [loadMessage, setLoadMessage] = useState<string>("No data loaded...");
     const classes = useStyles();
-    const ref = useRef<HTMLDivElement | null>(null);
     const iframeRef = useRef<HTMLIFrameElement | null>(null);
     const drawGraph = useCallback(() => {
         // @ts-ignore
@@ -60,103 +56,6 @@ export const PlanetGenerator = () => {
         }
 
         setLoadMessage("No data loaded...");
-        const handlePixiRender = (data: IGameMesh[]) => {
-            const app = context.app as PIXI.Application;
-
-            const meshesToSendToPixi: PIXI.Mesh<PIXI.Shader>[] = [];
-            for (const d of data) {
-                if (d.navmesh || d.oceanNavmesh) {
-                    continue;
-                }
-
-                const planetGeometry = new PIXI.Geometry();
-                for (const attribute of d.attributes) {
-                    planetGeometry.addAttribute(attribute.id, attribute.buffer, attribute.size);
-                }
-                // @ts-ignore
-                planetGeometry.addIndex(new Uint32Array(d.index));
-
-                if (d.ocean) {
-                    const planetVertexShader = `
-                        precision mediump float;
-            
-                        attribute vec3 aPosition;
-                        
-                        uniform mat4 uRotation;
-            
-                        void main() {
-                            gl_Position = uRotation * vec4(aPosition * 0.86 * vec3(-1.0/100.0, 1.0/100.0, 1.0/100.0), 1.0);
-                        }
-                    `;
-                    const planetFragmentShader = `
-                        precision mediump float;
-            
-                        void main() {
-                            gl_FragColor = vec4(0.3, 0.3, 1.0, 0.8);
-                        }
-                    `;
-                    const planetProgram = new PIXI.Program(planetVertexShader, planetFragmentShader);
-
-                    const shader = new PIXI.Shader(planetProgram, {
-                        uRotation: Quaternion.ONE.toMatrix4()
-                    });
-                    const state = PIXI.State.for2d();
-                    state.depthTest = true;
-                    state.culling = false;
-                    state.blend = true;
-                    state.blendMode = BLEND_MODES.NORMAL;
-                    const mesh = new PIXI.Mesh(planetGeometry, shader, state);
-                    meshesToSendToPixi.push(mesh);
-                } else {
-                    const planetVertexShader = `
-                        precision mediump float;
-            
-                        attribute vec3 aPosition;
-                        attribute vec3 aColor;
-                        attribute vec3 aNormal;
-                        
-                        uniform mat4 uRotation;
-            
-                        varying vec3 vColor;
-                        varying vec3 vNormal;
-            
-                        void main() {
-                            vColor = aColor;
-            
-                            gl_Position = uRotation * vec4(aPosition * 0.86 * vec3(-1.0/100.0, 1.0/100.0, 1.0/100.0), 1.0);
-                            vNormal = (uRotation * vec4(aNormal * vec3(-1.0, 1.0, 1.0), 1.0)).xyz;
-                        }
-                    `;
-                    const planetFragmentShader = `
-                        precision mediump float;
-            
-                        varying vec3 vColor;
-                        varying vec3 vNormal;
-            
-                        void main() {
-                            gl_FragColor = vec4(vColor * (0.3 + 0.7 * max(0.0, pow(dot(vec3(0.0, 0.0, -1.0), vNormal), 3.0))), 1.0);
-                        }
-                    `;
-                    const planetProgram = new PIXI.Program(planetVertexShader, planetFragmentShader);
-
-                    const shader = new PIXI.Shader(planetProgram, {
-                        uRotation: Quaternion.ONE.toMatrix4()
-                    });
-                    const state = PIXI.State.for2d();
-                    state.depthTest = true;
-                    state.culling = false;
-                    const mesh = new PIXI.Mesh(planetGeometry, shader, state);
-                    meshesToSendToPixi.push(mesh);
-                }
-            }
-
-            app.stage.children.forEach(x => {
-                app.stage.removeChild(x);
-            });
-            for (const mesh of meshesToSendToPixi) {
-                app.stage.addChild(mesh as unknown as any);
-            }
-        };
         const Uint8ToBase64 = (u8Arr: Uint8Array): string => {
             const CHUNK_SIZE = 0x8000;
             let index = 0;
@@ -312,8 +211,6 @@ export const PlanetGenerator = () => {
                     contentWindow?.addClientSecret(JSON.stringify({ roomId, clientSecret }));
                 }
             });
-
-            handlePixiRender(data);
         };
 
         (async () => {
@@ -353,36 +250,6 @@ export const PlanetGenerator = () => {
             }
         })();
     }, [context]);
-    useEffect(() => {
-        // @ts-ignore
-        if (global.use_ssr || !context) {
-            return;
-        }
-        if (context.app) {
-            context.app.destroy(true);
-        }
-        const animation = () => {
-            context.app!.stage.children.forEach((c: any) => {
-                const mesh = c as PIXI.Mesh;
-                if (mesh?.shader?.uniforms?.uRotation) {
-                    mesh.shader.uniforms.uRotation = Quaternion.fromAxisAngle([0, 1, 0], Math.PI * 2 / 100 * (+new Date() % (10 * 1000) / 100)).toMatrix4();
-                }
-            });
-        };
-        const curRef = ref.current;
-        if (ref.current) {
-            context.app = new PIXI.Application({ width : 256, height: 256, backgroundColor: 0x000000 });
-            // @ts-ignore
-            ref.current.appendChild(context.app.view);
-            context.app!.ticker.add(animation);
-        }
-        drawGraph();
-        return () => {
-            if (curRef && context.app) {
-                context.app.ticker.remove(animation);
-            }
-        };
-    }, [context, drawGraph, ref]);
     const download = async () => {
         const data: IGameMesh = context!.preview!;
         const buffer = await generatePlanetGltf(data);
@@ -445,8 +312,6 @@ export const PlanetGenerator = () => {
                                 <CardHeader title="Planet Generator" subheader="Create unique random planets"></CardHeader>
                                 <CardContent>
                                     <Typography>Load Status: {loadMessage}</Typography>
-                                    <div ref={ref} style={{width: 256, height: 256}}>
-                                    </div>
                                     <Grid container>
                                         <Grid item xs={6}>
                                             <Button variant="contained" fullWidth onClick={() => {
