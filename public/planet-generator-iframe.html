@@ -3996,7 +3996,7 @@
             if (charModelId === "SHIP" || charModelId === "PIRATE_SHIP") {
                 const dataEl = document.createElement("a-entity");
                 dataEl.setAttribute("class", "data");
-                dataEl.setAttribute("scale", "0.001 0.001 0.001");
+                dataEl.setAttribute("scale", "0.1 0.1 0.1");
                 dataEl.setAttribute("rotation", "0 -90 0");
                 dataEl.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; memberMesh: ${memberMesh};`);
                 dataEl.setAttribute("shadow", "");
@@ -4362,7 +4362,7 @@
             const rootModel = document.createElement("a-entity");
             rootModel.setAttribute("class", "data");
             rootModel.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; capacity: 100; memberMesh: true`);
-            rootModel.setAttribute("scale", "0.001 0.001 0.001");
+            rootModel.setAttribute("scale", "0.1 0.1 0.1");
             rootModel.setAttribute("rotation", "0 -90 0");
             rootModel.setAttribute("setup-cannons", `url: ${str};`);
             rootShip.appendChild(rootModel);
@@ -4709,7 +4709,7 @@
             rootModel.setAttribute("class", "data");
             rootModel.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; capacity: 100; memberMesh: true`);
             rootModel.setAttribute("go-to-sea", "");
-            rootModel.setAttribute("scale", "0.001 0.001 0.001");
+            rootModel.setAttribute("scale", "0.1 0.1 0.1");
             rootModel.setAttribute("rotation", "0 -90 0");
             rootModel.setAttribute("setup-cannons", `url: ${str}`);
             rootShip.appendChild(rootModel);
@@ -4905,7 +4905,7 @@
                 const updateMesh = (e) => {
                     const meshes = [];
                     e.traverse((x) => {
-                        if (x.isGroup && x.name.includes("Cylinder")) {
+                        if (x.isObject3D && x.name.includes("Canon")) {
                             meshes.push(x);
                         }
                     });
@@ -4916,7 +4916,7 @@
                         rightCannons = meshes.filter(x => x.position.z > 0);
                     } else {
                         e.el.components['instanced-mesh'].originalMesh.traverse((x) => {
-                            if (x.isGroup && x.name.includes("Cylinder")) {
+                            if (x.isObject3D && x.name.includes("Canon")) {
                                 meshes.push(x);
                             }
                         });
