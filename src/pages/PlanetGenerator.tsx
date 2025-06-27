@@ -1,4 +1,4 @@
-import React, {useCallback, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import '../App.scss';
 import {WebsiteDrawer2} from "../Drawer";
 import {
@@ -250,6 +250,9 @@ export const PlanetGenerator = () => {
             }
         })();
     }, [context]);
+    useEffect(() => {
+        drawGraph();
+    }, []);
     const download = async () => {
         const data: IGameMesh = context!.preview!;
         const buffer = await generatePlanetGltf(data);

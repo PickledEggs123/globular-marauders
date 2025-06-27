@@ -2771,16 +2771,11 @@
                             particle.object3D.up = normal;
                             particle.object3D.lookAt(new THREE.Vector3().copy(point).add(new THREE.Vector3().random()));
                             this.el.appendChild(particle);
-                            model.object3D.matrixAutoUpdate = false;
-                            model.object3D.matrixWorldAutoUpdate = false;
                             model.components.rotation.update({x: 0, y: 0, z: 0});
                             model.object3D.updateMatrix();
-                            particle.object3D.matrixAutoUpdate = false;
-                            particle.object3D.matrixWorldAutoUpdate = false;
                             particle.components.position.update({x: 0, y: 0, z: 0});
                             particle.object3D.updateMatrix();
                         }
-                        this.el.object3D.updateWorldMatrix(false, true);
                     };
                     const grassMesh = document.querySelector("#grass-mesh");
                     if (grassMesh.getObject3D("mesh")) {
@@ -2838,16 +2833,11 @@
                             particle.object3D.up = normal;
                             particle.object3D.lookAt(new THREE.Vector3().copy(point).add(new THREE.Vector3().random()));
                             this.el.appendChild(particle);
-                            model.object3D.matrixAutoUpdate = false;
-                            model.object3D.matrixWorldAutoUpdate = false;
                             model.components.rotation.update({x: 0, y: 0, z: 0});
                             model.object3D.updateMatrix();
-                            particle.object3D.matrixAutoUpdate = false;
-                            particle.object3D.matrixWorldAutoUpdate = false;
                             particle.components.position.update({x: 0, y: 0, z: 0});
                             particle.object3D.updateMatrix();
                         }
-                        this.el.object3D.updateWorldMatrix(false, true);
                     };
                     const treeMesh = document.querySelector("#tree-mesh");
                     if (treeMesh.getObject3D("mesh")) {
@@ -2878,10 +2868,6 @@
                 default: ""
             },
             init: function () {
-                this.el.object3D.matrixAutoUpdate = false;
-                this.el.object3D.matrixWorldAutoUpdate = false;
-                this.el.object3D.updateMatrix();
-                this.el.object3D.updateWorldMatrix(false, true);
             },
             tick: function (t, dt) {
                 if (!this.data) {
@@ -3357,9 +3343,15 @@
                 this.el.addEventListener("dead", this.innerHandleDead);
             },
             beginTransition: function () {
+                if (!this.data.building) {
+                    return;
+                }
                 this.data.building.emit('transition', this.el.id);
             },
             handleDead: function () {
+                if (!this.data.building) {
+                    return;
+                }
                 this.data.building.emit('dead', this.el.id);
             },
             remove: function () {
@@ -4470,8 +4462,6 @@
         AFRAME.registerComponent("terrain-folder-optimization", {
             schema: {},
             init: function () {
-                this.el.object3D.matrixAutoUpdate = false;
-                this.el.object3D.matrixWorldAutoUpdate = false;
             },
         });
 
@@ -4542,8 +4532,6 @@
                 rootModel.setAttribute("rotation", "90 0 0");
                 rootModel.setAttribute("position", "0 0 0");
             }
-            rootModel.object3D.matrixAutoUpdate = false;
-            rootModel.object3D.matrixWorldAutoUpdate = false;
             rootModel.components.scale.update({x: 1, y: 1, z: 1});
             rootModel.components.rotation.update({x: 0, y: 0, z: 0});
             rootModel.components.position.update({x: 0, y: 0, z: 0});
@@ -4558,8 +4546,6 @@
                 lod0.setAttribute("set-building-id", "");
             }
             lod0.setAttribute("shadow", "");
-            lod0.object3D.matrixAutoUpdate = false;
-            lod0.object3D.matrixWorldAutoUpdate = false;
             rootModel.appendChild(lod0);
 
             const lod1 = document.createElement("a-entity");
@@ -4570,8 +4556,6 @@
                 lod1.setAttribute("set-building-id", "");
             }
             lod1.setAttribute("shadow", "");
-            lod1.object3D.matrixAutoUpdate = false;
-            lod1.object3D.matrixWorldAutoUpdate = false;
             rootModel.appendChild(lod1);
 
             const lod2 = document.createElement("a-entity");
@@ -4582,8 +4566,6 @@
                 lod2.setAttribute("set-building-id", "");
             }
             lod2.setAttribute("shadow", "");
-            lod2.object3D.matrixAutoUpdate = false;
-            lod2.object3D.matrixWorldAutoUpdate = false;
             rootModel.appendChild(lod2);
 
             const scene = document.querySelector("a-scene");
@@ -4592,8 +4574,6 @@
 
             rootHouse.object3D.up = new THREE.Vector3(point[0], point[1], point[2]).normalize();
             rootHouse.object3D.lookAt(new THREE.Vector3(lookAt[0], lookAt[1], lookAt[2]));
-            rootHouse.object3D.matrixAutoUpdate = false;
-            rootHouse.object3D.matrixWorldAutoUpdate = false;
             rootHouse.components.position.update({x: 0, y: 0, z: 0});
             rootHouse.object3D.updateMatrix();
         }
@@ -4905,7 +4885,7 @@
                 const updateMesh = (e) => {
                     const meshes = [];
                     e.traverse((x) => {
-                        if (x.isGroup && x.name.includes("Cylinder")) {
+                        if (x.isMesh && x.name.includes("Cylinder")) {
                             meshes.push(x);
                         }
                     });
@@ -4916,7 +4896,7 @@
                         rightCannons = meshes.filter(x => x.position.z > 0);
                     } else {
                         e.el.components['instanced-mesh'].originalMesh.traverse((x) => {
-                            if (x.isGroup && x.name.includes("Cylinder")) {
+                            if (x.isMesh && x.name.includes("Cylinder")) {
                                 meshes.push(x);
                             }
                         });
