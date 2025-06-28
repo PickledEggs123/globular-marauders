@@ -2760,6 +2760,7 @@
                     const randomPoints = getRandomPointsOnMesh(mesh, this.data.origin, 256);
 
                     const updateTerrainWithGrass = () => {
+                        const particles = [];
                         for (const {point, normal} of randomPoints) {
                             const particle = document.createElement('a-entity');
                             particle.setAttribute('class', 'grass');
@@ -2775,7 +2776,17 @@
                             model.object3D.updateMatrix();
                             particle.components.position.update({x: 0, y: 0, z: 0});
                             particle.object3D.updateMatrix();
+                            particles.push(particle);
                         }
+                        this.el.object3D.parent.matrixWorldAutoUpdate = true;
+                        this.el.object3D.matrixWorldAutoUpdate = true;
+                        this.el.object3D.updateWorldMatrix(false, true);
+                        for (const particle of particles) {
+                            particle.object3D.matrixAutoUpdate = false;
+                            particle.object3D.matrixWorldAutoUpdate = false;
+                        }
+                        this.el.object3D.matrixWorldAutoUpdate = false;
+                        this.el.object3D.parent.matrixWorldAutoUpdate = false;
                     };
                     const grassMesh = document.querySelector("#grass-mesh");
                     if (grassMesh.getObject3D("mesh")) {
@@ -4462,6 +4473,8 @@
         AFRAME.registerComponent("terrain-folder-optimization", {
             schema: {},
             init: function () {
+                this.el.object3D.matrixAutoUpdate = false;
+                this.el.object3D.matrixWorldAutoUpdate = false;
             },
         });
 
@@ -4576,6 +4589,11 @@
             rootHouse.object3D.lookAt(new THREE.Vector3(lookAt[0], lookAt[1], lookAt[2]));
             rootHouse.components.position.update({x: 0, y: 0, z: 0});
             rootHouse.object3D.updateMatrix();
+            rootHouse.object3D.updateWorldMatrix(false, true);
+            rootHouse.object3D.matrixAutoUpdate = false;
+            rootHouse.object3D.matrixWorldAutoUpdate = false;
+            rootModel.object3D.matrixAutoUpdate = false;
+            rootModel.object3D.matrixWorldAutoUpdate = false;
         }
 
         function addCannonballFire(el) {
