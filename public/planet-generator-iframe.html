@@ -2839,7 +2839,8 @@
                             particle.setAttribute('position', `${point.x} ${point.y} ${point.z}`);
                             const model = document.createElement('a-entity');
                             model.setAttribute('rotation', '90 0 0');
-                            model.setAttribute('instanced-mesh-member', 'mesh: #tree-mesh;');
+                            model.setAttribute('instanced-mesh-member', 'mesh: #tree-mesh; memberMesh: true;');
+                            model.setAttribute('hide-from-camera', '');
                             particle.appendChild(model);
                             particle.object3D.up = normal;
                             particle.object3D.lookAt(new THREE.Vector3().copy(point).add(new THREE.Vector3().random()));
@@ -2871,6 +2872,54 @@
             remove: function () {
                 this.el.removeEventListener('add-tree', this.innerAddGrass);
                 this.el.removeEventListener('remove-tree', this.innerRemoveGrass);
+            },
+        });
+        AFRAME.registerComponent('hide-from-camera', {
+            schema: {},
+            init: function () {
+                this.elSet = new Set();
+            },
+            addTree: function (el) {
+                this.elSet.add(el);
+                this.updateVisible();
+            },
+            removeTree: function (el) {
+                this.elSet.delete(el);
+                this.updateVisible();
+            },
+            updateVisible: function () {
+                this.el.object3D.visible = this.elSet.size === 0;
+                this.el.emit("object3DUpdated");
+            }
+        });
+        AFRAME.registerComponent('hide-trees-from-camera', {
+            schema: {},
+            init: function () {
+                this.oldIntersections = new Set();
+            },
+            tick: function (t, dt) {
+                const origin = this.el.object3D.position.clone();
+                const cameraEl = document.querySelector('[camera]');
+                const threeCamera = cameraEl.getObject3D('camera'); // Access the Three.js camera
+                const cameraDirection = threeCamera.getWorldPosition(new THREE.Vector3()).sub(origin.clone());
+                const raycaster = new THREE.Raycaster(origin, cameraDirection.clone().normalize(), 0, cameraDirection.length());
+                const scene = document.querySelector("a-scene");
+                const terrainFolder = document.querySelector("#terrain");
+                const objects = Array.from(terrainFolder.querySelectorAll("[hide-from-camera]")).map(x => x.object3D);
+                const newIntersections = raycaster.intersectObjects(objects, true).map(x => x.object);
+
+                const newSet = new Set(newIntersections);
+                const oldSet = this.oldIntersections;
+                const addSet = newSet.difference(oldSet);
+                const removeSet = oldSet.difference(newSet);
+
+                for (const object of addSet) {
+                    findParentAttribute(object.el, 'hide-from-camera').addTree(this);
+                }
+                for (const object of removeSet) {
+                    findParentAttribute(object.el, 'hide-from-camera').removeTree(this);
+                }
+                this.oldIntersections = newSet;
             },
         });
         AFRAME.registerComponent('terrain-tile', {
@@ -4197,6 +4246,15 @@
             return id;
         }
 
+        function findParentAttribute(el, attribute) {
+            if (!el) {
+                return "";
+            }
+            if (el.components[attribute]) {
+                return el.components[attribute];
+            }
+            return findParentAttribute(el.parentElement, attribute);
+        }
         function addCannonBall(pos, velocity, el) {
             const scene = document.querySelector("a-scene");
 
@@ -4214,16 +4272,7 @@
             rootProjectile.setAttribute("cannonball-collider-ground", "");
             rootProjectile.setAttribute("cannonball-collider-water", "");
             rootProjectile.setAttribute("cannonball-hit-ready", "");
-            function findParentAttribute(el, attribute) {
-                if (!el) {
-                    return "";
-                }
-                if (el.components[attribute]) {
-                    return el.components[attribute].data;
-                }
-                return findParentAttribute(el.parentElement, attribute);
-            }
-            rootProjectile.setAttribute("npc-faction", findParentAttribute(el, "npc-faction"));
+            rootProjectile.setAttribute("npc-faction", findParentAttribute(el, "npc-faction").data);
             rootProjectile.setAttribute("despawn", "");
 
             if (characterModels.has("CANNONBALL")) {
@@ -4403,6 +4452,7 @@
             rootNpc.setAttribute("npc-melee-state", "");
             rootNpc.setAttribute("health", "");
             rootNpc.setAttribute("shadow", "");
+            rootNpc.setAttribute("hide-trees-from-camera", "");
 
             if (characterModels.has("WARRIOR")) {
                 const str = characterModels.get("WARRIOR");
@@ -4530,6 +4580,7 @@
             } = JSON.parse(item);
 
             const rootHouse = document.createElement("a-entity");
+            rootHouse.setAttribute("class", "house");
             rootHouse.setAttribute("position", `${point[0]} ${point[1]} ${point[2]}`);
             rootHouse.setAttribute("terrain-tile", "");
             rootHouse.setAttribute("building", type.toString().toLowerCase());
