@@ -2904,7 +2904,7 @@
                 const cameraDirection = threeCamera.getWorldPosition(new THREE.Vector3()).sub(origin.clone());
                 const raycaster = new THREE.Raycaster(origin, cameraDirection.clone().normalize(), 0, cameraDirection.length());
                 const scene = document.querySelector("a-scene");
-                const terrainFolder = document.querySelector("#terrain");
+                const terrainFolder = scene.querySelector("#terrain");
                 const objects = Array.from(terrainFolder.querySelectorAll("[hide-from-camera]")).map(x => x.object3D);
                 const newIntersections = raycaster.intersectObjects(objects, true).map(x => x.object);
 
