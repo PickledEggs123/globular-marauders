@@ -3673,7 +3673,7 @@
                 vCurrent.copy(vNext);
             },
             tick: function (t, dt) {
-                if (this.data.target && this.data.target.components['health'] && this.data.target.components['health'].data.health > 0) {
+                if (this.data.target && ((this.data.target.components['health'] && this.data.target.components['health'].data.health > 0) || this.data.target.components['networked-health'])) {
                     // go to target
                     this.goToTarget.call(this, t, dt);
 
@@ -3760,7 +3760,7 @@
             beginAttack: function (evt) {
                 const target = evt.detail;
                 if (this.data.melee && !this.el.hasAttribute('npc-melee')) {
-                    if (this.el.components['npc-melee-state'].npcState === NPC_MELEE_STATE_ENUM.IDLE) {
+                    if ([NPC_MELEE_STATE_ENUM.IDLE, NPC_MELEE_STATE_ENUM.END_ATTACK].includes(this.el.components['npc-melee-state'].npcState)) {
                         const p = this.el.components['globe-nav-agent'].data.destination;
                         const pv = new THREE.Vector3().copy(p);
                         if (pv.distanceTo(this.el.object3D.position) < this.data.range) {
