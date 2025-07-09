@@ -118,6 +118,7 @@ export const PlanetGenerator = () => {
             context.gameData = data;
 
             const staticMeshPaths = [
+                "/meshes/Model_Redo/Warrior/Warrior.glb",
                 "/meshes/Model_Redo/indicators/npc indicator/NpcDestination.glb",
                 "/meshes/Model_Redo/indicators/ship indicator/ShipDestination.glb",
                 "/meshes/ships/pirate-sloop.glb",
@@ -176,6 +177,7 @@ export const PlanetGenerator = () => {
                     }
 
                     const warriorDataUri = gltf[gltf.length - 7] as string;
+                    addCharacterModel(iframeRef.current, "WIZARD", gltf[gltf.length - 20] as string);
                     addCharacterModel(iframeRef.current, "NPC_DESTINATION", gltf[gltf.length - 19] as string);
                     addCharacterModel(iframeRef.current, "SHIP_DESTINATION", gltf[gltf.length - 18] as string);
                     addCharacterModel(iframeRef.current, "WARRIOR", warriorDataUri);

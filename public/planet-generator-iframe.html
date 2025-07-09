@@ -1683,6 +1683,32 @@
             }
         });
 
+        AFRAME.registerComponent("globe-moba-controls", {
+            schema: {},
+            init: function () {
+                this.handleClick = this.handleClick.bind(this);
+                this.el.addEventListener("click", this.handleClick);
+            },
+            remove: function () {
+                this.el.removeEventListener("click", this.handleClick);
+            },
+            handleClick: function () {
+                // set moba target
+                // navigate to moba target
+                // set camera to start behind wizard facing moba target
+
+                // detect attacks
+                // apply projection onto land
+                // apply attacks 1 second later
+
+                // q area attack
+
+                // e forward attack
+
+                // regular range attacks
+            },
+        });
+
         const pathfinder = new threePathfinding.Pathfinding();
         const oceanPathfinder = new threePathfinding.Pathfinding();
         const ZONE = 'level';
@@ -2597,6 +2623,7 @@
                         const scene = document.querySelector("a-scene");
                         const npcs = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
                         if (npcs.length === 0) {
+                            addWizardNpc();
                             const raiderAmount = scene.components['coin-purse'].getRaiderAmount();
                             for (let i = 0; i < raiderAmount; i++) {
                                 addNpc(i);
@@ -4079,7 +4106,7 @@
                 rootGoldCoin.setAttribute("rotation", "");
             }
 
-            if (charModelId === "WARRIOR") {
+            if (charModelId === "WARRIOR" || charModelId === "WIZARD") {
                 rootGoldCoin.setAttribute("npc-faction", "other-players");
                 rootGoldCoin.setAttribute("npc-finder", "active: false;");
                 rootGoldCoin.setAttribute("networked-health", "");
@@ -4483,6 +4510,44 @@
             arr.forEach(a => scene.removeChild(a));
         }
 
+        function addWizardNpc() {
+            const scene = document.querySelector("a-scene");
+
+            const rootNpc = document.createElement("a-entity");
+            rootNpc.setAttribute("class", `${scene.components['coin-purse'].activeUnit}`);
+            rootNpc.setAttribute("globe-nav-agent", "");
+            rootNpc.setAttribute("position", "0 0 0");
+            rootNpc.setAttribute("rotation", "0 0 0");
+            rootNpc.setAttribute("npc-faction", "player");
+            rootNpc.setAttribute("npc-finder", "active: true;");
+            rootNpc.setAttribute("npc-attack", `range: 10;`);
+            rootNpc.setAttribute("health", "health: 1000;");
+            rootNpc.setAttribute("shadow", "");
+            rootNpc.setAttribute("hide-trees-from-camera", "");
+
+            if (characterModels.has("WIZARD")) {
+                const str = characterModels.get("WIZARD");
+                rootNpc.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; capacity: 1000; memberMesh: true`);
+                rootNpc.setAttribute("networked", "template: #wizard-template; attachTemplateToLocal: false;");
+            } else {
+                const modelNpc = document.createElement("a-sphere");
+                modelNpc.setAttribute("scale", "0.1 0.1 0.1");
+                modelNpc.setAttribute("position", "0 0 0");
+                rootNpc.appendChild(modelNpc);
+            }
+
+            const positionCenterNpc = document.createElement("a-entity");
+            positionCenterNpc.setAttribute("position", "0 0 -5");
+            rootNpc.appendChild(positionCenterNpc);
+
+            const positionNpc = document.createElement("a-entity");
+            positionNpc.setAttribute("class", `${scene.components['coin-purse'].activeUnit}-position`);
+            positionNpc.setAttribute("update-npc-position-entity", "");
+            positionCenterNpc.appendChild(positionNpc);
+
+            scene.appendChild(rootNpc);
+        }
+
         function addTerrain(item) {
             const [str, collidable, navmesh, ocean, oceanNavmesh, vertex] = JSON.parse(item);
             const rootTerrain = document.createElement("a-entity");
@@ -4543,6 +4608,10 @@
             characterModels.set(type, str);
 
             switch (type) {
+                case "WIZARD": {
+                    addTemplate("wizard-template", "WIZARD", "wizard-model", false);
+                    break;
+                }
                 case "WARRIOR": {
                     addTemplate("warrior-template", "WARRIOR", "warrior-model", false);
                     break;
