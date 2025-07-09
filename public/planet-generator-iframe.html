@@ -1687,15 +1687,26 @@
             schema: {},
             init: function () {
                 this.handleClick = this.handleClick.bind(this);
-                this.el.addEventListener("click", this.handleClick);
+                this.el.addEventListener("moba-move", this.handleClick);
             },
             remove: function () {
-                this.el.removeEventListener("click", this.handleClick);
+                this.el.removeEventListener("moba-move", this.handleClick);
             },
-            handleClick: function () {
+            handleClick: function (e) {
+                const destination1 = new THREE.Vector3().copy(e.detail);
+
                 // set moba target
+                const scene = document.querySelector("a-scene");
+                const wizard = scene.querySelector(`.${scene.components['coin-purse'].activeUnit}-wizard`);
+                wizard.querySelector("[update-wizard-position-entity]").setAttribute("update-wizard-position-entity", {
+                    destination: destination1,
+                });
+
                 // navigate to moba target
+                wizard.setAttribute("globe-nav-agent", `active: true; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
+
                 // set camera to start behind wizard facing moba target
+
 
                 // detect attacks
                 // apply projection onto land
@@ -1704,8 +1715,6 @@
                 // q area attack
 
                 // e forward attack
-
-                // regular range attacks
             },
         });
 
@@ -2309,6 +2318,7 @@
                 const speed = data.speed * dt / 1000;
 
                 if (!data.active) return;
+                if (!el.components['globe-keyboard-controls']) return;
 
                 // Use PatrolJS pathfinding system to get the shortest path to target.
                 if (!this.path.length) {
@@ -2615,6 +2625,15 @@
 
                     const destination1 = e.detail.intersection.point.clone();
 
+                    const ships = [
+                        ...scene.querySelectorAll(`.ship-1`),
+                        ...scene.querySelectorAll(`.ship-2`),
+                        ...scene.querySelectorAll(`.ship-3`),
+                    ];
+                    ships.forEach((ship) => {
+                        ship.setAttribute("globe-keyboard-controls", {enabled: false});
+                    });
+
                     scene.components['coin-purse'].setUnit(unitMap.get(scene.components['coin-purse'].activeUnit));
                     const checkBox = document.querySelector(`#unit-selection-${scene.components['coin-purse'].activeUnit}`);
                     checkBox.click();
@@ -2664,6 +2683,10 @@
                                 npcEl.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2; razeTarget: #${this.el.id};`);
                             }
                         });
+                        const wizardEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}-wizard`);
+                        wizardEls.forEach(wizardEl => {
+                            wizardEl.emit("moba-move", destination1.clone())
+                        })
                         scene.emit("set-npc-indicator", destination1.clone());
                         scene.emit("clear-ship-indicator");
                     }, 1000);
@@ -2684,6 +2707,15 @@
                     scene.components['coin-purse'].setUnit(inverseUnitMap.get(scene.components['coin-purse'].activeUnit));
                     const checkBox = document.querySelector(`#unit-selection-${scene.components['coin-purse'].activeUnit}`);
                     checkBox.click();
+
+                    const ships = [
+                        ...scene.querySelectorAll(`.ship-1`),
+                        ...scene.querySelectorAll(`.ship-2`),
+                        ...scene.querySelectorAll(`.ship-3`),
+                    ];
+                    ships.forEach((ship) => {
+                        ship.setAttribute("globe-keyboard-controls", {enabled: true});
+                    });
 
                     setTimeout(() => {
                         const scene = document.querySelector("a-scene");
@@ -4066,6 +4098,26 @@
             },
         });
 
+        AFRAME.registerComponent("update-wizard-position-entity", {
+            schema: {
+                destination: {type: "vec3", default: new THREE.Vector3()},
+            },
+            tick: function (t, dt) {
+                const center = this.el.parentElement;
+                const centerHeight = center.object3D.getWorldPosition(new THREE.Vector3()).length();
+
+                const scene = document.querySelector("a-scene");
+                scene.object3D.attach(this.el.object3D);
+                const thisPos = center.object3D.getWorldPosition(new THREE.Vector3()).normalize().multiplyScalar(centerHeight);
+                const destinationPos = new THREE.Vector3().copy(this.data.destination).normalize().multiplyScalar(centerHeight);
+                const forward = destinationPos.clone().sub(thisPos.clone()).normalize().multiplyScalar(5);
+                this.el.object3D.position.copy(center.object3D.getWorldPosition(new THREE.Vector3()).sub(forward.clone()));
+                this.el.object3D.up = this.el.object3D.getWorldPosition(new THREE.Vector3()).normalize();
+                this.el.object3D.lookAt(destinationPos);
+                center.object3D.attach(this.el.object3D);
+            },
+        })
+
         function addTemplate(templateId, charModelId, instanceModelId, memberMesh) {
             const scene = document.querySelector("a-scene");
 
@@ -4514,7 +4566,7 @@
             const scene = document.querySelector("a-scene");
 
             const rootNpc = document.createElement("a-entity");
-            rootNpc.setAttribute("class", `${scene.components['coin-purse'].activeUnit}`);
+            rootNpc.setAttribute("class", `${scene.components['coin-purse'].activeUnit}-wizard`);
             rootNpc.setAttribute("globe-nav-agent", "");
             rootNpc.setAttribute("position", "0 0 0");
             rootNpc.setAttribute("rotation", "0 0 0");
@@ -4523,6 +4575,7 @@
             rootNpc.setAttribute("npc-attack", `range: 10;`);
             rootNpc.setAttribute("health", "health: 1000;");
             rootNpc.setAttribute("shadow", "");
+            rootNpc.setAttribute("globe-moba-controls", "");
             rootNpc.setAttribute("hide-trees-from-camera", "");
 
             if (characterModels.has("WIZARD")) {
@@ -4537,11 +4590,11 @@
             }
 
             const positionCenterNpc = document.createElement("a-entity");
-            positionCenterNpc.setAttribute("position", "0 0 -5");
+            positionCenterNpc.setAttribute("update-wizard-position-entity", "0 0 0");
             rootNpc.appendChild(positionCenterNpc);
 
             const positionNpc = document.createElement("a-entity");
-            positionNpc.setAttribute("class", `${scene.components['coin-purse'].activeUnit}-position`);
+            positionNpc.setAttribute("class", `${scene.components['coin-purse'].activeUnit}-wizard-position`);
             positionNpc.setAttribute("update-npc-position-entity", "");
             positionCenterNpc.appendChild(positionNpc);
 
@@ -5440,7 +5493,7 @@
                 this.activeUnit = u;
             },
             getUnit: function () {
-                const postfix = this.activeUnit.startsWith("ship") ? ":first-of-type" : "";
+                const postfix = this.activeUnit.startsWith("ship") ? ":first-of-type" : "-wizard";
                 return this.activeUnit + postfix;
             },
             buyShips: function () {
