@@ -4115,6 +4115,9 @@
                 this.el.object3D.up = this.el.object3D.getWorldPosition(new THREE.Vector3()).normalize();
                 this.el.object3D.lookAt(destinationPos);
                 center.object3D.attach(this.el.object3D);
+                if (forward.length() === 0) {
+                    this.el.object3D.position.set(0, 0, -5);
+                }
             },
         })
 
@@ -4560,6 +4563,8 @@
             const scene = document.querySelector("a-scene");
             const arr = Array.from(document.querySelectorAll(`.${unitMap.get(scene.components['coin-purse'].activeUnit)}`));
             arr.forEach(a => scene.removeChild(a));
+            const arr2 = Array.from(document.querySelectorAll(`.${unitMap.get(scene.components['coin-purse'].activeUnit)}-wizard`));
+            arr2.forEach(a => scene.removeChild(a));
         }
 
         function addWizardNpc() {
