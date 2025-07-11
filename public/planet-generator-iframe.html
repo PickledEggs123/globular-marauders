@@ -1686,12 +1686,122 @@
         AFRAME.registerComponent("globe-moba-controls", {
             schema: {},
             init: function () {
+                // To keep track of the pressed keys.
+                this.keys = {};
+                this.mainKeys = {};
+
+                // Bind methods and add event listeners.
+                this.onBlur = bind(this.onBlur, this);
+                this.onContextMenu = bind(this.onContextMenu, this);
+                this.onFocus = bind(this.onFocus, this);
+                this.onKeyDown = bind(this.onKeyDown, this);
+                this.onKeyUp = bind(this.onKeyUp, this);
+                this.onVisibilityChange = bind(this.onVisibilityChange, this);
+                this.attachVisibilityEventListeners();
+
                 this.handleClick = this.handleClick.bind(this);
-                this.el.addEventListener("moba-move", this.handleClick);
             },
             remove: function () {
+                this.removeKeyEventListeners();
+                this.removeVisibilityEventListeners();
                 this.el.removeEventListener("moba-move", this.handleClick);
             },
+
+            play: function () {
+                this.attachKeyEventListeners();
+                this.el.addEventListener("moba-move", this.handleClick);
+            },
+
+            pause: function () {
+                this.keys = {};
+                this.removeKeyEventListeners();
+                this.el.removeEventListener("moba-move", this.handleClick);
+            },
+
+            attachVisibilityEventListeners: function () {
+                window.oncontextmenu = this.onContextMenu;
+                window.addEventListener('blur', this.onBlur);
+                window.addEventListener('focus', this.onFocus);
+                document.addEventListener('visibilitychange', this.onVisibilityChange);
+            },
+
+            removeVisibilityEventListeners: function () {
+                window.removeEventListener('blur', this.onBlur);
+                window.removeEventListener('focus', this.onFocus);
+                document.removeEventListener('visibilitychange', this.onVisibilityChange);
+            },
+
+            attachKeyEventListeners: function () {
+                window.addEventListener('keydown', this.onKeyDown);
+                window.addEventListener('keyup', this.onKeyUp);
+            },
+
+            removeKeyEventListeners: function () {
+                window.removeEventListener('keydown', this.onKeyDown);
+                window.removeEventListener('keyup', this.onKeyUp);
+            },
+
+            onContextMenu: function () {
+                var keys = Object.keys(this.keys);
+                for (var i = 0; i < keys.length; i++) {
+                    delete this.keys[keys[i]];
+                }
+            },
+
+            onBlur: function () {
+                this.pause();
+            },
+
+            onFocus: function () {
+                this.play();
+            },
+
+            onVisibilityChange: function () {
+                if (document.hidden) {
+                    this.onBlur();
+                } else {
+                    this.onFocus();
+                }
+            },
+
+            onKeyDown: function (event) {
+                var el = this.el;
+
+                var code;
+                if (!shouldCaptureKeyEvent(event)) { return; }
+                code = event.code || KEYCODE_TO_CODE[event.keyCode];
+
+                if (code === "KeyE") {
+                    // forward attack
+
+                    // if (event.synthetic) {
+                    //     this.el.emit("fire-cannons", "left-cannon");
+                    // } else {
+                    //     const leftCannonFire = document.querySelector("#left-cannon-fire");
+                    //     leftCannonFire.components["select-cannon-side"].innerSelectCannonSide();
+                    // }
+                }
+                if (code === "KeyQ") {
+                    // area attack
+
+                    // if (event.synthetic) {
+                    //     this.el.emit("fire-cannons", "right-cannon");
+                    // } else {
+                    //     const rightCannonFire = document.querySelector("#right-cannon-fire");
+                    //     rightCannonFire.components["select-cannon-side"].innerSelectCannonSide();
+                    // }
+                }
+
+                if (KEYS.indexOf(code) !== -1) { this.keys[code] = true; }
+            },
+
+            onKeyUp: function (event) {
+                var code;
+                if (!shouldCaptureKeyEvent(event)) { return; }
+                code = event.code || KEYCODE_TO_CODE[event.keyCode]
+                delete this.keys[code];
+            },
+
             handleClick: function (e) {
                 const destination1 = new THREE.Vector3().copy(e.detail);
 
