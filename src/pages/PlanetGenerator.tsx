@@ -203,7 +203,7 @@ export const PlanetGenerator = () => {
                     }
 
                     if (spawnPoints.length) {
-                        for (const spawnPoint of spawnPoints) {
+                        for (const spawnPoint of spawnPoints.slice(1)) {
                             contentWindow?.addPirateShipSpawnPoint(JSON.stringify({
                                 point: spawnPoint.point.map(x => x * PLANET_SIZE)
                             }));

@@ -748,7 +748,7 @@
                 const trueUpDistance = object3D.getWorldPosition(new THREE.Vector3());
                 const trueUp = trueUpDistance.clone().normalize();
                 const currentUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
-                const currentForward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));;
+                const currentForward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
                 const currentRight = new THREE.Vector3(1, 0, 0).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
                 const diffUp = trueUp.clone().sub(currentUp.clone());
 
@@ -2786,7 +2786,7 @@
                         const cameraEl = document.querySelector("#camera-rig");
                         cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].getUnit()}`);
                         npcEls.forEach(npcEl => {
-                            const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3).add(new THREE.Vector3().random()), destination1.clone().negate());
+                            const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3).add(new THREE.Vector3().random().multiplyScalar(2).subScalar(1)), destination1.clone().negate());
                             const intersections = raycaster.intersectObject(this.system.getNavMesh());
                             if (intersections[0]) {
                                 const destination2 = intersections[0].point.clone();
@@ -4148,7 +4148,7 @@
             },
             applyImpulse: function () {
                 if (this.el.body) {
-                    const getRandom1to1 = () => (Math.random() * 2 - 1);
+                    const getRandom1to1 = () => (Math.random() * 2) - 1;
                     const bPos = this.el.body.position.clone();
                     const impulse = new CANNON.Vec3().set(getRandom1to1(), getRandom1to1(), getRandom1to1());
                     const bPosNorm = bPos.clone();
@@ -4713,6 +4713,12 @@
             positionNpc.setAttribute("update-npc-position-entity", "");
             positionCenterNpc.appendChild(positionNpc);
 
+            const orthographicCamera = document.createElement("a-entity");
+            orthographicCamera.setAttribute("position", "0 0 5");
+            orthographicCamera.setAttribute("orthographic-camera", "");
+            orthographicCamera.setAttribute("projected-texture", "");
+            positionNpc.appendChild(orthographicCamera);
+
             scene.appendChild(rootNpc);
         }
 
@@ -5263,6 +5269,7 @@
                 const unit = scene.components['coin-purse'].getUnit();
                 const visible = unit.startsWith("ship");
                 this.el.setAttribute("visible", visible);
+                this.el.emit("object3DUpdated");
             },
             selectCannonSide: function () {
                 if (this.data.selector === "none-cannon") {
@@ -5906,6 +5913,96 @@
             },
             navigationGroupChanged: function () {
                 this.system.registerMe(this.el);
+            },
+        });
+    </script>
+    <script type="module">
+        import ProjectedMaterial from './ProjectedMaterial.module.js';
+
+        AFRAME.registerComponent("orthographic-camera", {
+            schema: {},
+            init: function () {
+                this.camera = new THREE.OrthographicCamera(-5, 5, 5, -5, 0.1, 100);;
+                this.el.sceneEl.object3D.add(this.camera);
+            },
+            remove: function () {
+                this.el.sceneEl.object3D.remove(this.camera);
+                this.camera = null;
+            },
+            tick: function (t, dt) {
+                const camera = this.camera;
+                camera.position.copy(this.el.object3D.getWorldPosition(new THREE.Vector3()).normalize().multiplyScalar(150));
+                camera.up = new THREE.Vector3(0, 0, -1).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
+                camera.lookAt(0, 0, 0);
+            },
+            getCamera: function () {
+                return this.camera;
+            },
+        });
+
+        AFRAME.registerComponent("projected-texture", {
+            schema: {},
+            init: function () {
+                this.m = null;
+                this.cameraEl = null;
+                this.texture = null;
+                this.material = null;
+            },
+            remove: function () {
+                if (this.m) {
+                    this.el.sceneEl.object3D.remove(this.m);
+                }
+                this.m = null;
+                this.cameraEl = null;
+                this.texture = null;
+                this.material = null;
+            },
+            tick: function (t, dt) {
+                const mesh = this.el.sceneEl.systems['globe-nav'].getNavMesh();
+                if (!mesh) {
+                    return;
+                }
+                const geometry = mesh.geometry;
+                let texture;
+                if (this.texture) {
+                    texture = this.texture;
+                } else {
+                    texture = new THREE.TextureLoader().load('./images/attack-front.png');
+                    this.texture = texture;
+                }
+                if (!this.cameraEl) {
+                    this.cameraEl = this.el;
+                }
+                if (!this.cameraEl) {
+                    return;
+                }
+                if (!texture.image) {
+                    return;
+                }
+                const camera = this.cameraEl.components['orthographic-camera'].getCamera();
+                if (!camera) {
+                    return;
+                }
+                let material;
+                if (this.material) {
+                    material = this.material;
+                } else {
+                    material = new ProjectedMaterial({
+                        camera,
+                        texture,
+                        textureScale: 1,
+                        textureOffset: new THREE.Vector2(0, 0),
+                        transparent: true,
+                        backgroundOpacity: 0.0,
+                    });
+                    this.material = material;
+                }
+                if (!this.m) {
+                    const m = new THREE.Mesh(geometry, material);
+                    this.el.sceneEl.object3D.add(m);
+                    this.m = m;
+                }
+                material.project(this.m);
             },
         });
     </script>
