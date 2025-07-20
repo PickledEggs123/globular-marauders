@@ -5111,6 +5111,10 @@
                     type: "boolean",
                     default: false,
                 },
+                wizardShow: {
+                    type: "boolean",
+                    default: false,
+                },
             },
             tick: function (t, dt) {
                 const scene = document.querySelector("a-scene");
@@ -5119,7 +5123,12 @@
                         this.el.object3D.visible = false;
                         return;
                     } else {
-                        this.el.object3D.visible = true;
+                        const wizard = scene.querySelector(`.${scene.components['coin-purse'].activeUnit}-wizard`);
+                        if (this.data.wizardShow) {
+                            this.el.object3D.visible = !!wizard;
+                        } else {
+                            this.el.object3D.visible = !wizard;
+                        }
                     }
                 }
 
