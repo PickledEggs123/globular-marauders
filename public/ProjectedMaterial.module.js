@@ -1,4 +1,4 @@
-import * as THREE from '/three.mjs';
+import * as THREE from 'three';
 
 var id = 0;
 function _classPrivateFieldLooseKey(name) {

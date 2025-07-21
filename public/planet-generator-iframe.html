@@ -19,6 +19,14 @@
     <script src="/aframe-html.js"></script>
     <script src="/Tone.js"></script>
     <script src="/seedrandom.min.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "/three.module.js",
+                "three/addons": "/three/addons/"
+            }
+        }
+    </script>
     <script type="application/javascript">
         class MusicPlayer {
             synth = null;
@@ -4714,9 +4722,11 @@
             positionCenterNpc.appendChild(positionNpc);
 
             const orthographicCamera = document.createElement("a-entity");
+            orthographicCamera.setAttribute("class", "wizard-area-of-effect");
             orthographicCamera.setAttribute("position", "0 0 5");
             orthographicCamera.setAttribute("orthographic-camera", "");
             orthographicCamera.setAttribute("projected-texture", "");
+            orthographicCamera.setAttribute("obb-attack-zone", "center: 0 0 -2.5; dimension: 1 50 2.5;");
             positionNpc.appendChild(orthographicCamera);
 
             scene.appendChild(rootNpc);
@@ -5287,6 +5297,20 @@
                     const firstClick = cameraEl.getAttribute("look-at-box") !== selector;
                     if (firstClick) {
                         cameraEl.setAttribute("look-at-box", selector);
+                    }
+                } else if (this.data.selector === "forward-attack") {
+                    const selector = `.${scene.components['coin-purse'].getUnit()} .wizard-area-of-effect`;
+                    const el = document.querySelector(selector);
+                    const firstClick = !el.components['projected-texture'].data.enabled;
+                    if (firstClick) {
+                        el.setAttribute("projected-texture", {
+                            enabled: true,
+                        });
+                    } else {
+                        el.setAttribute("projected-texture", {
+                            enabled: false,
+                        });
+                        el.components['obb-attack-zone'].attack();
                     }
                 } else {
                     const cameraEl = document.querySelector("#camera-rig");
@@ -5927,6 +5951,7 @@
     </script>
     <script type="module">
         import ProjectedMaterial from './ProjectedMaterial.module.js';
+        import {OBB} from './three/addons/math/OBB.js';
 
         AFRAME.registerComponent("orthographic-camera", {
             schema: {},
@@ -5949,8 +5974,69 @@
             },
         });
 
+        AFRAME.registerComponent("obb-attack-zone", {
+            schema: {
+                center: {
+                    type: "vec3",
+                    default: new THREE.Vector3(0, 0, 0),
+                },
+                dimension: {
+                    type: "vec3",
+                    default: new THREE.Vector3(0, 0, 0),
+                },
+            },
+            multiple: true,
+            attack: function () {
+                let center = new THREE.Vector3().copy(this.data.center).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
+                const raycaster = new THREE.Raycaster(center.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), center.clone().negate());
+                const intersections = raycaster.intersectObjects([
+                    this.el.sceneEl.systems['globe-nav'].getNavMesh(),
+                    this.el.sceneEl.systems['globe-ocean-nav'].getNavMesh(),
+                ]);
+                if (intersections.length === 0) {
+                    return;
+                }
+
+                center = intersections[0].point;
+                const dimension = new THREE.Vector3().copy(this.data.dimension);
+                const obb = new OBB();
+                obb.center.copy(center);
+                obb.halfSize.copy(dimension);
+                obb.rotation.setFromMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion())));
+
+                const radius = 20;
+                const position = center;
+                const group = this.el.sceneEl.systems['globe-nav'].getGroup(position);
+                const factionName = findParentAttribute(this.el, 'npc-faction').data;
+                if (this.el.sceneEl.systems['npc-finder'].islandNpcList.has(group)) {
+                    const list = this.el.sceneEl.systems['npc-finder'].islandNpcList.get(group);
+                    const els = list.filter(x => {
+                        const pos = x.object3D.position;
+                        const dist = position.distanceTo(pos);
+                        return dist <= radius;
+                    });
+                    const filtered = els.filter(x => x && x.components['npc-faction'].data !== factionName);
+                    const npcs = filtered.sort((a, b) => {
+                        const distA = new THREE.Vector3().copy(a.object3D.position).distanceTo(position);
+                        const distB = new THREE.Vector3().copy(b.object3D.position).distanceTo(position);
+                        return distA - distB;
+                    });
+                    npcs.forEach(npc => {
+                        if (obb.containsPoint(npc.object3D.position)) {
+                            npc.emit("hit", 100);
+                        }
+                    })
+                }
+            }
+        })
+
         AFRAME.registerComponent("projected-texture", {
-            schema: {},
+            schema: {
+                enabled: {
+                    type: "boolean",
+                    default: false,
+                },
+            },
             init: function () {
                 this.m = null;
                 this.cameraEl = null;
@@ -5967,6 +6053,12 @@
                 this.material = null;
             },
             tick: function (t, dt) {
+                if (!this.data.enabled) {
+                    if (this.m) {
+                        this.remove();
+                    }
+                    return;
+                }
                 const mesh = this.el.sceneEl.systems['globe-nav'].getNavMesh();
                 if (!mesh) {
                     return;
@@ -6106,9 +6198,10 @@
                 <a-entity id="port-menu" align-with-projection="offset: 0.25 0.2 -0.5; rotation: 0 0 0; portShow: true" port-show html="cursor:#cursor;html:#my-interface" class="clickable"></a-entity>
                 <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
                 <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
-                <a-entity id="left-cannon-fire" align-with-projection="offset: -0.25 -0.2 -0.5; rotation: 0 90 0; scale: 0.03 0.03 0.03" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" class="clickable" select-cannon-side="selector: left-cannon"></a-entity>
-                <a-entity id="right-cannon-fire" align-with-projection="offset: 0.25 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" class="clickable" select-cannon-side="selector: right-cannon"></a-entity>
-                <a-entity id="none-cannon-fire" align-with-projection="offset: 0 -0.2 -0.5; rotation: 0 0 0; scale: 0.015 0.015 0.015" gltf-model="/meshes/Model_Redo/Ship Wheel/ShipWheel.glb" class="clickable" select-cannon-side="selector: none-cannon"></a-entity>
+                <a-entity id="left-cannon-fire" align-with-projection="offset: -0.25 -0.2 -0.5; rotation: 0 90 0; scale: 0.03 0.03 0.03;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" class="clickable" select-cannon-side="selector: left-cannon"></a-entity>
+                <a-entity id="right-cannon-fire" align-with-projection="offset: 0.25 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" class="clickable" select-cannon-side="selector: right-cannon"></a-entity>
+                <a-entity id="none-cannon-fire" align-with-projection="offset: 0 -0.2 -0.5; rotation: 0 0 0; scale: 0.015 0.015 0.015;" gltf-model="/meshes/Model_Redo/Ship Wheel/ShipWheel.glb" class="clickable" select-cannon-side="selector: none-cannon"></a-entity>
+                <a-entity id="forward-attack-fire" align-with-projection="offset: 0.2 -0.2 -0.5; rotation: 0 90 0; scale: 0.015 0.015 0.015; wizardShow: true;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" class="clickable" select-cannon-side="selector: forward-attack"></a-entity>
             </a-entity>
         </a-entity>
     </a-scene>
