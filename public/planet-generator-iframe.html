@@ -4726,7 +4726,7 @@
             orthographicCamera.setAttribute("position", "0 0 5");
             orthographicCamera.setAttribute("orthographic-camera", "");
             orthographicCamera.setAttribute("projected-texture", "");
-            orthographicCamera.setAttribute("obb-attack-zone", "center: 0 0 -2.5; dimension: 1 50 2.5;");
+            orthographicCamera.setAttribute("obb-attack-zone", "center: 0 0 -2.5; dimension: 1 50 2.5; debug: false;");
             positionNpc.appendChild(orthographicCamera);
 
             scene.appendChild(rootNpc);
@@ -5984,10 +5984,44 @@
                     type: "vec3",
                     default: new THREE.Vector3(0, 0, 0),
                 },
+                debug: {
+                    type: "boolean",
+                    default: false,
+                },
             },
             multiple: true,
+            remove: function () {
+                if (this.m) {
+                    this.el.sceneEl.object3D.remove(this.m);
+                    this.m = null;
+                }
+                this.b = null;
+                this.material = null;
+            },
+            tick: function () {
+                if (this.data.debug) {
+                    this.b = new THREE.BoxGeometry(1, 1, 1);
+                    if (!this.material) {
+                        this.material = new THREE.MeshBasicMaterial({
+                            color: 0xff0000,
+                            wireframe: true
+                        });
+                    }
+                    if (this.m) {
+                        this.el.sceneEl.object3D.remove(this.m);
+                        this.m = null;
+                    }
+                    if (!this.m) {
+                        this.m = new THREE.Mesh(this.b, this.material);
+                        this.m.scale.copy(new THREE.Vector3().copy(this.data.dimension).multiplyScalar(2));
+                        this.m.position.copy(new THREE.Vector3().copy(this.data.center).negate().applyMatrix4(this.el.object3D.matrixWorld));
+                        this.m.quaternion.copy(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
+                        this.el.sceneEl.object3D.add(this.m);
+                    }
+                }
+            },
             attack: function () {
-                let center = new THREE.Vector3().copy(this.data.center).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
+                let center = new THREE.Vector3().copy(this.data.center).negate().applyMatrix4(this.el.object3D.matrixWorld);
                 const raycaster = new THREE.Raycaster(center.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), center.clone().negate());
                 const intersections = raycaster.intersectObjects([
                     this.el.sceneEl.systems['globe-nav'].getNavMesh(),
@@ -6002,7 +6036,7 @@
                 const obb = new OBB();
                 obb.center.copy(center);
                 obb.halfSize.copy(dimension);
-                obb.rotation.setFromMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion())));
+                obb.rotation.setFromMatrix4(this.el.object3D.matrixWorld);
 
                 const radius = 20;
                 const position = center;
