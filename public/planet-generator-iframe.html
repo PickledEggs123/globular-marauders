@@ -4725,8 +4725,10 @@
             orthographicCamera.setAttribute("class", "wizard-area-of-effect");
             orthographicCamera.setAttribute("position", "0 0 5");
             orthographicCamera.setAttribute("orthographic-camera", "");
-            orthographicCamera.setAttribute("projected-texture", "");
-            orthographicCamera.setAttribute("obb-attack-zone", "center: 0 0 -2.5; dimension: 1 50 2.5; debug: false;");
+            orthographicCamera.setAttribute("projected-texture__forward-attack", "image: /images/attack-front.png");
+            orthographicCamera.setAttribute("obb-attack-zone__forward-attack", "center: 0 0 -2.5; dimension: 1 50 2.5; debug: false;");
+            orthographicCamera.setAttribute("projected-texture__area-attack", "image: /images/attack-area.png");
+            orthographicCamera.setAttribute("obb-attack-zone__area-attack", "center: 0 0 0; dimension: 1 50 1; debug: false;");
             positionNpc.appendChild(orthographicCamera);
 
             scene.appendChild(rootNpc);
@@ -5301,16 +5303,30 @@
                 } else if (this.data.selector === "forward-attack") {
                     const selector = `.${scene.components['coin-purse'].getUnit()} .wizard-area-of-effect`;
                     const el = document.querySelector(selector);
-                    const firstClick = !el.components['projected-texture'].data.enabled;
+                    const firstClick = !el.components['projected-texture__forward-attack'].data.enabled;
                     if (firstClick) {
-                        el.setAttribute("projected-texture", {
+                        el.setAttribute("projected-texture__forward-attack", {
                             enabled: true,
                         });
                     } else {
-                        el.setAttribute("projected-texture", {
+                        el.setAttribute("projected-texture__forward-attack", {
                             enabled: false,
                         });
-                        el.components['obb-attack-zone'].attack();
+                        el.components['obb-attack-zone__forward-attack'].attack();
+                    }
+                } else if (this.data.selector === "area-attack") {
+                    const selector = `.${scene.components['coin-purse'].getUnit()} .wizard-area-of-effect`;
+                    const el = document.querySelector(selector);
+                    const firstClick = !el.components['projected-texture__area-attack'].data.enabled;
+                    if (firstClick) {
+                        el.setAttribute("projected-texture__area-attack", {
+                            enabled: true,
+                        });
+                    } else {
+                        el.setAttribute("projected-texture__area-attack", {
+                            enabled: false,
+                        });
+                        el.components['obb-attack-zone__area-attack'].attack();
                     }
                 } else {
                     const cameraEl = document.querySelector("#camera-rig");
@@ -6070,7 +6086,12 @@
                     type: "boolean",
                     default: false,
                 },
+                image: {
+                    type: "string",
+                    default: "",
+                },
             },
+            multiple: true,
             init: function () {
                 this.m = null;
                 this.cameraEl = null;
@@ -6102,7 +6123,7 @@
                 if (this.texture) {
                     texture = this.texture;
                 } else {
-                    texture = new THREE.TextureLoader().load('./images/attack-front.png');
+                    texture = new THREE.TextureLoader().load(this.data.image);
                     this.texture = texture;
                 }
                 if (!this.cameraEl) {
@@ -6236,6 +6257,7 @@
                 <a-entity id="right-cannon-fire" align-with-projection="offset: 0.25 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" class="clickable" select-cannon-side="selector: right-cannon"></a-entity>
                 <a-entity id="none-cannon-fire" align-with-projection="offset: 0 -0.2 -0.5; rotation: 0 0 0; scale: 0.015 0.015 0.015;" gltf-model="/meshes/Model_Redo/Ship Wheel/ShipWheel.glb" class="clickable" select-cannon-side="selector: none-cannon"></a-entity>
                 <a-entity id="forward-attack-fire" align-with-projection="offset: 0.2 -0.2 -0.5; rotation: 0 90 0; scale: 0.015 0.015 0.015; wizardShow: true;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" class="clickable" select-cannon-side="selector: forward-attack"></a-entity>
+                <a-entity id="area-attack-fire" align-with-projection="offset: -0.2 -0.2 -0.5; rotation: 0 -90 0; scale: 0.015 0.015 0.015; wizardShow: true;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" class="clickable" select-cannon-side="selector: area-attack"></a-entity>
             </a-entity>
         </a-entity>
     </a-scene>
