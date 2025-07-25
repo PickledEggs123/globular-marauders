@@ -126,10 +126,6 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
                     link: "/about",
                     icon: <QuestionMark/>,
                     text: "About"
-                }, {
-                    link: "/contact",
-                    icon: <Person/>,
-                    text: "Contact"
                 }].map(({link, icon, text}) => (
                     <Link key={link} to={link} style={{textDecoration: "none", boxShadow: "none"}}>
                         <ListItem>

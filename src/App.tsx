@@ -4,7 +4,6 @@ import PixiGame from "./pages/PixiGame";
 import {GameModel} from "./pages/GameModel";
 import {PlanetGenerator} from "./pages/PlanetGenerator";
 import {About} from "./pages/About";
-import {Contact} from "./pages/Contact";
 import {ShipWiki} from "./pages/ShipWiki";
 import {CharacterWiki} from "./pages/CharacterWiki";
 import {ShipContext, ShipMeshLoader} from "./contextes/ShipContext";
@@ -105,7 +104,7 @@ export const App = () => {
             }/>
             <Route path="/character-wiki" element={<CharacterWiki/>}/>
             <Route path="/about" element={<About/>}/>
-            <Route path="/contact" element={<Contact/>}/>
+            <Route path="/contact" element={<Main/>}/>
             <Route index element={<Main/>}/>
         </Routes>
     );
