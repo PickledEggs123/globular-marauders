@@ -6057,6 +6057,7 @@
             init: function () {
                 this.startTime = (+new Date() / 1000);
                 this.endTime = (+new Date() / 1000) + this.data.speed;
+                this.npcSet = new Set();
             },
             tick: function (t, dt) {
                 const dimension = new THREE.Vector3().copy(this.data.dimension);
@@ -6131,7 +6132,10 @@
                     });
                     npcs.forEach(npc => {
                         if (obb.containsPoint(npc.object3D.position)) {
-                            npc.emit("hit", dt / 1000 * 100 / this.data.ratio);
+                            if (!this.npcSet.has(npc)) {
+                                this.npcSet.add(npc);
+                                npc.emit("hit", 100);
+                            }
                         }
                     })
                 }
