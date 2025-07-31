@@ -5964,6 +5964,13 @@
                 this.system.registerMe(this.el);
             },
         });
+
+        AFRAME.registerComponent('play-all-animations', {
+            schema: {},
+            init: function () {
+                this.el.setAttribute("animation-mixer", {timeScale: 1});
+            },
+        });
     </script>
     <script type="module">
         import ProjectedMaterial from './ProjectedMaterial.module.js';
@@ -6256,8 +6263,8 @@
                 <a-entity id="left-cannon-fire" align-with-projection="offset: -0.25 -0.2 -0.5; rotation: 0 90 0; scale: 0.03 0.03 0.03;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" class="clickable" select-cannon-side="selector: left-cannon"></a-entity>
                 <a-entity id="right-cannon-fire" align-with-projection="offset: 0.25 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" class="clickable" select-cannon-side="selector: right-cannon"></a-entity>
                 <a-entity id="none-cannon-fire" align-with-projection="offset: 0 -0.2 -0.5; rotation: 0 0 0; scale: 0.015 0.015 0.015;" gltf-model="/meshes/Model_Redo/Ship Wheel/ShipWheel.glb" class="clickable" select-cannon-side="selector: none-cannon"></a-entity>
-                <a-entity id="forward-attack-fire" align-with-projection="offset: 0.2 -0.2 -0.5; rotation: 0 90 0; scale: 0.015 0.015 0.015; wizardShow: true;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" class="clickable" select-cannon-side="selector: forward-attack"></a-entity>
-                <a-entity id="area-attack-fire" align-with-projection="offset: -0.2 -0.2 -0.5; rotation: 0 -90 0; scale: 0.015 0.015 0.015; wizardShow: true;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" class="clickable" select-cannon-side="selector: area-attack"></a-entity>
+                <a-entity id="forward-attack-fire" align-with-projection="offset: 0.2 -0.2 -0.5; rotation: 0 90 0; scale: 0.015 0.015 0.015; wizardShow: true;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" class="clickable" select-cannon-side="selector: forward-attack" play-all-animations></a-entity>
+                <a-entity id="area-attack-fire" align-with-projection="offset: -0.2 -0.2 -0.5; rotation: 0 -90 0; scale: 0.015 0.015 0.015; wizardShow: true;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" class="clickable" select-cannon-side="selector: area-attack" play-all-animations></a-entity>
             </a-entity>
         </a-entity>
     </a-scene>
