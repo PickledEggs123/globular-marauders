@@ -5996,6 +5996,189 @@
                 this.el.setAttribute("animation-mixer", {timeScale: 1});
             },
         });
+
+        AFRAME.registerComponent('ui-clicked', {
+            schema: {
+                rayOrigin: {
+                    default: 'mouse',
+                    oneOf: ['mouse', 'entity', 'xrselect'],
+                },
+            },
+            init: function () {
+                this.eventDetail = {};
+                this.intersectedEventDetail = {cursorEl: this.el};
+
+                this.onMouseMove = this.onMouseMove.bind(this);
+                this.onCursorDown = this.onCursorDown.bind(this);
+
+                this.intersections = [];
+                this.raycaster = new THREE.Raycaster(this.el.sceneEl.camera);
+
+                // Debounce.
+                this.updateCanvasBounds = debounce(() => {
+                    this.canvasBounds = this.el.sceneEl.canvas.getBoundingClientRect();
+                }, 500);
+            },
+            play: function () {
+                this.el.sceneEl.addEventListener('rendererresize', this.updateCanvasBounds);
+                window.addEventListener('resize', this.updateCanvasBounds);
+                window.addEventListener('scroll', this.updateCanvasBounds);
+
+                this.el.sceneEl.canvas.addEventListener('touchstart', this.onMouseMove);
+                this.el.sceneEl.canvas.addEventListener('touchmove', this.onMouseMove);
+                this.el.sceneEl.canvas.addEventListener('mousemove', this.onMouseMove);
+                this.el.sceneEl.canvas.addEventListener('click', this.onCursorDown);
+            },
+            pause: function () {
+                this.el.sceneEl.removeEventListener('rendererresize', this.updateCanvasBounds);
+                window.removeEventListener('resize', this.updateCanvasBounds);
+                window.removeEventListener('scroll', this.updateCanvasBounds);
+
+                this.el.sceneEl.canvas.removeEventListener('touchstart', this.onMouseMove);
+                this.el.sceneEl.canvas.removeEventListener('touchmove', this.onMouseMove);
+                this.el.sceneEl.canvas.removeEventListener('mousemove', this.onMouseMove);
+                this.el.sceneEl.canvas.removeEventListener('click', this.onCursorDown);
+            },
+            onMouseMove: (function () {
+                var direction = new THREE.Vector3();
+                var mouse = new THREE.Vector2();
+                var origin = new THREE.Vector3();
+                var rayCasterConfig = {origin: origin, direction: direction};
+
+                return function (evt) {
+                    var bounds = this.canvasBounds;
+                    var camera = this.el.sceneEl.camera;
+                    var cameraElParent;
+                    var left;
+                    var point;
+                    var top;
+
+                    var frame;
+                    var inputSource;
+                    var referenceSpace;
+                    var pose;
+                    var transform;
+
+                    camera.parent.updateMatrixWorld();
+
+                    // Calculate mouse position based on the canvas element
+                    if (evt.type === 'touchmove' || evt.type === 'touchstart') {
+                        // Track the first touch for simplicity.
+                        point = evt.touches.item(0);
+                    } else {
+                        point = evt;
+                    }
+
+                    if (!bounds) {
+                        return;
+                    }
+
+                    left = point.clientX - bounds.left;
+                    top = point.clientY - bounds.top;
+                    mouse.x = (left / bounds.width) * 2 - 1;
+                    mouse.y = -(top / bounds.height) * 2 + 1;
+
+                    if (this.data.rayOrigin === 'xrselect' && (evt.type === 'selectstart' || evt.type === 'fakeselectevent')) {
+                        frame = evt.frame;
+                        inputSource = evt.inputSource;
+                        referenceSpace = this.el.sceneEl.renderer.xr.getReferenceSpace();
+                        pose = frame.getPose(inputSource.targetRaySpace, referenceSpace);
+                        if (pose) {
+                            transform = pose.transform;
+                            direction.set(0, 0, -1);
+                            direction.applyQuaternion(transform.orientation);
+                            origin.copy(transform.position);
+
+                            // Transform XRPose into world space
+                            cameraElParent = camera.el.object3D.parent;
+                            cameraElParent.localToWorld(origin);
+                            direction.transformDirection(cameraElParent.matrixWorld);
+                        }
+                    } else if (evt.type === 'fakeselectout') {
+                        direction.set(0, 1, 0);
+                        origin.set(0, 9999, 0);
+                    } else if (camera && camera.isPerspectiveCamera) {
+                        origin.setFromMatrixPosition(camera.matrixWorld);
+                        direction.set(mouse.x, mouse.y, 0.5).unproject(camera).sub(origin).normalize();
+                    } else if (camera && camera.isOrthographicCamera) {
+                        origin.set(mouse.x, mouse.y, (camera.near + camera.far) / (camera.near - camera.far)).unproject(camera); // set origin in plane of camera
+                        direction.set(0, 0, -1).transformDirection(camera.matrixWorld);
+                    } else {
+                        console.error('AFRAME.Raycaster: Unsupported camera type: ' + camera.type);
+                    }
+
+                    //this.el.setAttribute('raycaster', rayCasterConfig);
+                    this.raycaster.ray.origin.copy(rayCasterConfig.origin);
+                    this.raycaster.ray.direction.copy(rayCasterConfig.direction);
+                    if (evt.type === 'touchmove') { evt.preventDefault(); }
+                };
+            })(),
+
+            /**
+             * Trigger mousedown and keep track of the mousedowned entity.
+             */
+            onCursorDown: function (evt) {
+                this.isCursorDown = true;
+                // Raycast again for touch.
+                if (this.data.rayOrigin === 'mouse' && evt.type === 'touchstart') {
+                    this.onMouseMove(evt);
+                    this.intersections.length = 0;
+                    this.raycaster.intersectObject(this.el.object3D, true, this.intersections);
+                    this.intersectedEl = this.intersections[0] || null;
+                    evt.preventDefault();
+                }
+
+                if (this.data.rayOrigin === 'xrselect' && evt.type === 'selectstart') {
+                    this.activeXRInput = evt.inputSource;
+                    this.onMouseMove(evt);
+                    this.raycaster.checkIntersections();
+
+                    // if something was tapped on don't do ar-hit-test things
+                    if (
+                        this.raycaster.intersectedEls.length &&
+                        this.el.sceneEl.components['ar-hit-test'] !== undefined &&
+                        this.el.sceneEl.getAttribute('ar-hit-test').enabled
+                    ) {
+                        // Cancel the ar-hit-test behaviours and disable the ar-hit-test
+                        this.el.sceneEl.setAttribute('ar-hit-test', 'enabled', false);
+                        this.reenableARHitTest = true;
+                    }
+                }
+
+                this.cursorDownEl = this.intersectedEl;
+                this.twoWayEmit('mousedown', evt);
+            },
+
+            /**
+             * Helper to emit on both the cursor and the intersected entity (if exists).
+             */
+            twoWayEmit: function (evtName, originalEvent) {
+                var el = this.el;
+                var intersectedEl = this.intersectedEl;
+                var intersection;
+
+                function addOriginalEvent (detail, evt) {
+                    if (originalEvent instanceof MouseEvent) {
+                        detail.mouseEvent = originalEvent;
+                    } else if (typeof TouchEvent !== 'undefined' &&
+                        originalEvent instanceof TouchEvent) {
+                        detail.touchEvent = originalEvent;
+                    }
+                }
+
+                intersection = this.intersections[0] || null;
+                this.eventDetail.intersectedEl = intersectedEl;
+                this.eventDetail.intersection = intersection;
+                addOriginalEvent(this.eventDetail, originalEvent);
+                // el.emit(evtName, this.eventDetail);
+
+                if (!intersectedEl) { return; }
+
+                this.intersectedEventDetail.intersection = intersection;
+                addOriginalEvent(this.intersectedEventDetail, originalEvent);
+                intersectedEl.emit(evtName, this.intersectedEventDetail);
+            }
+        })
     </script>
     <script type="module">
         import ProjectedMaterial from './ProjectedMaterial.module.js';
@@ -6373,11 +6556,11 @@
                 <a-entity id="port-menu" align-with-projection="offset: 0.25 0.2 -0.5; rotation: 0 0 0; portShow: true" port-show html="cursor:#cursor;html:#my-interface" class="clickable"></a-entity>
                 <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
                 <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
-                <a-entity id="left-cannon-fire" align-with-projection="offset: -0.25 -0.2 -0.5; rotation: 0 90 0; scale: 0.03 0.03 0.03;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" class="clickable" select-cannon-side="selector: left-cannon"></a-entity>
-                <a-entity id="right-cannon-fire" align-with-projection="offset: 0.25 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" class="clickable" select-cannon-side="selector: right-cannon"></a-entity>
-                <a-entity id="none-cannon-fire" align-with-projection="offset: 0 -0.2 -0.5; rotation: 0 0 0; scale: 0.015 0.015 0.015;" gltf-model="/meshes/Model_Redo/Ship Wheel/ShipWheel.glb" class="clickable" select-cannon-side="selector: none-cannon"></a-entity>
-                <a-entity id="forward-attack-fire" align-with-projection="offset: 0.2 -0.2 -0.5; rotation: 0 90 0; scale: 0.015 0.015 0.015; wizardShow: true;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" class="clickable" select-cannon-side="selector: forward-attack" play-all-animations></a-entity>
-                <a-entity id="area-attack-fire" align-with-projection="offset: -0.2 -0.2 -0.5; rotation: 0 -90 0; scale: 0.015 0.015 0.015; wizardShow: true;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" class="clickable" select-cannon-side="selector: area-attack" play-all-animations></a-entity>
+                <a-entity id="left-cannon-fire" align-with-projection="offset: -0.25 -0.2 -0.5; rotation: 0 90 0; scale: 0.03 0.03 0.03;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" class="clickable" select-cannon-side="selector: left-cannon" ui-clicked></a-entity>
+                <a-entity id="right-cannon-fire" align-with-projection="offset: 0.25 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" class="clickable" select-cannon-side="selector: right-cannon" ui-clicked></a-entity>
+                <a-entity id="none-cannon-fire" align-with-projection="offset: 0 -0.2 -0.5; rotation: 0 0 0; scale: 0.015 0.015 0.015;" gltf-model="/meshes/Model_Redo/Ship Wheel/ShipWheel.glb" class="clickable" select-cannon-side="selector: none-cannon" ui-clicked></a-entity>
+                <a-entity id="forward-attack-fire" align-with-projection="offset: 0.2 -0.2 -0.5; rotation: 0 90 0; scale: 0.015 0.015 0.015; wizardShow: true;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" class="clickable" select-cannon-side="selector: forward-attack" play-all-animations ui-clicked></a-entity>
+                <a-entity id="area-attack-fire" align-with-projection="offset: -0.2 -0.2 -0.5; rotation: 0 -90 0; scale: 0.015 0.015 0.015; wizardShow: true;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" class="clickable" select-cannon-side="selector: area-attack" play-all-animations ui-clicked></a-entity>
             </a-entity>
         </a-entity>
     </a-scene>
