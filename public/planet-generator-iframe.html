@@ -6018,6 +6018,11 @@
                 this.updateCanvasBounds = debounce(() => {
                     this.canvasBounds = this.el.sceneEl.canvas.getBoundingClientRect();
                 }, 500);
+
+                this.el.addEventListener("model-loaded", buildBoundsTree);
+            },
+            remove: function () {
+                this.el.removeEventListener("model-loaded", buildBoundsTree);
             },
             play: function () {
                 this.el.sceneEl.addEventListener('rendererresize', this.updateCanvasBounds);
@@ -6236,13 +6241,41 @@
                 }
                 this.b = null;
                 this.material = null;
+
+                if (this.fireball) {
+                    this.el.removeChild(this.fireball);
+                }
+                this.fireball = null;
             },
             init: function () {
-                this.startTime = (+new Date() / 1000);
-                this.endTime = (+new Date() / 1000) + this.data.speed;
+                this.startTime = null;
+                this.endTime = null;
                 this.npcSet = new Set();
+
+                this.fireball = null;
             },
             tick: function (t, dt) {
+                if (!this.fireball) {
+                    this.fireball = document.createElement("a-entity");
+                    this.fireball.setAttribute("gltf-model", "/meshes/EpicStore/Fireball/source/Fireball.glb");
+                    this.fireball.setAttribute("play-all-animations", "");
+                    this.el.appendChild(this.fireball);
+
+                    if (this.fireball.getObject3D("mesh")) {
+                        this.startTime = (+new Date() / 1000);
+                        this.endTime = this.startTime + this.data.speed;
+                    } else {
+                        this.fireball.addEventListener("model-loaded", () => {
+                            this.startTime = (+new Date() / 1000);
+                            this.endTime = this.startTime + this.data.speed;
+                        });
+                    }
+                }
+
+                if (!this.startTime || !this.endTime) {
+                    return;
+                }
+
                 const dimension = new THREE.Vector3().copy(this.data.dimension);
                 const ratioDimension = dimension.clone().multiply(new THREE.Vector3(1, 1, this.data.ratio));
                 let center = new THREE.Vector3().copy(this.data.center);
@@ -6256,6 +6289,17 @@
                     this.el.removeAttribute("obb-attack-forward-wave");
                     return;
                 }
+
+                center = ratioCenter.clone().negate().applyMatrix4(this.el.object3D.matrixWorld);
+                const raycaster = new THREE.Raycaster(center.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), center.clone().negate());
+                const intersections = raycaster.intersectObjects([
+                    this.el.sceneEl.systems['globe-nav'].getNavMesh(),
+                    this.el.sceneEl.systems['globe-ocean-nav'].getNavMesh(),
+                ]);
+                if (intersections.length === 0) {
+                    return;
+                }
+                center = intersections[0].point;
 
                 if (this.data.debug) {
                     this.b = new THREE.BoxGeometry(1, 1, 1);
@@ -6272,32 +6316,29 @@
                     if (!this.m) {
                         this.m = new THREE.Mesh(this.b, this.material);
                         this.m.scale.copy(ratioDimension.clone().multiplyScalar(2));
-                        this.m.position.copy(ratioCenter.clone().negate().applyMatrix4(this.el.object3D.matrixWorld));
+                        this.m.position.copy(center.clone());
                         this.m.quaternion.copy(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
                         this.el.sceneEl.object3D.add(this.m);
                     }
                 }
 
-
-
-                center = ratioCenter.clone().negate().applyMatrix4(this.el.object3D.matrixWorld);
-                const raycaster = new THREE.Raycaster(center.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), center.clone().negate());
-                const intersections = raycaster.intersectObjects([
-                    this.el.sceneEl.systems['globe-nav'].getNavMesh(),
-                    this.el.sceneEl.systems['globe-ocean-nav'].getNavMesh(),
-                ]);
-                if (intersections.length === 0) {
-                    return;
+                if (this.fireball) {
+                    const scene = this.el.sceneEl.object3D;
+                    scene.attach(this.fireball.object3D);
+                    this.fireball.object3D.position.copy(center.clone().add(center.clone().normalize()));
+                    this.fireball.object3D.up = center.clone().normalize();
+                    this.fireball.object3D.quaternion.copy(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
+                    this.fireball.object3D.scale.copy(new THREE.Vector3(0.2, 0.2, 0.2));
+                    this.el.object3D.attach(this.fireball.object3D);
                 }
 
-                center = intersections[0].point;
                 const obb = new OBB();
                 obb.center.copy(center);
                 obb.halfSize.copy(ratioDimension);
                 obb.rotation.setFromMatrix4(this.el.object3D.matrixWorld);
 
                 const radius = 20;
-                const position = ratioCenter;
+                const position = center;
                 const group = this.el.sceneEl.systems['globe-nav'].getGroup(position);
                 const factionName = findParentAttribute(this.el, 'npc-faction').data;
                 if (this.el.sceneEl.systems['npc-finder'].islandNpcList.has(group)) {
@@ -6378,7 +6419,8 @@
                 this.el.setAttribute("obb-attack-forward-wave", {
                     center: this.data.center,
                     dimension: this.data.dimension,
-                    debug: true,
+                    debug: false,
+                    ratio: 0.2,
                 });
             }
         })
