@@ -6366,6 +6366,162 @@
             },
         });
 
+        AFRAME.registerComponent("obb-attack-center-wave", {
+            schema: {
+                center: {
+                    type: "vec3",
+                    default: new THREE.Vector3(0, 0, 0),
+                },
+                dimension: {
+                    type: "vec3",
+                    default: new THREE.Vector3(0, 0, 0),
+                },
+                debug: {
+                    type: "boolean",
+                    default: false,
+                },
+                height: {
+                    type: "number",
+                    default: 50,
+                },
+                speed: {
+                    type: "number",
+                    default: 1,
+                },
+            },
+            multiple: true,
+            remove: function () {
+                if (this.m) {
+                    this.el.sceneEl.object3D.remove(this.m);
+                    this.m = null;
+                }
+                this.b = null;
+                this.material = null;
+
+                if (this.fireball) {
+                    this.el.removeChild(this.fireball);
+                }
+                this.fireball = null;
+            },
+            init: function () {
+                this.startTime = null;
+                this.endTime = null;
+                this.npcSet = new Set();
+
+                this.fireball = null;
+            },
+            tick: function (t, dt) {
+                if (!this.fireball) {
+                    this.fireball = document.createElement("a-entity");
+                    this.fireball.setAttribute("gltf-model", "/meshes/EpicStore/Fireball/source/Fireball.glb");
+                    this.fireball.setAttribute("play-all-animations", "");
+                    this.el.appendChild(this.fireball);
+
+                    if (this.fireball.getObject3D("mesh")) {
+                        this.startTime = (+new Date() / 1000);
+                        this.endTime = this.startTime + this.data.speed;
+                    } else {
+                        this.fireball.addEventListener("model-loaded", () => {
+                            this.startTime = (+new Date() / 1000);
+                            this.endTime = this.startTime + this.data.speed;
+                        });
+                    }
+                }
+
+                if (!this.startTime || !this.endTime) {
+                    return;
+                }
+
+                const dimension = new THREE.Vector3().copy(this.data.dimension);
+                let center = new THREE.Vector3().copy(this.data.center);
+                const linear = THREE.MathUtils.mapLinear(+new Date() / 1000, this.startTime, this.endTime, 0, 1);
+                const clamp = THREE.MathUtils.clamp(linear, 0, 1);
+
+                if (linear > 1) {
+                    const obb = new OBB();
+                    obb.center.copy(center);
+                    obb.halfSize.copy(dimension);
+                    obb.rotation.setFromMatrix4(this.el.object3D.matrixWorld);
+
+                    const radius = 20;
+                    const position = center;
+                    const group = this.el.sceneEl.systems['globe-nav'].getGroup(position);
+                    const factionName = findParentAttribute(this.el, 'npc-faction').data;
+                    if (this.el.sceneEl.systems['npc-finder'].islandNpcList.has(group)) {
+                        const list = this.el.sceneEl.systems['npc-finder'].islandNpcList.get(group);
+                        const els = list.filter(x => {
+                            const pos = x.object3D.position;
+                            const dist = position.distanceTo(pos);
+                            return dist <= radius;
+                        });
+                        const filtered = els.filter(x => x && x.components['npc-faction'].data !== factionName);
+                        const npcs = filtered.sort((a, b) => {
+                            const distA = new THREE.Vector3().copy(a.object3D.position).distanceTo(position);
+                            const distB = new THREE.Vector3().copy(b.object3D.position).distanceTo(position);
+                            return distA - distB;
+                        });
+                        npcs.forEach(npc => {
+                            if (obb.containsPoint(npc.object3D.position)) {
+                                if (!this.npcSet.has(npc)) {
+                                    this.npcSet.add(npc);
+                                    npc.emit("hit", 100);
+                                }
+                            }
+                        })
+                    }
+
+                    this.el.removeAttribute("obb-attack-center-wave");
+                } else {
+                    center = center.clone().negate().applyMatrix4(this.el.object3D.matrixWorld);
+                    const raycaster = new THREE.Raycaster(center.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), center.clone().negate());
+                    const intersections = raycaster.intersectObjects([
+                        this.el.sceneEl.systems['globe-nav'].getNavMesh(),
+                        this.el.sceneEl.systems['globe-ocean-nav'].getNavMesh(),
+                    ]);
+                    if (intersections.length === 0) {
+                        return;
+                    }
+                    center = intersections[0].point;
+                    const centerStart = new THREE.Vector3().copy(center).add(center.clone().normalize().multiplyScalar(this.data.height));
+                    const centerEnd = center.clone();
+                    const ratioCenter = new THREE.Vector3().lerpVectors(centerStart, centerEnd, clamp);
+                    center = ratioCenter.clone();
+
+                    if (this.data.debug) {
+                        this.b = new THREE.BoxGeometry(1, 1, 1);
+                        if (!this.material) {
+                            this.material = new THREE.MeshBasicMaterial({
+                                color: 0xff0000,
+                                wireframe: true
+                            });
+                        }
+                        if (this.m) {
+                            this.el.sceneEl.object3D.remove(this.m);
+                            this.m = null;
+                        }
+                        if (!this.m) {
+                            this.m = new THREE.Mesh(this.b, this.material);
+                            this.m.scale.copy(dimension.clone().multiplyScalar(2));
+                            this.m.position.copy(center.clone());
+                            this.m.up = new THREE.Vector3(0, 0, 1).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
+                            this.m.lookAt(center.clone());
+                            this.el.sceneEl.object3D.add(this.m);
+                        }
+                    }
+
+                    if (this.fireball) {
+                        const scene = this.el.sceneEl.object3D;
+                        scene.attach(this.fireball.object3D);
+                        this.fireball.object3D.position.copy(center.clone().add(center.clone().normalize()));
+                        this.fireball.object3D.up = new THREE.Vector3(0, 0, 1).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
+                        this.fireball.object3D.lookAt(center.clone());
+                        this.fireball.object3D.scale.copy(new THREE.Vector3(0.2, 0.2, 0.2));
+                        this.el.object3D.attach(this.fireball.object3D);
+                    }
+                }
+            },
+        });
+
         AFRAME.registerComponent("obb-attack-zone", {
             schema: {
                 center: {
@@ -6413,15 +6569,28 @@
                 }
             },
             attack: function () {
-                if (this.el.hasAttribute("obb-attack-forward-wave")) {
-                    this.el.removeAttribute("obb-attack-forward-wave");
+                if (new THREE.Vector3().copy(this.data.center).length() === 0) {
+                    if (this.el.hasAttribute("obb-attack-center-wave")) {
+                        this.el.removeAttribute("obb-attack-center-wave");
+                    }
+                    this.el.setAttribute("obb-attack-center-wave", {
+                        center: this.data.center,
+                        dimension: this.data.dimension,
+                        debug: false,
+                        height: 20,
+                        speed: 2,
+                    });
+                } else {
+                    if (this.el.hasAttribute("obb-attack-forward-wave")) {
+                        this.el.removeAttribute("obb-attack-forward-wave");
+                    }
+                    this.el.setAttribute("obb-attack-forward-wave", {
+                        center: this.data.center,
+                        dimension: this.data.dimension,
+                        debug: false,
+                        ratio: 0.2,
+                    });
                 }
-                this.el.setAttribute("obb-attack-forward-wave", {
-                    center: this.data.center,
-                    dimension: this.data.dimension,
-                    debug: false,
-                    ratio: 0.2,
-                });
             }
         })
 
