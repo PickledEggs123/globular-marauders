@@ -2730,65 +2730,85 @@
             init: function () {
                 this.system = this.el.sceneEl.systems['globe-nav'];
                 this.el.addEventListener('click', (e) => {
-                    const scene = document.querySelector("a-scene");
-                    const activeUnit = scene.components['coin-purse'].activeUnit;
-                    const ship = scene.querySelector(`.${activeUnit}`);
-                    if (!ship) {
-                        return;
-                    }
-
-                    if (!e.detail.intersection) {
-                        return;
-                    }
-
-                    const destination1 = e.detail.intersection.point.clone();
-
-                    const ships = [
-                        ...scene.querySelectorAll(`.ship-1`),
-                        ...scene.querySelectorAll(`.ship-2`),
-                        ...scene.querySelectorAll(`.ship-3`),
-                    ];
-                    ships.forEach((ship) => {
-                        ship.setAttribute("globe-keyboard-controls", {enabled: false});
-                    });
-
-                    scene.components['coin-purse'].setUnit(unitMap.get(scene.components['coin-purse'].activeUnit));
-                    const checkBox = document.querySelector(`#unit-selection-${scene.components['coin-purse'].activeUnit}`);
-                    checkBox.click();
-
-                    let addedNpcs = false;
-                    const npcs = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
-                    if (npcs.length === 0) {
-                        addWizardNpc();
-                        const raiderAmount = scene.components['coin-purse'].getRaiderAmount();
-                        for (let i = 0; i < raiderAmount; i++) {
-                            addNpc(i);
+                    ClickManager.addToQueue(() => {
+                        const scene = document.querySelector("a-scene");
+                        const activeUnit = scene.components['coin-purse'].activeUnit;
+                        const ship = scene.querySelector(`.${activeUnit}`);
+                        if (!ship) {
+                            return;
                         }
-                        addedNpcs = true;
-                    }
 
-                    if (addedNpcs) {
+                        if (!e.detail.intersection) {
+                            return;
+                        }
 
-                        setTimeout(() => {
-                            const npcEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
-                            npcEls.forEach(npcEl => {
-                                npcEl.setAttribute("globe-nav-agent", `active: false; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2; razeTarget: #${this.el.id};`);
-                            });
-                        }, 500);
-                        setTimeout(() => {
-                            const npcEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
-                            const cameraEl = document.querySelector("#camera-rig");
-                            cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].getUnit()}`);
-                            npcEls.forEach(npcEl => {
-                                const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3).add(new THREE.Vector3().random()), destination1.clone().negate());
-                                const intersections = raycaster.intersectObject(this.system.getNavMesh());
-                                if (intersections[0]) {
-                                    const destination2 = intersections[0].point.clone();
-                                    npcEl.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2; razeTarget: #${this.el.id};`);
-                                }
-                            });
-                        }, 750);
-                        setTimeout(() => {
+                        const destination1 = e.detail.intersection.point.clone();
+
+                        const ships = [
+                            ...scene.querySelectorAll(`.ship-1`),
+                            ...scene.querySelectorAll(`.ship-2`),
+                            ...scene.querySelectorAll(`.ship-3`),
+                        ];
+                        ships.forEach((ship) => {
+                            ship.setAttribute("globe-keyboard-controls", {enabled: false});
+                        });
+
+                        scene.components['coin-purse'].setUnit(unitMap.get(scene.components['coin-purse'].activeUnit));
+                        const checkBox = document.querySelector(`#unit-selection-${scene.components['coin-purse'].activeUnit}`);
+                        checkBox.click();
+
+                        let addedNpcs = false;
+                        const npcs = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
+                        if (npcs.length === 0) {
+                            addWizardNpc();
+                            const raiderAmount = scene.components['coin-purse'].getRaiderAmount();
+                            for (let i = 0; i < raiderAmount; i++) {
+                                addNpc(i);
+                            }
+                            addedNpcs = true;
+                        }
+
+                        if (addedNpcs) {
+
+                            setTimeout(() => {
+                                const npcEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
+                                npcEls.forEach(npcEl => {
+                                    npcEl.setAttribute("globe-nav-agent", `active: false; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2; razeTarget: #${this.el.id};`);
+                                });
+                            }, 500);
+                            setTimeout(() => {
+                                const npcEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
+                                const cameraEl = document.querySelector("#camera-rig");
+                                cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].getUnit()}`);
+                                npcEls.forEach(npcEl => {
+                                    const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3).add(new THREE.Vector3().random()), destination1.clone().negate());
+                                    const intersections = raycaster.intersectObject(this.system.getNavMesh());
+                                    if (intersections[0]) {
+                                        const destination2 = intersections[0].point.clone();
+                                        npcEl.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2; razeTarget: #${this.el.id};`);
+                                    }
+                                });
+                            }, 750);
+                            setTimeout(() => {
+                                const npcEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
+                                const cameraEl = document.querySelector("#camera-rig");
+                                cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].getUnit()}`);
+                                npcEls.forEach(npcEl => {
+                                    const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3).add(new THREE.Vector3().random().multiplyScalar(2).subScalar(1)), destination1.clone().negate());
+                                    const intersections = raycaster.intersectObject(this.system.getNavMesh());
+                                    if (intersections[0]) {
+                                        const destination2 = intersections[0].point.clone();
+                                        npcEl.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2; razeTarget: #${this.el.id};`);
+                                    }
+                                });
+                                const wizardEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}-wizard`);
+                                wizardEls.forEach(wizardEl => {
+                                    wizardEl.emit("moba-move", destination1.clone())
+                                })
+                                scene.emit("set-npc-indicator", destination1.clone());
+                                scene.emit("clear-ship-indicator");
+                            }, 1000);
+                        } else {
                             const npcEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
                             const cameraEl = document.querySelector("#camera-rig");
                             cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].getUnit()}`);
@@ -2806,26 +2826,8 @@
                             })
                             scene.emit("set-npc-indicator", destination1.clone());
                             scene.emit("clear-ship-indicator");
-                        }, 1000);
-                    } else {
-                        const npcEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
-                        const cameraEl = document.querySelector("#camera-rig");
-                        cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].getUnit()}`);
-                        npcEls.forEach(npcEl => {
-                            const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3).add(new THREE.Vector3().random().multiplyScalar(2).subScalar(1)), destination1.clone().negate());
-                            const intersections = raycaster.intersectObject(this.system.getNavMesh());
-                            if (intersections[0]) {
-                                const destination2 = intersections[0].point.clone();
-                                npcEl.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2; razeTarget: #${this.el.id};`);
-                            }
-                        });
-                        const wizardEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}-wizard`);
-                        wizardEls.forEach(wizardEl => {
-                            wizardEl.emit("moba-move", destination1.clone())
-                        })
-                        scene.emit("set-npc-indicator", destination1.clone());
-                        scene.emit("clear-ship-indicator");
-                    }
+                        }
+                    }, "go-on-land");
                 });
             }
         });
@@ -2833,61 +2835,63 @@
         AFRAME.registerComponent('go-to-sea', {
             init: function () {
                 this.el.addEventListener('click', function (e) {
-                    if (!e.detail.intersection) {
-                        return;
-                    }
+                    ClickManager.addToQueue(() => {
+                        if (!e.detail.intersection) {
+                            return;
+                        }
 
-                    const destination1 = e.detail.intersection.point.clone();
+                        const destination1 = e.detail.intersection.point.clone();
 
-                    const scene = document.querySelector("a-scene");
-                    scene.components['coin-purse'].setUnit(inverseUnitMap.get(scene.components['coin-purse'].activeUnit));
-                    const checkBox = document.querySelector(`#unit-selection-${scene.components['coin-purse'].activeUnit}`);
-                    checkBox.click();
+                        const scene = document.querySelector("a-scene");
+                        scene.components['coin-purse'].setUnit(inverseUnitMap.get(scene.components['coin-purse'].activeUnit));
+                        const checkBox = document.querySelector(`#unit-selection-${scene.components['coin-purse'].activeUnit}`);
+                        checkBox.click();
 
-                    const ships = [
-                        ...scene.querySelectorAll(`.ship-1`),
-                        ...scene.querySelectorAll(`.ship-2`),
-                        ...scene.querySelectorAll(`.ship-3`),
-                    ];
-                    ships.forEach((ship) => {
-                        ship.setAttribute("globe-keyboard-controls", {enabled: true});
-                    });
+                        const ships = [
+                            ...scene.querySelectorAll(`.ship-1`),
+                            ...scene.querySelectorAll(`.ship-2`),
+                            ...scene.querySelectorAll(`.ship-3`),
+                        ];
+                        ships.forEach((ship) => {
+                            ship.setAttribute("globe-keyboard-controls", {enabled: true});
+                        });
 
-                    let removedNpcs = false;
-                    const npcs = document.querySelectorAll(`.${unitMap.get(scene.components['coin-purse'].activeUnit)}`);
-                    if (npcs.length !== 0) {
-                        removeNpc();
-                        removedNpcs = true;
-                    }
+                        let removedNpcs = false;
+                        const npcs = document.querySelectorAll(`.${unitMap.get(scene.components['coin-purse'].activeUnit)}`);
+                        if (npcs.length !== 0) {
+                            removeNpc();
+                            removedNpcs = true;
+                        }
 
-                    if (removedNpcs) {
-                        setTimeout(() => {
-                            const cameraEl = document.querySelector("#camera-rig");
-                            cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].getUnit()}`);
-                        }, 0);
-                        setTimeout(() => {
-                            scene.emit("clear-npc-indicator");
-                        }, 1000);
-                        setTimeout(() => {
-                            const shipEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
-                            shipEls.forEach(shipEl => {
-                                shipEl.setAttribute("globe-ocean-nav-agent", `active: false; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
-                            });
-                        }, 500);
-                        setTimeout(() => {
+                        if (removedNpcs) {
+                            setTimeout(() => {
+                                const cameraEl = document.querySelector("#camera-rig");
+                                cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].getUnit()}`);
+                            }, 0);
+                            setTimeout(() => {
+                                scene.emit("clear-npc-indicator");
+                            }, 1000);
+                            setTimeout(() => {
+                                const shipEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
+                                shipEls.forEach(shipEl => {
+                                    shipEl.setAttribute("globe-ocean-nav-agent", `active: false; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
+                                });
+                            }, 500);
+                            setTimeout(() => {
+                                const shipEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
+                                shipEls.forEach(shipEl => {
+                                    shipEl.setAttribute("globe-ocean-nav-agent", `active: true; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
+                                });
+                                scene.emit("set-ship-indicator", destination1.clone());
+                            }, 1000);
+                        } else {
                             const shipEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
                             shipEls.forEach(shipEl => {
                                 shipEl.setAttribute("globe-ocean-nav-agent", `active: true; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
                             });
                             scene.emit("set-ship-indicator", destination1.clone());
-                        }, 1000);
-                    } else {
-                        const shipEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
-                        shipEls.forEach(shipEl => {
-                            shipEl.setAttribute("globe-ocean-nav-agent", `active: true; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
-                        });
-                        scene.emit("set-ship-indicator", destination1.clone());
-                    }
+                        }
+                    }, "go-to-sea");
                 });
             }
         });
@@ -6181,7 +6185,46 @@
 
                 this.intersectedEventDetail.intersection = intersection;
                 addOriginalEvent(this.intersectedEventDetail, originalEvent);
-                intersectedEl.emit(evtName, this.intersectedEventDetail);
+                ClickManager.addToQueue(() => {
+                        intersectedEl.emit(evtName, this.intersectedEventDetail);
+                    }, "ui-clicked"
+                );
+            }
+        });
+
+        const clickQueue = [];
+        const ClickManager = {
+            addToQueue: function (fn, type) {
+                clickQueue.push({
+                    fn,
+                    type,
+                    tick: 6,
+                });
+            },
+            iterateQueue: function () {
+                const uiClick = clickQueue.find(x => x.type === "ui-clicked");
+                const readyClick = clickQueue.find(x => x.tick <= 0);
+                const readyClickIndex = clickQueue.findIndex(x => x.tick <= 0);
+
+                if (uiClick) {
+                    uiClick.fn();
+                    clickQueue.length = 0;
+                    return;
+                }
+                if (readyClick) {
+                    readyClick.fn();
+                    clickQueue.splice(readyClickIndex, 1);
+                    return;
+                }
+
+                clickQueue.forEach(x => x.tick -= 1);
+            }
+        };
+
+        AFRAME.registerComponent("click-manager", {
+            schema: {},
+            tick: function(t, dt) {
+                ClickManager.iterateQueue();
             }
         })
     </script>
@@ -6703,7 +6746,7 @@
     </style>
 </head>
 <body>
-    <a-scene onclick="isDemoMode === false && playMusic === true ? window.musicPlayer.start() : undefined" draw-ship-indicator draw-npc-indicator coin-purse respawn physics="driver: local; gravity: 0 0 0;" globe-nav globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
+    <a-scene click-manager onclick="isDemoMode === false && playMusic === true ? window.musicPlayer.start() : undefined" draw-ship-indicator draw-npc-indicator coin-purse respawn physics="driver: local; gravity: 0 0 0;" globe-nav globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
         <a-assets>
             <template id="avatar-template">
                 <a-entity class="avatar" networked-audio-source>
