@@ -5332,6 +5332,9 @@
                 } else if (this.data.selector === "forward-attack") {
                     const selector = `.${scene.components['coin-purse'].getUnit()} .wizard-area-of-effect`;
                     const el = document.querySelector(selector);
+                    if (!el) {
+                        return;
+                    }
                     const firstClick = !el.components['projected-texture__forward-attack'].data.enabled;
                     if (firstClick) {
                         el.setAttribute("projected-texture__forward-attack", {
@@ -5346,6 +5349,9 @@
                 } else if (this.data.selector === "area-attack") {
                     const selector = `.${scene.components['coin-purse'].getUnit()} .wizard-area-of-effect`;
                     const el = document.querySelector(selector);
+                    if (!el) {
+                        return;
+                    }
                     const firstClick = !el.components['projected-texture__area-attack'].data.enabled;
                     if (firstClick) {
                         el.setAttribute("projected-texture__area-attack", {
@@ -6007,6 +6013,10 @@
                     default: 'mouse',
                     oneOf: ['mouse', 'entity', 'xrselect'],
                 },
+                debug: {
+                    type: 'boolean',
+                    default: false,
+                },
             },
             init: function () {
                 this.eventDetail = {};
@@ -6129,7 +6139,7 @@
             onCursorDown: function (evt) {
                 this.isCursorDown = true;
                 // Raycast again for touch.
-                if (this.data.rayOrigin === 'mouse' && evt.type === 'touchstart') {
+                if (this.data.rayOrigin === 'mouse' && (evt.type === 'touchstart' || evt.type === 'click')) {
                     this.onMouseMove(evt);
                     this.intersections.length = 0;
                     this.raycaster.intersectObject(this.el.object3D, true, this.intersections);
@@ -6154,8 +6164,12 @@
                     }
                 }
 
+                if (this.data.debug) {
+                    console.log("INTERSECTED", !!this.intersectedEl);
+                }
+
                 this.cursorDownEl = this.intersectedEl;
-                this.twoWayEmit('mousedown', evt);
+                this.twoWayEmit('click', evt);
             },
 
             /**
@@ -6186,7 +6200,7 @@
                 this.intersectedEventDetail.intersection = intersection;
                 addOriginalEvent(this.intersectedEventDetail, originalEvent);
                 ClickManager.addToQueue(() => {
-                        intersectedEl.emit(evtName, this.intersectedEventDetail);
+                        intersectedEl.object.el.emit(evtName, this.intersectedEventDetail);
                     }, "ui-clicked"
                 );
             }
