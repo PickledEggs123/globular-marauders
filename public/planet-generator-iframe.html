@@ -875,9 +875,12 @@
             },
             init: function () {
                 this.dtSumTickSize = 5000;
-                this.dtSum = this.dtSumTickSize;
+                this.dtSum = this.dtSumTickSize + 1;
                 this.heightDiff = 5;
                 this.heightDiffLerp = 5;
+            },
+            update(oldData) {
+                this.dtSum = this.dtSumTickSize + 1;
             },
             tick: function (t, dt) {
                 // get elements
@@ -942,7 +945,7 @@
                     if (this.heightDiff > this.heightDiffLerp) {
                         this.heightDiffLerp = 0.03 * this.heightDiff + 0.97 * this.heightDiffLerp;
                     } else {
-                        this.heightDiffLerp = 0.005 * this.heightDiff + 0.995 * this.heightDiffLerp;
+                        this.heightDiffLerp = 0.01 * this.heightDiff + 0.99 * this.heightDiffLerp;
                     }
                     finalPosition = objectWorldPos.clone().normalize().multiplyScalar(this.heightDiffLerp + height + 5).applyQuaternion(slerp);
                     this.dtSum += dt;
@@ -1624,7 +1627,7 @@
                 if (code === "KeyE") {
                     if (event.synthetic) {
                         this.el.emit("fire-cannons", "left-cannon");
-                    } else {
+                    } else if (!this.data.npc && this.data.enabled) {
                         const leftCannonFire = document.querySelector("#left-cannon-fire");
                         leftCannonFire.components["select-cannon-side"].innerSelectCannonSide();
                     }
@@ -1632,7 +1635,7 @@
                 if (code === "KeyQ") {
                     if (event.synthetic) {
                         this.el.emit("fire-cannons", "right-cannon");
-                    } else {
+                    } else if (!this.data.npc && this.data.enabled) {
                         const rightCannonFire = document.querySelector("#right-cannon-fire");
                         rightCannonFire.components["select-cannon-side"].innerSelectCannonSide();
                     }
@@ -1640,7 +1643,7 @@
                 if (code === "KeyF") {
                     if (event.synthetic) {
                         this.el.emit("fire-cannons", "none-cannon");
-                    } else {
+                    } else if (!this.data.npc && this.data.enabled) {
                         const noneCannonFire = document.querySelector("#none-cannon-fire");
                         noneCannonFire.components["select-cannon-side"].innerSelectCannonSide();
                     }
@@ -1688,7 +1691,15 @@
                     }
                 }
                 delete this.keys[code];
-            }
+            },
+            update(oldData) {
+                if (this.data.enabled === true && oldData.enabled === false) {
+                    this.play();
+                }
+                if (this.data.enabled === false && oldData.enabled === true) {
+                    this.pause();
+                }
+            },
         });
 
         AFRAME.registerComponent("globe-moba-controls", {
@@ -1788,6 +1799,9 @@
                     //     const leftCannonFire = document.querySelector("#left-cannon-fire");
                     //     leftCannonFire.components["select-cannon-side"].innerSelectCannonSide();
                     // }
+
+                    const forwardAttackFire = document.querySelector("#forward-attack-fire");
+                    forwardAttackFire.components["select-cannon-side"].innerSelectCannonSide();
                 }
                 if (code === "KeyQ") {
                     // area attack
@@ -1798,6 +1812,9 @@
                     //     const rightCannonFire = document.querySelector("#right-cannon-fire");
                     //     rightCannonFire.components["select-cannon-side"].innerSelectCannonSide();
                     // }
+
+                    const areaAttackFire = document.querySelector("#area-attack-fire");
+                    areaAttackFire.components["select-cannon-side"].innerSelectCannonSide();
                 }
 
                 if (KEYS.indexOf(code) !== -1) { this.keys[code] = true; }
@@ -4755,9 +4772,9 @@
             orthographicCamera.setAttribute("position", "0 0 5");
             orthographicCamera.setAttribute("orthographic-camera", "");
             orthographicCamera.setAttribute("projected-texture__forward-attack", "image: /images/attack-front.png");
-            orthographicCamera.setAttribute("obb-attack-zone__forward-attack", "center: 0 0 -2.5; dimension: 1 50 2.5; debug: false;");
+            orthographicCamera.setAttribute("obb-attack-zone__forward-attack", "center: 0 0 -5; dimension: 2 50 5; debug: false;");
             orthographicCamera.setAttribute("projected-texture__area-attack", "image: /images/attack-area.png");
-            orthographicCamera.setAttribute("obb-attack-zone__area-attack", "center: 0 0 0; dimension: 1 50 1; debug: false;");
+            orthographicCamera.setAttribute("obb-attack-zone__area-attack", "center: 0 0 0; dimension: 2 50 2; debug: false;");
             positionNpc.appendChild(orthographicCamera);
 
             scene.appendChild(rootNpc);
@@ -5308,7 +5325,7 @@
                 },
             },
             init: function () {
-                this.innerSelectCannonSide = this.selectCannonSide.bind(this);
+                this.innerSelectCannonSide = debounce(this.selectCannonSide.bind(this), 50);
                 this.el.addEventListener("click", this.innerSelectCannonSide);
             },
             remove: function () {
@@ -6212,7 +6229,7 @@
                 clickQueue.push({
                     fn,
                     type,
-                    tick: 6,
+                    tick: 3,
                 });
             },
             iterateQueue: function () {
@@ -6249,7 +6266,7 @@
         AFRAME.registerComponent("orthographic-camera", {
             schema: {},
             init: function () {
-                this.camera = new THREE.OrthographicCamera(-5, 5, 5, -5, 0.1, 100);;
+                this.camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 100);
                 this.el.sceneEl.object3D.add(this.camera);
             },
             remove: function () {
@@ -6827,8 +6844,8 @@
                 <a-entity id="left-cannon-fire" align-with-projection="offset: -0.25 -0.2 -0.5; rotation: 0 90 0; scale: 0.03 0.03 0.03;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" class="clickable" select-cannon-side="selector: left-cannon" ui-clicked></a-entity>
                 <a-entity id="right-cannon-fire" align-with-projection="offset: 0.25 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" class="clickable" select-cannon-side="selector: right-cannon" ui-clicked></a-entity>
                 <a-entity id="none-cannon-fire" align-with-projection="offset: 0 -0.2 -0.5; rotation: 0 0 0; scale: 0.015 0.015 0.015;" gltf-model="/meshes/Model_Redo/Ship Wheel/ShipWheel.glb" class="clickable" select-cannon-side="selector: none-cannon" ui-clicked></a-entity>
-                <a-entity id="forward-attack-fire" align-with-projection="offset: 0.2 -0.2 -0.5; rotation: 0 90 0; scale: 0.015 0.015 0.015; wizardShow: true;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" class="clickable" select-cannon-side="selector: forward-attack" play-all-animations ui-clicked></a-entity>
-                <a-entity id="area-attack-fire" align-with-projection="offset: -0.2 -0.2 -0.5; rotation: 0 -90 0; scale: 0.015 0.015 0.015; wizardShow: true;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" class="clickable" select-cannon-side="selector: area-attack" play-all-animations ui-clicked></a-entity>
+                <a-entity id="area-attack-fire" align-with-projection="offset: 0.2 -0.2 -0.5; rotation: 90 0 0; scale: 0.015 0.015 0.015; wizardShow: true;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" class="clickable" select-cannon-side="selector: area-attack" play-all-animations ui-clicked></a-entity>
+                <a-entity id="forward-attack-fire" align-with-projection="offset: -0.2 -0.2 -0.5; rotation: 0 90 0; scale: 0.015 0.015 0.015; wizardShow: true;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" class="clickable" select-cannon-side="selector: forward-attack" play-all-animations ui-clicked></a-entity>
             </a-entity>
         </a-entity>
     </a-scene>
