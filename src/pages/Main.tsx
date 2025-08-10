@@ -142,6 +142,7 @@ export const Main = () => {
                         </Grid>
                         <Grid item xs={12} md={6}>
                             <Card>
+                                <CardMedia component="img" src="/mainImages/ML-Demo1.png"></CardMedia>
                                 <CardHeader title="ML Demo from college" subheader="I haven't updated my ml skills in a while...">
                                 </CardHeader>
                                 <CardContent>
@@ -155,11 +156,11 @@ export const Main = () => {
                                 </CardContent>
                             </Card>
                         </Grid>
-                    </Grid>
-                    <Typography variant="h3">
-                        About the Developer
-                    </Typography>
-                    <Grid container spacing={2}>
+                        <Grid item xs={12} md={12}>
+                            <Typography variant="h3" style={{textAlign:'center'}}>
+                                About the Developer
+                            </Typography>
+                        </Grid>
                         <Grid item xs={12} md={6}>
                             <Card>
                                 <CardMedia component="img" src="/mainImages/DevPhoto.png"></CardMedia>
