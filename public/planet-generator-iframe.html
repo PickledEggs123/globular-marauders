@@ -3941,6 +3941,7 @@
             schema: {
                 range: {type: 'number', default: 10},
                 melee: {type: 'boolean', default: false},
+                charModelId: {type: 'string', default: ''},
             },
             init: function () {
                 this.attackEls = [];
@@ -3991,12 +3992,12 @@
                         }
                     }
                 } else {
-                    addProjectile(this.el, target);
+                    addProjectile(this.el, target, this.data.charModelId);
                 }
             },
             beginMelee: function (evt) {
                 const target = evt.detail;
-                addProjectile(this.el, target);
+                addProjectile(this.el, target, this.data.charModelId);
             },
         });
 
@@ -4306,6 +4307,10 @@
                 rootGoldCoin.setAttribute("shadow", "");
             }
 
+            if (charModelId === "FIREBALL") {
+                rootGoldCoin.setAttribute("scale", "0.05 0.05 0.05");
+            }
+
             if (charModelId === "SHIP") {
                 rootGoldCoin.setAttribute("npc-faction", "other-players");
                 rootGoldCoin.setAttribute("npc-finder", "active: false;");
@@ -4413,6 +4418,10 @@
                                     requiresNetworkUpdate: NAF.utils.vectorRequiresUpdate(0.5)
                                 },
                                 {
+                                    component: 'scale',
+                                    requiresNetworkUpdate: NAF.utils.vectorRequiresUpdate(0.001)
+                                },
+                                {
                                     component: 'globe-networked-instanced-mesh-member',
                                 },
                             ]
@@ -4460,7 +4469,7 @@
             return id;
         }
 
-        function addProjectile(startEl, destinationEl) {
+        function addProjectile(startEl, destinationEl, charModelId) {
             const scene = document.querySelector("a-scene");
 
             const rootProjectile = document.createElement("a-entity");
@@ -4472,9 +4481,12 @@
             rootProjectile.setAttribute("position", `${pos.x} ${pos.y} ${pos.z}`);
             rootProjectile.setAttribute("rotation", "0 0 0");
             rootProjectile.setAttribute("shadow", "");
+            if (charModelId === "FIREBALL") {
+                rootProjectile.setAttribute("scale", "0.05 0.05 0.05");
+            }
 
-            if (characterModels.has("ARROW")) {
-                const str = characterModels.get("ARROW");
+            if (characterModels.has(charModelId)) {
+                const str = characterModels.get(charModelId);
 
                 // add graphics
                 rootProjectile.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; capacity: 1000; memberMesh: true`);
@@ -4694,7 +4706,7 @@
             rootNpc.setAttribute("rotation", "0 0 0");
             rootNpc.setAttribute("npc-faction", "player");
             rootNpc.setAttribute("npc-finder", "active: true;");
-            rootNpc.setAttribute("npc-attack", `range: 5; melee: true`);
+            rootNpc.setAttribute("npc-attack", `range: 5; melee: true; charModelId: ARROW`);
             rootNpc.setAttribute("npc-melee-state", "");
             rootNpc.setAttribute("health", "");
             rootNpc.setAttribute("shadow", "");
@@ -4741,7 +4753,7 @@
             rootNpc.setAttribute("rotation", "0 0 0");
             rootNpc.setAttribute("npc-faction", "player");
             rootNpc.setAttribute("npc-finder", "active: true;");
-            rootNpc.setAttribute("npc-attack", `range: 10;`);
+            rootNpc.setAttribute("npc-attack", `range: 10; charModelId: FIREBALL`);
             rootNpc.setAttribute("health", "health: 1000;");
             rootNpc.setAttribute("shadow", "");
             rootNpc.setAttribute("globe-moba-controls", "");
@@ -4854,6 +4866,10 @@
                 }
                 case "ARROW": {
                     addTemplate("arrow-template", "ARROW", "arrow-model", false);
+                    break;
+                }
+                case "FIREBALL": {
+                    addTemplate("fireball-template", "FIREBALL", "fireball-model", false);
                     break;
                 }
                 case "CANNONBALL": {

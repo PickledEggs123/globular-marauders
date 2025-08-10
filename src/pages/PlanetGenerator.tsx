@@ -118,6 +118,7 @@ export const PlanetGenerator = () => {
             context.gameData = data;
 
             const staticMeshPaths = [
+                "/meshes/EpicStore/Fireball/source/Fireball.glb",
                 "/meshes/Model_Redo/Warrior/Warrior.glb",
                 "/meshes/Model_Redo/indicators/npc indicator/NpcDestination.glb",
                 "/meshes/Model_Redo/indicators/ship indicator/ShipDestination.glb",
@@ -177,6 +178,7 @@ export const PlanetGenerator = () => {
                     }
 
                     const warriorDataUri = gltf[gltf.length - 7] as string;
+                    addCharacterModel(iframeRef.current, "FIREBALL", gltf[gltf.length - 21] as string);
                     addCharacterModel(iframeRef.current, "WIZARD", gltf[gltf.length - 20] as string);
                     addCharacterModel(iframeRef.current, "NPC_DESTINATION", gltf[gltf.length - 19] as string);
                     addCharacterModel(iframeRef.current, "SHIP_DESTINATION", gltf[gltf.length - 18] as string);
