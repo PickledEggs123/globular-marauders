@@ -5289,7 +5289,7 @@
                         this.el.appendChild(entity);
 
                         const positionEntity = document.createElement("a-entity");
-                        positionEntity.setAttribute("position", new THREE.Vector3(0, 0, 50).add(x.position));
+                        positionEntity.setAttribute("position", new THREE.Vector3(0, 0, 5000).add(x.position));
                         positionEntity.setAttribute("class", "left-cannon-position");
                         this.el.appendChild(positionEntity);
                     });
@@ -5300,7 +5300,7 @@
                         this.el.appendChild(entity);
 
                         const positionEntity = document.createElement("a-entity");
-                        positionEntity.setAttribute("position", new THREE.Vector3(0, 0, -50).add(x.position));
+                        positionEntity.setAttribute("position", new THREE.Vector3(0, 0, -5000).add(x.position));
                         positionEntity.setAttribute("class", "right-cannon-position");
                         this.el.appendChild(positionEntity);
                     });
