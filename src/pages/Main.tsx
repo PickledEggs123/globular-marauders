@@ -64,7 +64,7 @@ export const Main = () => {
                                                 }, {
                                                     url: '/mainImages/3dGame3.png',
                                                 }].map(item => (
-                                                    <ImageExpander src={item.url} alt={item.url}/>
+                                                    <ImageExpander key={item.url} src={item.url} alt={item.url}/>
                                                 ))
                                             }
                                         </Carousel>
@@ -100,7 +100,7 @@ export const Main = () => {
                                                 }, {
                                                     url: '/mainImages/MainGame3.png',
                                                 }].map(item => (
-                                                    <ImageExpander src={item.url} alt={item.url}/>
+                                                    <ImageExpander key={item.url} src={item.url} alt={item.url}/>
                                                 ))
                                             }
                                         </Carousel>
@@ -131,7 +131,7 @@ export const Main = () => {
                                                 }, {
                                                     url: '/mainImages/Chat3.png',
                                                 }].map(item => (
-                                                    <ImageExpander src={item.url} alt={item.url}/>
+                                                    <ImageExpander key={item.url} src={item.url} alt={item.url}/>
                                                 ))
                                             }
                                         </Carousel>
