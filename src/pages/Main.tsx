@@ -9,7 +9,6 @@ import {
     Container,
     Grid,
     Typography,
-    Box,
     Button,
     CardMedia
 } from "@mui/material";
@@ -142,7 +141,7 @@ export const Main = () => {
                         </Grid>
                         <Grid item xs={12} md={6}>
                             <Card>
-                                <CardMedia component="img" src="/mainImages/ML-Demo1.png"></CardMedia>
+                                <ImageExpander src="/mainImages/ML-Demo1.png" alt="/mainImages/ML-Demo1.png"/>
                                 <CardHeader title="ML Demo from college" subheader="I haven't updated my ml skills in a while...">
                                 </CardHeader>
                                 <CardContent>
