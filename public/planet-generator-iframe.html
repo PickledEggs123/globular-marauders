@@ -5341,7 +5341,7 @@
                 },
             },
             init: function () {
-                this.innerSelectCannonSide = debounce(this.selectCannonSide.bind(this), 50);
+                this.innerSelectCannonSide = debounce(this.selectCannonSide.bind(this), 50, true);
                 this.el.addEventListener("click", this.innerSelectCannonSide);
             },
             remove: function () {
