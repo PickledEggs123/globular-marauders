@@ -4114,9 +4114,31 @@
             init: function () {
                 this.innerHandleHit = this.handleHit.bind(this);
                 this.el.addEventListener('hit', this.innerHandleHit);
+
+                this.maxHealth = this.data.health;
+                this.healTickDelay = 10;
+                this.healTickCount = this.healTickDelay;
+                this.healTickAmount = 40;
             },
             remove: function () {
                 this.el.removeEventListener('hit', this.innerHandleHit);
+            },
+            tick: function (t, dt) {
+                if (this.data.health >= this.maxHealth) {
+                    return;
+                }
+
+                if (this.healTickCount >= 0) {
+                    this.healTickCount -= dt / 1000;
+                    return;
+                }
+
+                const oldHealth = this.data.health;
+                const newHealth = Math.min(this.data.health + this.healTickAmount, this.maxHealth);
+                this.el.setAttribute("ship-health", `health: ${newHealth}`);
+            },
+            update(oldData) {
+                this.healTickCount = this.healTickDelay;
             },
             handleHit: function (evt) {
                 const hit = evt.detail;
