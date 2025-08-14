@@ -4976,7 +4976,7 @@
         }
 
         function addCannonballHit(el) {
-            const position = el.object3D.getWorldPosition(new THREE.Vector3());
+            const position = el.object3D.getWorldPosition(new THREE.Vector3()).sub(new THREE.Vector3().copy(el.body.velocity.clone()));
             const scene = document.querySelector("a-scene");
 
             const entity = document.createElement("a-entity");
