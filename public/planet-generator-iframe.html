@@ -4134,8 +4134,9 @@
                 }
 
                 const oldHealth = this.data.health;
-                const newHealth = Math.min(this.data.health + this.healTickAmount, this.maxHealth);
+                const newHealth = Math.min(oldHealth + this.healTickAmount, this.maxHealth);
                 this.el.setAttribute("ship-health", `health: ${newHealth}`);
+                addRepairSound(this.el);
             },
             update(oldData) {
                 this.healTickCount = this.healTickDelay;
@@ -4535,7 +4536,7 @@
             }
             return findParentAttribute(el.parentElement, attribute);
         }
-        function addCannonBall(pos, velocity, el) {
+        function addCannonBall(pos, velocity, el, damage) {
             const scene = document.querySelector("a-scene");
 
             const rootProjectile = document.createElement("a-entity");
@@ -4551,7 +4552,7 @@
             rootProjectile.setAttribute("initial-velocity", `${velocity.x} ${velocity.y} ${velocity.z}`);
             rootProjectile.setAttribute("cannonball-collider-ground", "");
             rootProjectile.setAttribute("cannonball-collider-water", "");
-            rootProjectile.setAttribute("cannonball-hit-ready", "");
+            rootProjectile.setAttribute("cannonball-hit-ready", `damage: ${damage}`);
             rootProjectile.setAttribute("npc-faction", findParentAttribute(el, "npc-faction").data);
             rootProjectile.setAttribute("despawn", "");
 
@@ -4677,6 +4678,7 @@
             rootShip.setAttribute("globe-gravity", "ship: true;");
             rootShip.setAttribute("ship-health", "");
             rootShip.setAttribute("ship-death", "");
+            rootShip.setAttribute("cannonball-damage", "damage: 5;");
             rootShip.setAttribute("fire-cannons", "");
             rootShip.setAttribute("firing-cannons", "");
             rootShip.setAttribute("globe-keyboard-controls", "enabled: true; fly: true; npc: true;");
@@ -5052,6 +5054,17 @@
             scene.appendChild(entity);
         }
 
+        function addRepairSound(el) {
+            const position = el.object3D.getWorldPosition(new THREE.Vector3());
+            const scene = document.querySelector("a-scene");
+
+            const entity = document.createElement("a-entity");
+            entity.setAttribute("position", position);
+            entity.setAttribute("networked", "template: #repair-template; attachTemplateToLocal: true;");
+            entity.setAttribute("despawn", "");
+            scene.appendChild(entity);
+        }
+
         window.shipModelStr = "";
         window.shipSpawnPoint = new THREE.Vector3(0, 0, PLANET_SIZE);
 
@@ -5084,6 +5097,7 @@
             rootShip.setAttribute("globe-keyboard-controls", "enabled: true; fly: true");
             rootShip.setAttribute("ship-health", "");
             rootShip.setAttribute("ship-death", "");
+            rootShip.setAttribute("cannonball-damage", "damage: 10;");
             rootShip.setAttribute("fire-cannons", "");
             rootShip.setAttribute("firing-cannons", "");
             rootShip.setAttribute("shadow", "");
@@ -5454,6 +5468,15 @@
             },
         });
 
+        AFRAME.registerComponent('cannonball-damage', {
+            schema: {
+                damage: {
+                    type: 'number',
+                    default: 10,
+                },
+            },
+        });
+
         AFRAME.registerComponent('firing-cannons', {
             schema: {},
             init: function () {
@@ -5475,7 +5498,7 @@
                     const cannonBallOrientation = cannon.object3D.getWorldQuaternion(new THREE.Quaternion());
                     const velocity = new THREE.Vector3(0, 100, e.detail.includes("left") ? -300 : 300).applyQuaternion(cannonBallOrientation);
 
-                    addCannonBall(worldPosition, velocity, cannon);
+                    addCannonBall(worldPosition, velocity, cannon, this.el.components['cannonball-damage'].data.damage);
                 });
             },
         });
@@ -5545,7 +5568,12 @@
         });
 
         AFRAME.registerComponent("cannonball-hit-ready", {
-            schema: {},
+            schema: {
+                damage: {
+                    type: 'number',
+                    default: 10,
+                },
+            },
         });
 
         AFRAME.registerComponent("cannonball-collider", {
@@ -5582,7 +5610,7 @@
                 });
             },
             collision: function (el) {
-                this.el.emit("hit", 10);
+                this.el.emit("hit", el.components['cannonball-hit-ready'].data.damage);
                 addCannonballHit(el);
             },
         });
@@ -6855,12 +6883,18 @@
                           sound="src: #arr; poolSize: 1; volume: 1; autoplay: true;"
                 ></a-entity>
             </template>
+            <template id="repair-template">
+                <a-entity class="repair"
+                          sound="src: #repair; poolSize: 1; volume: 1; autoplay: true;"
+                ></a-entity>
+            </template>
             <audio id="fire" src="/sounds/FireSFX.m4a" preload="auto"></audio>
             <audio id="hit" src="/sounds/WoodHitSFX.m4a" preload="auto"></audio>
             <audio id="scream" src="/sounds/WilhelmScreamSFX.mp3" preload="auto"></audio>
             <audio id="thump" src="/sounds/ThumpSFX.mp3" preload="auto"></audio>
             <audio id="splash" src="/sounds/SplashSFX.mp3" preload="auto"></audio>
             <audio id="arr" src="/sounds/PirateArrSFX.mp3" preload="auto"></audio>
+            <audio id="repair" src="/sounds/RepairSFX.wav" preload="auto"></audio>
             <img id="fog" src="/assets/fog.png" alt="fog"/>
             <img id="blob" src="/assets/blob.png" alt="blob"/>
         </a-assets>
