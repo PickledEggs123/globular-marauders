@@ -4132,7 +4132,7 @@
 
         AFRAME.registerComponent('ship-health', {
             schema: {
-                health: { type: 'number', default: 400 }
+                health: { type: 'number', default: 4000 }
             },
             init: function () {
                 this.innerHandleHit = this.handleHit.bind(this);
@@ -4141,7 +4141,7 @@
                 this.maxHealth = this.data.health;
                 this.healTickDelay = 10;
                 this.healTickCount = this.healTickDelay;
-                this.healTickAmount = 40;
+                this.healTickAmount = 400;
             },
             remove: function () {
                 this.el.removeEventListener('hit', this.innerHandleHit);
@@ -4701,7 +4701,7 @@
             rootShip.setAttribute("globe-gravity", "ship: true;");
             rootShip.setAttribute("ship-health", "");
             rootShip.setAttribute("ship-death", "");
-            rootShip.setAttribute("cannonball-damage", "damage: 5;");
+            rootShip.setAttribute("cannonball-damage", "damage: 50;");
             rootShip.setAttribute("fire-cannons", "");
             rootShip.setAttribute("firing-cannons", "");
             rootShip.setAttribute("globe-keyboard-controls", "enabled: true; fly: true; npc: true;");
@@ -5131,7 +5131,7 @@
             rootShip.setAttribute("globe-keyboard-controls", "enabled: true; fly: true");
             rootShip.setAttribute("ship-health", "");
             rootShip.setAttribute("ship-death", "");
-            rootShip.setAttribute("cannonball-damage", "damage: 10;");
+            rootShip.setAttribute("cannonball-damage", "damage: 100;");
             rootShip.setAttribute("fire-cannons", "");
             rootShip.setAttribute("firing-cannons", "");
             rootShip.setAttribute("shadow", "");
