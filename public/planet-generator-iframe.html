@@ -4068,9 +4068,32 @@
             init: function () {
                 this.innerHandleHit = this.handleHit.bind(this);
                 this.el.addEventListener('hit', this.innerHandleHit);
+
+                this.maxHealth = this.data.health;
+                this.healTickDelay = 10;
+                this.healTickCount = this.healTickDelay;
+                this.healTickAmount = 40;
             },
             remove: function () {
                 this.el.removeEventListener('hit', this.innerHandleHit);
+            },
+            tick: function (t, dt) {
+                if (this.data.health >= this.maxHealth) {
+                    return;
+                }
+
+                if (this.healTickCount >= 0) {
+                    this.healTickCount -= dt / 1000;
+                    return;
+                }
+
+                const oldHealth = this.data.health;
+                const newHealth = Math.min(oldHealth + this.healTickAmount, this.maxHealth);
+                this.el.setAttribute("health", `health: ${newHealth}`);
+                addHealSound(this.el);
+            },
+            update(oldData) {
+                this.healTickCount = this.healTickDelay;
             },
             handleHit: function (evt) {
                 const hit = evt.detail;
@@ -5061,6 +5084,17 @@
             const entity = document.createElement("a-entity");
             entity.setAttribute("position", position);
             entity.setAttribute("networked", "template: #repair-template; attachTemplateToLocal: true;");
+            entity.setAttribute("despawn", "");
+            scene.appendChild(entity);
+        }
+
+        function addHealSound(el) {
+            const position = el.object3D.getWorldPosition(new THREE.Vector3());
+            const scene = document.querySelector("a-scene");
+
+            const entity = document.createElement("a-entity");
+            entity.setAttribute("position", position);
+            entity.setAttribute("networked", "template: #heal-template; attachTemplateToLocal: true;");
             entity.setAttribute("despawn", "");
             scene.appendChild(entity);
         }
@@ -6888,6 +6922,11 @@
                           sound="src: #repair; poolSize: 1; volume: 1; autoplay: true;"
                 ></a-entity>
             </template>
+            <template id="heal-template">
+                <a-entity class="heal"
+                          sound="src: #heal; poolSize: 1; volume: 1; autoplay: true;"
+                ></a-entity>
+            </template>
             <audio id="fire" src="/sounds/FireSFX.m4a" preload="auto"></audio>
             <audio id="hit" src="/sounds/WoodHitSFX.m4a" preload="auto"></audio>
             <audio id="scream" src="/sounds/WilhelmScreamSFX.mp3" preload="auto"></audio>
@@ -6895,6 +6934,7 @@
             <audio id="splash" src="/sounds/SplashSFX.mp3" preload="auto"></audio>
             <audio id="arr" src="/sounds/PirateArrSFX.mp3" preload="auto"></audio>
             <audio id="repair" src="/sounds/RepairSFX.wav" preload="auto"></audio>
+            <audio id="heal" src="/sounds/HealSFX.wav" preload="auto"></audio>
             <img id="fog" src="/assets/fog.png" alt="fog"/>
             <img id="blob" src="/assets/blob.png" alt="blob"/>
         </a-assets>
