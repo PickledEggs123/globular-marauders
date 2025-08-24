@@ -424,9 +424,9 @@
             }
 
             const debounced = function (...arguments_) {
-                if (storedContext && this !== storedContext) {
-                    throw new Error('Debounced method called with different contexts.');
-                }
+                // if (storedContext && this !== storedContext) {
+                //     throw new Error('Debounced method called with different contexts.');
+                // }
 
                 storedContext = this; // eslint-disable-line unicorn/no-this-assignment
                 storedArguments = arguments_;
@@ -1629,7 +1629,7 @@
                         this.el.emit("fire-cannons", "left-cannon");
                     } else if (!this.data.npc && this.data.enabled) {
                         const leftCannonFire = document.querySelector("#left-cannon-fire");
-                        leftCannonFire.components["select-cannon-side"].innerSelectCannonSide();
+                        leftCannonFire.click();
                     }
                 }
                 if (code === "KeyQ") {
@@ -1637,7 +1637,7 @@
                         this.el.emit("fire-cannons", "right-cannon");
                     } else if (!this.data.npc && this.data.enabled) {
                         const rightCannonFire = document.querySelector("#right-cannon-fire");
-                        rightCannonFire.components["select-cannon-side"].innerSelectCannonSide();
+                        rightCannonFire.click();
                     }
                 }
                 if (code === "KeyF") {
@@ -1645,7 +1645,7 @@
                         this.el.emit("fire-cannons", "none-cannon");
                     } else if (!this.data.npc && this.data.enabled) {
                         const noneCannonFire = document.querySelector("#none-cannon-fire");
-                        noneCannonFire.components["select-cannon-side"].innerSelectCannonSide();
+                        noneCannonFire.click();
                     }
                 }
 
@@ -1797,11 +1797,11 @@
                     //     this.el.emit("fire-cannons", "left-cannon");
                     // } else {
                     //     const leftCannonFire = document.querySelector("#left-cannon-fire");
-                    //     leftCannonFire.components["select-cannon-side"].innerSelectCannonSide();
+                    //     leftCannonFire.click();
                     // }
 
                     const forwardAttackFire = document.querySelector("#forward-attack-fire");
-                    forwardAttackFire.components["select-cannon-side"].innerSelectCannonSide();
+                    forwardAttackFire.click();
                 }
                 if (code === "KeyQ") {
                     // area attack
@@ -1810,11 +1810,11 @@
                     //     this.el.emit("fire-cannons", "right-cannon");
                     // } else {
                     //     const rightCannonFire = document.querySelector("#right-cannon-fire");
-                    //     rightCannonFire.components["select-cannon-side"].innerSelectCannonSide();
+                    //     rightCannonFire.click();
                     // }
 
                     const areaAttackFire = document.querySelector("#area-attack-fire");
-                    areaAttackFire.components["select-cannon-side"].innerSelectCannonSide();
+                    areaAttackFire.click();
                 }
 
                 if (KEYS.indexOf(code) !== -1) { this.keys[code] = true; }
@@ -5411,7 +5411,10 @@
                 },
             },
             init: function () {
-                this.innerSelectCannonSide = debounce(this.selectCannonSide.bind(this), 50, true);
+                this.innerDebounce = debounce(this.selectCannonSide.bind(this), 1, true);
+                this.innerSelectCannonSide = () => {
+                    this.innerDebounce.trigger();
+                };
                 this.el.addEventListener("click", this.innerSelectCannonSide);
             },
             remove: function () {
