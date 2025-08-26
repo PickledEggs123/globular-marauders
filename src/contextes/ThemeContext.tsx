@@ -1,14 +1,10 @@
 import {createTheme, ThemeProvider, CssBaseline, Theme} from '@mui/material';
 import React, { FC, ReactNode, createContext } from 'react';
-import {theme} from "../theme";
+import {theme, darkTheme2} from "../theme";
 
 export const lightTheme = theme;
 
-export const darkTheme = createTheme({
-    palette: {
-        mode: 'dark',
-    },
-});
+export const darkTheme = darkTheme2;
 
 interface ThemeConfigProps {
     children: ReactNode;

@@ -1,4 +1,4 @@
-import React, {useContext, useRef, useState} from "react";
+import React, {useContext, useEffect, useRef, useState} from "react";
 import {
     AppBar, Button, Container,
     Drawer, FormControl, FormControlLabel,
@@ -37,6 +37,14 @@ import {useAuth} from "./contextes/auth";
 
 const drawerWidth = 180;
 
+const backgroundImages = [
+    "url(/mainImages/3dGameScreenshot1.png)",
+    "url(/mainImages/3dGameScreenshot2.png)",
+    "url(/mainImages/3dGameScreenshot3.png)",
+    "url(/mainImages/3dGameScreenshot4.png)",
+    "url(/mainImages/3dGameScreenshot5.png)",
+];
+
 export const WebsiteDrawer2 = ({rightSide, content}: {
     rightSide: React.ReactNode | null,
     content: React.ReactNode,
@@ -50,6 +58,22 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
     const [email, setEmail] = useState("");
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
+    const [backgroundImage, setBackgroundImage] = useState("");
+
+    useEffect(() => {
+        {
+            const index = Math.floor(Math.random() * backgroundImages.length);
+            setBackgroundImage(backgroundImages[index]);
+        }
+        const interval = setInterval(() => {
+            const index = Math.floor(Math.random() * backgroundImages.length);
+            setBackgroundImage(backgroundImages[index]);
+        }, 10_000);
+
+        return () => {
+            clearInterval(interval);
+        };
+    }, []);
 
     const handleDrawerToggle = () => {
         setMobileOpen(!mobileOpen);
@@ -209,7 +233,7 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
             </Modal>
             <AppBar position="fixed" ref={ref}>
                 <Toolbar>
-                    <Grid container>
+                    <Grid container gap={2}>
                         <Grid item xs={12} lg={6} display="flex">
                             <IconButton
                                 aria-label="Menu"
@@ -255,7 +279,22 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
                     {drawer}
                 </Drawer>
             </nav>
-            <Paper style={{display: 'flex', flexDirection: 'column'}}  sx={{ marginLeft: { xs: 0, md: drawerWidth / 8}, padding: '20px', display: 'flex', marginTop: (ref.current?.getBoundingClientRect().height ?? 40) / 8, height: `calc(100vh - ${ref.current?.getBoundingClientRect().height ?? 40}px)` }}>
+            <div style={{
+                display: 'flex',
+                position: 'fixed',
+                flexDirection: 'column',
+                backgroundImage,
+                backgroundRepeat: 'no-repeat',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                width: "100vw",
+                height: '100vh',
+                zIndex: -1,
+            }}></div>
+            <Paper style={{
+                display: 'flex',
+                flexDirection: 'column',
+            }}  sx={{ marginLeft: { xs: 0, md: drawerWidth / 8}, padding: '20px', display: 'flex', marginTop: (ref.current?.getBoundingClientRect().height ?? 40) / 8, height: `calc(100vh - ${ref.current?.getBoundingClientRect().height ?? 40}px)` }}>
                 {content}
             </Paper>
         </div>
