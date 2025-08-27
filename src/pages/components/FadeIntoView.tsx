@@ -6,13 +6,14 @@ export const FadeIntoView = ({children}: { children: React.ReactElement }) => {
     const ref = React.useRef<HTMLDivElement | null>(null);
     useEffect(() => {
         const interval = setInterval(() => {
-            const maxY = window.innerHeight;
+            const maxY = window.innerHeight || document.documentElement.clientHeight;
 
-            const m1 = ref.current?.getBoundingClientRect()?.top || 0;
-            const m2 = ref.current?.getBoundingClientRect()?.bottom || 0;
+            const m1 = ref.current?.getBoundingClientRect()?.top || NaN;
+            const m2 = ref.current?.getBoundingClientRect()?.bottom || NaN;
+            const height = ref.current?.getBoundingClientRect()?.height || NaN;
 
-            setFadeIn((m1 >= 0 && m1 <= maxY) || (m2 <= maxY && m2 >= 0));
-        }, 1000);
+            setFadeIn(m1 + height / 2 >= 0 && m2 - height / 2 <= maxY);
+        }, 50);
         return () => {
             clearInterval(interval);
         }
