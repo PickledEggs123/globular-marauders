@@ -12,7 +12,7 @@ export const FadeIntoView = ({children}: { children: React.ReactElement }) => {
             const m2 = ref.current?.getBoundingClientRect()?.bottom || NaN;
             const height = ref.current?.getBoundingClientRect()?.height || NaN;
 
-            setFadeIn(m1 + height / 2 >= 0 && m2 - height / 2 <= maxY);
+            setFadeIn(m1 + height * 0.75 >= 0 && m2 - height * 0.75 <= maxY);
         }, 50);
         return () => {
             clearInterval(interval);
