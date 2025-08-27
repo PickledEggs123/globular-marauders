@@ -4,6 +4,7 @@ import {WebsiteDrawer2} from "../Drawer";
 import {Paper, Button, Card, CardContent, CardHeader, Container, Grid, Typography} from "@mui/material";
 import {DelaunayGraph, VoronoiGraph} from "@pickledeggs123/globular-marauders-game/lib/src/Graph";
 import Quaternion from "quaternion";
+import {FadeIntoView} from "./components/FadeIntoView";
 
 interface IThetaTableData {
     thetaNorth: number;
@@ -197,57 +198,63 @@ export const GameModel = () => {
                                 <CardContent>
                                     <Grid container spacing={2}>
                                         <Grid item xs={12} md={6}>
-                                            <Card>
-                                                <CardHeader title="North Polar Chart">
-                                                </CardHeader>
-                                                <CardContent>
-                                                    <canvas id="canvasNorth" width={256} height={256}></canvas>
-                                                    <br/>
-                                                    <Typography variant="caption">Big dot is the start of the path.</Typography>
-                                                </CardContent>
-                                            </Card>
+                                            <FadeIntoView>
+                                                <Card>
+                                                    <CardHeader title="North Polar Chart">
+                                                    </CardHeader>
+                                                    <CardContent>
+                                                        <canvas id="canvasNorth" width={256} height={256}></canvas>
+                                                        <br/>
+                                                        <Typography variant="caption">Big dot is the start of the path.</Typography>
+                                                    </CardContent>
+                                                </Card>
+                                            </FadeIntoView>
                                         </Grid>
                                         <Grid item xs={12} md={6}>
-                                            <Card>
-                                                <CardHeader title="South Polar Chart">
-                                                </CardHeader>
-                                                <CardContent>
-                                                    <canvas id="canvasSouth" width={256} height={256}></canvas>
-                                                    <br/>
-                                                    <Typography variant="caption">Big dot is the start of the path.</Typography>
-                                                </CardContent>
-                                            </Card>
+                                            <FadeIntoView>
+                                                <Card>
+                                                    <CardHeader title="South Polar Chart">
+                                                    </CardHeader>
+                                                    <CardContent>
+                                                        <canvas id="canvasSouth" width={256} height={256}></canvas>
+                                                        <br/>
+                                                        <Typography variant="caption">Big dot is the start of the path.</Typography>
+                                                    </CardContent>
+                                                </Card>
+                                            </FadeIntoView>
                                         </Grid>
                                         <Grid item xs={12} md={6} style={{maxHeight: 500, overflowY: "scroll"}}>
-                                            <Card>
-                                                <CardHeader title="Theta Correction Chart">
-                                                </CardHeader>
-                                                <CardContent>
-                                                    <table>
-                                                        <tr>
-                                                            <th>Step</th>
-                                                            <th>South Pole</th>
-                                                            <th>Theta v1</th>
-                                                            <th>TD v1</th>
-                                                            <th>RO</th>
-                                                            <th>RD</th>
-                                                        </tr>
-                                                        {
-                                                            thetaTable.map(({thetaNorth, deltaNorth, southPoleDistance, rotationOffset, rotationDelta}, i) => (
-                                                                <tr style={{fontWeight: southPoleDistance < 0.2 ? "bold" : southPoleDistance > 0.5 ? "100" : "500"}}>
-                                                                    <td>{i}</td>
-                                                                    <td>{southPoleDistance.toFixed(3)}</td>
-                                                                    <td>{thetaNorth.toFixed(3)}</td>
-                                                                    <td style={{color: Math.abs(deltaNorth) > 360 / (numPoints / 2) ? "red" : undefined}}>{deltaNorth.toFixed(3)}</td>
-                                                                    <td>{rotationOffset.toFixed(3)}</td>
-                                                                    <td style={{color: Math.abs(rotationDelta) > 360 / (numPoints / 2) ? "red" : undefined}}>{rotationDelta.toFixed(3)}</td>
-                                                                </tr>
-                                                            ))
-                                                        }
-                                                    </table>
-                                                    <Typography variant="caption">Bold is near the south pole which is problematic. Red is problematic data which causes positive or negative rotation. Depending on the clockwise or counter-clockwise movement around the pole, you drift left (clockwise) or right (counter-clockwise).</Typography>
-                                                </CardContent>
-                                            </Card>
+                                            <FadeIntoView>
+                                                <Card>
+                                                    <CardHeader title="Theta Correction Chart">
+                                                    </CardHeader>
+                                                    <CardContent>
+                                                        <table>
+                                                            <tr>
+                                                                <th>Step</th>
+                                                                <th>South Pole</th>
+                                                                <th>Theta v1</th>
+                                                                <th>TD v1</th>
+                                                                <th>RO</th>
+                                                                <th>RD</th>
+                                                            </tr>
+                                                            {
+                                                                thetaTable.map(({thetaNorth, deltaNorth, southPoleDistance, rotationOffset, rotationDelta}, i) => (
+                                                                    <tr style={{fontWeight: southPoleDistance < 0.2 ? "bold" : southPoleDistance > 0.5 ? "100" : "500"}}>
+                                                                        <td>{i}</td>
+                                                                        <td>{southPoleDistance.toFixed(3)}</td>
+                                                                        <td>{thetaNorth.toFixed(3)}</td>
+                                                                        <td style={{color: Math.abs(deltaNorth) > 360 / (numPoints / 2) ? "red" : undefined}}>{deltaNorth.toFixed(3)}</td>
+                                                                        <td>{rotationOffset.toFixed(3)}</td>
+                                                                        <td style={{color: Math.abs(rotationDelta) > 360 / (numPoints / 2) ? "red" : undefined}}>{rotationDelta.toFixed(3)}</td>
+                                                                    </tr>
+                                                                ))
+                                                            }
+                                                        </table>
+                                                        <Typography variant="caption">Bold is near the south pole which is problematic. Red is problematic data which causes positive or negative rotation. Depending on the clockwise or counter-clockwise movement around the pole, you drift left (clockwise) or right (counter-clockwise).</Typography>
+                                                    </CardContent>
+                                                </Card>
+                                            </FadeIntoView>
                                         </Grid>
                                     </Grid>
                                     <Button variant="contained" onClick={() => {

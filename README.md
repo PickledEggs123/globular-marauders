@@ -1,4 +1,4 @@
-## Globular Marauders
+## Play Planet
 
 A 3d planet with ships firing cannon balls and knights marching on the islands attacking villagers. Press WASD to move
 ship, QE to aim and fire cannons, F to go back to normal movement mode. You can also click on water to sail to that

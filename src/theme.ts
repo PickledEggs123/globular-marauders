@@ -23,8 +23,8 @@ const themeOptions: ThemeOptions = {
         },
         divider: "rgba(0,0,0,0.67)",
         background: {
-            default: "#ebb",
-            paper: "#dcc",
+            default: "#ddc",
+            paper: "#ddc",
         },
     },
     typography: {

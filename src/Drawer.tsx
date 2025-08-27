@@ -217,12 +217,14 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
                                             )
                                         }
                                     </form>
-                                    <Grid container>
+                                    <Grid container style={{backgroundColor: "#ddc"}} gap={2}>
                                         <Grid item xs={12} md={6}>
                                             <Typography>Sign In With Google</Typography>
                                         </Grid>
                                         <Grid item xs={12} md={6}>
-                                            <IconButton onClick={doSignInWIthGoogle}><Google/></IconButton>
+                                            <Paper>
+                                                <IconButton onClick={doSignInWIthGoogle}><Google/></IconButton>
+                                            </Paper>
                                         </Grid>
                                     </Grid>
                                 </React.Fragment>
@@ -243,8 +245,8 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
                             >
                                 {mobileOpen ? <MenuOpen/> : <Menu/>}
                             </IconButton>
-                            <Typography variant="h4" color="inherit" component="div" sx={{ marginLeft: { xs: 0, sm: drawerWidth / 8} }} style={{flexGrow: 1}} textAlign="center">
-                                Globular Marauders
+                            <Typography variant="h4" className="title" color="inherit" component="div" sx={{ marginLeft: { xs: 0, sm: drawerWidth / 8} }} style={{flexGrow: 1}} textAlign="center">
+                                Play Planet
                             </Typography>
                         </Grid>
                         <Grid item xs={12} lg={6} display="flex" flexDirection="row-reverse">

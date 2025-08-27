@@ -23,6 +23,7 @@ import {DepthOutlineFilter} from "../filters/DepthOutline/DepthOutlineFilter";
 import {ShipContext} from "../contextes/ShipContext";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import {CheckBoxOutlineBlank} from "@mui/icons-material";
+import {FadeIntoView} from "./components/FadeIntoView";
 
 
 export const ShipWiki = () => {
@@ -258,18 +259,20 @@ export const ShipWiki = () => {
                         lg: 12
                     }}>
                         <Grid item xs={12}>
-                            <Card>
-                                <CardHeader title={`${selectedShipType} Render`} subheader="Preview and Download a Ship">
-                                </CardHeader>
-                                <CardContent>
-                                    <div ref={ref}>
-                                    </div>
-                                    <Button variant="contained" onClick={download}>Download</Button>
-                                    <Typography variant="body1">
-                                        {shipBody.get(selectedShipType) ?? undefined}
-                                    </Typography>
-                                </CardContent>
-                            </Card>
+                            <FadeIntoView>
+                                <Card>
+                                    <CardHeader title={`${selectedShipType} Render`} subheader="Preview and Download a Ship">
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div ref={ref}>
+                                        </div>
+                                        <Button variant="contained" onClick={download}>Download</Button>
+                                        <Typography variant="body1">
+                                            {shipBody.get(selectedShipType) ?? undefined}
+                                        </Typography>
+                                    </CardContent>
+                                </Card>
+                            </FadeIntoView>
                         </Grid>
                         <Grid item xs={12}>
                             <Typography variant="h3">
@@ -280,22 +283,24 @@ export const ShipWiki = () => {
                             Object.values(EShipType).map(shipType => {
                                 return (
                                     <Grid key={shipType} item xs={4}>
-                                        <Card>
-                                            <CardActionArea onClick={() => {
-                                                setSelectedShipType(shipType);
-                                            }}>
-                                                <CardMedia component="img" alt={shipType} src={shipThumbnails.get(shipType) ?? undefined}>
-                                                </CardMedia>
-                                                <CardHeader title={shipType}>
-                                                </CardHeader>
-                                                <CardContent>
-                                                    {shipType === selectedShipType ? <CheckBoxIcon/> : <CheckBoxOutlineBlank/>}
-                                                    <Typography variant="body1">
-                                                        {shipBody.get(shipType) ?? undefined}
-                                                    </Typography>
-                                                </CardContent>
-                                            </CardActionArea>
-                                        </Card>
+                                        <FadeIntoView>
+                                            <Card>
+                                                <CardActionArea onClick={() => {
+                                                    setSelectedShipType(shipType);
+                                                }}>
+                                                    <CardMedia component="img" alt={shipType} src={shipThumbnails.get(shipType) ?? undefined}>
+                                                    </CardMedia>
+                                                    <CardHeader title={shipType}>
+                                                    </CardHeader>
+                                                    <CardContent>
+                                                        {shipType === selectedShipType ? <CheckBoxIcon/> : <CheckBoxOutlineBlank/>}
+                                                        <Typography variant="body1">
+                                                            {shipBody.get(shipType) ?? undefined}
+                                                        </Typography>
+                                                    </CardContent>
+                                                </CardActionArea>
+                                            </Card>
+                                        </FadeIntoView>
                                     </Grid>
                                 );
                             })
