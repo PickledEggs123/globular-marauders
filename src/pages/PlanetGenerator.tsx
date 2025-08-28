@@ -319,7 +319,7 @@ export const PlanetGenerator = () => {
                                 <CardHeader title="Planet Generator" subheader="Create unique random planets"></CardHeader>
                                 <CardContent>
                                     <Typography>Load Status: {loadMessage}</Typography>
-                                    <Grid container>
+                                    <Grid container gap={2}>
                                         <Grid item xs={6}>
                                             <Button variant="contained" fullWidth onClick={() => {
                                                 drawGraph();
