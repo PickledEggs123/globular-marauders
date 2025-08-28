@@ -157,6 +157,102 @@ export const Main = () => {
                         <Grid item xs={12} md={6}>
                             <FadeIntoView>
                                 <Typography variant="h3" style={{textAlign:'center'}}>
+                                    Job Experience
+                                </Typography>
+                            </FadeIntoView>
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                            <FadeIntoView>
+                                <Card>
+                                    <CardMedia component="img" src="/mainImages/SimBlocks.png"></CardMedia>
+                                    <CardHeader title="SimBlocks.io" subheader="3D Terrain for Military Simulation">
+                                    </CardHeader>
+                                    <CardContent>
+                                        <Typography variant="body1">
+                                            I worked on the OpenFlight Importer for Unity, a product for SimBlocks.io in
+                                            2017 from May to November. This is solid 3D and C# experience making primitives
+                                            such as planes and boxes and cylinders. Unity has a way to dynamically create
+                                            geometry and OpenFlight defines the geometry, it was a matter of converting a
+                                            binary file into C# and then into Unity.
+                                        </Typography>
+                                    </CardContent>
+                                </Card>
+                            </FadeIntoView>
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                            <FadeIntoView>
+                                <Card>
+                                    <CardMedia component="img" src="/mainImages/CNHind.png"></CardMedia>
+                                    <CardHeader title="Actalent | Case New Holland Part Number Tracker" subheader="A NodeJS MySQL React platform for tracking replaced by and obsolete parts for dealerships.">
+                                    </CardHeader>
+                                    <CardContent>
+                                        <Typography variant="body1">
+                                            This is an enterprise website running on the intranet for Case New Holland.
+                                            They are a tractor company similar to John Deer. They have dealerships around
+                                            the world and need to know which part number is replaced by or obsoleted so
+                                            service technicians can order the correct part or assembly or wire harness
+                                            to repair a tractor.
+                                        </Typography>
+                                    </CardContent>
+                                </Card>
+                            </FadeIntoView>
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                            <FadeIntoView>
+                                <Card>
+                                    <CardMedia component="img" src="/mainImages/FreedomCommunicationTechnologies.png"></CardMedia>
+                                    <CardHeader title="Actalent | Freedom Communication Technologies R9000 Prototype" subheader="A NodeJS React ElectronJS GUI for a touch screen spectrum analyzer.">
+                                    </CardHeader>
+                                    <CardContent>
+                                        <Typography variant="body1">
+                                            GUI for a spectrum analyzer prototype. The hardware maybe simulated but the
+                                            UI mocks every feature required such as FM/AM/QAM/Smith Chart/PSK. It comes
+                                            in multiple languages such as English, Spanish, French, Italian and Chinese.
+                                            This is a team effort by 2 developers, 1 English Major handling data entry and
+                                            learning development, and 1 QA learning development with Selenium. I helped
+                                            write the 2d charts and Unit Tests in Jest and Mocha. I also helped with the
+                                            selenium making the tests pass with flying colors.
+                                        </Typography>
+                                        <Typography variant="body1">
+                                            The rest of the team designed every button and dropdown and the color scheme
+                                            for the website. They also wrote some Jest Tests and Mocha Tests.
+                                        </Typography>
+                                    </CardContent>
+                                </Card>
+                            </FadeIntoView>
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                            <FadeIntoView>
+                                <Card>
+                                    <CardMedia component="img" src="/mainImages/KCLCAD.png"></CardMedia>
+                                    <CardHeader title="StatusQuote.com | KCLCAD.com" subheader="A WPF OpenGL AutoCAD DWG / MAUI WebView AFrameVR ThreeJS AutoCAD DWG Application">
+                                    </CardHeader>
+                                    <CardContent>
+                                        <Typography variant="body1">
+                                            I used my skills from the spectrum analyzer and SimBlocks.io to convert CAD DWG
+                                            model specifications in C# to OpenGL. This allowed me to convert a bunch of AutoLISP
+                                            to OpenGL 1.0 Graphics which worked great for the catalog of 250 custom furniture and equipment
+                                            and 250k models in 2d and 3d. I learned that interior designers use layers or color coding
+                                            to specify clearances between equipment such a swinging door or sliding drawer.
+                                        </Typography>
+                                        <Typography variant="body1">
+                                            Later on I spent time learning WPF, Uno, WaveEngine, MAUI, ASP.Net Core, Net Framework
+                                            Net Core, DLLs, WinService, WMI, ActiveX, ThreeJS, AframeVR and WebGL. This is to convert
+                                            the Room Builder which I made, Custom Blocks which I helped convert from AutoLISP to C#,
+                                            NapkinSketch (a free version of AutoCAD if you cannot afford $500.00 per year for AutoCAD Lite).
+                                        </Typography>
+                                        <Typography variant="body1">
+                                            Kevin, the now retired business owner, handled the business development in acquiring the 200 Manufactures
+                                            and their 250k models. Robert, the now retired StatusQuote President, acquired the AutoLISP for CustomBlocks
+                                            and wrote must of the legacy code.
+                                        </Typography>
+                                    </CardContent>
+                                </Card>
+                            </FadeIntoView>
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                            <FadeIntoView>
+                                <Typography variant="h3" style={{textAlign:'center'}}>
                                     About the Developer
                                 </Typography>
                             </FadeIntoView>
