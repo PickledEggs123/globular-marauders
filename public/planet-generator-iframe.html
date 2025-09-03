@@ -23,7 +23,12 @@
         {
             "imports": {
                 "three": "/three.module.js",
-                "three/addons": "/three/addons/"
+                "three/addons": "/three/addons/",
+                "three-nebula": "/three/nebula/",
+                "lodash/sample": "/lib/lodash/sample.js",
+                "lodash/isNumber": "/lib/lodash/isNumber.js",
+                "potpack": "/potpack.js",
+                "uuid/v1": "/lib/uuid/v1.js"
             }
         }
     </script>
@@ -5029,6 +5034,7 @@
             const entity = document.createElement("a-entity");
             entity.setAttribute("position", position);
             entity.setAttribute("networked", "template: #cannonball-hit-template; attachTemplateToLocal: true;");
+            entity.setAttribute("damage-particles", "");
             entity.setAttribute("despawn", "");
             scene.appendChild(entity);
         }
@@ -6365,6 +6371,116 @@
     <script type="module">
         import ProjectedMaterial from './ProjectedMaterial.module.js';
         import {OBB} from './three/addons/math/OBB.js';
+        import ParticleSystem, {
+            BoxZone,
+            Color,
+            CrossZone,
+            CustomRenderer,
+            Debug,
+            Emitter,
+            Gravity,
+            Life,
+            Mass,
+            RadialVelocity,
+            Radius,
+            Rate,
+            Rotate,
+            Scale,
+            Span,
+            Vector3D,
+            ease
+        } from 'three-nebula';
+
+        const createZone = () => {
+            const zone = new BoxZone(600);
+
+            zone.friction = 0.95;
+            zone.max = 7;
+
+            return zone;
+        };
+
+        const createEmitter = zone => {
+            const emitter = new Emitter();
+
+            emitter
+                .setRate(new Rate(new Span(4, 8), new Span(0.2, 0.5)))
+                .addInitializers([
+                    new Mass(1),
+                    new Radius(400),
+                    new Life(2, 4),
+                    new RadialVelocity(600, new Vector3D(0, 1, 0), 60),
+                ])
+                .addBehaviours([
+                    new Rotate('random', 'random'),
+                    new Scale(1, 0.1),
+                    new Gravity(10),
+                    new CrossZone(zone, 'bound'),
+                    new Color(0xff0000, 'random', Infinity, ease.easeOutQuart),
+                ])
+                .setPosition({ x: 0, y: 0 })
+                .emit();
+
+            return emitter;
+        };
+
+        AFRAME.registerSystem("damage-particles", {
+            schema: {},
+            init: function () {
+                this.system = new ParticleSystem();
+                this.renderer = new CustomRenderer();
+                this.mesh = new THREE.Mesh(
+                    new THREE.BoxGeometry(1, 1, 1),
+                    new THREE.MeshNormalMaterial()
+                );
+                const mesh = this.mesh;
+                const scene = this.sceneEl.object3D;
+
+                this.renderer.onParticleCreated = function (p) {
+                    p.target = this.targetPool.get(mesh);
+
+                    p.target.position.copy(p.position);
+                    scene.add(p.target);
+                };
+
+                this.renderer.onParticleUpdate = function (p) {
+                    const scale = p.scale * 30;
+
+                    p.target.position.copy(p.position);
+                    p.target.rotation.set(p.rotation.x, p.rotation.y, p.rotation.z);
+                    p.target.scale.set(scale, scale, scale);
+                };
+
+                this.renderer.onParticleDead = function (p) {
+                    this.targetPool.expire(p.target);
+                    scene.remove(p.target);
+
+                    p.target = null;
+                };
+
+                this.system.addRenderer(this.renderer);
+            },
+            tick: function (t, dt) {
+                this.system.update(dt);
+            },
+            addEmitter: function (emitter, zone) {
+                this.system.addEmitter(emitter);
+            },
+            removeEmitter: function (emitter, zone) {
+                this.system.removeEmitter(emitter);
+            }
+        });
+        AFRAME.registerComponent("damage-particles", {
+            schema: {},
+            init: function () {
+                this.zone = createZone();
+                this.emitter = createEmitter(this.zone);
+                this.system.addEmitter(this.emitter, this.zone);
+            },
+            remove: function () {
+                this.system.removeEmitter(this.emitter, this.zone);
+            }
+        });
 
         AFRAME.registerComponent("orthographic-camera", {
             schema: {},
@@ -6956,6 +7072,7 @@
                 <a-entity id="port-menu" align-with-projection="offset: 0.25 0.2 -0.5; rotation: 0 0 0; portShow: true" port-show html="cursor:#cursor;html:#my-interface" class="clickable"></a-entity>
                 <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
                 <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
+                <a-entity damage-particles=""></a-entity>
                 <a-entity id="left-cannon-fire" align-with-projection="offset: -0.25 -0.2 -0.5; rotation: 0 90 0; scale: 0.03 0.03 0.03;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" select-cannon-side="selector: left-cannon" ui-clicked></a-entity>
                 <a-entity id="right-cannon-fire" align-with-projection="offset: 0.25 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" select-cannon-side="selector: right-cannon" ui-clicked></a-entity>
                 <a-entity id="none-cannon-fire" align-with-projection="offset: 0 -0.2 -0.5; rotation: 0 0 0; scale: 0.015 0.015 0.015;" gltf-model="/meshes/Model_Redo/Ship Wheel/ShipWheel.glb" select-cannon-side="selector: none-cannon" ui-clicked></a-entity>

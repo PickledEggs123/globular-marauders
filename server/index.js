@@ -12,6 +12,8 @@ import {PrismaClient} from "@prisma/client";
 import compression from "compression";
 
 const express = require('express');
+const finalhandler = require('finalhandler');
+const serveStatic = require('serve-static');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -254,7 +256,14 @@ app.get('/api/planet', async (req, res) => {
 });
 
 app.use(compression());
-app.use(express.static('./build'));
+
+const serve = serveStatic('./build', {
+    index: ['index.html', 'index.htm', 'index.js'],
+    extensions: ['html', 'htm', 'js'],
+});
+app.use(function onRequest (req, res) {
+    serve(req, res, finalhandler(req, res));
+});
 
 // Start Express http server
 const webServer = http.createServer(app);

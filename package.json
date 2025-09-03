@@ -39,6 +39,7 @@
     "three": "^0.163.0",
     "tone": "^14.7.77",
     "typescript": "^5.8.2",
+    "uuid": "^11.1.0",
     "web-vitals": "^1.1.1",
     "webpack-node-externals": "^3.0.0",
     "ws": "^8.18.0"
@@ -52,6 +53,7 @@
     "sitemap": "babel-node builders/sitemap.js",
     "dev:build-server": "webpack --config not-a-config.server.js --mode=development -w",
     "dev:start": "nodemon ./server-build/index.js",
+    "dev:debug": "node ./server-build/index.js",
     "dev": "npm-run-all --parallel build dev:*",
     "build-server": "webpack --config not-a-config.server.js --mode=production"
   },
