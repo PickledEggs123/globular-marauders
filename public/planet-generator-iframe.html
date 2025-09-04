@@ -5034,7 +5034,6 @@
             const entity = document.createElement("a-entity");
             entity.setAttribute("position", position);
             entity.setAttribute("networked", "template: #cannonball-hit-template; attachTemplateToLocal: true;");
-            entity.setAttribute("damage-particles", "");
             entity.setAttribute("despawn", "");
             scene.appendChild(entity);
         }
@@ -6391,8 +6390,8 @@
             ease
         } from 'three-nebula';
 
-        const createZone = () => {
-            const zone = new BoxZone(600);
+        const createZone = (position) => {
+            const zone = new BoxZone(position.x, position.y, position.z, 5, 5, 5);
 
             zone.friction = 0.95;
             zone.max = 7;
@@ -6400,25 +6399,25 @@
             return zone;
         };
 
-        const createEmitter = zone => {
+        const createEmitter = (zone, position) => {
             const emitter = new Emitter();
 
             emitter
-                .setRate(new Rate(new Span(4, 8), new Span(0.2, 0.5)))
+                .setRate(new Rate(new Span(2, 4), new Span(0.5, 1)))
                 .addInitializers([
                     new Mass(1),
-                    new Radius(400),
+                    new Radius(0.1, 0.1, false),
                     new Life(2, 4),
-                    new RadialVelocity(600, new Vector3D(0, 1, 0), 60),
+                    new RadialVelocity(1, new Vector3D(0, 1, 0), 180),
                 ])
                 .addBehaviours([
                     new Rotate('random', 'random'),
-                    new Scale(1, 0.1),
-                    new Gravity(10),
+                    new Scale(0.2, 0.05),
+
                     new CrossZone(zone, 'bound'),
                     new Color(0xff0000, 'random', Infinity, ease.easeOutQuart),
                 ])
-                .setPosition({ x: 0, y: 0 })
+                .setPosition(position)
                 .emit();
 
             return emitter;
@@ -6444,7 +6443,7 @@
                 };
 
                 this.renderer.onParticleUpdate = function (p) {
-                    const scale = p.scale * 30;
+                    const scale = p.scale;
 
                     p.target.position.copy(p.position);
                     p.target.rotation.set(p.rotation.x, p.rotation.y, p.rotation.z);
@@ -6461,7 +6460,7 @@
                 this.system.addRenderer(this.renderer);
             },
             tick: function (t, dt) {
-                this.system.update(dt);
+                this.system.update(dt / 1000);
             },
             addEmitter: function (emitter, zone) {
                 this.system.addEmitter(emitter);
@@ -6473,8 +6472,9 @@
         AFRAME.registerComponent("damage-particles", {
             schema: {},
             init: function () {
-                this.zone = createZone();
-                this.emitter = createEmitter(this.zone);
+                const position = this.el.object3D.position.clone();
+                this.zone = createZone(position);
+                this.emitter = createEmitter(this.zone, position);
                 this.system.addEmitter(this.emitter, this.zone);
             },
             remove: function () {
@@ -7012,38 +7012,47 @@
                 <a-entity class="cannonball-hit"
                           sound="src: #hit; poolSize: 1; volume: 1; autoplay: true;"
                           particle-emitter
+                          despawn
                 ></a-entity>
             </template>
             <template id="cannonball-thump-template">
                 <a-entity class="cannonball-thump"
                           sound="src: #thump; poolSize: 1; volume: 1; autoplay: true;"
                           particle-emitter="dirt: true;"
+                          despawn
                 ></a-entity>
             </template>
             <template id="cannonball-splash-template">
                 <a-entity class="cannonball-splash"
                           sound="src: #splash; poolSize: 1; volume: 1; autoplay: true;"
                           particle-emitter="water: true;"
+                          despawn
                 ></a-entity>
             </template>
             <template id="wilhelm-scream-template">
                 <a-entity class="wilhelm-scream"
                           sound="src: #scream; poolSize: 1; volume: 1; autoplay: true;"
+                          despawn
                 ></a-entity>
             </template>
             <template id="arr-template">
                 <a-entity class="arr"
                           sound="src: #arr; poolSize: 1; volume: 1; autoplay: true;"
+                          despawn
                 ></a-entity>
             </template>
             <template id="repair-template">
                 <a-entity class="repair"
                           sound="src: #repair; poolSize: 1; volume: 1; autoplay: true;"
+                          damage-particles
+                          despawn
                 ></a-entity>
             </template>
             <template id="heal-template">
                 <a-entity class="heal"
                           sound="src: #heal; poolSize: 1; volume: 1; autoplay: true;"
+                          damage-particles
+                          despawn
                 ></a-entity>
             </template>
             <audio id="fire" src="/sounds/FireSFX.m4a" preload="auto"></audio>
@@ -7072,7 +7081,6 @@
                 <a-entity id="port-menu" align-with-projection="offset: 0.25 0.2 -0.5; rotation: 0 0 0; portShow: true" port-show html="cursor:#cursor;html:#my-interface" class="clickable"></a-entity>
                 <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
                 <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
-                <a-entity damage-particles=""></a-entity>
                 <a-entity id="left-cannon-fire" align-with-projection="offset: -0.25 -0.2 -0.5; rotation: 0 90 0; scale: 0.03 0.03 0.03;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" select-cannon-side="selector: left-cannon" ui-clicked></a-entity>
                 <a-entity id="right-cannon-fire" align-with-projection="offset: 0.25 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" select-cannon-side="selector: right-cannon" ui-clicked></a-entity>
                 <a-entity id="none-cannon-fire" align-with-projection="offset: 0 -0.2 -0.5; rotation: 0 0 0; scale: 0.015 0.015 0.015;" gltf-model="/meshes/Model_Redo/Ship Wheel/ShipWheel.glb" select-cannon-side="selector: none-cannon" ui-clicked></a-entity>
