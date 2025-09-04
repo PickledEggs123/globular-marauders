@@ -6466,8 +6466,8 @@
                 this.system.addEmitter(emitter);
             },
             removeEmitter: function (emitter, zone) {
-                this.system.removeEmitter(emitter);
-            }
+                emitter.destroy();
+            },
         });
         AFRAME.registerComponent("damage-particles", {
             schema: {},
@@ -6479,7 +6479,7 @@
             },
             remove: function () {
                 this.system.removeEmitter(this.emitter, this.zone);
-            }
+            },
         });
 
         AFRAME.registerComponent("orthographic-camera", {
@@ -7012,47 +7012,40 @@
                 <a-entity class="cannonball-hit"
                           sound="src: #hit; poolSize: 1; volume: 1; autoplay: true;"
                           particle-emitter
-                          despawn
                 ></a-entity>
             </template>
             <template id="cannonball-thump-template">
                 <a-entity class="cannonball-thump"
                           sound="src: #thump; poolSize: 1; volume: 1; autoplay: true;"
                           particle-emitter="dirt: true;"
-                          despawn
                 ></a-entity>
             </template>
             <template id="cannonball-splash-template">
                 <a-entity class="cannonball-splash"
                           sound="src: #splash; poolSize: 1; volume: 1; autoplay: true;"
                           particle-emitter="water: true;"
-                          despawn
                 ></a-entity>
             </template>
             <template id="wilhelm-scream-template">
                 <a-entity class="wilhelm-scream"
                           sound="src: #scream; poolSize: 1; volume: 1; autoplay: true;"
-                          despawn
                 ></a-entity>
             </template>
             <template id="arr-template">
                 <a-entity class="arr"
                           sound="src: #arr; poolSize: 1; volume: 1; autoplay: true;"
-                          despawn
                 ></a-entity>
             </template>
             <template id="repair-template">
                 <a-entity class="repair"
                           sound="src: #repair; poolSize: 1; volume: 1; autoplay: true;"
                           damage-particles
-                          despawn
                 ></a-entity>
             </template>
             <template id="heal-template">
                 <a-entity class="heal"
                           sound="src: #heal; poolSize: 1; volume: 1; autoplay: true;"
                           damage-particles
-                          despawn
                 ></a-entity>
             </template>
             <audio id="fire" src="/sounds/FireSFX.m4a" preload="auto"></audio>
