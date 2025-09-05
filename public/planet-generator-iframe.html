@@ -6538,7 +6538,11 @@
                 this.system.addEmitter(this.emitter, this.zone);
             },
             tick: function (t, dt) {
-                this.emitter.position.copy(this.el.object3D.getWorldPosition(new THREE.Vector3()));
+                const position = this.el.object3D.getWorldPosition(new THREE.Vector3());
+                this.emitter.position.copy(position);
+                this.zone.x = position.x;
+                this.zone.y = position.y;
+                this.zone.z = position.z;
             },
             remove: function () {
                 this.system.removeEmitter(this.emitter, this.zone);
