@@ -4077,7 +4077,8 @@
                 this.maxHealth = this.data.health;
                 this.healTickDelay = 10;
                 this.healTickCount = this.healTickDelay;
-                this.healTickAmount = 40;
+                this.healTickAmount = this.maxHealth / 10;
+                this.el.setAttribute("set-follow-id", "");
             },
             remove: function () {
                 this.el.removeEventListener('hit', this.innerHandleHit);
@@ -4146,7 +4147,8 @@
                 this.maxHealth = this.data.health;
                 this.healTickDelay = 10;
                 this.healTickCount = this.healTickDelay;
-                this.healTickAmount = 400;
+                this.healTickAmount = this.maxHealth / 10;
+                this.el.setAttribute("set-follow-id", "");
             },
             remove: function () {
                 this.el.removeEventListener('hit', this.innerHandleHit);
@@ -4335,7 +4337,51 @@
                     this.el.object3D.position.set(0, 0, -5);
                 }
             },
-        })
+        });
+
+        AFRAME.registerComponent("set-follow-id", {
+            schema: {},
+            init: function () {
+                this.delay = 1;
+            },
+            tick: function (t, dt) {
+                if (this.delay >= 0) {
+                    this.delay -= dt / 1000;
+                    return;
+                }
+
+                if (!this.el.id) {
+                    this.el.id = "id" + Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(36);
+                }
+                this.el.removeAttribute("set-follow-id");
+            },
+        });
+
+        AFRAME.registerComponent('follow-entity', {
+            schema: {
+                target: { type: 'selector' }, // Selector for the entity to follow
+                offset: { type: 'vec3', default: { x: 0, y: 0, z: -1 } }, // Offset from the target
+                speed: { type: 'number', default: 0.1 } // Speed of following
+            },
+
+            tick: function (time, deltaTime) {
+                const targetEl = this.data.target;
+                if (!targetEl) return;
+
+                const targetPosition = targetEl.object3D.position;
+                const followerPosition = this.el.object3D.position;
+
+                // Calculate desired position with offset
+                const desiredPosition = new THREE.Vector3();
+                desiredPosition.copy(targetPosition).add(this.data.offset);
+
+                // Lerp towards the desired position for smooth following
+                followerPosition.lerp(desiredPosition, this.data.speed);
+
+                // Optional: Make the follower look at the target
+                // this.el.object3D.lookAt(targetPosition);
+            }
+        });
 
         function addTemplate(templateId, charModelId, instanceModelId, memberMesh) {
             const scene = document.querySelector("a-scene");
@@ -5089,6 +5135,13 @@
             const entity = document.createElement("a-entity");
             entity.setAttribute("position", position);
             entity.setAttribute("networked", "template: #repair-template; attachTemplateToLocal: true;");
+            if (el.id) {
+                entity.setAttribute("follow-entity", {
+                    target: `#${el.id}`,
+                    offset: new THREE.Vector3().set(0, 0, 0),
+                    speed: 1,
+                });
+            }
             entity.setAttribute("despawn", "");
             scene.appendChild(entity);
         }
@@ -5100,6 +5153,13 @@
             const entity = document.createElement("a-entity");
             entity.setAttribute("position", position);
             entity.setAttribute("networked", "template: #heal-template; attachTemplateToLocal: true;");
+            if (el.id) {
+                entity.setAttribute("follow-entity", {
+                    target: el.id,
+                    offset: new THREE.Vector3().set(0, 0, 0),
+                    speed: 1,
+                });
+            }
             entity.setAttribute("despawn", "");
             scene.appendChild(entity);
         }
@@ -6476,6 +6536,9 @@
                 this.zone = createZone(position);
                 this.emitter = createEmitter(this.zone, position);
                 this.system.addEmitter(this.emitter, this.zone);
+            },
+            tick: function (t, dt) {
+                this.emitter.position.copy(this.el.object3D.getWorldPosition(new THREE.Vector3()));
             },
             remove: function () {
                 this.system.removeEmitter(this.emitter, this.zone);
