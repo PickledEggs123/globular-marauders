@@ -100,7 +100,7 @@ export const PlanetGenerator = () => {
             });
         };
 
-        const handleData = (
+        const handleData = async (
             inputData: { meshes: IGameMesh[], spawnPoints: IGameSpawnPoint[], buildings: IGameBuilding[] },
             { roomId }: { roomId: string }
         ) => {
@@ -141,80 +141,80 @@ export const PlanetGenerator = () => {
                 "/meshes/Model_Redo/Temple/Temple.glb"
             ];
 
-            Promise.all<Uint8Array | string>([
+            const gltf = await Promise.all<Uint8Array | string>([
                 ...data.map(m => generatePlanetGltf(m, m.ocean, m.navmesh || m.oceanNavmesh)),
                 ...staticMeshPaths
-            ]).then((gltf) => {
-                const worldMeshes: [string, boolean?, boolean?, boolean?, boolean?, [number, number, number]?][] = [];
-                for (let i = 0; i < data.length; i++) {
-                    const dataUri = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[i] as Uint8Array)}`;
-                    worldMeshes.push([
-                        dataUri,
-                        data[i].collidable,
-                        data[i].navmesh,
-                        data[i].ocean,
-                        data[i].oceanNavmesh,
-                        data[i].vertex
+            ]);
+
+            const worldMeshes: [string, boolean?, boolean?, boolean?, boolean?, [number, number, number]?][] = [];
+            for (let i = 0; i < data.length; i++) {
+                const dataUri = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[i] as Uint8Array)}`;
+                worldMeshes.push([
+                    dataUri,
+                    data[i].collidable,
+                    data[i].navmesh,
+                    data[i].ocean,
+                    data[i].oceanNavmesh,
+                    data[i].vertex
+                ]);
+            }
+
+            if (iframeRef.current) {
+                const contentWindow = iframeRef.current.contentWindow as IFrameWindow;
+                contentWindow?.setDemo(false);
+                contentWindow?.clearTerrain();
+
+                worldMeshes.forEach(w => {
+                    contentWindow?.addTerrain(JSON.stringify(w));
+                });
+
+                const shipDataUri = gltf[gltf.length - 13] as string;
+                if (spawnPoints[0]) {
+                    const spawnPoint = spawnPoints[0];
+                    addCharacterModel(iframeRef.current, "SHIP", shipDataUri);
+                    await contentWindow?.addShip(JSON.stringify({
+                        data: shipDataUri,
+                        point: spawnPoint.point.map(x => x * PLANET_SIZE)
+                    }));
+                }
+
+                const warriorDataUri = gltf[gltf.length - 7] as string;
+                addCharacterModel(iframeRef.current, "FIREBALL", gltf[gltf.length - 21] as string);
+                addCharacterModel(iframeRef.current, "WIZARD", gltf[gltf.length - 20] as string);
+                addCharacterModel(iframeRef.current, "NPC_DESTINATION", gltf[gltf.length - 19] as string);
+                addCharacterModel(iframeRef.current, "SHIP_DESTINATION", gltf[gltf.length - 18] as string);
+                addCharacterModel(iframeRef.current, "WARRIOR", warriorDataUri);
+                addCharacterModel(iframeRef.current, "PIRATE_SHIP", gltf[gltf.length - 17] as string);
+                addCharacterModel(iframeRef.current, "PERSON", gltf[gltf.length - 11] as string);
+                addCharacterModel(iframeRef.current, "ARROW", gltf[gltf.length - 12] as string);
+                addCharacterModel(iframeRef.current, "GOLD_COIN", gltf[gltf.length - 14] as string);
+                addCharacterModel(iframeRef.current, "CANNONBALL", gltf[gltf.length - 15] as string);
+                addCharacterModel(iframeRef.current, "HELM", gltf[gltf.length - 16] as string);
+
+                if (buildings.length) {
+                    addBuildings(iframeRef.current, buildings, [
+                        gltf[gltf.length - 10] as string,
+                        gltf[gltf.length - 9] as string,
+                        gltf[gltf.length - 8] as string,
+                        gltf[gltf.length - 6] as string,
+                        gltf[gltf.length - 5] as string,
+                        gltf[gltf.length - 4] as string,
+                        gltf[gltf.length - 3] as string,
+                        gltf[gltf.length - 2] as string,
+                        gltf[gltf.length - 1] as string
                     ]);
                 }
 
-                if (iframeRef.current) {
-                    const contentWindow = iframeRef.current.contentWindow as IFrameWindow;
-                    contentWindow?.setDemo(false);
-                    contentWindow?.clearTerrain();
-
-                    worldMeshes.forEach(w => {
-                        contentWindow?.addTerrain(JSON.stringify(w));
-                    });
-
-                    const shipDataUri = gltf[gltf.length - 13] as string;
-                    if (spawnPoints[0]) {
-                        const spawnPoint = spawnPoints[0];
-                        addCharacterModel(iframeRef.current, "SHIP", shipDataUri);
-                        contentWindow?.addShip(JSON.stringify({
-                            data: shipDataUri,
+                if (spawnPoints.length) {
+                    for (const spawnPoint of spawnPoints.slice(1)) {
+                        contentWindow?.addPirateShipSpawnPoint(JSON.stringify({
                             point: spawnPoint.point.map(x => x * PLANET_SIZE)
                         }));
                     }
-
-                    const warriorDataUri = gltf[gltf.length - 7] as string;
-                    addCharacterModel(iframeRef.current, "FIREBALL", gltf[gltf.length - 21] as string);
-                    addCharacterModel(iframeRef.current, "WIZARD", gltf[gltf.length - 20] as string);
-                    addCharacterModel(iframeRef.current, "NPC_DESTINATION", gltf[gltf.length - 19] as string);
-                    addCharacterModel(iframeRef.current, "SHIP_DESTINATION", gltf[gltf.length - 18] as string);
-                    addCharacterModel(iframeRef.current, "WARRIOR", warriorDataUri);
-                    addCharacterModel(iframeRef.current, "PIRATE_SHIP", gltf[gltf.length - 17] as string);
-                    addCharacterModel(iframeRef.current, "PERSON", gltf[gltf.length - 11] as string);
-                    addCharacterModel(iframeRef.current, "ARROW", gltf[gltf.length - 12] as string);
-                    addCharacterModel(iframeRef.current, "GOLD_COIN", gltf[gltf.length - 14] as string);
-                    addCharacterModel(iframeRef.current, "CANNONBALL", gltf[gltf.length - 15] as string);
-                    addCharacterModel(iframeRef.current, "HELM", gltf[gltf.length - 16] as string);
-
-                    if (buildings.length) {
-                        addBuildings(iframeRef.current, buildings, [
-                            gltf[gltf.length - 10] as string,
-                            gltf[gltf.length - 9] as string,
-                            gltf[gltf.length - 8] as string,
-                            gltf[gltf.length - 6] as string,
-                            gltf[gltf.length - 5] as string,
-                            gltf[gltf.length - 4] as string,
-                            gltf[gltf.length - 3] as string,
-                            gltf[gltf.length - 2] as string,
-                            gltf[gltf.length - 1] as string
-                        ]);
-                    }
-
-                    if (spawnPoints.length) {
-                        for (const spawnPoint of spawnPoints.slice(1)) {
-                            contentWindow?.addPirateShipSpawnPoint(JSON.stringify({
-                                point: spawnPoint.point.map(x => x * PLANET_SIZE)
-                            }));
-                        }
-                    }
-
-                    contentWindow?.addClientSecret(JSON.stringify({ roomId, clientSecret }));
                 }
-            });
+
+                contentWindow?.addClientSecret(JSON.stringify({ roomId, clientSecret }));
+            }
         };
 
         (async () => {
@@ -250,7 +250,7 @@ export const PlanetGenerator = () => {
                 const gameJson = await gameResponse.json();
 
                 context.preview = previewJson as IGameMesh;
-                handleData(gameJson as {meshes: IGameMesh[], spawnPoints: IGameSpawnPoint[], buildings: IGameBuilding[]}, {roomId});
+                await handleData(gameJson as {meshes: IGameMesh[], spawnPoints: IGameSpawnPoint[], buildings: IGameBuilding[]}, {roomId});
             }
         })();
     }, [context]);
