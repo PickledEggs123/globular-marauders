@@ -5087,7 +5087,7 @@
             const entity = document.createElement("a-entity");
             entity.setAttribute("position", position);
             entity.setAttribute("networked", "template: #cannonball-fire-template; attachTemplateToLocal: true;");
-            entity.setAttribute("despawn", "");
+            entity.setAttribute("despawn", "1");
             scene.appendChild(entity);
         }
 
@@ -5098,7 +5098,7 @@
             const entity = document.createElement("a-entity");
             entity.setAttribute("position", position);
             entity.setAttribute("networked", "template: #cannonball-hit-template; attachTemplateToLocal: true;");
-            entity.setAttribute("despawn", "");
+            entity.setAttribute("despawn", "1");
             scene.appendChild(entity);
         }
 
@@ -5109,7 +5109,7 @@
             const entity = document.createElement("a-entity");
             entity.setAttribute("position", position);
             entity.setAttribute("networked", "template: #cannonball-thump-template; attachTemplateToLocal: true;");
-            entity.setAttribute("despawn", "");
+            entity.setAttribute("despawn", "1");
             scene.appendChild(entity);
         }
 
@@ -5120,7 +5120,7 @@
             const entity = document.createElement("a-entity");
             entity.setAttribute("position", position);
             entity.setAttribute("networked", "template: #cannonball-splash-template; attachTemplateToLocal: true;");
-            entity.setAttribute("despawn", "");
+            entity.setAttribute("despawn", "1");
             scene.appendChild(entity);
         }
 
@@ -5731,69 +5731,6 @@
             collision: function (el) {
                 this.el.emit("hit", el.components['cannonball-hit-ready'].data.damage);
                 addCannonballHit(el);
-            },
-        });
-
-        AFRAME.registerComponent('random-movement', {
-            schema: {},
-            init: function () {
-                const random = () => (Math.random() * 2) - 1;
-                this.offset = new THREE.Vector3(random(), random(), random()).multiplyScalar(0.1);
-            },
-            tick: function (t, dt) {
-                const position = this.el.object3D.position.clone();
-                this.el.setAttribute("position", position.add(this.offset.multiplyScalar(dt / 1000)));
-            },
-        });
-
-        AFRAME.registerComponent('particle-emitter', {
-            schema: {
-                activate: {
-                    type: "boolean",
-                    default: true,
-                },
-                dirt: {
-                    type: "boolean",
-                    default: false,
-                },
-                water: {
-                    type: "boolean",
-                    default: false,
-                },
-            },
-            tick: function (t, dt) {
-                if (!this.data.activate) {
-                    return;
-                }
-                for (let i = 0; i < 10; i++) {
-                    this.spawnParticle();
-                }
-                this.el.removeAttribute("particle-emitter");
-            },
-            spawnParticle: function () {
-                const worldPosition = this.el.object3D.getWorldPosition(new THREE.Vector3());
-                const random = () => (Math.random() * 2) - 1;
-                const randomOffset = new THREE.Vector3(random(), random(), random()).multiplyScalar(0.1);
-                const scene = document.querySelector("a-scene");
-
-                const entity = document.createElement("a-entity");
-                entity.setAttribute("geometry", "primitive: box");
-                if (this.data.water) {
-                    // water
-                    entity.setAttribute("material", "src: #fog; color: #5555ff; alphaTest: 0.01; transparent: true;");
-                } else if (this.data.dirt) {
-                    // dirt
-                    entity.setAttribute("material", "src: #blob; color: #9B7653; alphaTest: 0.01; transparent: true;");
-                } else {
-                    // smoke
-                    entity.setAttribute("material", "src: #fog; alphaTest: 0.01; transparent: true;");
-                }
-                entity.setAttribute("position", worldPosition.clone().add(randomOffset.clone()));
-                entity.setAttribute("scale", "0.1 0.1 0.1");
-                entity.setAttribute("billboard", "");
-                entity.setAttribute("random-movement", "");
-                entity.setAttribute("despawn", "");
-                scene.appendChild(entity);
             },
         });
 
@@ -6476,11 +6413,11 @@
             return zone;
         };
 
-        const createEmitter = (zone, position) => {
+        const createEmitter = (zone, position, particleType) => {
             const emitter = new Emitter();
 
             emitter
-                .setRate(new Rate(new Span(2, 4), new Span(0.5, 1)))
+                .setRate(particleType === 'damage' ? new Rate(new Span(2, 4), new Span(0.5, 1)) : new Rate(new Span(1, 2), new Span(0.5, 1)))
                 .addInitializers([
                     new Mass(1),
                     new Radius(0.1, 0.1, false),
@@ -6503,14 +6440,95 @@
         AFRAME.registerSystem("damage-particles", {
             schema: {},
             init: function () {
-                this.system = new ParticleSystem();
+                this.particleSystems = [];
+            },
+            addParticleSystem: function (particleSystem) {
+                const time = +new Date();
+                this.particleSystems.push({
+                    particleSystem,
+                    time,
+                });
+            },
+            tick: function (t, dt) {
+                for (const {particleSystem} of this.particleSystems) {
+                    particleSystem.update(dt / 1000);
+                }
+                const newTime = +new Date();
+                this.particleSystems = this.particleSystems.filter(x => x.time + 60_000 > newTime);
+            },
+        });
+
+        AFRAME.registerComponent("damage-particles", {
+            schema: {
+                particleType: {
+                    default: "damage",
+                    oneOf: ["damage", "smoke", "dirt", "water"],
+                },
+            },
+            init: function () {
+                const position = this.el.object3D.position.clone();
+                this.zone = createZone(position);
+                this.emitter = createEmitter(this.zone, position, this.data.particleType);
+
+                this.particleSystem = new ParticleSystem();
                 this.renderer = new CustomRenderer();
-                this.mesh = new THREE.Mesh(
-                    new THREE.BoxGeometry(1, 1, 1),
-                    new THREE.MeshNormalMaterial()
-                );
+
+                switch (this.data.particleType) {
+                    case "damage": {
+                        this.mesh = new THREE.Mesh(
+                            new THREE.BoxGeometry(1, 1, 1),
+                            new THREE.MeshNormalMaterial()
+                        );
+                        break;
+                    }
+                    case "smoke": {
+                        const imageElement = document.querySelector("#fog");
+                        const textureLoader = new THREE.TextureLoader();
+                        const map = textureLoader.load(imageElement.src);
+                        this.mesh = new THREE.Mesh(
+                            new THREE.BoxGeometry(1, 1, 1),
+                            new THREE.MeshStandardMaterial({
+                                map,
+                                color: '#ffffff',
+                                alphaTest: 0.01,
+                                transparent: true,
+                            })
+                        );
+                        break;
+                    }
+                    case "dirt": {
+                        const imageElement = document.querySelector("#blob");
+                        const textureLoader = new THREE.TextureLoader();
+                        const map = textureLoader.load(imageElement.src);
+                        this.mesh = new THREE.Mesh(
+                            new THREE.BoxGeometry(1, 1, 1),
+                            new THREE.MeshStandardMaterial({
+                                map,
+                                color: '#9B7653',
+                                alphaTest: 0.01,
+                                transparent: true,
+                            })
+                        );
+                        break;
+                    }
+                    case "water": {
+                        const imageElement = document.querySelector("#fog");
+                        const textureLoader = new THREE.TextureLoader();
+                        const map = textureLoader.load(imageElement.src);
+                        this.mesh = new THREE.Mesh(
+                            new THREE.BoxGeometry(1, 1, 1),
+                            new THREE.MeshStandardMaterial({
+                                map,
+                                color: '#5555ff',
+                                alphaTest: 0.01,
+                                transparent: true,
+                            })
+                        );
+                        break;
+                    }
+                }
                 const mesh = this.mesh;
-                const scene = this.sceneEl.object3D;
+                const scene = this.el.sceneEl.object3D;
 
                 this.renderer.onParticleCreated = function (p) {
                     p.target = this.targetPool.get(mesh);
@@ -6534,25 +6552,9 @@
                     p.target = null;
                 };
 
-                this.system.addRenderer(this.renderer);
-            },
-            tick: function (t, dt) {
-                this.system.update(dt / 1000);
-            },
-            addEmitter: function (emitter, zone) {
-                this.system.addEmitter(emitter);
-            },
-            removeEmitter: function (emitter, zone) {
-                emitter.destroy();
-            },
-        });
-        AFRAME.registerComponent("damage-particles", {
-            schema: {},
-            init: function () {
-                const position = this.el.object3D.position.clone();
-                this.zone = createZone(position);
-                this.emitter = createEmitter(this.zone, position);
-                this.system.addEmitter(this.emitter, this.zone);
+                this.particleSystem.addRenderer(this.renderer);
+                this.particleSystem.addEmitter(this.emitter);
+                this.system.addParticleSystem(this.particleSystem);
             },
             tick: function (t, dt) {
                 const position = this.el.object3D.getWorldPosition(new THREE.Vector3());
@@ -6562,7 +6564,8 @@
                 this.zone.z = position.z;
             },
             remove: function () {
-                this.system.removeEmitter(this.emitter, this.zone);
+                this.emitter.destroy();
+                this.emitter = null;
             },
         });
 
@@ -7089,25 +7092,25 @@
             <template id="cannonball-fire-template">
                 <a-entity class="cannonball-fire"
                           sound="src: #fire; poolSize: 1; volume: 1; autoplay: true;"
-                          particle-emitter
+                          damage-particles="particleType: smoke"
                 ></a-entity>
             </template>
             <template id="cannonball-hit-template">
                 <a-entity class="cannonball-hit"
                           sound="src: #hit; poolSize: 1; volume: 1; autoplay: true;"
-                          particle-emitter
+                          damage-particles="particleType: smoke"
                 ></a-entity>
             </template>
             <template id="cannonball-thump-template">
                 <a-entity class="cannonball-thump"
                           sound="src: #thump; poolSize: 1; volume: 1; autoplay: true;"
-                          particle-emitter="dirt: true;"
+                          damage-particles="particleType: dirt"
                 ></a-entity>
             </template>
             <template id="cannonball-splash-template">
                 <a-entity class="cannonball-splash"
                           sound="src: #splash; poolSize: 1; volume: 1; autoplay: true;"
-                          particle-emitter="water: true;"
+                          damage-particles="particleType: water"
                 ></a-entity>
             </template>
             <template id="wilhelm-scream-template">
