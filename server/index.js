@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOMServer from 'react-dom/server';
 
 import {App} from '../src/App';
+import {SSRLoadingScreen} from '../src/SSRLoadingScreen';
 import {StaticRouter} from "react-router-dom/server";
 import {CacheProvider} from "@emotion/react";
 import createEmotionServer from "@emotion/server/create-instance";
@@ -39,13 +40,15 @@ const handleReactPage = (req, res) => {
 
     const html = ReactDOMServer.renderToString(
         <React.StrictMode>
-            <CacheProvider value={cache}>
-                <ThemeProvider theme={theme}>
-                    <StaticRouter location={req.url}>
-                        <App/>
-                    </StaticRouter>
-                </ThemeProvider>
-            </CacheProvider>
+            <SSRLoadingScreen>
+                <CacheProvider value={cache}>
+                    <ThemeProvider theme={theme}>
+                        <StaticRouter location={req.url}>
+                            <App/>
+                        </StaticRouter>
+                    </ThemeProvider>
+                </CacheProvider>
+            </SSRLoadingScreen>
         </React.StrictMode>
     );
     const chunks = extractCriticalToChunks(html);

@@ -119,7 +119,7 @@ export const PlanetGenerator = () => {
 
             const staticMeshPaths = [
                 "/meshes/EpicStore/Fireball/source/Fireball.glb",
-                "/meshes/Model_Redo/Warrior/Warrior.glb",
+                "/meshes/Model_Redo/Warrior/Wizard.glb",
                 "/meshes/Model_Redo/indicators/npc indicator/NpcDestination.glb",
                 "/meshes/Model_Redo/indicators/ship indicator/ShipDestination.glb",
                 "/meshes/Model_Redo/piratesloop/sloop.glb",
