@@ -138,7 +138,7 @@ export const PlanetGenerator = () => {
                 "/meshes/Model_Redo/House/House.glb",
                 "/meshes/Model_Redo/Temple/Temple.glb",
                 "/meshes/Model_Redo/Temple/Temple.glb",
-                "/meshes/Model_Redo/Temple/Temple.glb"
+                "/meshes/Model_Redo/Temple/Temple.glb",
             ];
 
             const gltf = await Promise.all<Uint8Array | string>([
