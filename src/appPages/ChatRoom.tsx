@@ -1,3 +1,5 @@
+'use client';
+
 import React, { ChangeEvent, useState } from "react";
 import {
     Avatar,
@@ -203,3 +205,5 @@ export const ChatRoom = () => {
         </Paper>
     );
 };
+
+export default ChatRoom;

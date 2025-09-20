@@ -1,3 +1,5 @@
+'use client';
+
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import '../App.scss';
 import {WebsiteDrawer2} from "../Drawer";
@@ -155,7 +157,8 @@ export const PlanetGenerator = () => {
                     data[i].navmesh,
                     data[i].ocean,
                     data[i].oceanNavmesh,
-                    data[i].vertex
+                    // @ts-ignore
+                    data[i].vertex,
                 ]);
             }
 
@@ -369,3 +372,5 @@ export const PlanetGenerator = () => {
         </Paper>
     );
 }
+
+export default PlanetGenerator;

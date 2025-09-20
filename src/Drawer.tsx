@@ -1,3 +1,5 @@
+'use client';
+
 import React, {useContext, useEffect, useRef, useState} from "react";
 import {
     AppBar, Button, Container,
@@ -16,15 +18,10 @@ import {
     Domain, Email, Google,
     Menu,
     MenuOpen, Password,
-    People,
-    Person,
     PieChart,
-    PlayArrow,
     Public,
-    QuestionMark,
-    Sailing
 } from "@mui/icons-material";
-import {Link} from "react-router-dom";
+import Link from "next/link";
 import {ThemeContext} from "./contextes/ThemeContext";
 import {
     doCreateUserWithEmailAndPassword,
@@ -132,20 +129,8 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
                     link: "/game-model",
                     icon: <PieChart/>,
                     text: "Game Model"
-                }, {
-                    link: "/ship-wiki",
-                    icon: <Sailing/>,
-                    text: "Ship Wiki"
-                }, {
-                    link: "/character-wiki",
-                    icon: <People/>,
-                    text: "Character Wiki"
-                }, {
-                    link: "/about",
-                    icon: <QuestionMark/>,
-                    text: "About"
                 }].map(({link, icon, text}) => (
-                    <Link key={link} to={link} style={{textDecoration: "none", boxShadow: "none"}}>
+                    <Link key={link} href={link} style={{textDecoration: "none", boxShadow: "none"}}>
                         <ListItem>
                             <ListItemIcon>
                                 {icon}

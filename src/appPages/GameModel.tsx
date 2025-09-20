@@ -1,3 +1,5 @@
+'use client';
+
 import React, {useEffect, useState} from 'react';
 import '../App.scss';
 import {WebsiteDrawer2} from "../Drawer";
@@ -300,3 +302,5 @@ export const GameModel = () => {
         </Paper>
     );
 }
+
+export default GameModel;

@@ -1,8 +1,10 @@
+'use client';
+
 import React from 'react';
 import '../App.scss';
 import {WebsiteDrawer2} from "../Drawer";
 import {Button, Card, CardContent, CardHeader, CardMedia, Container, Grid, Paper, Typography} from "@mui/material";
-import {Link} from "react-router-dom";
+import Link from "next/link";
 import {Carousel} from "nuka-carousel";
 import {ImageExpander} from "./Main/ImageExpander";
 import {FadeIntoView} from "./components/FadeIntoView";
@@ -43,7 +45,7 @@ export const Main = () => {
                                             ships fire cannon balls
                                             and add the ability to control multiple ships and multiple NPCs.
                                             <br/>
-                                            <Link to="/planet-generator"><Button variant="contained">Click here to play the 3d game</Button></Link>
+                                            <Link href="/planet-generator"><Button variant="contained">Click here to play the 3d game</Button></Link>
                                         </Typography>
                                         <br/>
                                         <div style={{width: 256, margin: '0 auto'}}>
@@ -76,7 +78,7 @@ export const Main = () => {
                                             I added an AI chatbot powered by Google Gemini. The AI is advanced enough to write poetry
                                             or code. You can ask it any question such as science, physics, legal advice, ect...
                                             <br/>
-                                            <Link to="/chat"><Button variant="contained">Click here to Chat with AI</Button></Link>
+                                            <Link href="/chat"><Button variant="contained">Click here to Chat with AI</Button></Link>
                                         </Typography>
                                         <br/>
                                         <div style={{width: 256, margin: '0 auto'}}>
@@ -268,3 +270,5 @@ export const Main = () => {
         </Paper>
     );
 }
+
+export default Main;

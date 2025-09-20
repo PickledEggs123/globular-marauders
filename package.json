@@ -12,10 +12,6 @@
     "@pickledeggs123/globular-marauders-game": "^0.2.195",
     "@pickledeggs123/globular-marauders-generator": "^0.1.72",
     "@pickledeggs123/three-pathfinding": "^1.2.11",
-    "@pixi/core": "^7.2.4",
-    "@pixi/layers": "^2.1.0",
-    "@pixi/particle-emitter": "^5.0.8",
-    "@pixi/sound": "^5.2.1",
     "@prisma/client": "^6.5.0",
     "@testing-library/jest-dom": "^5.11.10",
     "@testing-library/react": "^11.2.5",
@@ -28,8 +24,8 @@
     "octree-es": "^1.0.0",
     "pixi.js": "^7.3.1",
     "prisma": "^6.5.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
     "react-markdown": "^10.1.0",
     "sass": "^1.52.3",
     "sockjs-client": "^1.5.1",
@@ -43,13 +39,7 @@
   "scripts": {
     "start": "npx serve@latest ./build",
     "build": "next build",
-    "postbuild": "npm run sitemap",
-    "sitemap": "babel-node builders/sitemap.js",
-    "dev:build-server": "webpack --config not-a-config.server.js --mode=development -w",
-    "dev:start": "nodemon ./server-build/index.js",
-    "dev:debug": "node ./server-build/index.js",
-    "dev": "next dev --turbopack",
-    "build-server": "webpack --config not-a-config.server.js --mode=production"
+    "dev": "next dev --turbopack"
   },
   "eslintConfig": {
     "extends": [
@@ -83,6 +73,7 @@
     "@types/three": "^0.158.2",
     "chai": "^5.2.0",
     "enzyme": "^3.11.0",
+    "eslint": "^9.36.0",
     "mocha": "^11.1.0",
     "nodemon": "^2.0.21",
     "npm-run-all": "^4.1.5",
