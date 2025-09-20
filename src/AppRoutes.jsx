@@ -5,8 +5,6 @@ export const AppRoutes = () => (
     <Routes>
         <Route path="/"/>
         <Route path="/chat"/>
-        <Route path="/2d-game"/>
-        <Route path="/2d"/>
         <Route path="/game-model"/>
         <Route path="/planet-generator"/>
         <Route path="/3d"/>

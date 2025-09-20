@@ -230,26 +230,30 @@ export const GameModel = () => {
                                                     </CardHeader>
                                                     <CardContent>
                                                         <table>
-                                                            <tr>
-                                                                <th>Step</th>
-                                                                <th>South Pole</th>
-                                                                <th>Theta v1</th>
-                                                                <th>TD v1</th>
-                                                                <th>RO</th>
-                                                                <th>RD</th>
-                                                            </tr>
-                                                            {
-                                                                thetaTable.map(({thetaNorth, deltaNorth, southPoleDistance, rotationOffset, rotationDelta}, i) => (
-                                                                    <tr style={{fontWeight: southPoleDistance < 0.2 ? "bold" : southPoleDistance > 0.5 ? "100" : "500"}}>
-                                                                        <td>{i}</td>
-                                                                        <td>{southPoleDistance.toFixed(3)}</td>
-                                                                        <td>{thetaNorth.toFixed(3)}</td>
-                                                                        <td style={{color: Math.abs(deltaNorth) > 360 / (numPoints / 2) ? "red" : undefined}}>{deltaNorth.toFixed(3)}</td>
-                                                                        <td>{rotationOffset.toFixed(3)}</td>
-                                                                        <td style={{color: Math.abs(rotationDelta) > 360 / (numPoints / 2) ? "red" : undefined}}>{rotationDelta.toFixed(3)}</td>
-                                                                    </tr>
-                                                                ))
-                                                            }
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Step</th>
+                                                                    <th>South Pole</th>
+                                                                    <th>Theta v1</th>
+                                                                    <th>TD v1</th>
+                                                                    <th>RO</th>
+                                                                    <th>RD</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {
+                                                                    thetaTable.map(({thetaNorth, deltaNorth, southPoleDistance, rotationOffset, rotationDelta}, i) => (
+                                                                        <tr style={{fontWeight: southPoleDistance < 0.2 ? "bold" : southPoleDistance > 0.5 ? "100" : "500"}}>
+                                                                            <td>{i}</td>
+                                                                            <td>{southPoleDistance.toFixed(3)}</td>
+                                                                            <td>{thetaNorth.toFixed(3)}</td>
+                                                                            <td style={{color: Math.abs(deltaNorth) > 360 / (numPoints / 2) ? "red" : undefined}}>{deltaNorth.toFixed(3)}</td>
+                                                                            <td>{rotationOffset.toFixed(3)}</td>
+                                                                            <td style={{color: Math.abs(rotationDelta) > 360 / (numPoints / 2) ? "red" : undefined}}>{rotationDelta.toFixed(3)}</td>
+                                                                        </tr>
+                                                                    ))
+                                                                }
+                                                            </tbody>
                                                         </table>
                                                         <Typography variant="caption">Bold is near the south pole which is problematic. Red is problematic data which causes positive or negative rotation. Depending on the clockwise or counter-clockwise movement around the pole, you drift left (clockwise) or right (counter-clockwise).</Typography>
                                                     </CardContent>

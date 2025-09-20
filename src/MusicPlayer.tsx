@@ -1,10 +1,12 @@
-import * as Tone from "tone";
+import * as Tone from "tone/build/esm";
 
 /**
  * A class for playing music through a series of notes. The data is a list of musical notes to play in sequence.
  */
 export class MusicPlayer {
+    // @ts-ignore
     synth: Tone.PolySynth | null = null;
+    // @ts-ignore
     synthPart: Tone.Sequence | null = null;
 
     public start() {

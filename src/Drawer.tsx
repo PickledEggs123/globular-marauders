@@ -24,7 +24,6 @@ import {
     QuestionMark,
     Sailing
 } from "@mui/icons-material";
-import PixiGame from "./pages/PixiGame";
 import {Link} from "react-router-dom";
 import {ThemeContext} from "./contextes/ThemeContext";
 import {
@@ -111,7 +110,6 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
                         <Switch
                             onClick={toggleTheme}
                             checked={theme.palette.mode === 'dark'}
-                            onKeyDown={PixiGame.cancelSpacebar.bind(this)}
                         />
                     }
                     label="Toggle Theme"
@@ -130,10 +128,6 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
                     link: "/3d",
                     icon: <Public/>,
                     text: "Play 3D"
-                }, {
-                    link: "/2d",
-                    icon: <PlayArrow/>,
-                    text: "Play 2D"
                 }, {
                     link: "/game-model",
                     icon: <PieChart/>,
@@ -239,7 +233,6 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
                         <Grid item xs={12} lg={6} display="flex">
                             <IconButton
                                 aria-label="Menu"
-                                onKeyDown={PixiGame.cancelSpacebar.bind(this)}
                                 onClick={handleDrawerToggle}
                                 sx={{ mr: 2, display: { md: 'none' } }}
                             >
