@@ -38,7 +38,7 @@
     "ws": "^8.18.0"
   },
   "scripts": {
-    "start": "npx serve@latest ./build",
+    "start": "node ./build/standalone/server.js",
     "build": "next build",
     "dev": "next dev --turbopack",
     "prepare": "next-ws patch"

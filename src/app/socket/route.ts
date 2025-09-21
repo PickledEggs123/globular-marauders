@@ -1,6 +1,4 @@
 import crypto from 'crypto';
-// @ts-ignore
-import {WebSocket} from 'ws';
 import EventEmitter from "node:events";
 import { headers } from 'next/headers';
 
@@ -20,11 +18,13 @@ export function GET() {
 }
 
 export async function UPGRADE(
-    client: WebSocket,
+    client: any,
+    server: any,
 ) {
     await headers();
 
     const socket = client;
+    const io = server;
     socket.id = randomBytes();
     console.log("user connected", socket.id);
 

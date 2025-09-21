@@ -336,7 +336,7 @@ export const PlanetGenerator = () => {
                                     {/* @ts-ignore */}
                                     <iframe title="3d game" className={classes.responsiveIframe} ref={iframeRef} allowFullScreen="yes"
                                             allowvr="yes"
-                                            src="/planet-generator-iframe.html"/>
+                                            src="/iframe-planet-generator.html"/>
                                     <Typography variant="body1">
                                         This page allows you to generate a random planet, using the generator package. This
                                         is a

@@ -1,4 +1,4 @@
-FROM node:22-alpine as builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -18,7 +18,10 @@ WORKDIR /app
 
 RUN rm -rf ./*
 
-COPY --from=builder /app/build ./build
-COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/build/standalone ./
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/build/static ./build/static
 
-ENTRYPOINT ["npm", "start"]
+EXPOSE 3000
+
+ENTRYPOINT ["node", "server.js"]

@@ -6,7 +6,6 @@ const maxOccupantsInRoom = 8;
 export async function GET(req: Request, { params }: { params: Promise<{ slug: string }> }) {// try to find room that is less than 4 users
     try {
         // find room with less than 4 users and less than 5 minutes old
-        await prisma.$connect();
         const availableRoomRecords = await prisma.roomUser.groupBy({
             by: [
                 "roomId",
