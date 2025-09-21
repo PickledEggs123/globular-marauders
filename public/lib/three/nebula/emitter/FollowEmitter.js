@@ -1,7 +1,7 @@
-import Emitter from './Emitter';
-import THREEUtil from '../utils/THREEUtil';
-import Util from '../utils/Util';
-import { EMITTER_TYPE_FOLLOW as type } from './types';
+import Emitter from './Emitter.js';
+import THREEUtil from '../utils/THREEUtil.js';
+import Util from '../utils/Util.js';
+import { EMITTER_TYPE_FOLLOW as type } from './types.js';
 
 export default class FollowEmitter extends Emitter {
   /**

@@ -1,6 +1,6 @@
-import BaseRenderer from './BaseRenderer';
-import { Pool } from '../core';
-import { RENDERER_TYPE_CUSTOM as type } from './types';
+import BaseRenderer from './BaseRenderer.js';
+import {Pool} from '../core/index.js';
+import {RENDERER_TYPE_CUSTOM as type} from './types.js';
 
 export default class CustomRenderer extends BaseRenderer {
   constructor() {

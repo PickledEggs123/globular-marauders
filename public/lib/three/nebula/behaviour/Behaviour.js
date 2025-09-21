@@ -1,9 +1,9 @@
-import { DEFAULT_BEHAVIOUR_EASING, DEFAULT_LIFE } from './constants';
+import { DEFAULT_BEHAVIOUR_EASING, DEFAULT_LIFE } from './constants.js';
 
-import { BEHAVIOUR_TYPE_ABSTRACT } from './types';
-import { MEASURE } from '../constants';
+import { BEHAVIOUR_TYPE_ABSTRACT } from './types.js';
+import { MEASURE } from '../constants/index.js';
 import isNumber from 'lodash/isNumber';
-import { uid } from '../utils';
+import { uid } from '../utils/index.js';
 
 /**
  * The base behaviour class.

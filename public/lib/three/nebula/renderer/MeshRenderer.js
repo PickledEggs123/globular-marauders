@@ -1,7 +1,7 @@
-import BaseRenderer from './BaseRenderer';
-import { PUID } from '../utils';
-import { Pool } from '../core';
-import { RENDERER_TYPE_MESH as type } from './types';
+import BaseRenderer from './BaseRenderer.js';
+import {PUID} from '../utils/index.js';
+import {Pool} from '../core/index.js';
+import {RENDERER_TYPE_MESH as type} from './types.js';
 
 /**
  * @requires THREE - { Mesh, BoxGeometry, MeshLambertMaterial }

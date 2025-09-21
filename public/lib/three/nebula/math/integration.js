@@ -1,5 +1,5 @@
-import { INTEGRATION_TYPE_EULER } from './constants';
-import { DEFAULT_SYSTEM_DELTA } from '../core/constants';
+import {INTEGRATION_TYPE_EULER} from './constants.js';
+import {DEFAULT_SYSTEM_DELTA} from '../core/constants.js';
 
 /**
  * Performs euler integration on the particle.

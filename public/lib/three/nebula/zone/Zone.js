@@ -1,5 +1,5 @@
-import Vector3D from '../math/Vector3D';
-import { ZONE_TYPE_ABSTRACT } from './types';
+import Vector3D from '../math/Vector3D.js';
+import {ZONE_TYPE_ABSTRACT} from './types.js';
 
 /**
  * A Zone determines the area in 3D space where an emitter's particles can position

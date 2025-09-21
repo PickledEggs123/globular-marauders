@@ -1,8 +1,8 @@
-import { PI } from '../constants';
-import Util from '../utils/Util';
-import Vector3D from '../math/Vector3D';
-import Zone from './Zone';
-import { ZONE_TYPE_SPHERE as type } from './types';
+import {PI} from '../constants/index.js';
+import Util from '../utils/Util.js';
+import Vector3D from '../math/Vector3D.js';
+import Zone from './Zone.js';
+import {ZONE_TYPE_SPHERE as type} from './types.js';
 
 /**
  * A spherical zone for particles to be emitted within.

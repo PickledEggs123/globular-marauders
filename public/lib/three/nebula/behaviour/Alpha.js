@@ -1,9 +1,9 @@
-import { MathUtils, createSpan } from '../math';
+import { MathUtils, createSpan } from '../math/index.js';
 
-import Behaviour from './Behaviour';
-import { PARTICLE_ALPHA_THRESHOLD } from './constants';
-import { getEasingByName } from '../ease';
-import { BEHAVIOUR_TYPE_ALPHA as type } from './types';
+import Behaviour from './Behaviour.js';
+import { PARTICLE_ALPHA_THRESHOLD } from './constants.js';
+import { getEasingByName } from '../ease/index.js';
+import { BEHAVIOUR_TYPE_ALPHA as type } from './types.js';
 
 /**
  * Behaviour that applies an alpha transition effect to particles.

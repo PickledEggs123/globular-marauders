@@ -1,7 +1,7 @@
-import MathUtils from '../math/MathUtils';
-import Util from '../utils/Util';
-import Zone from './Zone';
-import { ZONE_TYPE_BOX as type } from './types';
+import MathUtils from '../math/MathUtils.js';
+import Util from '../utils/Util.js';
+import Zone from './Zone.js';
+import {ZONE_TYPE_BOX as type} from './types.js';
 
 export default class BoxZone extends Zone {
   /**

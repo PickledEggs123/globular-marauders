@@ -1,2 +1,2 @@
-export { fragmentShader } from './fragmentShader';
-export { vertexShader } from './vertexShader';
+export { fragmentShader } from './fragmentShader.js';
+export { vertexShader } from './vertexShader.js';

@@ -1,4 +1,4 @@
-import { INITIALIZER_TYPE_ABSTRACT } from './types';
+import {INITIALIZER_TYPE_ABSTRACT} from './types.js';
 
 /**
  * The base Emitter / Particle property class.

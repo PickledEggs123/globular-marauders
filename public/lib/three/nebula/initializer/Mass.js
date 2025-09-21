@@ -1,6 +1,6 @@
-import Initializer from './Initializer';
-import { createSpan } from '../math';
-import { INITIALIZER_TYPE_MASS as type } from './types';
+import Initializer from './Initializer.js';
+import {createSpan} from '../math/index.js';
+import {INITIALIZER_TYPE_MASS as type} from './types.js';
 
 /**
  * Sets the mass property on initialized particles.

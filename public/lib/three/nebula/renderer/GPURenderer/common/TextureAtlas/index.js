@@ -1,10 +1,7 @@
-import {
-  RENDERER_TYPE_GPU_DESKTOP,
-  RENDERER_TYPE_GPU_MOBILE,
-} from '../../../types';
+import {RENDERER_TYPE_GPU_DESKTOP, RENDERER_TYPE_GPU_MOBILE,} from '../../../types.js';
 
-import { DATA_TEXTURE_SIZE } from './constants';
-import { __DEV__ } from '../../../../constants';
+import {DATA_TEXTURE_SIZE} from './constants.js';
+import {__DEV__} from '../../../../constants/index.js';
 import potpack from 'potpack';
 
 /**

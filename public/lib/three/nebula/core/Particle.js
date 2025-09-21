@@ -13,12 +13,12 @@ import {
   DEFAULT_SLEEP,
   DEFAULT_USE_ALPHA,
   DEFAULT_USE_COLOR,
-} from './constants';
-import { Util, uid } from '../utils';
+} from './constants.js';
+import { Util, uid } from '../utils/index.js';
 
-import { PI } from '../constants';
-import { Vector3D } from '../math';
-import { CORE_TYPE_PARTICLE as type } from './types';
+import { PI } from '../constants/index.js';
+import { Vector3D } from '../math/index.js';
+import { CORE_TYPE_PARTICLE as type } from './types.js';
 
 /**
  * A Particle is an object that is emitted by an emitter.

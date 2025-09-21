@@ -1,4 +1,4 @@
-import { Euler } from '../core/three/';
+import {Euler} from '../core/three/index.js';
 
 const particleEuler = new Euler();
 

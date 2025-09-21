@@ -1,9 +1,9 @@
-import * as Zone from '../zone';
+import * as Zone from '../zone/index.js';
 
-import Behaviour from './Behaviour';
-import { DEFAULT_CROSS_TYPE } from './constants';
-import { getEasingByName } from '../ease';
-import { BEHAVIOUR_TYPE_CROSS_ZONE as type } from './types';
+import Behaviour from './Behaviour.js';
+import { DEFAULT_CROSS_TYPE } from './constants.js';
+import { getEasingByName } from '../ease/index.js';
+import { BEHAVIOUR_TYPE_CROSS_ZONE as type } from './types.js';
 
 /**
  * Behaviour that allows for specific functions to be called on particles when

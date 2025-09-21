@@ -1,6 +1,6 @@
-import Initializer from './Initializer';
-import { createArraySpan } from '../math';
-import { INITIALIZER_TYPE_BODY as type } from './types';
+import Initializer from './Initializer.js';
+import { createArraySpan } from '../math/index.js';
+import { INITIALIZER_TYPE_BODY as type } from './types.js';
 /**
  * Sets the body property on initialized particles.
  *

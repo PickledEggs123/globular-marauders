@@ -3,16 +3,16 @@ import EventDispatcher, {
   EMITTER_REMOVED,
   SYSTEM_UPDATE,
   SYSTEM_UPDATE_AFTER,
-} from '../events';
+} from '../events/index.js';
 
-import { DEFAULT_SYSTEM_DELTA } from './constants';
-import Emitter from '../emitter/Emitter';
-import { INTEGRATION_TYPE_EULER } from '../math/constants';
-import { POOL_MAX } from '../constants';
-import Pool from './Pool';
-import fromJSON from './fromJSON';
-import fromJSONAsync from './fromJSONAsync';
-import { CORE_TYPE_SYSTEM as type } from './types';
+import { DEFAULT_SYSTEM_DELTA } from './constants.js';
+import Emitter from '../emitter/Emitter.js';
+import { INTEGRATION_TYPE_EULER } from '../math/constants.js';
+import { POOL_MAX } from '../constants/index.js';
+import Pool from './Pool.js';
+import fromJSON from './fromJSON.js';
+import fromJSONAsync from './fromJSONAsync.js';
+import { CORE_TYPE_SYSTEM as type } from './types.js';
 
 /**
  * The core of the three-system particle engine.

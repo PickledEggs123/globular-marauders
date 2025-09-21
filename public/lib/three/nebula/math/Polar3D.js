@@ -1,5 +1,5 @@
-import Vector3D from './Vector3D';
-import { MATH_TYPE_POLAR_3D as type } from './types';
+import Vector3D from './Vector3D.js';
+import {MATH_TYPE_POLAR_3D as type} from './types.js';
 
 export default class Polar3D {
   constructor(radius, theta, phi) {

@@ -1,9 +1,9 @@
-import { DR, PI } from '../constants';
-import { MathUtils, Vector3D, createSpan } from '../math';
+import { DR, PI } from '../constants/index.js';
+import { MathUtils, Vector3D, createSpan } from '../math/index.js';
 
-import Behaviour from './Behaviour';
-import { getEasingByName } from '../ease';
-import { BEHAVIOUR_TYPE_ROTATE as type } from './types';
+import Behaviour from './Behaviour.js';
+import { getEasingByName } from '../ease/index.js';
+import { BEHAVIOUR_TYPE_ROTATE as type } from './types.js';
 
 /**
  * Behaviour that rotates particles.

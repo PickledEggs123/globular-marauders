@@ -1,4 +1,4 @@
-import { DEFAULT_POSITION, DEFAULT_SIZE as size } from './constants';
+import { DEFAULT_POSITION, DEFAULT_SIZE as size } from './constants.js';
 
 /**
  * @exports Debug - methods and helpers for debugging System emitters, zones and particles.

@@ -1,8 +1,8 @@
-import BaseRenderer from '../BaseRenderer';
-import { DEFAULT_RENDERER_OPTIONS } from './common/constants';
-import DesktopGPURenderer from './Desktop';
-import MobileGPURenderer from './Mobile';
-import { RENDERER_TYPE_GPU } from '../types';
+import BaseRenderer from '../BaseRenderer.js';
+import {DEFAULT_RENDERER_OPTIONS} from './common/constants.js';
+import DesktopGPURenderer from './Desktop/index.js';
+import MobileGPURenderer from './Mobile/index.js';
+import {RENDERER_TYPE_GPU} from '../types.js';
 
 /**
  * Performant particle renderer that uses THREE.Points to propagate particle (postiion, rgba etc.,) properties to

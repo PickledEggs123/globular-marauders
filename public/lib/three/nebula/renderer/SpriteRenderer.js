@@ -1,5 +1,5 @@
-import MeshRenderer from './MeshRenderer';
-import { RENDERER_TYPE_SPRITE as type } from './types';
+import MeshRenderer from './MeshRenderer.js';
+import {RENDERER_TYPE_SPRITE as type} from './types.js';
 
 /**
  * @requires THREE - { Mesh, BoxGeometry, MeshLambertMaterial, Sprite, SpriteMaterial }

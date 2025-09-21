@@ -1,5 +1,5 @@
-import PUID from '../utils/PUID';
-import { CORE_TYPE_POOL as type } from './types';
+import PUID from '../utils/PUID.js';
+import { CORE_TYPE_POOL as type } from './types.js';
 /**
  * An object pool implementation. Used for pooling objects to avoid unnecessary
  * garbage collection.

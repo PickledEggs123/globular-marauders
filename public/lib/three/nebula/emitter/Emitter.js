@@ -4,20 +4,20 @@ import {
   DEFAULT_DAMPING,
   DEFAULT_EMITTER_INDEX,
   DEFAULT_EMITTER_RATE,
-} from './constants';
+} from './constants.js';
 import EventDispatcher, {
   EMITTER_DEAD,
   PARTICLE_CREATED,
   PARTICLE_DEAD,
   PARTICLE_UPDATE,
-} from '../events';
-import { INTEGRATION_TYPE_EULER, integrate } from '../math';
-import { Util, uid } from '../utils';
+} from '../events/index.js';
+import { INTEGRATION_TYPE_EULER, integrate } from '../math/index.js';
+import { Util, uid } from '../utils/index.js';
 
-import { InitializerUtil } from '../initializer';
-import Particle from '../core/Particle';
+import { InitializerUtil } from '../initializer/index.js';
+import Particle from '../core/Particle.js';
 import isNumber from 'lodash/isNumber';
-import { EMITTER_TYPE_EMITTER as type } from './types';
+import { EMITTER_TYPE_EMITTER as type } from './types.js';
 
 /**
  * Emitters are the System engine's particle factories. They cause particles to

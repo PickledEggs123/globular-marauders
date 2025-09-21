@@ -1,7 +1,7 @@
-import Attraction from './Attraction';
-import { Vector3D } from '../math';
-import { getEasingByName } from '../ease';
-import { BEHAVIOUR_TYPE_REPULSION as type } from './types';
+import Attraction from './Attraction.js';
+import { Vector3D } from '../math/index.js';
+import { getEasingByName } from '../ease/index.js';
+import { BEHAVIOUR_TYPE_REPULSION as type } from './types.js';
 /**
  * Behaviour that causes particles to be repelled from a target position.
  *

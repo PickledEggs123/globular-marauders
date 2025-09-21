@@ -1,4 +1,4 @@
-import { DEFAULT_MAX_PARTICLES } from './ParticleBuffer/constants';
+import {DEFAULT_MAX_PARTICLES} from './ParticleBuffer/constants.js';
 
 export const DEFAULT_RENDERER_OPTIONS = {
   blending: 'AdditiveBlending',

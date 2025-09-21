@@ -1,7 +1,7 @@
-import Behaviour from './Behaviour';
-import { Vector3D } from '../math';
-import { getEasingByName } from '../ease';
-import { BEHAVIOUR_TYPE_SPRING as type } from './types';
+import Behaviour from './Behaviour.js';
+import { Vector3D } from '../math/index.js';
+import { getEasingByName } from '../ease/index.js';
+import { BEHAVIOUR_TYPE_SPRING as type } from './types.js';
 
 /**
  * Behaviour that causes particles to spring.

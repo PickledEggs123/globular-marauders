@@ -1,6 +1,6 @@
-import Behaviour from './Behaviour';
-import { Vector3D } from '../math';
-import { BEHAVIOUR_TYPE_COLLISION as type } from './types';
+import Behaviour from './Behaviour.js';
+import { Vector3D } from '../math/index.js';
+import { BEHAVIOUR_TYPE_COLLISION as type } from './types.js';
 
 /**
  * Behaviour that causes particles to move away from other particles they collide with.

@@ -1,4 +1,4 @@
-import { PI } from '../constants';
+import { PI } from '../constants/index.js';
 
 /**
  * The Ease class provides a collection of easing functions for use with System

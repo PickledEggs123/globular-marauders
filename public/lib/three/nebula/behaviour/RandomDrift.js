@@ -1,9 +1,9 @@
-import { MathUtils, Vector3D, createSpan } from '../math';
+import { MathUtils, Vector3D, createSpan } from '../math/index.js';
 
-import Behaviour from './Behaviour';
-import { DEFAULT_RANDOM_DRIFT_DELAY } from './constants';
-import { getEasingByName } from '../ease';
-import { BEHAVIOUR_TYPE_RANDOM_DRIFT as type } from './types';
+import Behaviour from './Behaviour.js';
+import { DEFAULT_RANDOM_DRIFT_DELAY } from './constants.js';
+import { getEasingByName } from '../ease/index.js';
+import { BEHAVIOUR_TYPE_RANDOM_DRIFT as type } from './types.js';
 
 /**
  * Behaviour that causes particles to drift to random coordinates in 3D space.

@@ -1,4 +1,4 @@
-import { PI } from '../constants';
+import {PI} from '../constants/index.js';
 
 export default {
   randomAToB: function(a, b, INT) {

@@ -1,8 +1,8 @@
-import * as Zone from '../zone';
+import * as Zone from '../zone/index.js';
 
-import Initializer from './Initializer';
-import { SUPPORTED_JSON_ZONE_TYPES } from '../core/constants';
-import { INITIALIZER_TYPE_POSITION as type } from './types';
+import Initializer from './Initializer.js';
+import {SUPPORTED_JSON_ZONE_TYPES} from '../core/constants.js';
+import {INITIALIZER_TYPE_POSITION as type} from './types.js';
 
 /**
  * Sets the starting position property for initialized particles.

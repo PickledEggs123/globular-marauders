@@ -1,8 +1,8 @@
-import { MathUtils, createSpan } from '../math';
+import { MathUtils, createSpan } from '../math/index.js';
 
-import Behaviour from './Behaviour';
-import { getEasingByName } from '../ease';
-import { BEHAVIOUR_TYPE_SCALE as type } from './types';
+import Behaviour from './Behaviour.js';
+import { getEasingByName } from '../ease/index.js';
+import { BEHAVIOUR_TYPE_SCALE as type } from './types.js';
 
 /**
  * Behaviour that scales particles.

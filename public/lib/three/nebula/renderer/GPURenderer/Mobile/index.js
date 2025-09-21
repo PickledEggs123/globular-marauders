@@ -1,10 +1,10 @@
-import { ParticleBuffer, Target, TextureAtlas, UniqueList } from '../common';
-import { fragmentShader, vertexShader } from './shaders';
+import {ParticleBuffer, Target, TextureAtlas, UniqueList} from '../common/index.js';
+import {fragmentShader, vertexShader} from './shaders/index.js';
 
-import BaseRenderer from '../../BaseRenderer';
-import { DEFAULT_RENDERER_OPTIONS } from '../common/constants';
-import { Pool } from '../../../core';
-import { RENDERER_TYPE_GPU_MOBILE } from '../../types';
+import BaseRenderer from '../../BaseRenderer.js';
+import {DEFAULT_RENDERER_OPTIONS} from '../common/constants.js';
+import {Pool} from '../../../core/index.js';
+import {RENDERER_TYPE_GPU_MOBILE} from '../../types.js';
 
 let THREE;
 

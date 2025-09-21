@@ -1,12 +1,7 @@
-import {
-  PARTICLE_CREATED,
-  PARTICLE_DEAD,
-  PARTICLE_UPDATE,
-  SYSTEM_UPDATE,
-} from '../events/constants';
+import {PARTICLE_CREATED, PARTICLE_DEAD, PARTICLE_UPDATE, SYSTEM_UPDATE,} from '../events/constants.js';
 
-import { RENDERER_TYPE_BASE } from './types';
-import { __DEV__ } from '../constants';
+import {RENDERER_TYPE_BASE} from './types.js';
+import {__DEV__} from '../constants/index.js';
 
 export default class BaseRenderer {
   constructor(type = RENDERER_TYPE_BASE) {

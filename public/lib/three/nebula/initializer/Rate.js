@@ -1,8 +1,8 @@
-import { DEFAULT_RATE_NUM_PAN, DEFAULT_RATE_TIME_PAN } from './constants';
-import { Span, createSpan } from '../math';
+import {DEFAULT_RATE_NUM_PAN, DEFAULT_RATE_TIME_PAN} from './constants.js';
+import {createSpan, Span} from '../math/index.js';
 
-import Initializer from './Initializer';
-import { INITIALIZER_TYPE_RATE as type } from './types';
+import Initializer from './Initializer.js';
+import {INITIALIZER_TYPE_RATE as type} from './types.js';
 
 /**
  * Calculates the rate of particle emission.

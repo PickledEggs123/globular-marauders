@@ -1,6 +1,7 @@
-import Initializer from './Initializer';
-import { createSpan } from '../math';
-import { INITIALIZER_TYPE_RADIUS as type } from './types';
+import Initializer from './Initializer.js';
+import {createSpan} from '../math/index.js';
+import {INITIALIZER_TYPE_RADIUS as type} from './types.js';
+
 /**
  * Sets the radius property on initialized particles.
  *

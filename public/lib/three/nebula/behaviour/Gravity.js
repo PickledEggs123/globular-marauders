@@ -1,6 +1,6 @@
-import Force from './Force';
-import { getEasingByName } from '../ease';
-import { BEHAVIOUR_TYPE_GRAVITY as type } from './types';
+import Force from './Force.js';
+import { getEasingByName } from '../ease/index.js';
+import { BEHAVIOUR_TYPE_GRAVITY as type } from './types.js';
 
 /**
  * Behaviour that forces particles down the y axis.

@@ -1,2 +1,2 @@
-export { default as FollowEmitter } from './FollowEmitter';
-export { default as Emitter } from './Emitter';
+export { default as FollowEmitter } from './FollowEmitter.js';
+export { default as Emitter } from './Emitter.js';

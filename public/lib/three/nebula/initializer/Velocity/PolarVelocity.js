@@ -1,7 +1,7 @@
-import { DR } from '../../constants';
-import { Polar3D } from '../../math';
-import Velocity from './Velocity';
-import { INITIALIZER_TYPE_POLAR_VELOCITY as type } from '../types';
+import { DR } from '../../constants/index.js';
+import { Polar3D } from '../../math/index.js';
+import Velocity from './Velocity.js';
+import { INITIALIZER_TYPE_POLAR_VELOCITY as type } from '../types.js';
 
 /**
  * Sets the velocity property on initialized particles.

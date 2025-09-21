@@ -1,14 +1,14 @@
-import * as Behaviour from '../behaviour';
-import * as Initializer from '../initializer';
+import * as Behaviour from '../behaviour/index.js';
+import * as Initializer from '../initializer/index.js';
 
-import { EULER, POOL_MAX } from '../constants';
+import { EULER, POOL_MAX } from '../constants/index.js';
 import {
   INITIALIZER_TYPES_THAT_REQUIRE_THREE,
   SUPPORTED_JSON_BEHAVIOUR_TYPES,
   SUPPORTED_JSON_INITIALIZER_TYPES,
-} from './constants';
+} from './constants.js';
 
-import Rate from '../initializer/Rate';
+import Rate from '../initializer/Rate.js';
 
 /**
  * Makes a rate instance.

@@ -1,7 +1,7 @@
-import MathUtils from './MathUtils';
-import Span from './Span';
+import MathUtils from './MathUtils.js';
+import Span from './Span.js';
 import sample from 'lodash/sample';
-import { MATH_TYPE_COLOR_SPAN as type } from './types';
+import {MATH_TYPE_COLOR_SPAN as type} from './types.js';
 
 /**
  * Class for storing and interacting with an array of colours.

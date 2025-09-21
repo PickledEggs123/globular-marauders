@@ -1,9 +1,9 @@
-import { MathUtils, createColorSpan } from '../math';
+import { MathUtils, createColorSpan } from '../math/index.js';
 
-import Behaviour from './Behaviour';
-import { ColorUtil } from '../utils';
-import { getEasingByName } from '../ease';
-import { BEHAVIOUR_TYPE_COLOR as type } from './types';
+import Behaviour from './Behaviour.js';
+import { ColorUtil } from '../utils/index.js';
+import { getEasingByName } from '../ease/index.js';
+import { BEHAVIOUR_TYPE_COLOR as type } from './types.js';
 
 /**
  * A behaviour which mutates the color of a particle over time.

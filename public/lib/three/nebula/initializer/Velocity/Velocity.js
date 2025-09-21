@@ -1,7 +1,7 @@
-import { MEASURE, PI } from '../../constants';
-import { MathUtils, Vector3D } from '../../math';
+import { MEASURE, PI } from '../../constants/index.js';
+import { MathUtils, Vector3D } from '../../math/index.js';
 
-import Initializer from '../Initializer';
+import Initializer from '../Initializer.js';
 
 /**
  * Abstract class for Velocity initializers.

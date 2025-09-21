@@ -1,5 +1,5 @@
-import Zone from './Zone';
-import { ZONE_TYPE_MESH as type } from './types';
+import Zone from './Zone.js';
+import {ZONE_TYPE_MESH as type} from './types.js';
 
 /**
  * Uses a three THREE.Geometry to determine the zone parameters.

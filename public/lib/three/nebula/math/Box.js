@@ -1,4 +1,4 @@
-import { MATH_TYPE_BOX as type } from './types';
+import {MATH_TYPE_BOX as type} from './types.js';
 
 export default class Box {
   constructor(x, y, z, w, h, d) {

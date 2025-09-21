@@ -1,8 +1,8 @@
-import { Vector3D, createSpan } from '../../math';
+import { Vector3D, createSpan } from '../../math/index.js';
 
-import { DR } from '../../constants';
-import Velocity from './Velocity';
-import { INITIALIZER_TYPE_VECTOR_VELOCITY as type } from '../types';
+import { DR } from '../../constants/index.js';
+import Velocity from './Velocity.js';
+import { INITIALIZER_TYPE_VECTOR_VELOCITY as type } from '../types.js';
 
 /**
  * Sets the velocity property on initialized particles.

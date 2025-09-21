@@ -1,7 +1,7 @@
-import THREEUtil from '../utils/THREEUtil';
-import Vector3D from '../math/Vector3D';
-import Zone from './Zone';
-import { ZONE_TYPE_SCREEN as type } from './types';
+import THREEUtil from '../utils/THREEUtil.js';
+import Vector3D from '../math/Vector3D.js';
+import Zone from './Zone.js';
+import {ZONE_TYPE_SCREEN as type} from './types.js';
 
 export default class ScreenZone extends Zone {
   /**

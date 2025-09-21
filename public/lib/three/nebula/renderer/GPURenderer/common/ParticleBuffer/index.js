@@ -1,8 +1,4 @@
-import {
-  ATTRIBUTE_TO_SIZE_MAP,
-  DEFAULT_MAX_PARTICLES,
-  PARTICLE_BYTE_SIZE,
-} from './constants';
+import {ATTRIBUTE_TO_SIZE_MAP, DEFAULT_MAX_PARTICLES, PARTICLE_BYTE_SIZE,} from './constants.js';
 
 let THREE;
 

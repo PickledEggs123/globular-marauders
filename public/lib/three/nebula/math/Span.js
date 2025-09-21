@@ -1,6 +1,6 @@
-import MathUtils from './MathUtils';
-import Util from '../utils/Util';
-import { MATH_TYPE_SPAN as type } from './types';
+import MathUtils from './MathUtils.js';
+import Util from '../utils/Util.js';
+import {MATH_TYPE_SPAN as type} from './types.js';
 
 export default class Span {
   /**

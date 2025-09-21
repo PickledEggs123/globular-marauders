@@ -1,12 +1,12 @@
 import {
-  DEFAULT_JSON_MATERIAL_PROPERTIES,
-  DEFAULT_MATERIAL_PROPERTIES,
-  SUPPORTED_MATERIAL_BLENDING_MODES,
-} from './constants';
+    DEFAULT_JSON_MATERIAL_PROPERTIES,
+    DEFAULT_MATERIAL_PROPERTIES,
+    SUPPORTED_MATERIAL_BLENDING_MODES,
+} from './constants.js';
 
-import Initializer from './Initializer';
-import { INITIALIZER_TYPE_TEXTURE as type } from './types';
-import { withDefaults } from '../utils';
+import Initializer from './Initializer.js';
+import {INITIALIZER_TYPE_TEXTURE as type} from './types.js';
+import {withDefaults} from '../utils/index.js';
 
 /**
  * Sets the body property to be a THREE.Sprite with a texture map on initialized particles.

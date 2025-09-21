@@ -6389,9 +6389,7 @@
             Color,
             CrossZone,
             CustomRenderer,
-            Debug,
             Emitter,
-            Gravity,
             Life,
             Mass,
             RadialVelocity,
@@ -6402,7 +6400,7 @@
             Span,
             Vector3D,
             ease
-        } from 'three-nebula';
+        } from './lib/three/nebula/index.js';
 
         const createZone = (position) => {
             const zone = new BoxZone(position.x, position.y, position.z, 5, 5, 5);

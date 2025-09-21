@@ -1,6 +1,6 @@
-import Util from '../utils/Util';
-import Zone from './Zone';
-import { ZONE_TYPE_POINT as type } from './types';
+import Util from '../utils/Util.js';
+import Zone from './Zone.js';
+import {ZONE_TYPE_POINT as type} from './types.js';
 
 export default class PointZone extends Zone {
   /**

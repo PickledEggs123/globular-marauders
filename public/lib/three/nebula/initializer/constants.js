@@ -1,11 +1,11 @@
 import {
-  AdditiveBlending,
-  CustomBlending,
-  MultiplyBlending,
-  NoBlending,
-  NormalBlending,
-  SubtractiveBlending,
-} from '../core/three/';
+    AdditiveBlending,
+    CustomBlending,
+    MultiplyBlending,
+    NoBlending,
+    NormalBlending,
+    SubtractiveBlending,
+} from '../core/three/index.js';
 
 export const SUPPORTED_MATERIAL_BLENDING_MODES = {
   AdditiveBlending,

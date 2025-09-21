@@ -1,4 +1,4 @@
-import { SIZE_ATTENUATION_FACTOR } from '../../common/shaders/constants';
+import {SIZE_ATTENUATION_FACTOR} from '../../common/shaders/constants.js';
 
 export const vertexShader = () => {
   return `

@@ -1,6 +1,6 @@
-import Span from './Span';
+import Span from './Span.js';
 import sample from 'lodash/sample';
-import { MATH_TYPE_ARRAY_SPAN as type } from './types';
+import {MATH_TYPE_ARRAY_SPAN as type} from './types.js';
 
 /**
  * Class for storing items of mixed type and fetching a randomised

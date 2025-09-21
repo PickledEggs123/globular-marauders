@@ -4,12 +4,12 @@ import {
   DEFAULT_BEHAVIOUR_EASING,
   DEFAULT_LIFE,
   PARTICLE_LENGTH_SQ_THRESHOLD,
-} from './constants';
+} from './constants.js';
 
-import Behaviour from './Behaviour';
-import { Vector3D } from '../math';
-import { getEasingByName } from '../ease';
-import { BEHAVIOUR_TYPE_ATTRACTION as type } from './types';
+import Behaviour from './Behaviour.js';
+import { Vector3D } from '../math/index.js';
+import { getEasingByName } from '../ease/index.js';
+import { BEHAVIOUR_TYPE_ATTRACTION as type } from './types.js';
 
 /**
  * Behaviour that causes particles to be attracted to a target position.

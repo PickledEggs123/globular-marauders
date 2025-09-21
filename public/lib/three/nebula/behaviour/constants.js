@@ -1,4 +1,4 @@
-import { easeLinear } from '../ease';
+import { easeLinear } from '../ease/index.js';
 
 export const DEFAULT_LIFE = Infinity;
 export const DEFAULT_ATTRACITON_RADIUS = 1000;

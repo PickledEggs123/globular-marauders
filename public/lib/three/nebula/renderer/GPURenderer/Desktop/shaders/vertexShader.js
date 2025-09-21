@@ -1,5 +1,5 @@
-import { DATA_TEXTURE_SIZE } from '../../common/TextureAtlas/constants';
-import { SIZE_ATTENUATION_FACTOR } from '../../common/shaders/constants';
+import {DATA_TEXTURE_SIZE} from '../../common/TextureAtlas/constants.js';
+import {SIZE_ATTENUATION_FACTOR} from '../../common/shaders/constants.js';
 
 export const vertexShader = () => {
   return `

@@ -1,6 +1,6 @@
-import Vector3D from '../math/Vector3D';
-import Zone from './Zone';
-import { ZONE_TYPE_LINE as type } from './types';
+import Vector3D from '../math/Vector3D.js';
+import Zone from './Zone.js';
+import {ZONE_TYPE_LINE as type} from './types.js';
 
 export default class LineZone extends Zone {
   /**
