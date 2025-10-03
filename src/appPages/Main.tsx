@@ -23,17 +23,16 @@ export const Main = () => {
                                     </CardHeader>
                                     <CardContent>
                                         <Typography variant="body1">
-                                            With more skills, I added a planet with height and terrain. I also added navigation
+                                            I added a planet with height and terrain. I also added navigation
                                             meshes to pathfind
-                                            around the land and ocean parts of the planet. Instead of being in space, now it's
-                                            on a single planet.
-                                            This is a fully decked out ThreeJS experience with multiplayer via EasyRTC and
+                                            around the land and ocean parts of the planet.
+                                            This is a fully decked out ThreeJS experience with multiplayer via WebSockets and
                                             Networked-Aframe. There
                                             are bugs in Networked-Aframe such as when an NPC is killed or despawns between
                                             connecting to the network
                                             and creating the networked NPC, it will try to delete something that doesn't exist.
                                             It's not a perfect
-                                            multiplayer netcode library.
+                                            multiplayer netcode library. It mostly works.
                                         </Typography>
                                         <br/>
                                         <Typography variant="body1">
@@ -49,7 +48,7 @@ export const Main = () => {
                                         </Typography>
                                         <br/>
                                         <div style={{width: 256, margin: '0 auto'}}>
-                                            <Carousel autoplay showDots>
+                                            <Carousel autoplay showDots wrapMode="wrap">
                                                 {
                                                     [{
                                                         url: '/mainImages/3dGame1.png',
@@ -82,7 +81,7 @@ export const Main = () => {
                                         </Typography>
                                         <br/>
                                         <div style={{width: 256, margin: '0 auto'}}>
-                                            <Carousel autoplay showDots>
+                                            <Carousel autoplay showDots wrapMode="wrap">
                                                 {
                                                     [{
                                                         url: '/mainImages/Chat1.png',
@@ -229,7 +228,9 @@ export const Main = () => {
                                     </CardHeader>
                                     <CardContent>
                                         <Typography variant="body1">
-                                            I hope this is a great resume project containing a mixture of 3d graphics, react front end, and basic material styling.
+                                            I hope this is a great resume project containing a mixture of 3d graphics,
+                                            react front end, and basic material styling with a NodeJS backend. It's hosted
+                                            on Google Cloud Run and Google Cloud SQL.
                                         </Typography>
                                     </CardContent>
                                 </Card>
