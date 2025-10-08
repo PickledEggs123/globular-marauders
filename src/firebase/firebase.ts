@@ -27,3 +27,4 @@ const vertexAI = getVertexAI(app);
 const model = getGenerativeModel(vertexAI, { model: "gemini-2.0-flash" });
 
 export { app, analytics, auth, model };
+
