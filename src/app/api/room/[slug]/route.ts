@@ -1,7 +1,11 @@
 import {PrismaClient} from '@prisma/client';
+import {ServerIdSingleton} from "../../../../utils/serverId";
+
 const prisma = new PrismaClient();
 
 const maxOccupantsInRoom = 8;
+
+const timeBeforeNextRoom = 60_000;
 
 export async function GET(req: Request, { params }: { params: Promise<{ slug: string }> }) {// try to find room that is less than 4 users
     try {
@@ -16,7 +20,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
             where: {
                 room: {
                     creationDate: {
-                        gt: new Date(+new Date() - 300_000).toISOString(),
+                        gt: new Date(+new Date() - timeBeforeNextRoom).toISOString(),
                     },
                 },
             },
@@ -48,6 +52,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
                 throw new Error("No planet found!");
             }
 
+            console.log("Creating room on server", ServerIdSingleton.v4);
             availableRoom = await prisma.room.create({
                 data: {
                     creationDate: new Date().toISOString(),
@@ -60,6 +65,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
                             },
                         ],
                     },
+                    serverId: ServerIdSingleton.v4,
                 },
                 include: {
                     roomUser: true,

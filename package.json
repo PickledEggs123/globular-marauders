@@ -28,6 +28,7 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-markdown": "^10.1.0",
+    "redis": "^5.9.0",
     "sass": "^1.52.3",
     "sockjs-client": "^1.5.1",
     "tone": "^14.7.77",

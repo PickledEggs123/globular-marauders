@@ -19,6 +19,7 @@ model room {
   id           Int        @id @default(autoincrement())
   creationDate DateTime   @db.DateTime(0)
   planetId     Int
+  serverId     String?    @db.VarChar(256)
   planet       planet     @relation(fields: [planetId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "mapId")
   roomUser     roomUser[]
 
