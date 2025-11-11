@@ -79,10 +79,16 @@ export async function UPGRADE(
     let pub: any, sub: any;
     try {
         pub = createClient({
-            url: process.env.REDIS_HOST
+            socket: {
+                host: process.env.REDIS_HOST,
+                port: 6379
+            },
         });
         sub = createClient({
-            url: process.env.REDIS_HOST
+            socket: {
+                host: process.env.REDIS_HOST,
+                port: 6379
+            },
         });
         await pub.connect();
         await sub.connect();
