@@ -76,14 +76,20 @@ export async function UPGRADE(
 
 
     // connect to Redis
-    const pub = createClient({
-        url: process.env.REDIS_HOST
-    });
-    const sub = createClient({
-        url: process.env.REDIS_HOST
-    });
-    await pub.connect();
-    await sub.connect();
+    let pub: any, sub: any;
+    try {
+        pub = createClient({
+            url: process.env.REDIS_HOST
+        });
+        sub = createClient({
+            url: process.env.REDIS_HOST
+        });
+        await pub.connect();
+        await sub.connect();
+    } catch (e) {
+        console.log(e);
+        throw e;
+    }
 
     // rename variables from new code to old code
     const socket = client;
