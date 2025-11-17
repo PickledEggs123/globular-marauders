@@ -325,12 +325,7 @@ export async function UPGRADE(
         // detect right server or need redis
         for (let i = 0; i < 60; i++) {
             if (!roomReady) {
-                if (type === "u" || type === "um" || type === "r") {
-                    return;
-                }
-                await new Promise((resolve) => {
-                    setTimeout(resolve, 1000);
-                });
+                return;
             } else {
                 break;
             }
