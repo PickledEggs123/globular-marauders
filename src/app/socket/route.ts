@@ -285,6 +285,7 @@ export async function UPGRADE(
 
 
 
+
     // send to client on server or redis
     eventEmitterOut.on(MessageType.SEND, async ({ data, from, to, type, msgType, forwardToRedis, drillToSocket }) => {
         // @ts-ignore
@@ -323,11 +324,9 @@ export async function UPGRADE(
         const mainShardOccupants = Array.from(Object.keys(rooms.get(curRoom)?.occupants ?? {}));
 
         // detect right server or need redis
-        for (let i = 0; i < 60; i++) {
-            if (!roomReady) {
+        if (!roomReady) {
+            if (["u", "um", "r"].includes(type)) {
                 return;
-            } else {
-                break;
             }
         }
         if (roomFromSQL.serverId !== ServerIdSingleton.v4 && forwardToRedis) {
