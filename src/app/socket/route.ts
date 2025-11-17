@@ -151,11 +151,19 @@ export async function UPGRADE(
         curRoom = room;
 
         // detect right server or need redis
-        roomFromSQL = await prisma.room.findFirst({
-            where: {
-                id: parseInt(room),
-            },
-        });
+        for (let i = 0; i < 10; i++) {
+            roomFromSQL = await prisma.room.findFirst({
+                where: {
+                    id: parseInt(room),
+                },
+            });
+            if (roomFromSQL) {
+                break;
+            }
+            await new Promise((resolve) => {
+                setTimeout(resolve, 1000);
+            });
+        }
         if (!roomFromSQL) {
             throw new Error("No such room with id " + room);
         }
