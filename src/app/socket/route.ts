@@ -328,11 +328,12 @@ export async function UPGRADE(
                 if (type === "u" || type === "um" || type === "r") {
                     return;
                 }
-                continue;
+                await new Promise((resolve) => {
+                    setTimeout(resolve, 1000);
+                });
+            } else {
+                break;
             }
-            await new Promise((resolve) => {
-                setTimeout(resolve, 1000);
-            });
         }
         if (roomFromSQL.serverId !== ServerIdSingleton.v4 && forwardToRedis) {
             await pub.publish(`svr:${roomFromSQL.serverId}`, JSON.stringify({
@@ -418,8 +419,8 @@ export async function UPGRADE(
 
         // detect right server or need redis
         for (let i = 0; i < 60; i++) {
-            if (!roomReady) {
-                continue;
+            if (roomReady) {
+                break;
             }
             await new Promise((resolve) => {
                 setTimeout(resolve, 1000);
