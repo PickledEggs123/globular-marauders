@@ -47,8 +47,6 @@ const maxOccupantsInRoom = 8;
 
 const rooms = new Map();
 
-const prisma = new PrismaClient();
-
 function randomBytes() {
     return crypto.randomBytes(16).toString("base64url");
 }
@@ -72,6 +70,9 @@ export async function UPGRADE(
 ) {
     await headers();
 
+
+
+    const prisma = new PrismaClient();
 
 
 
@@ -322,11 +323,16 @@ export async function UPGRADE(
         const mainShardOccupants = Array.from(Object.keys(rooms.get(curRoom)?.occupants ?? {}));
 
         // detect right server or need redis
-        if (!roomFromSQL || !roomReady) {
-            if (type === "u" || type === "um" || type === "r") {
-                return;
+        for (let i = 0; i < 60; i++) {
+            if (!roomReady) {
+                if (type === "u" || type === "um" || type === "r") {
+                    return;
+                }
+                continue;
             }
-            throw new Error("No such room with id " + curRoom);
+            await new Promise((resolve) => {
+                setTimeout(resolve, 1000);
+            });
         }
         if (roomFromSQL.serverId !== ServerIdSingleton.v4 && forwardToRedis) {
             await pub.publish(`svr:${roomFromSQL.serverId}`, JSON.stringify({
@@ -411,8 +417,13 @@ export async function UPGRADE(
         }
 
         // detect right server or need redis
-        if (!roomFromSQL) {
-            throw new Error("No such room with id " + curRoom);
+        for (let i = 0; i < 60; i++) {
+            if (!roomReady) {
+                continue;
+            }
+            await new Promise((resolve) => {
+                setTimeout(resolve, 1000);
+            });
         }
         if (roomFromSQL.serverId !== ServerIdSingleton.v4) {
             // wrong server, publish to network
