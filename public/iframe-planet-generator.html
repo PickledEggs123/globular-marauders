@@ -1489,7 +1489,11 @@
                         const shipEls = Array.from(document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`));
                         shipEls.slice(1).forEach(shipEl => {
                             const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), destination1.clone().negate());
-                            const intersections = raycaster.intersectObject(this.el.sceneEl.systems['globe-ocean-nav'].getNavMesh());
+                            const m = findParentScene(shipEl)?.systems['globe-ocean-nav'].getNavMesh();
+                            if (!m) {
+                                return;
+                            }
+                            const intersections = raycaster.intersectObject(m);
                             if (intersections[0]) {
                                 const destination2 = intersections[0].point.clone();
                                 shipEl.setAttribute("globe-ocean-nav-agent", `active: false; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2;`);
@@ -1501,7 +1505,11 @@
                         const shipEls = Array.from(document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`));
                         shipEls.slice(1).forEach(shipEl => {
                             const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), destination1.clone().negate());
-                            const intersections = raycaster.intersectObject(this.el.sceneEl.systems['globe-ocean-nav'].getNavMesh());
+                            const m = findParentScene(shipEl)?.systems['globe-ocean-nav'].getNavMesh();
+                            if (!m) {
+                                return;
+                            }
+                            const intersections = raycaster.intersectObject(m);
                             if (intersections[0]) {
                                 const destination2 = intersections[0].point.clone();
                                 shipEl.setAttribute("globe-ocean-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2;`);
@@ -2105,10 +2113,6 @@
                     object3D.position.copy(position);
                     this.group = this.group || this.system.getGroup(position);
                     this.path = this.system.getPath(position, vDest.copy(data.destination), this.group) || [];
-                    if (!this.path.length) {
-                        this.group = this.system.getGroup(position);
-                        this.path = this.system.getPath(position, vDest.copy(data.destination), this.group) || [];
-                    }
                     el.emit('navigation-start');
                 }
 
@@ -2257,10 +2261,6 @@
                     const position = this.el.object3D.position;
                     this.group = this.group || this.system.getGroup(position);
                     this.path = this.system.getPath(position, vDest.copy(data.destination), this.group) || [];
-                    if (!this.path.length) {
-                        this.group = this.system.getGroup(position);
-                        this.path = this.system.getPath(position, vDest.copy(data.destination), this.group) || [];
-                    }
                     el.emit('navigation-start');
                 }
 
@@ -2507,10 +2507,6 @@
                     const position = this.el.object3D.position;
                     this.group = this.group || this.system.getGroup(position);
                     this.path = this.system.getPath(position, vDest.copy(data.destination), this.group) || [];
-                    if (!this.path.length) {
-                        this.group = this.system.getGroup(position);
-                        this.path = this.system.getPath(position, vDest.copy(data.destination), this.group) || [];
-                    }
                     el.emit('navigation-start');
                 }
 
@@ -2842,7 +2838,11 @@
                                 const npcEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
                                 npcEls.forEach(npcEl => {
                                     const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), destination1.clone().negate());
-                                    const intersections = raycaster.intersectObject(this.el.sceneEl.systems['globe-nav'].getNavMesh());
+                                    const m = findParentScene(npcEl)?.systems['globe-nav'].getNavMesh();
+                                    if (!m) {
+                                        return;
+                                    }
+                                    const intersections = raycaster.intersectObject(m);
                                     if (intersections[0]) {
                                         const destination2 = intersections[0].point.clone();
                                         npcEl.setAttribute("globe-nav-agent", `active: false; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2; razeTarget: #${this.el.id};`);
@@ -2855,7 +2855,11 @@
                                 cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].getUnit()}`);
                                 npcEls.forEach(npcEl => {
                                     const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3).add(new THREE.Vector3().random()), destination1.clone().negate());
-                                    const intersections = raycaster.intersectObject(this.el.sceneEl.systems['globe-nav'].getNavMesh());
+                                    const m = findParentScene(npcEl)?.systems['globe-nav'].getNavMesh();
+                                    if (!m) {
+                                        return;
+                                    }
+                                    const intersections = raycaster.intersectObject(m);
                                     if (intersections[0]) {
                                         const destination2 = intersections[0].point.clone();
                                         npcEl.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2; razeTarget: #${this.el.id};`);
@@ -2868,7 +2872,11 @@
                                 cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].getUnit()}`);
                                 npcEls.forEach(npcEl => {
                                     const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3).add(new THREE.Vector3().random().multiplyScalar(2).subScalar(1)), destination1.clone().negate());
-                                    const intersections = raycaster.intersectObject(this.el.sceneEl.systems['globe-nav'].getNavMesh());
+                                    const m = findParentScene(npcEl)?.systems['globe-nav'].getNavMesh();
+                                    if (!m) {
+                                        return;
+                                    }
+                                    const intersections = raycaster.intersectObject(m);
                                     if (intersections[0]) {
                                         const destination2 = intersections[0].point.clone();
                                         npcEl.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2; razeTarget: #${this.el.id};`);
@@ -2877,7 +2885,11 @@
                                 const wizardEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}-wizard`);
                                 wizardEls.forEach(wizardEl => {
                                     const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), destination1.clone().negate());
-                                    const intersections = raycaster.intersectObject(this.el.sceneEl.systems['globe-nav'].getNavMesh());
+                                    const m = findParentScene(wizardEl)?.systems['globe-nav'].getNavMesh();
+                                    if (!m) {
+                                        return;
+                                    }
+                                    const intersections = raycaster.intersectObject(m);
                                     if (intersections[0]) {
                                         const destination2 = intersections[0].point.clone();
                                         wizardEl.emit("moba-move", destination2.clone())
@@ -2892,7 +2904,11 @@
                             cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].getUnit()}`);
                             npcEls.forEach(npcEl => {
                                 const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3).add(new THREE.Vector3().random().multiplyScalar(2).subScalar(1)), destination1.clone().negate());
-                                const intersections = raycaster.intersectObject(this.el.sceneEl.systems['globe-nav'].getNavMesh());
+                                const m = findParentScene(npcEl)?.systems['globe-nav'].getNavMesh();
+                                if (!m) {
+                                    return;
+                                }
+                                const intersections = raycaster.intersectObject(m);
                                 if (intersections[0]) {
                                     const destination2 = intersections[0].point.clone();
                                     npcEl.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2; razeTarget: #${this.el.id};`);
@@ -2953,7 +2969,11 @@
                                 const shipEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
                                 shipEls.forEach(shipEl => {
                                     const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), destination1.clone().negate());
-                                    const intersections = raycaster.intersectObject(this.el.sceneEl.systems['globe-ocean-nav'].getNavMesh());
+                                    const m = findParentScene(shipEl)?.systems['globe-ocean-nav'].getNavMesh();
+                                    if (!m) {
+                                        return;
+                                    }
+                                    const intersections = raycaster.intersectObject(m);
                                     if (intersections[0]) {
                                         const destination2 = intersections[0].point.clone();
                                         shipEl.setAttribute("globe-ocean-nav-agent", `active: false; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2;`);
@@ -2964,7 +2984,11 @@
                                 const shipEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
                                 shipEls.forEach(shipEl => {
                                     const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), destination1.clone().negate());
-                                    const intersections = raycaster.intersectObject(this.el.sceneEl.systems['globe-ocean-nav'].getNavMesh());
+                                    const m = findParentScene(shipEl)?.systems['globe-ocean-nav'].getNavMesh();
+                                    if (!m) {
+                                        return;
+                                    }
+                                    const intersections = raycaster.intersectObject(m);
                                     if (intersections[0]) {
                                         const destination2 = intersections[0].point.clone();
                                         shipEl.setAttribute("globe-ocean-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2;`);
@@ -2976,7 +3000,11 @@
                             const shipEls = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
                             shipEls.forEach(shipEl => {
                                 const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), destination1.clone().negate());
-                                const intersections = raycaster.intersectObject(this.el.sceneEl.systems['globe-ocean-nav'].getNavMesh());
+                                const m = findParentScene(shipEl)?.systems['globe-ocean-nav'].getNavMesh();
+                                if (!m) {
+                                    return;
+                                }
+                                const intersections = raycaster.intersectObject(m);
                                 if (intersections[0]) {
                                     const destination2 = intersections[0].point.clone();
                                     shipEl.setAttribute("globe-ocean-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2;`);
@@ -3996,7 +4024,11 @@
                     const destination2 = this.el.object3D.position.clone();
                     setTimeout(() => {
                         const raycaster = new THREE.Raycaster(destination2.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), destination2.clone().negate());
-                        const intersections = raycaster.intersectObject(this.el.sceneEl.systems['globe-nav'].getNavMesh());
+                        const m = findParentScene(this.el)?.systems['globe-nav'].getNavMesh();
+                        if (!m) {
+                            return;
+                        }
+                        const intersections = raycaster.intersectObject(m);
                         if (intersections[0]) {
                             const destination2 = intersections[0].point.clone();
                             this.el.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2;`);
@@ -4676,6 +4708,16 @@
                 return el.components[attribute];
             }
             return findParentAttribute(el.parentElement, attribute);
+        }
+
+        function findParentScene(el) {
+            if (!el) {
+                return null;
+            }
+            if (el.sceneEl) {
+                return el.sceneEl;
+            }
+            return findParentAttribute(el.parentElement);
         }
         function addCannonBall(pos, velocity, el, damage) {
             const scene = document.querySelector("a-scene");
