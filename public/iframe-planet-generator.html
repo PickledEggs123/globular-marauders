@@ -2150,7 +2150,8 @@
                     if (this.el.sceneEl.object3DMap[`line-debug-${this.debugId}`]) {
                         this.el.sceneEl.removeObject3D(`line-debug-${this.debugId}`);
                     }
-                    this.geometry.setFromPoints([this.el.object3D.position, this.el.object3D.position, ...this.path].map(x => new THREE.Vector3().addVectors(x, x.clone().normalize())));
+                    this.geometry.dispose();
+                    this.geometry = new THREE.BufferGeometry().setFromPoints([this.el.object3D.position, this.el.object3D.position, ...this.path].map(x => new THREE.Vector3().addVectors(x, x.clone().normalize())));
                     this.geometry.computeBoundingSphere();
                     this.line = new THREE.Line(this.geometry, this.material);
                     this.el.sceneEl.setObject3D(`line-debug-${this.debugId}`, this.line);
@@ -2235,7 +2236,8 @@
                     if (this.el.sceneEl.object3DMap[`line-debug-${this.debugId}`]) {
                         this.el.sceneEl.removeObject3D(`line-debug-${this.debugId}`);
                     }
-                    this.geometry.setFromPoints([this.el.object3D.position, this.el.object3D.position, ...this.path].map(x => new THREE.Vector3().addVectors(x, x.clone().normalize())));
+                    this.geometry.dispose();
+                    this.geometry = new THREE.BufferGeometry().setFromPoints([this.el.object3D.position, this.el.object3D.position, ...this.path].map(x => new THREE.Vector3().addVectors(x, x.clone().normalize())));
                     this.geometry.computeBoundingSphere();
                     this.line = new THREE.Line(this.geometry, this.material);
                     this.el.sceneEl.setObject3D(`line-debug-${this.debugId}`, this.line);
