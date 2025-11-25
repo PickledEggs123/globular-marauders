@@ -1706,6 +1706,29 @@
             },
         });
 
+        AFRAME.registerComponent("update-wizard-position-entity", {
+            schema: {
+                destination: {type: "vec3", default: new THREE.Vector3()},
+            },
+            tick: function (t, dt) {
+                const center = this.el.parentElement;
+                const centerHeight = center.object3D.getWorldPosition(new THREE.Vector3()).length();
+
+                const scene = document.querySelector("a-scene");
+                scene.object3D.attach(this.el.object3D);
+                const thisPos = center.object3D.getWorldPosition(new THREE.Vector3()).normalize().multiplyScalar(centerHeight);
+                const destinationPos = new THREE.Vector3().copy(this.data.destination).normalize().multiplyScalar(centerHeight);
+                const forward = destinationPos.clone().sub(thisPos.clone()).normalize().multiplyScalar(5);
+                this.el.object3D.position.copy(center.object3D.getWorldPosition(new THREE.Vector3()).sub(forward.clone()));
+                this.el.object3D.up = this.el.object3D.getWorldPosition(new THREE.Vector3()).normalize();
+                this.el.object3D.lookAt(destinationPos);
+                center.object3D.attach(this.el.object3D);
+                if (forward.length() === 0) {
+                    this.el.object3D.position.set(0, 0, -5);
+                }
+            },
+        });
+
         AFRAME.registerComponent("globe-moba-controls", {
             schema: {},
             init: function () {
@@ -4326,29 +4349,6 @@
                 this.el.object3D.up = this.el.object3D.getWorldPosition(new THREE.Vector3()).normalize();
                 this.el.object3D.lookAt(center.object3D.getWorldPosition(new THREE.Vector3()));
                 parent.object3D.attach(this.el.object3D);
-            },
-        });
-
-        AFRAME.registerComponent("update-wizard-position-entity", {
-            schema: {
-                destination: {type: "vec3", default: new THREE.Vector3()},
-            },
-            tick: function (t, dt) {
-                const center = this.el.parentElement;
-                const centerHeight = center.object3D.getWorldPosition(new THREE.Vector3()).length();
-
-                const scene = document.querySelector("a-scene");
-                scene.object3D.attach(this.el.object3D);
-                const thisPos = center.object3D.getWorldPosition(new THREE.Vector3()).normalize().multiplyScalar(centerHeight);
-                const destinationPos = new THREE.Vector3().copy(this.data.destination).normalize().multiplyScalar(centerHeight);
-                const forward = destinationPos.clone().sub(thisPos.clone()).normalize().multiplyScalar(5);
-                this.el.object3D.position.copy(center.object3D.getWorldPosition(new THREE.Vector3()).sub(forward.clone()));
-                this.el.object3D.up = this.el.object3D.getWorldPosition(new THREE.Vector3()).normalize();
-                this.el.object3D.lookAt(destinationPos);
-                center.object3D.attach(this.el.object3D);
-                if (forward.length() === 0) {
-                    this.el.object3D.position.set(0, 0, -5);
-                }
             },
         });
 
