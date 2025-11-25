@@ -1974,7 +1974,7 @@
              */
             getNode: function (position, groupID) {
                 return this.navMesh
-                    ? pathfinder.getClosestNode(position, ZONE, groupID, false)
+                    ? pathfinder.getClosestNode(position, ZONE, groupID, true)
                     : null;
             },
 
@@ -2404,7 +2404,7 @@
              */
             getNode: function (position, groupID) {
                 return this.navMesh
-                    ? oceanPathfinder.getClosestNode(position, ZONE, groupID, false)
+                    ? oceanPathfinder.getClosestNode(position, ZONE, groupID, true)
                     : null;
             },
 
