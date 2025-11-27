@@ -2061,20 +2061,9 @@
                 this.group = null;
                 this.pathDistance = 0;
                 this.path = [];
-                this.material = new THREE.LineBasicMaterial({ color: 0xffffff });
-                this.geometry = new THREE.BufferGeometry().setFromPoints([]);
-                this.line = new THREE.Line(this.geometry, this.material);
-                this.debugId = "id" + Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(36);
             },
             remove: function () {
-                const scene = document.querySelector("a-scene");
                 this.system.removeAgent(this);
-                const el = this.el;
-                if (el.classList.contains(`${scene.components['coin-purse'].activeUnit}`)) {
-                    if (this.el.sceneEl.object3DMap[`line-debug-${this.debugId}`]) {
-                        this.el.sceneEl.removeObject3D(`line-debug-${this.debugId}`);
-                    }
-                }
             },
             update: function () {
                 this.path.length = 0;
@@ -2181,18 +2170,6 @@
                         break;
                     }
                 }
-
-                const scene = document.querySelector("a-scene");
-                if (el.classList.contains(`${scene.components['coin-purse'].activeUnit}`)) {
-                    if (this.el.sceneEl.object3DMap[`line-debug-${this.debugId}`]) {
-                        this.el.sceneEl.removeObject3D(`line-debug-${this.debugId}`);
-                    }
-                    this.geometry.dispose();
-                    this.geometry = new THREE.BufferGeometry().setFromPoints([this.el.object3D.position, this.el.object3D.position, ...this.path].map(x => new THREE.Vector3().addVectors(x, x.clone().normalize())));
-                    this.geometry.computeBoundingSphere();
-                    this.line = new THREE.Line(this.geometry, this.material);
-                    this.el.sceneEl.setObject3D(`line-debug-${this.debugId}`, this.line);
-                }
             },
         });
 
@@ -2220,13 +2197,10 @@
                 this.debugId = "id" + Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(36);
             },
             remove: function () {
-                const scene = document.querySelector("a-scene");
                 this.system.removeAgent(this);
-                const el = this.el;
-                if (el.classList.contains(`${scene.components['coin-purse'].activeUnit}`)) {
-                    if (this.el.sceneEl.object3DMap[`line-debug-${this.debugId}`]) {
-                        this.el.sceneEl.removeObject3D(`line-debug-${this.debugId}`);
-                    }
+                if (this.el.sceneEl.object3DMap[`line-debug-${this.debugId}`]) {
+                    this.el.sceneEl.removeObject3D(`line-debug-${this.debugId}`);
+                    this.line.dispose();
                 }
             },
             update: function () {
@@ -2277,6 +2251,10 @@
                     this.geometry.computeBoundingSphere();
                     this.line = new THREE.Line(this.geometry, this.material);
                     this.el.sceneEl.setObject3D(`line-debug-${this.debugId}`, this.line);
+                } else {
+                    if (this.el.sceneEl.object3DMap[`line-debug-${this.debugId}`]) {
+                        this.el.sceneEl.removeObject3D(`line-debug-${this.debugId}`);
+                    }
                 }
 
                 // If no path is found, exit.
@@ -2287,7 +2265,9 @@
                     el.emit('navigation-group-change');
                     el.object3D.position.copy(vDest);
                     this.group = null;
-                    this.el.sceneEl.removeObject3D(`line-debug-${this.debugId}`);
+                    if (this.el.sceneEl.object3DMap[`line-debug-${this.debugId}`]) {
+                        this.el.sceneEl.removeObject3D(`line-debug-${this.debugId}`);
+                    }
                     el.emit('navigation-group-changed');
                     return;
                 }
@@ -2829,7 +2809,7 @@
                         checkBox.click();
 
                         let addedNpcs = false;
-                        const npcs = document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`);
+                        const npcs = [...document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`), ...document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}-wizard`)];
                         if (npcs.length === 0) {
                             addWizardNpc();
                             const raiderAmount = scene.components['coin-purse'].getRaiderAmount();
