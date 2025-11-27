@@ -2200,7 +2200,6 @@
                 this.system.removeAgent(this);
                 if (this.el.sceneEl.object3DMap[`line-debug-${this.debugId}`]) {
                     this.el.sceneEl.removeObject3D(`line-debug-${this.debugId}`);
-                    this.line.dispose();
                 }
             },
             update: function () {
