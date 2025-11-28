@@ -676,9 +676,32 @@
                 if (!lod0 || !lod1 || !lod2) {
                     return;
                 }
-                lod0.setAttribute("instanced-mesh-member", `mesh: #${getBuildingLodHash(data[0], 3000, "manual")}; memberMesh: true;`);
-                lod1.setAttribute("instanced-mesh-member", `mesh: #${getBuildingLodHash(data[1], 3000, "manual")}; memberMesh: true;`);
-                lod2.setAttribute("instanced-mesh-member", `mesh: #${getBuildingLodHash(data[2], 3000, "manual")}; memberMesh: true;`);
+
+                const lod0Mesh = getBuildingLodHash(data[0], 3000, "manual");
+                const lod1Mesh = getBuildingLodHash(data[1], 3000, "manual");
+                const lod2Mesh = getBuildingLodHash(data[2], 3000, "manual");
+
+                const checkLoadedModel = (lodNode, id) => {
+                    const interval = setInterval(() => {
+                        let mesh;
+                        try {
+                            const scene = document.querySelector("a-scene");
+                            mesh = scene.querySelector(`#${id}`);
+                        } catch {}
+                        if (!mesh) {
+                            return;
+                        }
+                        const gltf = mesh.getObject3D("mesh");
+                        if (!gltf) {
+                            return;
+                        }
+                        lodNode.setAttribute("instanced-mesh-member", `mesh: #${id}; memberMesh: true;`);
+                        clearInterval(interval);
+                    }, 10);
+                };
+                checkLoadedModel(lod0, lod0Mesh);
+                checkLoadedModel(lod1, lod1Mesh);
+                checkLoadedModel(lod2, lod2Mesh);
             },
             tick: function (t, dt) {
                 if (this.counter > 0) {
