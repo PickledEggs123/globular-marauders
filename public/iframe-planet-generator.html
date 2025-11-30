@@ -4016,6 +4016,18 @@
                 el.object3D.lookAt(gazeTarget);
 
                 vCurrent.copy(vNext);
+
+                const destination1 = new THREE.Vector3().copy(vCurrent);
+                const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), destination1.clone().negate());
+                const m = findParentScene(this.el)?.systems['globe-nav'].getNavMesh();
+                if (!m) {
+                    return;
+                }
+                const intersections = raycaster.intersectObject(m);
+                if (intersections[0]) {
+                    const destination2 = intersections[0].point.clone();
+                    vCurrent.copy(destination2);
+                }
             },
             tick: function (t, dt) {
                 if (this.data.target && ((this.data.target.components['health'] && this.data.target.components['health'].data.health > 0) || this.data.target.components['networked-health'])) {
@@ -4492,12 +4504,14 @@
                 dataEl.setAttribute("class", "data");
                 dataEl.setAttribute("scale", "0.001 0.001 0.001");
                 dataEl.setAttribute("rotation", "0 -90 0");
+                getBuildingLodHash(str, 100, "auto");
                 dataEl.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; memberMesh: ${memberMesh};`);
                 dataEl.setAttribute("shadow", "");
                 rootGoldCoin.setAttribute("networked-ship-health", "");
                 rootGoldCoin.setAttribute("cannonball-collider", "");
                 rootGoldCoin.appendChild(dataEl);
             } else {
+                getBuildingLodHash(str, 2000, "auto");
                 rootGoldCoin.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; capacity: 2000; memberMesh: ${memberMesh};`);
                 rootGoldCoin.setAttribute("shadow", "");
             }
@@ -4666,6 +4680,7 @@
                 const str = characterModels.get("GOLD_COIN");
 
                 // add graphics
+                getBuildingLodHash(str, 1000, "auto");
                 rootGoldCoin.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; capacity: 1000; memberMesh: true`);
                 rootGoldCoin.setAttribute("networked", "template: #gold-coin-template; attachTemplateToLocal: false;");
 
@@ -4703,6 +4718,7 @@
                 const str = characterModels.get(charModelId);
 
                 // add graphics
+                getBuildingLodHash(str, 1000, "auto");
                 rootProjectile.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; capacity: 1000; memberMesh: true`);
                 rootProjectile.setAttribute("networked", "template: #arrow-template; attachTemplateToLocal: false;");
             } else {
@@ -4761,6 +4777,7 @@
                 const str = characterModels.get("CANNONBALL");
 
                 // add graphics
+                getBuildingLodHash(str, 1000, "auto");
                 rootProjectile.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; capacity: 1000; memberMesh: true`);
                 rootProjectile.setAttribute("networked", "template: #cannonball-template; attachTemplateToLocal: false;");
             } else {
@@ -4810,6 +4827,7 @@
                 const str = characterModels.get("PERSON");
 
                 // add graphics
+                getBuildingLodHash(str, 1000, "auto");
                 rootNpc.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; capacity: 1000; memberMesh: true`);
                 rootNpc.setAttribute("networked", "template: #person-template; attachTemplateToLocal: false;");
             } else {
@@ -4896,6 +4914,7 @@
 
             const rootModel = document.createElement("a-entity");
             rootModel.setAttribute("class", "data");
+            getBuildingLodHash(str, 100, "auto");
             rootModel.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; capacity: 100; memberMesh: true`);
             rootModel.setAttribute("scale", "0.001 0.001 0.001");
             rootModel.setAttribute("rotation", "0 -90 0");
@@ -4939,6 +4958,7 @@
 
             if (characterModels.has("WARRIOR")) {
                 const str = characterModels.get("WARRIOR");
+                getBuildingLodHash(str, 1000, "auto");
                 rootNpc.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; capacity: 1000; memberMesh: true`);
                 rootNpc.setAttribute("networked", "template: #warrior-template; attachTemplateToLocal: false;");
             } else {
@@ -4986,6 +5006,7 @@
 
             if (characterModels.has("WIZARD")) {
                 const str = characterModels.get("WIZARD");
+                getBuildingLodHash(str, 1000, "auto");
                 rootNpc.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; capacity: 1000; memberMesh: true`);
                 rootNpc.setAttribute("networked", "template: #wizard-template; attachTemplateToLocal: false;");
             } else {
@@ -5334,6 +5355,7 @@
 
             const rootModel = document.createElement("a-entity");
             rootModel.setAttribute("class", "data");
+            getBuildingLodHash(str, 100, "auto");
             rootModel.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; capacity: 100; memberMesh: true`);
             rootModel.setAttribute("go-to-sea", "");
             rootModel.setAttribute("scale", "0.001 0.001 0.001");
