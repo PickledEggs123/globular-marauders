@@ -107,7 +107,7 @@ export const PlanetGenerator = () => {
             { roomId }: { roomId: string }
         ) => {
             const { meshes, spawnPoints, buildings } = inputData;
-            const data: IGameMesh[] = meshes.map((mesh: IGameMesh) => ({
+            let data: IGameMesh[] = meshes.map((mesh: IGameMesh) => ({
                 ...mesh,
                 attributes: mesh.attributes.map(attr =>
                     attr.id === "aPosition"
@@ -115,7 +115,23 @@ export const PlanetGenerator = () => {
                         : attr
                 )
             }));
-
+            data = data.map((x: IGameMesh): IGameMesh[] => {
+                if (x.navmesh) {
+                    return [{
+                        ...x,
+                        attributes: [...x.attributes.filter(x => x.id !== "aNormal")],
+                        // @ts-ignore
+                        navmesh: true,
+                    }, {
+                        ...x,
+                        // @ts-ignore
+                        projected: true,
+                        navmesh: false,
+                    }];
+                } else {
+                    return [x];
+                }
+            }).flat();
             setLoadMessage("Data Loaded");
             context.gameData = data;
 
@@ -148,7 +164,7 @@ export const PlanetGenerator = () => {
                 ...staticMeshPaths
             ]);
 
-            const worldMeshes: [string, boolean?, boolean?, boolean?, boolean?, [number, number, number]?][] = [];
+            const worldMeshes: [string, boolean?, boolean?, boolean?, boolean?, [number, number, number]?, boolean?][] = [];
             for (let i = 0; i < data.length; i++) {
                 const dataUri = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[i] as Uint8Array)}`;
                 worldMeshes.push([
@@ -159,6 +175,8 @@ export const PlanetGenerator = () => {
                     data[i].oceanNavmesh,
                     // @ts-ignore
                     data[i].vertex,
+                    // @ts-ignore
+                    data[i].projected,
                 ]);
             }
 

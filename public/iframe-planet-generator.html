@@ -1930,6 +1930,73 @@
          *
          * Pathfinding system, using PatrolJS.
          */
+        AFRAME.registerSystem('globe-nav-projected', {
+            navMesh: null,
+            agents: new Set(),
+            init: function () {
+                this.navMesh = null;
+            },
+
+            /**
+             * @param {THREE.Geometry} geometry
+             */
+            setNavMeshGeometry: function (geometry) {
+                this.navMesh = new THREE.Mesh(geometry);
+            },
+
+            /**
+             * @return {THREE.Mesh}
+             */
+            getNavMesh: function () {
+                return this.navMesh;
+            },
+        });
+
+        AFRAME.registerComponent('globe-nav-projected-mesh', {
+            schema: {
+                nodeName: {type: 'string'}
+            },
+            hasLoadedNavMesh: false,
+            nodeName: "",
+            init: function () {
+                this.system = this.el.sceneEl.systems['globe-nav-projected'];
+                this.hasLoadedNavMesh = false;
+                this.nodeName = this.data.nodeName;
+                this.el.addEventListener('object3dset', this.loadNavMesh.bind(this));
+            },
+
+            play: function () {
+                if (!this.hasLoadedNavMesh) this.loadNavMesh();
+            },
+
+            loadNavMesh: function () {
+                var self = this;
+                const object = this.el.getObject3D('mesh');
+
+                if (!object) return;
+
+                let navMesh;
+                object.traverse((node) => {
+                    if (node.isMesh &&
+                        (!self.nodeName || node.name === self.nodeName)) navMesh = node;
+                });
+
+                if (!navMesh) return;
+
+                const navMeshGeometry = navMesh.geometry.clone();
+                navMesh.updateWorldMatrix(true, false);
+                navMeshGeometry.applyMatrix4(navMesh.matrixWorld);
+                this.system.setNavMeshGeometry(navMeshGeometry);
+                this.hasLoadedNavMesh = true;
+                this.el.setAttribute("visible", "false");
+            }
+        });
+
+        /**
+         * nav
+         *
+         * Pathfinding system, using PatrolJS.
+         */
         AFRAME.registerSystem('globe-nav', {
             navMesh: null,
             agents: new Set(),
@@ -2041,7 +2108,6 @@
             loadNavMesh: function () {
                 var self = this;
                 const object = this.el.getObject3D('mesh');
-                const scene = this.el.sceneEl.object3D;
 
                 if (!object) return;
 
@@ -2450,7 +2516,6 @@
             loadNavMesh: function () {
                 var self = this;
                 const object = this.el.getObject3D('mesh');
-                const scene = this.el.sceneEl.object3D;
 
                 if (!object) return;
 
@@ -5039,7 +5104,7 @@
         }
 
         function addTerrain(item) {
-            const [str, collidable, navmesh, ocean, oceanNavmesh, vertex] = JSON.parse(item);
+            const [str, collidable, navmesh, ocean, oceanNavmesh, vertex, projected] = JSON.parse(item);
             const rootTerrain = document.createElement("a-entity");
             rootTerrain.setAttribute("gltf-model", str);
             rootTerrain.addEventListener("model-loaded", buildBoundsTree);
@@ -5050,7 +5115,10 @@
                 // ocean nav mesh
                 rootTerrain.setAttribute("go-to-sea", "");
                 rootTerrain.setAttribute("globe-ocean-nav-mesh", "");
-            } else if (navmesh) {
+            } else if (projected) {
+                // land nav mesh
+                rootTerrain.setAttribute("globe-nav-projected-mesh", "");
+            }  else if (navmesh) {
                 // land nav mesh
                 rootTerrain.setAttribute("globe-nav-mesh", "");
             } else if (ocean) {
@@ -7137,7 +7205,7 @@
                     }
                     return;
                 }
-                const mesh = this.el.sceneEl.systems['globe-nav'].getNavMesh();
+                const mesh = this.el.sceneEl.systems['globe-nav-projected'].getNavMesh();
                 if (!mesh) {
                     return;
                 }
