@@ -128,6 +128,13 @@ export const PlanetGenerator = () => {
                         projected: true,
                         navmesh: false,
                     }];
+                } else if (x.oceanNavmesh) {
+                    return [{
+                        ...x,
+                        attributes: [...x.attributes.filter(x => x.id !== "aNormal")],
+                        // @ts-ignore
+                        oceanNavmesh: true,
+                    }];
                 } else {
                     return [x];
                 }
