@@ -25,7 +25,7 @@
     "octree-es": "^1.0.0",
     "pixi.js": "^7.3.1",
     "prisma": "^6.5.0",
-    "react": "^19.1.1",
+    "react": "^19.1.2",
     "react-dom": "^19.1.1",
     "react-markdown": "^10.1.0",
     "redis": "^5.9.0",
