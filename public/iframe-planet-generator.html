@@ -6570,15 +6570,47 @@
                 }
 
                 clickQueue.forEach(x => x.tick -= 1);
-            }
+            },
         };
 
         AFRAME.registerComponent("click-manager", {
             schema: {},
             tick: function(t, dt) {
                 ClickManager.iterateQueue();
-            }
-        })
+            },
+        });
+
+        AFRAME.registerComponent("health-bar", {
+            schema: {},
+            tick: function(t, dt) {
+                const scene = document.querySelector("a-scene");
+                const shipEls = [
+                    ...Array.from(document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}-wizard`)),
+                    ...Array.from(document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`)),
+                ];
+                const ship = shipEls.slice(0, 1)[0];
+
+                const meshes = [];
+                this.el.object3D.traverse((node) => {
+                    if (node.isMesh) {
+                        meshes.push(node);
+                    }
+                });
+                const mesh = meshes[0];
+
+                if (mesh) {
+                    if (ship) {
+                        const healthComponent = ship.components['ship-health'] || ship.components['health'];
+                        const maxHealth = healthComponent.maxHealth;
+                        const health = healthComponent.data.health;
+                        const ratio = health / maxHealth;
+                        mesh.morphTargetInfluences[0] = ratio;
+                    } else {
+                        mesh.morphTargetInfluences[0] = 0;
+                    }
+                }
+            },
+        });
     </script>
     <script type="module">
         import ProjectedMaterial from './ProjectedMaterial.module.js';
@@ -7358,6 +7390,9 @@
                 <a-entity id="port-menu" align-with-projection="offset: 0.25 0.2 -0.5; rotation: 0 0 0; portShow: true" port-show html="cursor:#cursor;html:#my-interface" class="clickable"></a-entity>
                 <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
                 <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
+                <a-entity id="health-bar" align-with-projection="offset: 0 -0.25 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03;" gltf-model="/meshes/ui/healthbar/HealthBar.glb" health-bar></a-entity>
+                <a-entity id="health-bar" align-with-projection="offset: 0 -0.25 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03; wizardShow: true;" gltf-model="/meshes/ui/healthbar/HealthBar.glb" health-bar></a-entity>
+                <a-entity id="mana-bar" align-with-projection="offset: 0 -0.3 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03; wizardShow: true;" gltf-model="/meshes/ui/healthbar/ManaBar.glb" mana-bar></a-entity>
                 <a-entity id="left-cannon-fire" align-with-projection="offset: -0.25 -0.2 -0.5; rotation: 0 90 0; scale: 0.03 0.03 0.03;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" select-cannon-side="selector: left-cannon" ui-clicked></a-entity>
                 <a-entity id="right-cannon-fire" align-with-projection="offset: 0.25 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" select-cannon-side="selector: right-cannon" ui-clicked></a-entity>
                 <a-entity id="none-cannon-fire" align-with-projection="offset: 0 -0.2 -0.5; rotation: 0 0 0; scale: 0.015 0.015 0.015;" gltf-model="/meshes/Model_Redo/Ship Wheel/ShipWheel.glb" select-cannon-side="selector: none-cannon" ui-clicked></a-entity>

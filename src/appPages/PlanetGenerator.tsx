@@ -143,6 +143,8 @@ export const PlanetGenerator = () => {
             context.gameData = data;
 
             const staticMeshPaths = [
+                "/meshes/ui/healthbar/HealthBar.glb",
+                "/meshes/ui/healthbar/ManaBar.glb",
                 "/meshes/EpicStore/Fireball/source/Fireball.glb",
                 "/meshes/Model_Redo/Warrior/Wizard.glb",
                 "/meshes/Model_Redo/indicators/npc indicator/NpcDestination.glb",
@@ -207,6 +209,8 @@ export const PlanetGenerator = () => {
                 }
 
                 const warriorDataUri = gltf[gltf.length - 7] as string;
+                addCharacterModel(iframeRef.current, "HEALTHBAR", gltf[gltf.length - 23] as string);
+                addCharacterModel(iframeRef.current, "MANABAR", gltf[gltf.length - 22] as string);
                 addCharacterModel(iframeRef.current, "FIREBALL", gltf[gltf.length - 21] as string);
                 addCharacterModel(iframeRef.current, "WIZARD", gltf[gltf.length - 20] as string);
                 addCharacterModel(iframeRef.current, "NPC_DESTINATION", gltf[gltf.length - 19] as string);
