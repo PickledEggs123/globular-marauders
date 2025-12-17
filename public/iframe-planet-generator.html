@@ -5065,6 +5065,7 @@
             rootNpc.setAttribute("npc-finder", "active: true;");
             rootNpc.setAttribute("npc-attack", `range: 10; charModelId: FIREBALL`);
             rootNpc.setAttribute("health", "health: 1000;");
+            rootNpc.setAttribute("wizard-mana", "");
             rootNpc.setAttribute("shadow", "");
             rootNpc.setAttribute("globe-moba-controls", "");
             rootNpc.setAttribute("hide-trees-from-camera", "");
@@ -5722,6 +5723,9 @@
                     if (!el) {
                         return;
                     }
+                    if (!findParentAttribute(el, "wizard-mana")?.canAttack()) {
+                        return;
+                    }
                     const firstClick = !el.components['projected-texture__forward-attack'].data.enabled;
                     if (firstClick) {
                         el.setAttribute("projected-texture__forward-attack", {
@@ -5737,6 +5741,9 @@
                     const selector = `.${scene.components['coin-purse'].getUnit()} .wizard-area-of-effect`;
                     const el = document.querySelector(selector);
                     if (!el) {
+                        return;
+                    }
+                    if (!findParentAttribute(el, "wizard-mana")?.canAttack()) {
                         return;
                     }
                     const firstClick = !el.components['projected-texture__area-attack'].data.enabled;
@@ -6611,6 +6618,38 @@
                 }
             },
         });
+
+        AFRAME.registerComponent("mana-bar", {
+            schema: {},
+            tick: function(t, dt) {
+                const scene = document.querySelector("a-scene");
+                const shipEls = [
+                    ...Array.from(document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}-wizard`)),
+                ];
+                const ship = shipEls.slice(0, 1)[0];
+
+                const meshes = [];
+                this.el.object3D.traverse((node) => {
+                    if (node.isMesh) {
+                        meshes.push(node);
+                    }
+                });
+                const mesh = meshes[0];
+
+                if (mesh) {
+                    if (ship) {
+                        const healthComponent = ship.components['wizard-mana'];
+                        const endTime = healthComponent.endTime;
+                        const startTime = healthComponent.startTime;
+                        const time = +new Date();
+                        const ratio = Math.min((time - startTime) / (endTime - startTime), 1);
+                        mesh.morphTargetInfluences[0] = ratio;
+                    } else {
+                        mesh.morphTargetInfluences[0] = 0;
+                    }
+                }
+            },
+        });
     </script>
     <script type="module">
         import ProjectedMaterial from './ProjectedMaterial.module.js';
@@ -7131,6 +7170,28 @@
             },
         });
 
+        AFRAME.registerComponent("wizard-mana", {
+            init: function () {
+                const time = +new Date();
+                this.startTime = time - 10_000;
+                this.endTime = time;
+            },
+            shouldAttack: function () {
+                const time = +new Date();
+                if (time > this.endTime) {
+                    this.startTime = time;
+                    this.endTime = time + 10_000;
+                    return true;
+                } else {
+                    return false;
+                }
+            },
+            canAttack: function () {
+                const time = +new Date();
+                return time > this.endTime;
+            },
+        });
+
         AFRAME.registerComponent("obb-attack-zone", {
             schema: {
                 center: {
@@ -7178,6 +7239,10 @@
                 }
             },
             attack: function () {
+                if (!findParentAttribute(this.el, "wizard-mana")?.shouldAttack()) {
+                    return;
+                }
+
                 if (new THREE.Vector3().copy(this.data.center).length() === 0) {
                     if (this.el.hasAttribute("obb-attack-center-wave")) {
                         this.el.removeAttribute("obb-attack-center-wave");
