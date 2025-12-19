@@ -949,7 +949,7 @@
                 const upVector = boxPosWorldPos.clone().sub(new THREE.Vector3(0, 0, 0)).normalize();
                 const object3D = this.el.object3D;
                 const objectWorldPos = object3D.getWorldPosition(new THREE.Vector3());
-                const height = boxPosWorldPos.clone().sub(new THREE.Vector3(0, 0, 0)).length();
+                const height = THREE.MathUtils.clamp(boxPosWorldPos.clone().sub(new THREE.Vector3(0, 0, 0)).length(), 100, 150);
 
                 // update info
                 const quaternion = new THREE.Quaternion().setFromUnitVectors(objectWorldPos.clone().normalize(), boxPosWorldPos.clone().normalize());
@@ -977,7 +977,6 @@
                     finalPosition = objectWorldPos.clone().normalize().multiplyScalar(this.heightDiffLerp + height + 5).applyQuaternion(slerp);
                     this.dtSum += dt;
                 }
-                console.log("HEIGHT", this.heightDiff, this.heightDiffLerp, height);
 
                 // update camera
                 const cameraLookControlsEl = document.querySelector('[globe-look-controls]');
