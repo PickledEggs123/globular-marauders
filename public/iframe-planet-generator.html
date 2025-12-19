@@ -965,7 +965,7 @@
                         destination1 = intersections[0].point.clone();
                     }
                     finalPosition = destination1.clone().add(destination1.clone().normalize().multiplyScalar(5));
-                    this.heightDiff = new THREE.Vector3().distanceTo(finalPosition) - (height + 5);
+                    this.heightDiff = THREE.MathUtils.clamp(new THREE.Vector3().distanceTo(finalPosition) - (height + 5), -5, 5);
                     this.heightDiffLerp = 0.1 * this.heightDiff + 0.9 * this.heightDiffLerp;
                     this.dtSum = 0;
                 } else {
@@ -977,6 +977,7 @@
                     finalPosition = objectWorldPos.clone().normalize().multiplyScalar(this.heightDiffLerp + height + 5).applyQuaternion(slerp);
                     this.dtSum += dt;
                 }
+                console.log("HEIGHT", this.heightDiff, this.heightDiffLerp, height);
 
                 // update camera
                 const cameraLookControlsEl = document.querySelector('[globe-look-controls]');
