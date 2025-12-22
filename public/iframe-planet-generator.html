@@ -3099,6 +3099,7 @@
                 });
             }
         });
+
         function getRandomPointsOnMesh(mesh, origin, count) {
             const geometry = mesh.geometry;
             const positionAttribute = geometry.attributes.position;
@@ -3148,6 +3149,7 @@
 
             return randomPoints;
         }
+
         AFRAME.registerComponent('grass-particles', {
             schema: {
                 origin: { type: 'vec3', default: {x: 0, y: 0, z: 0} },
@@ -3221,6 +3223,7 @@
                 this.el.removeEventListener('remove-grass', this.innerRemoveGrass);
             },
         });
+
         AFRAME.registerComponent('tree-particles', {
             schema: {
                 origin: { type: 'vec3', default: {x: 0, y: 0, z: 0} },
@@ -3284,6 +3287,7 @@
                 this.el.removeEventListener('remove-tree', this.innerRemoveGrass);
             },
         });
+
         AFRAME.registerComponent('hide-from-camera', {
             schema: {},
             init: function () {
@@ -3302,6 +3306,7 @@
                 this.el.emit("object3DUpdated");
             }
         });
+
         AFRAME.registerComponent('hide-trees-from-camera', {
             schema: {},
             init: function () {
@@ -3332,6 +3337,7 @@
                 this.oldIntersections = newSet;
             },
         });
+
         AFRAME.registerComponent('terrain-tile', {
             schema: {
                 type: "string",
@@ -3614,6 +3620,7 @@
                 this.el.setAttribute("id", this.elId);
             },
         });
+
         AFRAME.registerComponent('npc-spawner', {
             schema: {},
             multiple: true,
@@ -3947,6 +3954,7 @@
                 }
             },
         });
+
         AFRAME.registerComponent('pirate-attack', {
             schema: {
                 range: {type: 'number', default: 5},
@@ -4010,6 +4018,7 @@
             BEGIN_ATTACK: 1,
             END_ATTACK: 2,
         };
+
         AFRAME.registerComponent('npc-melee-state', {
             init: function () {
                 this.npcState = NPC_MELEE_STATE_ENUM.IDLE;
@@ -4401,6 +4410,7 @@
                 });
             },
         });
+
         AFRAME.registerComponent("ship-death", {
             schema: {},
             init: function () {
@@ -4818,6 +4828,7 @@
             }
             return findParentAttribute(el.parentElement);
         }
+
         function addCannonBall(pos, velocity, el, damage) {
             const scene = document.querySelector("a-scene");
 
@@ -5159,6 +5170,7 @@
         }
 
         var characterModels = new Map();
+
         function addCharacterModel(item) {
             const {
                 data: str, type
