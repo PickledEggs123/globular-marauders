@@ -3003,6 +3003,8 @@
                             })
                             scene.emit("set-npc-indicator", destination1.clone());
                             scene.emit("clear-ship-indicator");
+
+                            addGhostBuilding(destination1.clone());
                         }
                     }, "go-on-land");
                 });
@@ -5064,6 +5066,118 @@
             arr2.forEach(a => scene.removeChild(a));
         }
 
+        AFRAME.registerComponent("rise-out-of-ground", {
+            schema: {},
+            init: function () {
+                this.done = false;
+                this.begin = false;
+                this.active = false;
+                this.maxHeight = -100;
+            },
+            tick: function () {
+                if (this.done) {
+                    return;
+                }
+
+                const meshes = [];
+                this.el.object3D.traverse((x) => {
+                    if (x.isMesh) {
+                        meshes.push(x);
+                    }
+                });
+
+                if (meshes.length <= 0) {
+                    return;
+                }
+
+                if (!this.begin && !this.active) {
+                    this.maxHeight = meshes.reduce((acc, x) => Math.max(acc, x.geometry.boundingBox.max.z), -100);
+                    this.startTime = +new Date() / 1000;
+                    this.endTime = (+new Date() / 1000) + this.maxHeight;
+                    this.begin = true;
+                    this.active = true;
+                }
+
+                if (this.begin && this.active) {
+                    const l = THREE.MathUtils.mapLinear(+new Date() / 1000, this.startTime, this.endTime, -this.maxHeight, 0);
+                    const c = THREE.MathUtils.clamp(l, -this.maxHeight, 0);
+                    this.el.object3D.position.set(0, 0, c);
+                    if (c >= 0) {
+                        this.active = false;
+                    }
+                }
+
+                if (this.begin && !this.active) {
+                    this.done = true;
+                }
+            },
+        });
+
+        function addGhostBuilding(position) {
+            const scene = document.querySelector("a-scene");
+
+            const rootHouse = document.createElement("a-entity");
+            rootHouse.setAttribute("position", position);
+            rootHouse.setAttribute("orthographic-camera-building", "");
+            rootHouse.setAttribute("projected-texture__wizard-tower", "image: /meshes/WizardTowerProjection.png; enabled: true");
+
+            scene.appendChild(rootHouse);
+
+            setTimeout(() => {
+                rootHouse.setAttribute("projected-texture__wizard-tower", "image: /meshes/WizardTowerProjection.png; enabled: false");
+
+                const type = "WIZARD_TOWER";
+                const point = [position.x, position.y, position.z];
+                const lookAt = [position.x, position.y, position.z].map(x => x * 2);
+                const rootModel = document.createElement("a-entity");
+                rootModel.setAttribute("rise-out-of-ground", "");
+                rootModel.setAttribute("globe-lod", characterModels.get(type));
+                if (type === "PORT") {
+                    rootModel.setAttribute("scale", "0.1 0.1 0.1");
+                    rootModel.setAttribute("rotation", "90 0 0");
+                    rootModel.setAttribute("position", "0 -1.35 -0.5");
+                } else {
+                    rootModel.setAttribute("scale", "1 1 1");
+                    rootModel.setAttribute("rotation", "90 0 0");
+                    rootModel.setAttribute("position", "0 0 0");
+                }
+                rootHouse.appendChild(rootModel);
+
+                const lod0 = document.createElement("a-entity");
+                lod0.setAttribute("class", `lod0 clickable${type === "PORT" ? " port" : ""}`);
+                if (type !== "PORT") {
+                    lod0.setAttribute("go-on-land", "raze: true");
+                    lod0.setAttribute("spawn-gold", "");
+                    lod0.setAttribute("set-building-id", "");
+                }
+                lod0.setAttribute("shadow", "");
+                rootModel.appendChild(lod0);
+
+                const lod1 = document.createElement("a-entity");
+                lod1.setAttribute("class", `lod1 clickable${type === "PORT" ? " port" : ""}`);
+                if (type !== "PORT") {
+                    lod1.setAttribute("go-on-land", "raze: true");
+                    lod1.setAttribute("spawn-gold", "");
+                    lod1.setAttribute("set-building-id", "");
+                }
+                lod1.setAttribute("shadow", "");
+                rootModel.appendChild(lod1);
+
+                const lod2 = document.createElement("a-entity");
+                lod2.setAttribute("class", `lod2 clickable${type === "PORT" ? " port" : ""}`);
+                if (type !== "PORT") {
+                    lod2.setAttribute("go-on-land", "raze: true");
+                    lod2.setAttribute("spawn-gold", "");
+                    lod2.setAttribute("set-building-id", "");
+                }
+                lod2.setAttribute("shadow", "");
+                rootModel.appendChild(lod2);
+
+                rootHouse.object3D.up = new THREE.Vector3(point[0], point[1], point[2]).normalize();
+                rootHouse.object3D.lookAt(new THREE.Vector3(lookAt[0], lookAt[1], lookAt[2]));
+            }, 5000);
+        }
+
         function addWizardNpc() {
             const scene = document.querySelector("a-scene");
 
@@ -5216,6 +5330,24 @@
                     break;
                 }
             }
+        }
+
+        /**
+         * Building placement should have a ghost building moving across terrain,
+         * The ghost building should appear if it is in a valid location,
+         * The ghost building should disappear if it is not in a valid location,
+         *
+         * Clicking should spawn a building below ground level,
+         * The building will rise out of the ground for a few seconds until maximum height
+         * The building will then be part of the map.
+         * @param item
+         */
+        function placeBuildingBegin(item) {
+            const {
+                type
+            } = JSON.parse(item);
+
+
         }
 
         function addHouse(item) {
@@ -6870,6 +7002,27 @@
             },
         });
 
+        AFRAME.registerComponent("orthographic-camera-building", {
+            schema: {},
+            init: function () {
+                this.camera = new THREE.OrthographicCamera(-8, 8, 8, -8, 0.1, 100);
+                this.el.sceneEl.object3D.add(this.camera);
+            },
+            remove: function () {
+                this.el.sceneEl.object3D.remove(this.camera);
+                this.camera = null;
+            },
+            tick: function (t, dt) {
+                const camera = this.camera;
+                camera.position.copy(this.el.object3D.getWorldPosition(new THREE.Vector3()).normalize().multiplyScalar(150));
+                camera.up = new THREE.Vector3(0, 0, -1).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
+                camera.lookAt(0, 0, 0);
+            },
+            getCamera: function () {
+                return this.camera;
+            },
+        });
+
         AFRAME.registerComponent("obb-attack-forward-wave", {
             schema: {
                 center: {
@@ -7335,7 +7488,7 @@
                 if (!texture.image) {
                     return;
                 }
-                const camera = this.cameraEl.components['orthographic-camera'].getCamera();
+                const camera = (this.cameraEl.components['orthographic-camera'] ?? this.cameraEl.components['orthographic-camera-building']).getCamera();
                 if (!camera) {
                     return;
                 }
