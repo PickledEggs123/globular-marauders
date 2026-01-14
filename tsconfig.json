@@ -18,7 +18,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "incremental": true,
     "plugins": [
       {
@@ -29,7 +29,9 @@
   "include": [
     "build/types/**/*.ts",
     "src",
-    ".next/types/**/*.ts"
+    ".next/types/**/*.ts",
+    "build/dev/types/**/*.ts",
+    "build/dev/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

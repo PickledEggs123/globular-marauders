@@ -3309,6 +3309,22 @@
             }
         });
 
+        AFRAME.registerComponent("update-npc-position-entity", {
+            schema: {},
+            tick: function (t, dt) {
+                const parent = this.el.parentElement;
+                const center = this.el.parentElement.parentElement;
+                const centerHeight = parent.object3D.getWorldPosition(new THREE.Vector3()).length();
+
+                const scene = document.querySelector("a-scene");
+                scene.object3D.attach(this.el.object3D);
+                this.el.object3D.position.copy(this.el.object3D.getWorldPosition(new THREE.Vector3()).normalize().multiplyScalar(centerHeight));
+                this.el.object3D.up = this.el.object3D.getWorldPosition(new THREE.Vector3()).normalize();
+                this.el.object3D.lookAt(center.object3D.getWorldPosition(new THREE.Vector3()));
+                parent.object3D.attach(this.el.object3D);
+            },
+        });
+
         AFRAME.registerComponent('hide-trees-from-camera', {
             schema: {},
             init: function () {
@@ -4510,22 +4526,6 @@
             },
         });
 
-        AFRAME.registerComponent("update-npc-position-entity", {
-            schema: {},
-            tick: function (t, dt) {
-                const parent = this.el.parentElement;
-                const center = this.el.parentElement.parentElement;
-                const centerHeight = parent.object3D.getWorldPosition(new THREE.Vector3()).length();
-
-                const scene = document.querySelector("a-scene");
-                scene.object3D.attach(this.el.object3D);
-                this.el.object3D.position.copy(this.el.object3D.getWorldPosition(new THREE.Vector3()).normalize().multiplyScalar(centerHeight));
-                this.el.object3D.up = this.el.object3D.getWorldPosition(new THREE.Vector3()).normalize();
-                this.el.object3D.lookAt(center.object3D.getWorldPosition(new THREE.Vector3()));
-                parent.object3D.attach(this.el.object3D);
-            },
-        });
-
         AFRAME.registerComponent("set-follow-id", {
             schema: {},
             init: function () {
@@ -4573,7 +4573,7 @@
         function addTemplate(templateId, charModelId, instanceModelId, memberMesh) {
             const scene = document.querySelector("a-scene");
 
-            const str = characterModels.get(charModelId);
+            const str = characterModels.get(charModelId).split("|")[0];
 
             const rootGoldCoin = document.createElement("a-entity");
             if (charModelId === "SHIP" || charModelId === "PIRATE_SHIP") {
@@ -4586,6 +4586,15 @@
                 dataEl.setAttribute("shadow", "");
                 rootGoldCoin.setAttribute("networked-ship-health", "");
                 rootGoldCoin.setAttribute("cannonball-collider", "");
+                rootGoldCoin.appendChild(dataEl);
+            } else if (charModelId === "WIZARD_TOWER") {
+                const dataEl = document.createElement("a-entity");
+                dataEl.setAttribute("class", "data");
+                dataEl.setAttribute("scale", "1 1 1");
+                dataEl.setAttribute("rotation", "-90 0 0");
+                getBuildingLodHash(str, 1000, "auto");
+                dataEl.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; memberMesh: ${memberMesh};`);
+                dataEl.setAttribute("shadow", "");
                 rootGoldCoin.appendChild(dataEl);
             } else {
                 getBuildingLodHash(str, 2000, "auto");
@@ -4665,6 +4674,35 @@
                 a.appendChild(t[0]);
 
                 if (charModelId === "SHIP" || charModelId === "PIRATE_SHIP") {
+                    if (!NAF.schemas.hasTemplate(`#${templateId}`)) {
+                        NAF.schemas.add({
+                            template: `#${templateId}`,
+                            components: [
+                                {
+                                    component: 'position',
+                                    requiresNetworkUpdate: NAF.utils.vectorRequiresUpdate(0.001)
+                                },
+                                {
+                                    component: 'rotation',
+                                    requiresNetworkUpdate: NAF.utils.vectorRequiresUpdate(0.5)
+                                },
+                                {
+                                    selector: '.data',
+                                    component: 'scale',
+                                },
+                                {
+                                    selector: '.data',
+                                    component: 'rotation',
+                                },
+                                {
+                                    selector: '.data',
+                                    component: 'globe-networked-instanced-mesh-member',
+                                    requiresNetworkUpdate: componentRequiresUpdate,
+                                },
+                            ]
+                        });
+                    }
+                } else if (charModelId === "WIZARD_TOWER") {
                     if (!NAF.schemas.hasTemplate(`#${templateId}`)) {
                         NAF.schemas.add({
                             template: `#${templateId}`,
@@ -4792,7 +4830,7 @@
             }
 
             if (characterModels.has(charModelId)) {
-                const str = characterModels.get(charModelId);
+                const str = characterModels.get(charModelId).split("|")[0];
 
                 // add graphics
                 getBuildingLodHash(str, 1000, "auto");
@@ -5067,7 +5105,12 @@
         }
 
         AFRAME.registerComponent("rise-out-of-ground", {
-            schema: {},
+            schema: {
+                position: {
+                    type: "vec3",
+                    default: new THREE.Vector3(),
+                },
+            },
             init: function () {
                 this.done = false;
                 this.begin = false;
@@ -5101,7 +5144,7 @@
                 if (this.begin && this.active) {
                     const l = THREE.MathUtils.mapLinear(+new Date() / 1000, this.startTime, this.endTime, -this.maxHeight, 0);
                     const c = THREE.MathUtils.clamp(l, -this.maxHeight, 0);
-                    this.el.object3D.position.set(0, 0, c);
+                    this.el.object3D.position.copy(this.data.position).add(new THREE.Vector3().copy(this.data.position).normalize().multiplyScalar(c));
                     if (c >= 0) {
                         this.active = false;
                     }
@@ -5117,6 +5160,7 @@
             const scene = document.querySelector("a-scene");
 
             const rootHouse = document.createElement("a-entity");
+            rootHouse.setAttribute("class", "wizard-tower");
             rootHouse.setAttribute("position", position);
             rootHouse.setAttribute("orthographic-camera-building", "");
             rootHouse.setAttribute("projected-texture__wizard-tower", "image: /meshes/WizardTowerProjection.png; enabled: true");
@@ -5124,54 +5168,27 @@
             scene.appendChild(rootHouse);
 
             setTimeout(() => {
-                rootHouse.setAttribute("projected-texture__wizard-tower", "image: /meshes/WizardTowerProjection.png; enabled: false");
+                rootHouse.setAttribute("projected-texture__wizard-tower", {
+                    enabled: false,
+                });
 
                 const type = "WIZARD_TOWER";
+                const str = characterModels.get(type).split("|")[0];
                 const point = [position.x, position.y, position.z];
-                const lookAt = [position.x, position.y, position.z].map(x => x * 2);
+                const lookAt = new THREE.Vector3(0, 0, -1).applyQuaternion(rootHouse.components["orthographic-camera-building"].camera.getWorldQuaternion(new THREE.Quaternion()));
+                rootHouse.setAttribute("rise-out-of-ground", {
+                    position,
+                });
+
                 const rootModel = document.createElement("a-entity");
-                rootModel.setAttribute("rise-out-of-ground", "");
-                rootModel.setAttribute("globe-lod", characterModels.get(type));
-                if (type === "PORT") {
-                    rootModel.setAttribute("scale", "0.1 0.1 0.1");
-                    rootModel.setAttribute("rotation", "90 0 0");
-                    rootModel.setAttribute("position", "0 -1.35 -0.5");
-                } else {
-                    rootModel.setAttribute("scale", "1 1 1");
-                    rootModel.setAttribute("rotation", "90 0 0");
-                    rootModel.setAttribute("position", "0 0 0");
-                }
+                rootModel.setAttribute("class", "data");
+                getBuildingLodHash(str, 1000, "auto");
+                rootModel.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; capacity: 1000; memberMesh: true`);
+                rootModel.setAttribute("scale", "1 1 1");
+                rootModel.setAttribute("rotation", "-90 0 0");
+                rootModel.setAttribute("position", "0 0 0");
                 rootHouse.appendChild(rootModel);
-
-                const lod0 = document.createElement("a-entity");
-                lod0.setAttribute("class", `lod0 clickable${type === "PORT" ? " port" : ""}`);
-                if (type !== "PORT") {
-                    lod0.setAttribute("go-on-land", "raze: true");
-                    lod0.setAttribute("spawn-gold", "");
-                    lod0.setAttribute("set-building-id", "");
-                }
-                lod0.setAttribute("shadow", "");
-                rootModel.appendChild(lod0);
-
-                const lod1 = document.createElement("a-entity");
-                lod1.setAttribute("class", `lod1 clickable${type === "PORT" ? " port" : ""}`);
-                if (type !== "PORT") {
-                    lod1.setAttribute("go-on-land", "raze: true");
-                    lod1.setAttribute("spawn-gold", "");
-                    lod1.setAttribute("set-building-id", "");
-                }
-                lod1.setAttribute("shadow", "");
-                rootModel.appendChild(lod1);
-
-                const lod2 = document.createElement("a-entity");
-                lod2.setAttribute("class", `lod2 clickable${type === "PORT" ? " port" : ""}`);
-                if (type !== "PORT") {
-                    lod2.setAttribute("go-on-land", "raze: true");
-                    lod2.setAttribute("spawn-gold", "");
-                    lod2.setAttribute("set-building-id", "");
-                }
-                lod2.setAttribute("shadow", "");
-                rootModel.appendChild(lod2);
+                rootHouse.setAttribute("networked", "template: #wizard-tower-template; attachTemplateToLocal: false;");
 
                 rootHouse.object3D.up = new THREE.Vector3(point[0], point[1], point[2]).normalize();
                 rootHouse.object3D.lookAt(new THREE.Vector3(lookAt[0], lookAt[1], lookAt[2]));
@@ -5327,6 +5344,10 @@
                 }
                 case "PIRATE_SHIP": {
                     addTemplate("pirate-ship-template", "PIRATE_SHIP", "pirate-ship-model", false);
+                    break;
+                }
+                case "WIZARD_TOWER": {
+                    addTemplate("wizard-tower-template", "WIZARD_TOWER", "wizard-tower-model", false);
                     break;
                 }
             }
