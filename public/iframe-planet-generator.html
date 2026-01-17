@@ -3004,7 +3004,10 @@
                             scene.emit("set-npc-indicator", destination1.clone());
                             scene.emit("clear-ship-indicator");
 
-                            addGhostBuilding(destination1.clone());
+                            const buildMenuState = document.querySelector("#build-menu-state");
+                            if (buildMenuState.hasAttribute("wizard-tower-build")) {
+                                addGhostBuilding(destination1.clone());
+                            }
                         }
                     }, "go-on-land");
                 });
@@ -5156,6 +5159,8 @@
             },
         });
 
+        let ghostBuilding = null;
+
         function addGhostBuilding(position) {
             const scene = document.querySelector("a-scene");
 
@@ -5166,8 +5171,13 @@
             rootHouse.setAttribute("projected-texture__wizard-tower", "image: /meshes/WizardTowerProjection.png; enabled: true");
 
             scene.appendChild(rootHouse);
+            if (ghostBuilding) {
+                scene.removeChild(ghostBuilding);
+                ghostBuilding = null;
+            }
+            ghostBuilding = rootHouse;
 
-            setTimeout(() => {
+            rootHouse.buildActivate = () => {
                 rootHouse.setAttribute("projected-texture__wizard-tower", {
                     enabled: false,
                 });
@@ -5192,7 +5202,7 @@
 
                 rootHouse.object3D.up = new THREE.Vector3(point[0], point[1], point[2]).normalize();
                 rootHouse.object3D.lookAt(new THREE.Vector3(lookAt[0], lookAt[1], lookAt[2]));
-            }, 5000);
+            };
         }
 
         function addWizardNpc() {
@@ -5706,6 +5716,18 @@
                     type: "boolean",
                     default: false,
                 },
+                menuShow: {
+                    type: "boolean",
+                    default: false,
+                },
+                hammerShow: {
+                    type: "boolean",
+                    default: false,
+                },
+                buildShow: {
+                    type: "boolean",
+                    default: false,
+                },
             },
             tick: function (t, dt) {
                 const scene = document.querySelector("a-scene");
@@ -5719,6 +5741,17 @@
                             this.el.object3D.visible = !!wizard;
                         } else {
                             this.el.object3D.visible = !wizard;
+                        }
+
+                        const buildMenuState = scene.querySelector("#build-menu-state");
+                        if (this.data.menuShow && this.data.wizardShow) {
+                            this.el.object3D.visible = !buildMenuState.hasAttribute("show-build") && !buildMenuState.hasAttribute("show-hammer");
+                        }
+                        if (this.data.buildShow && this.data.wizardShow) {
+                            this.el.object3D.visible = buildMenuState.hasAttribute("show-build");
+                        }
+                        if (this.data.hammerShow && this.data.wizardShow) {
+                            this.el.object3D.visible = buildMenuState.hasAttribute("show-hammer");
                         }
                     }
                 }
@@ -5882,6 +5915,41 @@
                     if (firstClick) {
                         cameraEl.setAttribute("look-at-box", selector);
                     }
+                } else if (this.data.selector === "wizard-tower-build") {
+                    const buildMenuState = document.querySelector("#build-menu-state");
+                    buildMenuState.removeAttribute("show-hammer");
+                    buildMenuState.setAttribute("show-build", "");
+                    buildMenuState.setAttribute("wizard-tower-build", "");
+
+                }  else if (this.data.selector === "hammer-build") {
+                    const buildMenuState = document.querySelector("#build-menu-state");
+                    buildMenuState.setAttribute("show-hammer", "");
+                    buildMenuState.removeAttribute("show-build");
+                    buildMenuState.removeAttribute("wizard-tower-build");
+
+                } else if (this.data.selector === "cancel-build") {
+                    const buildMenuState = document.querySelector("#build-menu-state");
+                    buildMenuState.removeAttribute("show-hammer");
+                    buildMenuState.removeAttribute("show-build");
+                    buildMenuState.removeAttribute("wizard-tower-build");
+                    const scene = document.querySelector("a-scene");
+                    if (ghostBuilding) {
+                        scene.removeChild(ghostBuilding);
+                        ghostBuilding = null;
+                    }
+
+                } else if (this.data.selector === "ok-build") {
+                    if (!ghostBuilding) {
+                        return;
+                    }
+
+                    ghostBuilding.buildActivate();
+                    ghostBuilding = null;
+                    const buildMenuState = document.querySelector("#build-menu-state");
+                    buildMenuState.removeAttribute("show-hammer");
+                    buildMenuState.removeAttribute("show-build");
+                    buildMenuState.removeAttribute("wizard-tower-build");
+
                 } else if (this.data.selector === "forward-attack") {
                     const selector = `.${scene.components['coin-purse'].getUnit()} .wizard-area-of-effect`;
                     const el = document.querySelector(selector);
@@ -6647,6 +6715,10 @@
              * Trigger mousedown and keep track of the mousedowned entity.
              */
             onCursorDown: function (evt) {
+                if (!this.el.object3D.visible) {
+                    return;
+                }
+
                 this.isCursorDown = true;
                 // Raycast again for touch.
                 if (this.data.rayOrigin === 'mouse' && (evt.type === 'touchstart' || evt.type === 'click')) {
@@ -7649,7 +7721,11 @@
                 <a-entity id="none-cannon-fire" align-with-projection="offset: 0 -0.2 -0.5; rotation: 0 0 0; scale: 0.015 0.015 0.015;" gltf-model="/meshes/Model_Redo/Ship Wheel/ShipWheel.glb" select-cannon-side="selector: none-cannon" ui-clicked></a-entity>
                 <a-entity id="area-attack-fire" align-with-projection="offset: 0.2 -0.2 -0.5; rotation: 90 0 0; scale: 0.015 0.015 0.015; wizardShow: true;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" select-cannon-side="selector: area-attack" play-all-animations ui-clicked></a-entity>
                 <a-entity id="forward-attack-fire" align-with-projection="offset: -0.2 -0.2 -0.5; rotation: 0 90 0; scale: 0.015 0.015 0.015; wizardShow: true;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" select-cannon-side="selector: forward-attack" play-all-animations ui-clicked></a-entity>
-                <a-entity id="hammer-build" align-with-projection="offset: -0.05 -0.2 -0.5; rotation: 0 90 0; scale: 0.03 0.03 0.03; wizardShow: true;" gltf-model="/meshes/ui/build/Hammer.glb" select-cannon-side="selector: hammer-build" ui-clicked></a-entity>
+                <a-entity id="hammer-build" align-with-projection="offset: -0.05 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03; wizardShow: true; menuShow: true;" gltf-model="/meshes/ui/build/Hammer.glb" select-cannon-side="selector: hammer-build" ui-clicked></a-entity>
+                <a-entity id="ok-build" align-with-projection="offset: -0.03 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03; wizardShow: true; buildShow: true;" gltf-model="/meshes/ui/build/Ok.glb" select-cannon-side="selector: ok-build" ui-clicked></a-entity>
+                <a-entity id="cancel-build" align-with-projection="offset: 0.03 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03; wizardShow: true; buildShow: true;" gltf-model="/meshes/ui/build/Cancel.glb" select-cannon-side="selector: cancel-build" ui-clicked></a-entity>
+                <a-entity id="wizard-tower-build" align-with-projection="offset: 0.06 -0.4 -1; rotation: 0 -90 0; scale: 0.015 0.015 0.015; wizardShow: true; hammerShow: true;" gltf-model="/meshes/WizardTower.glb" select-cannon-side="selector: wizard-tower-build" ui-clicked></a-entity>
+                <a-entity id="build-menu-state"></a-entity>
             </a-entity>
         </a-entity>
     </a-scene>
