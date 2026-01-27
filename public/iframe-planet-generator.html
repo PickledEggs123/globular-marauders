@@ -32,6 +32,932 @@
             }
         }
     </script>
+    <script type="module">
+        import ProjectedMaterial from './ProjectedMaterial.module.js';
+        import {OBB} from './lib/three/addons/math/OBB.js';
+        import ParticleSystem, {
+            BoxZone,
+            Color,
+            CrossZone,
+            CustomRenderer,
+            ease,
+            Emitter,
+            Life,
+            Mass,
+            RadialVelocity,
+            Radius,
+            Rate,
+            Rotate,
+            Scale,
+            Span,
+            Vector3D
+        } from './lib/three/nebula/index.js';
+
+        const createZone = (position) => {
+            const zone = new BoxZone(position.x, position.y, position.z, 5, 5, 5);
+
+            zone.friction = 0.95;
+            zone.max = 7;
+
+            return zone;
+        };
+
+        const createEmitter = (zone, position, particleType) => {
+            const emitter = new Emitter();
+
+            emitter
+                .setRate(particleType === 'damage' ? new Rate(new Span(2, 4), new Span(0.5, 1)) : new Rate(new Span(1, 2), new Span(0.5, 1)))
+                .addInitializers([
+                    new Mass(1),
+                    new Radius(0.1, 0.1, false),
+                    new Life(2, 4),
+                    new RadialVelocity(1, new Vector3D(0, 1, 0), 180),
+                ])
+                .addBehaviours([
+                    new Rotate('random', 'random'),
+                    new Scale(0.2, 0.05),
+
+                    new CrossZone(zone, 'bound'),
+                    new Color(0xff0000, 'random', Infinity, ease.easeOutQuart),
+                ])
+                .setPosition(position)
+                .emit();
+
+            return emitter;
+        };
+
+        AFRAME.registerSystem("damage-particles", {
+            schema: {},
+            init: function () {
+                this.particleSystems = [];
+            },
+            addParticleSystem: function (particleSystem) {
+                const time = +new Date();
+                this.particleSystems.push({
+                    particleSystem,
+                    time,
+                });
+            },
+            tick: function (t, dt) {
+                for (const {particleSystem} of this.particleSystems) {
+                    particleSystem.update(dt / 1000);
+                }
+                const newTime = +new Date();
+                this.particleSystems = this.particleSystems.filter(x => x.time + 60_000 > newTime);
+            },
+        });
+
+        AFRAME.registerComponent("damage-particles", {
+            schema: {
+                particleType: {
+                    default: "damage",
+                    oneOf: ["damage", "smoke", "dirt", "water"],
+                },
+            },
+            init: function () {
+                const position = this.el.object3D.position.clone();
+                this.zone = createZone(position);
+                this.emitter = createEmitter(this.zone, position, this.data.particleType);
+
+                this.particleSystem = new ParticleSystem();
+                this.renderer = new CustomRenderer();
+
+                switch (this.data.particleType) {
+                    case "damage": {
+                        this.mesh = new THREE.Mesh(
+                            new THREE.BoxGeometry(1, 1, 1),
+                            new THREE.MeshNormalMaterial()
+                        );
+                        break;
+                    }
+                    case "smoke": {
+                        const imageElement = document.querySelector("#fog");
+                        const textureLoader = new THREE.TextureLoader();
+                        const map = textureLoader.load(imageElement.src);
+                        this.mesh = new THREE.Mesh(
+                            new THREE.BoxGeometry(1, 1, 1),
+                            new THREE.MeshStandardMaterial({
+                                map,
+                                color: '#ffffff',
+                                alphaTest: 0.01,
+                                transparent: true,
+                            })
+                        );
+                        break;
+                    }
+                    case "dirt": {
+                        const imageElement = document.querySelector("#blob");
+                        const textureLoader = new THREE.TextureLoader();
+                        const map = textureLoader.load(imageElement.src);
+                        this.mesh = new THREE.Mesh(
+                            new THREE.BoxGeometry(1, 1, 1),
+                            new THREE.MeshStandardMaterial({
+                                map,
+                                color: '#9B7653',
+                                alphaTest: 0.01,
+                                transparent: true,
+                            })
+                        );
+                        break;
+                    }
+                    case "water": {
+                        const imageElement = document.querySelector("#fog");
+                        const textureLoader = new THREE.TextureLoader();
+                        const map = textureLoader.load(imageElement.src);
+                        this.mesh = new THREE.Mesh(
+                            new THREE.BoxGeometry(1, 1, 1),
+                            new THREE.MeshStandardMaterial({
+                                map,
+                                color: '#5555ff',
+                                alphaTest: 0.01,
+                                transparent: true,
+                            })
+                        );
+                        break;
+                    }
+                }
+                const mesh = this.mesh;
+                const scene = this.el.sceneEl.object3D;
+
+                this.renderer.onParticleCreated = function (p) {
+                    p.target = this.targetPool.get(mesh);
+
+                    p.target.position.copy(p.position);
+                    scene.add(p.target);
+                };
+
+                this.renderer.onParticleUpdate = function (p) {
+                    const scale = p.scale;
+
+                    p.target.position.copy(p.position);
+                    p.target.rotation.set(p.rotation.x, p.rotation.y, p.rotation.z);
+                    p.target.scale.set(scale, scale, scale);
+                };
+
+                this.renderer.onParticleDead = function (p) {
+                    this.targetPool.expire(p.target);
+                    scene.remove(p.target);
+
+                    p.target = null;
+                };
+
+                this.particleSystem.addRenderer(this.renderer);
+                this.particleSystem.addEmitter(this.emitter);
+                this.system.addParticleSystem(this.particleSystem);
+            },
+            tick: function (t, dt) {
+                const position = this.el.object3D.getWorldPosition(new THREE.Vector3());
+                this.emitter.position.copy(position);
+                this.zone.x = position.x;
+                this.zone.y = position.y;
+                this.zone.z = position.z;
+            },
+            remove: function () {
+                this.emitter.destroy();
+                this.emitter = null;
+            },
+        });
+
+        AFRAME.registerComponent("orthographic-camera", {
+            schema: {},
+            init: function () {
+                this.camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 100);
+                this.el.sceneEl.object3D.add(this.camera);
+            },
+            remove: function () {
+                this.el.sceneEl.object3D.remove(this.camera);
+                this.camera = null;
+            },
+            tick: function (t, dt) {
+                const camera = this.camera;
+                camera.position.copy(this.el.object3D.getWorldPosition(new THREE.Vector3()).normalize().multiplyScalar(150));
+                camera.up = new THREE.Vector3(0, 0, -1).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
+                camera.lookAt(0, 0, 0);
+            },
+            getCamera: function () {
+                return this.camera;
+            },
+        });
+
+        AFRAME.registerComponent("orthographic-camera-building", {
+            schema: {},
+            init: function () {
+                this.camera = new THREE.OrthographicCamera(-8, 8, 8, -8, 0.1, 100);
+                this.el.sceneEl.object3D.add(this.camera);
+            },
+            remove: function () {
+                this.el.sceneEl.object3D.remove(this.camera);
+                this.camera = null;
+            },
+            tick: function (t, dt) {
+                const camera = this.camera;
+                camera.position.copy(this.el.object3D.getWorldPosition(new THREE.Vector3()).normalize().multiplyScalar(150));
+                camera.up = new THREE.Vector3(0, 0, -1).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
+                camera.lookAt(0, 0, 0);
+            },
+            getCamera: function () {
+                return this.camera;
+            },
+        });
+
+        AFRAME.registerComponent("obb-attack-forward-wave", {
+            schema: {
+                center: {
+                    type: "vec3",
+                    default: new THREE.Vector3(0, 0, 0),
+                },
+                dimension: {
+                    type: "vec3",
+                    default: new THREE.Vector3(0, 0, 0),
+                },
+                debug: {
+                    type: "boolean",
+                    default: false,
+                },
+                ratio: {
+                    type: "number",
+                    default: 0.1
+                },
+                speed: {
+                    type: "number",
+                    default: 1,
+                },
+            },
+            multiple: true,
+            remove: function () {
+                if (this.m) {
+                    this.el.sceneEl.object3D.remove(this.m);
+                    this.m = null;
+                }
+                this.b = null;
+                this.material = null;
+
+                if (this.fireball) {
+                    this.el.removeChild(this.fireball);
+                }
+                this.fireball = null;
+            },
+            init: function () {
+                this.startTime = null;
+                this.endTime = null;
+                this.npcSet = new Set();
+
+                this.fireball = null;
+            },
+            tick: function (t, dt) {
+                if (!this.fireball) {
+                    this.fireball = document.createElement("a-entity");
+                    this.fireball.setAttribute("gltf-model", "/meshes/EpicStore/Fireball/source/Fireball.glb");
+                    this.fireball.setAttribute("play-all-animations", "");
+                    this.el.appendChild(this.fireball);
+
+                    if (this.fireball.getObject3D("mesh")) {
+                        this.startTime = (+new Date() / 1000);
+                        this.endTime = this.startTime + this.data.speed;
+                    } else {
+                        this.fireball.addEventListener("model-loaded", () => {
+                            this.startTime = (+new Date() / 1000);
+                            this.endTime = this.startTime + this.data.speed;
+                        });
+                    }
+                }
+
+                if (!this.startTime || !this.endTime) {
+                    return;
+                }
+
+                const dimension = new THREE.Vector3().copy(this.data.dimension);
+                const ratioDimension = dimension.clone().multiply(new THREE.Vector3(1, 1, this.data.ratio));
+                let center = new THREE.Vector3().copy(this.data.center);
+                const ratioCenterStart = center.clone().add(dimension.clone()).sub(ratioDimension.clone());
+                const ratioCenterEnd = center.clone().sub(dimension.clone()).add(ratioDimension.clone());
+                const linear = THREE.MathUtils.mapLinear(+new Date() / 1000, this.startTime, this.endTime, 0, 1);
+                const clamp = THREE.MathUtils.clamp(linear, 0, 1);
+                const ratioCenter = new THREE.Vector3().lerpVectors(ratioCenterStart, ratioCenterEnd, clamp);
+
+                if (linear > 1) {
+                    this.el.removeAttribute("obb-attack-forward-wave");
+                    return;
+                }
+
+                center = ratioCenter.clone().negate().applyMatrix4(this.el.object3D.matrixWorld);
+                const raycaster = new THREE.Raycaster(center.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), center.clone().negate());
+                const intersections = raycaster.intersectObjects([
+                    this.el.sceneEl.systems['globe-nav'].getNavMesh(),
+                    this.el.sceneEl.systems['globe-ocean-nav'].getNavMesh(),
+                ]);
+                if (intersections.length === 0) {
+                    return;
+                }
+                center = intersections[0].point;
+
+                if (this.data.debug) {
+                    this.b = new THREE.BoxGeometry(1, 1, 1);
+                    if (!this.material) {
+                        this.material = new THREE.MeshBasicMaterial({
+                            color: 0xff0000,
+                            wireframe: true
+                        });
+                    }
+                    if (this.m) {
+                        this.el.sceneEl.object3D.remove(this.m);
+                        this.m = null;
+                    }
+                    if (!this.m) {
+                        this.m = new THREE.Mesh(this.b, this.material);
+                        this.m.scale.copy(ratioDimension.clone().multiplyScalar(2));
+                        this.m.position.copy(center.clone());
+                        this.m.quaternion.copy(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
+                        this.el.sceneEl.object3D.add(this.m);
+                    }
+                }
+
+                if (this.fireball) {
+                    const scene = this.el.sceneEl.object3D;
+                    scene.attach(this.fireball.object3D);
+                    this.fireball.object3D.position.copy(center.clone().add(center.clone().normalize()));
+                    this.fireball.object3D.up = center.clone().normalize();
+                    this.fireball.object3D.quaternion.copy(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
+                    this.fireball.object3D.scale.copy(new THREE.Vector3(0.2, 0.2, 0.2));
+                    this.el.object3D.attach(this.fireball.object3D);
+                }
+
+                const obb = new OBB();
+                obb.center.copy(center);
+                obb.halfSize.copy(ratioDimension);
+                obb.rotation.setFromMatrix4(this.el.object3D.matrixWorld);
+
+                const radius = 20;
+                const position = center;
+                const group = this.el.sceneEl.systems['globe-nav'].getGroup(position);
+                const factionName = findParentAttribute(this.el, 'npc-faction').data;
+                if (this.el.sceneEl.systems['npc-finder'].islandNpcList.has(group)) {
+                    const list = this.el.sceneEl.systems['npc-finder'].islandNpcList.get(group);
+                    const els = list.filter(x => {
+                        const pos = x.object3D.position;
+                        const dist = position.distanceTo(pos);
+                        return dist <= radius;
+                    });
+                    const filtered = els.filter(x => x && x.components['npc-faction'].data !== factionName);
+                    const npcs = filtered.sort((a, b) => {
+                        const distA = new THREE.Vector3().copy(a.object3D.position).distanceTo(position);
+                        const distB = new THREE.Vector3().copy(b.object3D.position).distanceTo(position);
+                        return distA - distB;
+                    });
+                    npcs.forEach(npc => {
+                        if (obb.containsPoint(npc.object3D.position)) {
+                            if (!this.npcSet.has(npc)) {
+                                this.npcSet.add(npc);
+                                npc.emit("hit", 100);
+                            }
+                        }
+                    })
+                }
+            },
+        });
+
+        AFRAME.registerComponent("obb-attack-center-wave", {
+            schema: {
+                center: {
+                    type: "vec3",
+                    default: new THREE.Vector3(0, 0, 0),
+                },
+                dimension: {
+                    type: "vec3",
+                    default: new THREE.Vector3(0, 0, 0),
+                },
+                debug: {
+                    type: "boolean",
+                    default: false,
+                },
+                height: {
+                    type: "number",
+                    default: 50,
+                },
+                speed: {
+                    type: "number",
+                    default: 1,
+                },
+            },
+            multiple: true,
+            remove: function () {
+                if (this.m) {
+                    this.el.sceneEl.object3D.remove(this.m);
+                    this.m = null;
+                }
+                this.b = null;
+                this.material = null;
+
+                if (this.fireball) {
+                    this.el.removeChild(this.fireball);
+                }
+                this.fireball = null;
+            },
+            init: function () {
+                this.startTime = null;
+                this.endTime = null;
+                this.npcSet = new Set();
+
+                this.fireball = null;
+            },
+            tick: function (t, dt) {
+                if (!this.fireball) {
+                    this.fireball = document.createElement("a-entity");
+                    this.fireball.setAttribute("gltf-model", "/meshes/EpicStore/Fireball/source/Fireball.glb");
+                    this.fireball.setAttribute("play-all-animations", "");
+                    this.el.appendChild(this.fireball);
+
+                    if (this.fireball.getObject3D("mesh")) {
+                        this.startTime = (+new Date() / 1000);
+                        this.endTime = this.startTime + this.data.speed;
+                    } else {
+                        this.fireball.addEventListener("model-loaded", () => {
+                            this.startTime = (+new Date() / 1000);
+                            this.endTime = this.startTime + this.data.speed;
+                        });
+                    }
+                }
+
+                if (!this.startTime || !this.endTime) {
+                    return;
+                }
+
+                const dimension = new THREE.Vector3().copy(this.data.dimension);
+                let center = new THREE.Vector3().copy(this.data.center);
+                const linear = THREE.MathUtils.mapLinear(+new Date() / 1000, this.startTime, this.endTime, 0, 1);
+                const clamp = THREE.MathUtils.clamp(linear, 0, 1);
+
+                if (linear > 1) {
+                    const obb = new OBB();
+                    obb.center.copy(center);
+                    obb.halfSize.copy(dimension);
+                    obb.rotation.setFromMatrix4(this.el.object3D.matrixWorld);
+
+                    const radius = 20;
+                    const position = center;
+                    const group = this.el.sceneEl.systems['globe-nav'].getGroup(position);
+                    const factionName = findParentAttribute(this.el, 'npc-faction').data;
+                    if (this.el.sceneEl.systems['npc-finder'].islandNpcList.has(group)) {
+                        const list = this.el.sceneEl.systems['npc-finder'].islandNpcList.get(group);
+                        const els = list.filter(x => {
+                            const pos = x.object3D.position;
+                            const dist = position.distanceTo(pos);
+                            return dist <= radius;
+                        });
+                        const filtered = els.filter(x => x && x.components['npc-faction'].data !== factionName);
+                        const npcs = filtered.sort((a, b) => {
+                            const distA = new THREE.Vector3().copy(a.object3D.position).distanceTo(position);
+                            const distB = new THREE.Vector3().copy(b.object3D.position).distanceTo(position);
+                            return distA - distB;
+                        });
+                        npcs.forEach(npc => {
+                            if (obb.containsPoint(npc.object3D.position)) {
+                                if (!this.npcSet.has(npc)) {
+                                    this.npcSet.add(npc);
+                                    npc.emit("hit", 100);
+                                }
+                            }
+                        })
+                    }
+
+                    this.el.removeAttribute("obb-attack-center-wave");
+                } else {
+                    center = center.clone().negate().applyMatrix4(this.el.object3D.matrixWorld);
+                    const raycaster = new THREE.Raycaster(center.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), center.clone().negate());
+                    const intersections = raycaster.intersectObjects([
+                        this.el.sceneEl.systems['globe-nav'].getNavMesh(),
+                        this.el.sceneEl.systems['globe-ocean-nav'].getNavMesh(),
+                    ]);
+                    if (intersections.length === 0) {
+                        return;
+                    }
+                    center = intersections[0].point;
+                    const centerStart = new THREE.Vector3().copy(center).add(center.clone().normalize().multiplyScalar(this.data.height));
+                    const centerEnd = center.clone();
+                    const ratioCenter = new THREE.Vector3().lerpVectors(centerStart, centerEnd, clamp);
+                    center = ratioCenter.clone();
+
+                    if (this.data.debug) {
+                        this.b = new THREE.BoxGeometry(1, 1, 1);
+                        if (!this.material) {
+                            this.material = new THREE.MeshBasicMaterial({
+                                color: 0xff0000,
+                                wireframe: true
+                            });
+                        }
+                        if (this.m) {
+                            this.el.sceneEl.object3D.remove(this.m);
+                            this.m = null;
+                        }
+                        if (!this.m) {
+                            this.m = new THREE.Mesh(this.b, this.material);
+                            this.m.scale.copy(dimension.clone().multiplyScalar(2));
+                            this.m.position.copy(center.clone());
+                            this.m.up = new THREE.Vector3(0, 0, 1).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
+                            this.m.lookAt(center.clone());
+                            this.el.sceneEl.object3D.add(this.m);
+                        }
+                    }
+
+                    if (this.fireball) {
+                        const scene = this.el.sceneEl.object3D;
+                        scene.attach(this.fireball.object3D);
+                        this.fireball.object3D.position.copy(center.clone().add(center.clone().normalize()));
+                        this.fireball.object3D.up = new THREE.Vector3(0, 0, 1).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
+                        this.fireball.object3D.lookAt(center.clone());
+                        this.fireball.object3D.scale.copy(new THREE.Vector3(0.2, 0.2, 0.2));
+                        this.el.object3D.attach(this.fireball.object3D);
+                    }
+                }
+            },
+        });
+
+        AFRAME.registerComponent("wizard-mana", {
+            init: function () {
+                const time = +new Date();
+                this.startTime = time - 10_000;
+                this.endTime = time;
+            },
+            shouldAttack: function () {
+                const time = +new Date();
+                if (time > this.endTime) {
+                    this.startTime = time;
+                    this.endTime = time + 10_000;
+                    return true;
+                } else {
+                    return false;
+                }
+            },
+            canAttack: function () {
+                const time = +new Date();
+                return time > this.endTime;
+            },
+        });
+
+        AFRAME.registerComponent("obb-attack-zone", {
+            schema: {
+                center: {
+                    type: "vec3",
+                    default: new THREE.Vector3(0, 0, 0),
+                },
+                dimension: {
+                    type: "vec3",
+                    default: new THREE.Vector3(0, 0, 0),
+                },
+                debug: {
+                    type: "boolean",
+                    default: false,
+                },
+            },
+            multiple: true,
+            remove: function () {
+                if (this.m) {
+                    this.el.sceneEl.object3D.remove(this.m);
+                    this.m = null;
+                }
+                this.b = null;
+                this.material = null;
+            },
+            tick: function () {
+                if (this.data.debug) {
+                    this.b = new THREE.BoxGeometry(1, 1, 1);
+                    if (!this.material) {
+                        this.material = new THREE.MeshBasicMaterial({
+                            color: 0xff0000,
+                            wireframe: true
+                        });
+                    }
+                    if (this.m) {
+                        this.el.sceneEl.object3D.remove(this.m);
+                        this.m = null;
+                    }
+                    if (!this.m) {
+                        this.m = new THREE.Mesh(this.b, this.material);
+                        this.m.scale.copy(new THREE.Vector3().copy(this.data.dimension).multiplyScalar(2));
+                        this.m.position.copy(new THREE.Vector3().copy(this.data.center).negate().applyMatrix4(this.el.object3D.matrixWorld));
+                        this.m.quaternion.copy(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
+                        this.el.sceneEl.object3D.add(this.m);
+                    }
+                }
+            },
+            attack: function () {
+                if (!findParentAttribute(this.el, "wizard-mana")?.shouldAttack()) {
+                    return;
+                }
+
+                if (new THREE.Vector3().copy(this.data.center).length() === 0) {
+                    if (this.el.hasAttribute("obb-attack-center-wave")) {
+                        this.el.removeAttribute("obb-attack-center-wave");
+                    }
+                    this.el.setAttribute("obb-attack-center-wave", {
+                        center: this.data.center,
+                        dimension: this.data.dimension,
+                        debug: false,
+                        height: 20,
+                        speed: 2,
+                    });
+                } else {
+                    if (this.el.hasAttribute("obb-attack-forward-wave")) {
+                        this.el.removeAttribute("obb-attack-forward-wave");
+                    }
+                    this.el.setAttribute("obb-attack-forward-wave", {
+                        center: this.data.center,
+                        dimension: this.data.dimension,
+                        debug: false,
+                        ratio: 0.2,
+                    });
+                }
+            }
+        })
+
+        class NavMeshTriangles {
+            constructor(geometry) {
+                this.vertices = [];
+                for (let i = 0; i < geometry.attributes.position.array.length; i += 3) {
+                    const vertex = new THREE.Vector3(
+                        geometry.attributes.position.array[i],
+                        geometry.attributes.position.array[i + 1],
+                        geometry.attributes.position.array[i + 2]
+                    );
+                    this.vertices.push(vertex);
+                }
+                this.nextIndex = Math.round(this.vertices.length / 3);
+                this.indices = [...geometry.index.array];
+
+                const groupEls = document.querySelectorAll("[grass-particles]");
+                const groups = [...groupEls].map(x => ({
+                    vertex: new THREE.Vector3().copy(x.components["grass-particles"].data.origin),
+                    faces: [],
+                }));
+                this.faces = [];
+                for (let i = 0; i < this.indices.length; i += 3) {
+                    this.faces.push(this.makeFaceObject(i));
+                }
+                this.groups = groups.map(x => ({
+                    vertex: x.vertex,
+                    faces: this.faces.filter(y => y.centroid.distanceTo(x.vertex) < 30),
+                }));
+            }
+            makeFaceObject(i) {
+                const a = this.indices[i];
+                const b = this.indices[i + 1];
+                const c = this.indices[i + 2];
+                const centroid = new THREE.Vector3().add(this.vertices[a]).add(this.vertices[b]).add(this.vertices[c]).multiplyScalar(1/3);
+                return {
+                    a, b, c,
+                    centroid,
+                    faceIndex: Math.round(i / 3),
+                };
+            }
+            insertPoint(point, faceIndex, face) {
+                this.nextIndex = Math.round(this.vertices.length / 3);
+                this.vertices.push(point.clone());
+                this.indices.splice(faceIndex, 3,
+                    this.nextIndex, face.a, face.b,
+                    this.nextIndex, face.b, face.c,
+                    this.nextIndex, face.c, face.a
+                );
+                this.faces.splice(faceIndex, 1, this.makeFaceObject(faceIndex * 3), this.makeFaceObject(faceIndex * 3 + 3), this.makeFaceObject(faceIndex * 3 + 6));
+                for (let i = faceIndex + 3; i < this.faces.length; i++) {
+                    this.faces[i].faceIndex += 2;
+                }
+            }
+            insertMesh(mesh, matrixWorld) {
+                const scene = document.querySelector("a-scene");
+                if (!scene) {
+                    return;
+                }
+                let m = scene.systems['globe-nav'].getNavMesh();
+                if (!m) {
+                    return;
+                }
+
+                const geometry = mesh.geometry;
+                geometry.computeBoundingBox();
+
+                const obb = new OBB();
+                const position = new THREE.Vector3();
+                position.setFromMatrixPosition(matrixWorld);
+                obb.center.copy(geometry.boundingBox.getCenter(new THREE.Vector3()).add(position.clone()));
+                obb.halfSize.copy(geometry.boundingBox.getSize(new THREE.Vector3()).multiplyScalar(0.5));
+                obb.rotation.copy(new THREE.Matrix3().setFromMatrix4(matrixWorld));
+
+                // Function to get OBB corner points
+                function getOBBPoints(obb) {
+                    const points = [];
+                    const dirs = [
+                        // new THREE.Vector3(-1, -1, -1),
+                        // new THREE.Vector3( 1, -1, -1),
+                        // new THREE.Vector3( 1,  1, -1),
+                        // new THREE.Vector3(-1,  1, -1),
+                        new THREE.Vector3(-1, -1,  1),
+                        new THREE.Vector3( 1, -1,  1),
+                        new THREE.Vector3( 1,  1,  1),
+                        new THREE.Vector3(-1,  1,  1),
+                    ];
+
+                    for (let dir of dirs) {
+                        const corner = new THREE.Vector3().copy(obb.center);
+                        const basisX = new THREE.Vector3();
+                        const basisY = new THREE.Vector3();
+                        const basisZ = new THREE.Vector3();
+                        obb.rotation.extractBasis(basisX, basisY, basisZ);
+                        corner.addScaledVector(basisX, dir.x * obb.halfSize.x);
+                        corner.addScaledVector(basisY, dir.y * obb.halfSize.y);
+                        corner.addScaledVector(basisZ, dir.z * obb.halfSize.z);
+                        points.push(corner);
+                    }
+                    return points;
+                }
+
+// Get and log OBB points
+                const obbPoints = getOBBPoints(obb);
+                const pp = obbPoints[0];
+                if (!pp) {
+                    return;
+                }
+                const [,closestGroup] = this.groups.reduce((acc, x) => {
+                    const d = x.vertex.distanceTo(pp);
+                    if (acc[0] > d) {
+                        return [d, x];
+                    } else {
+                        return acc;
+                    }
+                }, [Infinity, null]);
+                if (!closestGroup) {
+                    return;
+                }
+
+                for (const p of obbPoints) {
+                    for (const f of closestGroup.faces) {
+                        if (this.isPointInFace(f, p)) {
+                            const raycaster = new THREE.Raycaster(p.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), p.clone().negate());
+                            const intersections = raycaster.intersectObjects([
+                                scene.systems['globe-nav'].getNavMesh(),
+                            ]);
+                            if (intersections[0]) {
+                                const ip = intersections[0].point.clone();
+                                this.insertPoint(ip, intersections[0].faceIndex, this.faces[intersections[0].faceIndex]);
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                const groupEls = document.querySelectorAll("[grass-particles]");
+                const groups = [...groupEls].map(x => ({
+                    vertex: new THREE.Vector3().copy(x.components["grass-particles"].data.origin),
+                    faces: [],
+                }));
+                this.groups = groups.map(x => ({
+                    vertex: x.vertex,
+                    faces: this.faces.filter(y => y.centroid.distanceTo(x.vertex) < 30),
+                }));
+            }
+            isPointInFace(face, point) {
+                const crossProducts = [
+                    new THREE.Vector3().crossVectors(this.vertices[face.a].clone().normalize(), this.vertices[face.b].clone().normalize()),
+                    new THREE.Vector3().crossVectors(this.vertices[face.b].clone().normalize(), this.vertices[face.c].clone().normalize()),
+                    new THREE.Vector3().crossVectors(this.vertices[face.c].clone().normalize(), this.vertices[face.a].clone().normalize()),
+                ];
+
+                const inner = crossProducts.every(cc => {
+                    const c = cc.clone();
+                    const p = point.clone();
+                    return c.x * p.x + c.y * p.y + c.z * p.z > 0;
+                });
+                const outer = crossProducts.every(cc => {
+                    const c = cc.clone();
+                    const p = point.clone();
+                    return c.x * p.x + c.y * p.y + c.z * p.z < 0;
+                });
+                return inner || outer;
+            }
+            getGeometry() {
+                const ix = [];
+                for (let i = 0; i < this.indices.length; i += 3) {
+                    const a = this.indices[i];
+                    const b = this.indices[i + 1]
+                    const c = this.indices[i + 2];
+                    ix.push(a, b, c);
+                }
+                const vx = [];
+                for (let i = 0; i < this.vertices.length; i++) {
+                    const x = this.vertices[i];
+                    vx.push(
+                        x.x, x.y, x.z
+                    );
+                }
+                const g = new THREE.BufferGeometry();
+                g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(vx), 3));
+                g.setIndex(new THREE.BufferAttribute(new Uint32Array(ix), 1));
+                return g;
+            }
+            getLineSegmentGeometry() {
+                const ix = [];
+                for (let i = 0; i < this.indices.length; i += 3) {
+                    const a = this.indices[i];
+                    const b = this.indices[i + 1]
+                    const c = this.indices[i + 2];
+                    ix.push(a, b, b, c, c, a);
+                }
+                const vx = [];
+                for (let i = 0; i < ix.length; i++) {
+                    const x = this.vertices[ix[i]];
+                    vx.push(
+                        x.x, x.y, x.z
+                    );
+                }
+                const v = new THREE.BufferAttribute(new Float32Array(vx), 3);
+                const g = new THREE.BufferGeometry();
+                g.setAttribute("position", v);
+                return g;
+            }
+        }
+        window.NavMeshTriangles = NavMeshTriangles;
+
+        AFRAME.registerComponent("projected-texture", {
+            schema: {
+                enabled: {
+                    type: "boolean",
+                    default: false,
+                },
+                image: {
+                    type: "string",
+                    default: "",
+                },
+            },
+            multiple: true,
+            init: function () {
+                this.m = null;
+                this.cameraEl = null;
+                this.texture = null;
+                this.material = null;
+            },
+            remove: function () {
+                if (this.m) {
+                    this.el.sceneEl.object3D.remove(this.m);
+                }
+                this.m = null;
+                this.cameraEl = null;
+                this.texture = null;
+                this.material = null;
+            },
+            tick: function (t, dt) {
+                if (!this.data.enabled) {
+                    if (this.m) {
+                        this.remove();
+                    }
+                    return;
+                }
+                const mesh = this.el.sceneEl.systems['globe-nav-projected'].getNavMesh();
+                if (!mesh) {
+                    return;
+                }
+                const geometry = mesh.geometry;
+                let texture;
+                if (this.texture) {
+                    texture = this.texture;
+                } else {
+                    texture = new THREE.TextureLoader().load(this.data.image);
+                    this.texture = texture;
+                }
+                if (!this.cameraEl) {
+                    this.cameraEl = this.el;
+                }
+                if (!this.cameraEl) {
+                    return;
+                }
+                if (!texture.image) {
+                    return;
+                }
+                const camera = (this.cameraEl.components['orthographic-camera'] ?? this.cameraEl.components['orthographic-camera-building']).getCamera();
+                if (!camera) {
+                    return;
+                }
+                let material;
+                if (this.material) {
+                    material = this.material;
+                } else {
+                    material = new ProjectedMaterial({
+                        camera,
+                        texture,
+                        textureScale: 1,
+                        textureOffset: new THREE.Vector2(0, 0),
+                        transparent: true,
+                        backgroundOpacity: 0.0,
+                    });
+                    this.material = material;
+                }
+                if (!this.m) {
+                    const m = new THREE.Mesh(geometry, material);
+                    this.el.sceneEl.object3D.add(m);
+                    this.m = m;
+                }
+                material.project(this.m);
+            },
+        });
+    </script>
     <script type="application/javascript">
         class MusicPlayer {
             synth = null;
@@ -634,6 +1560,7 @@
                 capacity: {type: 'number', default: 100},
                 updateMode: {type: 'string', default: "auto"},
                 memberMesh: {type: 'boolean', default: false},
+                ghostBuilding: {type: 'boolean', default: false},
             },
             init: function () {
                 this.done = false;
@@ -658,6 +1585,12 @@
                     return;
                 }
                 this.el.setAttribute("instanced-mesh-member", `mesh: #${id}; memberMesh: ${data.memberMesh};`);
+
+                if (data.ghostBuilding) {
+                    const scene = document.querySelector("a-scene");
+                    scene.systems['globe-nav'].insertGhostBuilding(gltf, this.el.object3D.matrixWorld);
+                }
+
                 this.done = true;
             }
         });
@@ -1999,17 +2932,54 @@
          */
         AFRAME.registerSystem('globe-nav', {
             navMesh: null,
+            debugMesh: null,
             agents: new Set(),
+            dynamicMap: null,
+            schema: {
+                debug: {
+                    type: "boolean",
+                    default: false,
+                },
+            },
             init: function () {
                 this.navMesh = null;
                 this.agents = new Set();
+            },
+
+            insertGhostBuilding: function (mesh, matrixWorld) {
+                if (!this.dynamicMap) {
+                    return;
+                }
+
+                this.dynamicMap.insertMesh(mesh, matrixWorld);
+                const newGeometry = this.dynamicMap.getGeometry();
+                this.setNavMeshGeometry(newGeometry);
             },
 
             /**
              * @param {THREE.Geometry} geometry
              */
             setNavMeshGeometry: function (geometry) {
+                if (!this.dynamicMap) {
+                    this.dynamicMap = new window.NavMeshTriangles(geometry);
+                }
+
                 this.navMesh = new THREE.Mesh(geometry);
+
+                if (this.data.debug) {
+                    const scene = document.querySelector("a-scene").object3D;
+                    if (this.debugMesh) {
+                        this.debugMesh.parent.remove(this.debugMesh);
+                        this.debugMesh?.material.dispose();
+                        this.debugMesh?.geometry.dispose();
+                        this.debugMesh = null;
+                    }
+                    const material = new THREE.LineBasicMaterial({ color: 0xff0000ff, lineWidth: 1 });
+                    const g = this.dynamicMap.getLineSegmentGeometry();
+                    this.debugMesh = new THREE.LineSegments(g, material);
+                    scene.add(this.debugMesh);
+                }
+
                 pathfinder.setZoneData(ZONE, threePathfinding.Pathfinding.createZone(geometry));
                 Array.from(this.agents).forEach((agent) => agent.updateNavLocation());
             },
@@ -5193,7 +6163,7 @@
                 const rootModel = document.createElement("a-entity");
                 rootModel.setAttribute("class", "data");
                 getBuildingLodHash(str, 1000, "auto");
-                rootModel.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; capacity: 1000; memberMesh: true`);
+                rootModel.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; capacity: 1000; memberMesh: true; ghostBuilding: true;`);
                 rootModel.setAttribute("scale", "1 1 1");
                 rootModel.setAttribute("rotation", "-90 0 0");
                 rootModel.setAttribute("position", "0 0 0");
@@ -6888,726 +7858,6 @@
             },
         });
     </script>
-    <script type="module">
-        import ProjectedMaterial from './ProjectedMaterial.module.js';
-        import {OBB} from './lib/three/addons/math/OBB.js';
-        import ParticleSystem, {
-            BoxZone,
-            Color,
-            CrossZone,
-            CustomRenderer,
-            Emitter,
-            Life,
-            Mass,
-            RadialVelocity,
-            Radius,
-            Rate,
-            Rotate,
-            Scale,
-            Span,
-            Vector3D,
-            ease
-        } from './lib/three/nebula/index.js';
-
-        const createZone = (position) => {
-            const zone = new BoxZone(position.x, position.y, position.z, 5, 5, 5);
-
-            zone.friction = 0.95;
-            zone.max = 7;
-
-            return zone;
-        };
-
-        const createEmitter = (zone, position, particleType) => {
-            const emitter = new Emitter();
-
-            emitter
-                .setRate(particleType === 'damage' ? new Rate(new Span(2, 4), new Span(0.5, 1)) : new Rate(new Span(1, 2), new Span(0.5, 1)))
-                .addInitializers([
-                    new Mass(1),
-                    new Radius(0.1, 0.1, false),
-                    new Life(2, 4),
-                    new RadialVelocity(1, new Vector3D(0, 1, 0), 180),
-                ])
-                .addBehaviours([
-                    new Rotate('random', 'random'),
-                    new Scale(0.2, 0.05),
-
-                    new CrossZone(zone, 'bound'),
-                    new Color(0xff0000, 'random', Infinity, ease.easeOutQuart),
-                ])
-                .setPosition(position)
-                .emit();
-
-            return emitter;
-        };
-
-        AFRAME.registerSystem("damage-particles", {
-            schema: {},
-            init: function () {
-                this.particleSystems = [];
-            },
-            addParticleSystem: function (particleSystem) {
-                const time = +new Date();
-                this.particleSystems.push({
-                    particleSystem,
-                    time,
-                });
-            },
-            tick: function (t, dt) {
-                for (const {particleSystem} of this.particleSystems) {
-                    particleSystem.update(dt / 1000);
-                }
-                const newTime = +new Date();
-                this.particleSystems = this.particleSystems.filter(x => x.time + 60_000 > newTime);
-            },
-        });
-
-        AFRAME.registerComponent("damage-particles", {
-            schema: {
-                particleType: {
-                    default: "damage",
-                    oneOf: ["damage", "smoke", "dirt", "water"],
-                },
-            },
-            init: function () {
-                const position = this.el.object3D.position.clone();
-                this.zone = createZone(position);
-                this.emitter = createEmitter(this.zone, position, this.data.particleType);
-
-                this.particleSystem = new ParticleSystem();
-                this.renderer = new CustomRenderer();
-
-                switch (this.data.particleType) {
-                    case "damage": {
-                        this.mesh = new THREE.Mesh(
-                            new THREE.BoxGeometry(1, 1, 1),
-                            new THREE.MeshNormalMaterial()
-                        );
-                        break;
-                    }
-                    case "smoke": {
-                        const imageElement = document.querySelector("#fog");
-                        const textureLoader = new THREE.TextureLoader();
-                        const map = textureLoader.load(imageElement.src);
-                        this.mesh = new THREE.Mesh(
-                            new THREE.BoxGeometry(1, 1, 1),
-                            new THREE.MeshStandardMaterial({
-                                map,
-                                color: '#ffffff',
-                                alphaTest: 0.01,
-                                transparent: true,
-                            })
-                        );
-                        break;
-                    }
-                    case "dirt": {
-                        const imageElement = document.querySelector("#blob");
-                        const textureLoader = new THREE.TextureLoader();
-                        const map = textureLoader.load(imageElement.src);
-                        this.mesh = new THREE.Mesh(
-                            new THREE.BoxGeometry(1, 1, 1),
-                            new THREE.MeshStandardMaterial({
-                                map,
-                                color: '#9B7653',
-                                alphaTest: 0.01,
-                                transparent: true,
-                            })
-                        );
-                        break;
-                    }
-                    case "water": {
-                        const imageElement = document.querySelector("#fog");
-                        const textureLoader = new THREE.TextureLoader();
-                        const map = textureLoader.load(imageElement.src);
-                        this.mesh = new THREE.Mesh(
-                            new THREE.BoxGeometry(1, 1, 1),
-                            new THREE.MeshStandardMaterial({
-                                map,
-                                color: '#5555ff',
-                                alphaTest: 0.01,
-                                transparent: true,
-                            })
-                        );
-                        break;
-                    }
-                }
-                const mesh = this.mesh;
-                const scene = this.el.sceneEl.object3D;
-
-                this.renderer.onParticleCreated = function (p) {
-                    p.target = this.targetPool.get(mesh);
-
-                    p.target.position.copy(p.position);
-                    scene.add(p.target);
-                };
-
-                this.renderer.onParticleUpdate = function (p) {
-                    const scale = p.scale;
-
-                    p.target.position.copy(p.position);
-                    p.target.rotation.set(p.rotation.x, p.rotation.y, p.rotation.z);
-                    p.target.scale.set(scale, scale, scale);
-                };
-
-                this.renderer.onParticleDead = function (p) {
-                    this.targetPool.expire(p.target);
-                    scene.remove(p.target);
-
-                    p.target = null;
-                };
-
-                this.particleSystem.addRenderer(this.renderer);
-                this.particleSystem.addEmitter(this.emitter);
-                this.system.addParticleSystem(this.particleSystem);
-            },
-            tick: function (t, dt) {
-                const position = this.el.object3D.getWorldPosition(new THREE.Vector3());
-                this.emitter.position.copy(position);
-                this.zone.x = position.x;
-                this.zone.y = position.y;
-                this.zone.z = position.z;
-            },
-            remove: function () {
-                this.emitter.destroy();
-                this.emitter = null;
-            },
-        });
-
-        AFRAME.registerComponent("orthographic-camera", {
-            schema: {},
-            init: function () {
-                this.camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 100);
-                this.el.sceneEl.object3D.add(this.camera);
-            },
-            remove: function () {
-                this.el.sceneEl.object3D.remove(this.camera);
-                this.camera = null;
-            },
-            tick: function (t, dt) {
-                const camera = this.camera;
-                camera.position.copy(this.el.object3D.getWorldPosition(new THREE.Vector3()).normalize().multiplyScalar(150));
-                camera.up = new THREE.Vector3(0, 0, -1).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
-                camera.lookAt(0, 0, 0);
-            },
-            getCamera: function () {
-                return this.camera;
-            },
-        });
-
-        AFRAME.registerComponent("orthographic-camera-building", {
-            schema: {},
-            init: function () {
-                this.camera = new THREE.OrthographicCamera(-8, 8, 8, -8, 0.1, 100);
-                this.el.sceneEl.object3D.add(this.camera);
-            },
-            remove: function () {
-                this.el.sceneEl.object3D.remove(this.camera);
-                this.camera = null;
-            },
-            tick: function (t, dt) {
-                const camera = this.camera;
-                camera.position.copy(this.el.object3D.getWorldPosition(new THREE.Vector3()).normalize().multiplyScalar(150));
-                camera.up = new THREE.Vector3(0, 0, -1).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
-                camera.lookAt(0, 0, 0);
-            },
-            getCamera: function () {
-                return this.camera;
-            },
-        });
-
-        AFRAME.registerComponent("obb-attack-forward-wave", {
-            schema: {
-                center: {
-                    type: "vec3",
-                    default: new THREE.Vector3(0, 0, 0),
-                },
-                dimension: {
-                    type: "vec3",
-                    default: new THREE.Vector3(0, 0, 0),
-                },
-                debug: {
-                    type: "boolean",
-                    default: false,
-                },
-                ratio: {
-                    type: "number",
-                    default: 0.1
-                },
-                speed: {
-                    type: "number",
-                    default: 1,
-                },
-            },
-            multiple: true,
-            remove: function () {
-                if (this.m) {
-                    this.el.sceneEl.object3D.remove(this.m);
-                    this.m = null;
-                }
-                this.b = null;
-                this.material = null;
-
-                if (this.fireball) {
-                    this.el.removeChild(this.fireball);
-                }
-                this.fireball = null;
-            },
-            init: function () {
-                this.startTime = null;
-                this.endTime = null;
-                this.npcSet = new Set();
-
-                this.fireball = null;
-            },
-            tick: function (t, dt) {
-                if (!this.fireball) {
-                    this.fireball = document.createElement("a-entity");
-                    this.fireball.setAttribute("gltf-model", "/meshes/EpicStore/Fireball/source/Fireball.glb");
-                    this.fireball.setAttribute("play-all-animations", "");
-                    this.el.appendChild(this.fireball);
-
-                    if (this.fireball.getObject3D("mesh")) {
-                        this.startTime = (+new Date() / 1000);
-                        this.endTime = this.startTime + this.data.speed;
-                    } else {
-                        this.fireball.addEventListener("model-loaded", () => {
-                            this.startTime = (+new Date() / 1000);
-                            this.endTime = this.startTime + this.data.speed;
-                        });
-                    }
-                }
-
-                if (!this.startTime || !this.endTime) {
-                    return;
-                }
-
-                const dimension = new THREE.Vector3().copy(this.data.dimension);
-                const ratioDimension = dimension.clone().multiply(new THREE.Vector3(1, 1, this.data.ratio));
-                let center = new THREE.Vector3().copy(this.data.center);
-                const ratioCenterStart = center.clone().add(dimension.clone()).sub(ratioDimension.clone());
-                const ratioCenterEnd = center.clone().sub(dimension.clone()).add(ratioDimension.clone());
-                const linear = THREE.MathUtils.mapLinear(+new Date() / 1000, this.startTime, this.endTime, 0, 1);
-                const clamp = THREE.MathUtils.clamp(linear, 0, 1);
-                const ratioCenter = new THREE.Vector3().lerpVectors(ratioCenterStart, ratioCenterEnd, clamp);
-
-                if (linear > 1) {
-                    this.el.removeAttribute("obb-attack-forward-wave");
-                    return;
-                }
-
-                center = ratioCenter.clone().negate().applyMatrix4(this.el.object3D.matrixWorld);
-                const raycaster = new THREE.Raycaster(center.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), center.clone().negate());
-                const intersections = raycaster.intersectObjects([
-                    this.el.sceneEl.systems['globe-nav'].getNavMesh(),
-                    this.el.sceneEl.systems['globe-ocean-nav'].getNavMesh(),
-                ]);
-                if (intersections.length === 0) {
-                    return;
-                }
-                center = intersections[0].point;
-
-                if (this.data.debug) {
-                    this.b = new THREE.BoxGeometry(1, 1, 1);
-                    if (!this.material) {
-                        this.material = new THREE.MeshBasicMaterial({
-                            color: 0xff0000,
-                            wireframe: true
-                        });
-                    }
-                    if (this.m) {
-                        this.el.sceneEl.object3D.remove(this.m);
-                        this.m = null;
-                    }
-                    if (!this.m) {
-                        this.m = new THREE.Mesh(this.b, this.material);
-                        this.m.scale.copy(ratioDimension.clone().multiplyScalar(2));
-                        this.m.position.copy(center.clone());
-                        this.m.quaternion.copy(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
-                        this.el.sceneEl.object3D.add(this.m);
-                    }
-                }
-
-                if (this.fireball) {
-                    const scene = this.el.sceneEl.object3D;
-                    scene.attach(this.fireball.object3D);
-                    this.fireball.object3D.position.copy(center.clone().add(center.clone().normalize()));
-                    this.fireball.object3D.up = center.clone().normalize();
-                    this.fireball.object3D.quaternion.copy(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
-                    this.fireball.object3D.scale.copy(new THREE.Vector3(0.2, 0.2, 0.2));
-                    this.el.object3D.attach(this.fireball.object3D);
-                }
-
-                const obb = new OBB();
-                obb.center.copy(center);
-                obb.halfSize.copy(ratioDimension);
-                obb.rotation.setFromMatrix4(this.el.object3D.matrixWorld);
-
-                const radius = 20;
-                const position = center;
-                const group = this.el.sceneEl.systems['globe-nav'].getGroup(position);
-                const factionName = findParentAttribute(this.el, 'npc-faction').data;
-                if (this.el.sceneEl.systems['npc-finder'].islandNpcList.has(group)) {
-                    const list = this.el.sceneEl.systems['npc-finder'].islandNpcList.get(group);
-                    const els = list.filter(x => {
-                        const pos = x.object3D.position;
-                        const dist = position.distanceTo(pos);
-                        return dist <= radius;
-                    });
-                    const filtered = els.filter(x => x && x.components['npc-faction'].data !== factionName);
-                    const npcs = filtered.sort((a, b) => {
-                        const distA = new THREE.Vector3().copy(a.object3D.position).distanceTo(position);
-                        const distB = new THREE.Vector3().copy(b.object3D.position).distanceTo(position);
-                        return distA - distB;
-                    });
-                    npcs.forEach(npc => {
-                        if (obb.containsPoint(npc.object3D.position)) {
-                            if (!this.npcSet.has(npc)) {
-                                this.npcSet.add(npc);
-                                npc.emit("hit", 100);
-                            }
-                        }
-                    })
-                }
-            },
-        });
-
-        AFRAME.registerComponent("obb-attack-center-wave", {
-            schema: {
-                center: {
-                    type: "vec3",
-                    default: new THREE.Vector3(0, 0, 0),
-                },
-                dimension: {
-                    type: "vec3",
-                    default: new THREE.Vector3(0, 0, 0),
-                },
-                debug: {
-                    type: "boolean",
-                    default: false,
-                },
-                height: {
-                    type: "number",
-                    default: 50,
-                },
-                speed: {
-                    type: "number",
-                    default: 1,
-                },
-            },
-            multiple: true,
-            remove: function () {
-                if (this.m) {
-                    this.el.sceneEl.object3D.remove(this.m);
-                    this.m = null;
-                }
-                this.b = null;
-                this.material = null;
-
-                if (this.fireball) {
-                    this.el.removeChild(this.fireball);
-                }
-                this.fireball = null;
-            },
-            init: function () {
-                this.startTime = null;
-                this.endTime = null;
-                this.npcSet = new Set();
-
-                this.fireball = null;
-            },
-            tick: function (t, dt) {
-                if (!this.fireball) {
-                    this.fireball = document.createElement("a-entity");
-                    this.fireball.setAttribute("gltf-model", "/meshes/EpicStore/Fireball/source/Fireball.glb");
-                    this.fireball.setAttribute("play-all-animations", "");
-                    this.el.appendChild(this.fireball);
-
-                    if (this.fireball.getObject3D("mesh")) {
-                        this.startTime = (+new Date() / 1000);
-                        this.endTime = this.startTime + this.data.speed;
-                    } else {
-                        this.fireball.addEventListener("model-loaded", () => {
-                            this.startTime = (+new Date() / 1000);
-                            this.endTime = this.startTime + this.data.speed;
-                        });
-                    }
-                }
-
-                if (!this.startTime || !this.endTime) {
-                    return;
-                }
-
-                const dimension = new THREE.Vector3().copy(this.data.dimension);
-                let center = new THREE.Vector3().copy(this.data.center);
-                const linear = THREE.MathUtils.mapLinear(+new Date() / 1000, this.startTime, this.endTime, 0, 1);
-                const clamp = THREE.MathUtils.clamp(linear, 0, 1);
-
-                if (linear > 1) {
-                    const obb = new OBB();
-                    obb.center.copy(center);
-                    obb.halfSize.copy(dimension);
-                    obb.rotation.setFromMatrix4(this.el.object3D.matrixWorld);
-
-                    const radius = 20;
-                    const position = center;
-                    const group = this.el.sceneEl.systems['globe-nav'].getGroup(position);
-                    const factionName = findParentAttribute(this.el, 'npc-faction').data;
-                    if (this.el.sceneEl.systems['npc-finder'].islandNpcList.has(group)) {
-                        const list = this.el.sceneEl.systems['npc-finder'].islandNpcList.get(group);
-                        const els = list.filter(x => {
-                            const pos = x.object3D.position;
-                            const dist = position.distanceTo(pos);
-                            return dist <= radius;
-                        });
-                        const filtered = els.filter(x => x && x.components['npc-faction'].data !== factionName);
-                        const npcs = filtered.sort((a, b) => {
-                            const distA = new THREE.Vector3().copy(a.object3D.position).distanceTo(position);
-                            const distB = new THREE.Vector3().copy(b.object3D.position).distanceTo(position);
-                            return distA - distB;
-                        });
-                        npcs.forEach(npc => {
-                            if (obb.containsPoint(npc.object3D.position)) {
-                                if (!this.npcSet.has(npc)) {
-                                    this.npcSet.add(npc);
-                                    npc.emit("hit", 100);
-                                }
-                            }
-                        })
-                    }
-
-                    this.el.removeAttribute("obb-attack-center-wave");
-                } else {
-                    center = center.clone().negate().applyMatrix4(this.el.object3D.matrixWorld);
-                    const raycaster = new THREE.Raycaster(center.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), center.clone().negate());
-                    const intersections = raycaster.intersectObjects([
-                        this.el.sceneEl.systems['globe-nav'].getNavMesh(),
-                        this.el.sceneEl.systems['globe-ocean-nav'].getNavMesh(),
-                    ]);
-                    if (intersections.length === 0) {
-                        return;
-                    }
-                    center = intersections[0].point;
-                    const centerStart = new THREE.Vector3().copy(center).add(center.clone().normalize().multiplyScalar(this.data.height));
-                    const centerEnd = center.clone();
-                    const ratioCenter = new THREE.Vector3().lerpVectors(centerStart, centerEnd, clamp);
-                    center = ratioCenter.clone();
-
-                    if (this.data.debug) {
-                        this.b = new THREE.BoxGeometry(1, 1, 1);
-                        if (!this.material) {
-                            this.material = new THREE.MeshBasicMaterial({
-                                color: 0xff0000,
-                                wireframe: true
-                            });
-                        }
-                        if (this.m) {
-                            this.el.sceneEl.object3D.remove(this.m);
-                            this.m = null;
-                        }
-                        if (!this.m) {
-                            this.m = new THREE.Mesh(this.b, this.material);
-                            this.m.scale.copy(dimension.clone().multiplyScalar(2));
-                            this.m.position.copy(center.clone());
-                            this.m.up = new THREE.Vector3(0, 0, 1).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
-                            this.m.lookAt(center.clone());
-                            this.el.sceneEl.object3D.add(this.m);
-                        }
-                    }
-
-                    if (this.fireball) {
-                        const scene = this.el.sceneEl.object3D;
-                        scene.attach(this.fireball.object3D);
-                        this.fireball.object3D.position.copy(center.clone().add(center.clone().normalize()));
-                        this.fireball.object3D.up = new THREE.Vector3(0, 0, 1).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
-                        this.fireball.object3D.lookAt(center.clone());
-                        this.fireball.object3D.scale.copy(new THREE.Vector3(0.2, 0.2, 0.2));
-                        this.el.object3D.attach(this.fireball.object3D);
-                    }
-                }
-            },
-        });
-
-        AFRAME.registerComponent("wizard-mana", {
-            init: function () {
-                const time = +new Date();
-                this.startTime = time - 10_000;
-                this.endTime = time;
-            },
-            shouldAttack: function () {
-                const time = +new Date();
-                if (time > this.endTime) {
-                    this.startTime = time;
-                    this.endTime = time + 10_000;
-                    return true;
-                } else {
-                    return false;
-                }
-            },
-            canAttack: function () {
-                const time = +new Date();
-                return time > this.endTime;
-            },
-        });
-
-        AFRAME.registerComponent("obb-attack-zone", {
-            schema: {
-                center: {
-                    type: "vec3",
-                    default: new THREE.Vector3(0, 0, 0),
-                },
-                dimension: {
-                    type: "vec3",
-                    default: new THREE.Vector3(0, 0, 0),
-                },
-                debug: {
-                    type: "boolean",
-                    default: false,
-                },
-            },
-            multiple: true,
-            remove: function () {
-                if (this.m) {
-                    this.el.sceneEl.object3D.remove(this.m);
-                    this.m = null;
-                }
-                this.b = null;
-                this.material = null;
-            },
-            tick: function () {
-                if (this.data.debug) {
-                    this.b = new THREE.BoxGeometry(1, 1, 1);
-                    if (!this.material) {
-                        this.material = new THREE.MeshBasicMaterial({
-                            color: 0xff0000,
-                            wireframe: true
-                        });
-                    }
-                    if (this.m) {
-                        this.el.sceneEl.object3D.remove(this.m);
-                        this.m = null;
-                    }
-                    if (!this.m) {
-                        this.m = new THREE.Mesh(this.b, this.material);
-                        this.m.scale.copy(new THREE.Vector3().copy(this.data.dimension).multiplyScalar(2));
-                        this.m.position.copy(new THREE.Vector3().copy(this.data.center).negate().applyMatrix4(this.el.object3D.matrixWorld));
-                        this.m.quaternion.copy(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
-                        this.el.sceneEl.object3D.add(this.m);
-                    }
-                }
-            },
-            attack: function () {
-                if (!findParentAttribute(this.el, "wizard-mana")?.shouldAttack()) {
-                    return;
-                }
-
-                if (new THREE.Vector3().copy(this.data.center).length() === 0) {
-                    if (this.el.hasAttribute("obb-attack-center-wave")) {
-                        this.el.removeAttribute("obb-attack-center-wave");
-                    }
-                    this.el.setAttribute("obb-attack-center-wave", {
-                        center: this.data.center,
-                        dimension: this.data.dimension,
-                        debug: false,
-                        height: 20,
-                        speed: 2,
-                    });
-                } else {
-                    if (this.el.hasAttribute("obb-attack-forward-wave")) {
-                        this.el.removeAttribute("obb-attack-forward-wave");
-                    }
-                    this.el.setAttribute("obb-attack-forward-wave", {
-                        center: this.data.center,
-                        dimension: this.data.dimension,
-                        debug: false,
-                        ratio: 0.2,
-                    });
-                }
-            }
-        })
-
-        AFRAME.registerComponent("projected-texture", {
-            schema: {
-                enabled: {
-                    type: "boolean",
-                    default: false,
-                },
-                image: {
-                    type: "string",
-                    default: "",
-                },
-            },
-            multiple: true,
-            init: function () {
-                this.m = null;
-                this.cameraEl = null;
-                this.texture = null;
-                this.material = null;
-            },
-            remove: function () {
-                if (this.m) {
-                    this.el.sceneEl.object3D.remove(this.m);
-                }
-                this.m = null;
-                this.cameraEl = null;
-                this.texture = null;
-                this.material = null;
-            },
-            tick: function (t, dt) {
-                if (!this.data.enabled) {
-                    if (this.m) {
-                        this.remove();
-                    }
-                    return;
-                }
-                const mesh = this.el.sceneEl.systems['globe-nav-projected'].getNavMesh();
-                if (!mesh) {
-                    return;
-                }
-                const geometry = mesh.geometry;
-                let texture;
-                if (this.texture) {
-                    texture = this.texture;
-                } else {
-                    texture = new THREE.TextureLoader().load(this.data.image);
-                    this.texture = texture;
-                }
-                if (!this.cameraEl) {
-                    this.cameraEl = this.el;
-                }
-                if (!this.cameraEl) {
-                    return;
-                }
-                if (!texture.image) {
-                    return;
-                }
-                const camera = (this.cameraEl.components['orthographic-camera'] ?? this.cameraEl.components['orthographic-camera-building']).getCamera();
-                if (!camera) {
-                    return;
-                }
-                let material;
-                if (this.material) {
-                    material = this.material;
-                } else {
-                    material = new ProjectedMaterial({
-                        camera,
-                        texture,
-                        textureScale: 1,
-                        textureOffset: new THREE.Vector2(0, 0),
-                        transparent: true,
-                        backgroundOpacity: 0.0,
-                    });
-                    this.material = material;
-                }
-                if (!this.m) {
-                    const m = new THREE.Mesh(geometry, material);
-                    this.el.sceneEl.object3D.add(m);
-                    this.m = m;
-                }
-                material.project(this.m);
-            },
-        });
-    </script>
     <style>
         a-scene {
             width: 100%;
@@ -7635,7 +7885,7 @@
     </style>
 </head>
 <body>
-    <a-scene click-manager onclick="isDemoMode === false && playMusic === true ? window.musicPlayer.start() : undefined" draw-ship-indicator draw-npc-indicator coin-purse respawn physics="driver: local; gravity: 0 0 0;" globe-nav globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
+    <a-scene click-manager onclick="isDemoMode === false && playMusic === true ? window.musicPlayer.start() : undefined" draw-ship-indicator draw-npc-indicator coin-purse respawn physics="driver: local; gravity: 0 0 0;" globe-nav="debug: true;" globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
         <a-assets>
             <template id="avatar-template">
                 <a-entity class="avatar" networked-audio-source>
