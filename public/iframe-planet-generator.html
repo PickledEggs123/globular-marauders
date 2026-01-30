@@ -50,8 +50,9 @@
             Rotate,
             Scale,
             Span,
-            Vector3D
+            Vector3D,
         } from './lib/three/nebula/index.js';
+        import {MeshSurfaceSampler} from "./lib/three/addons/math/MeshSurfaceSampler.js";
 
         const createZone = (position) => {
             const zone = new BoxZone(position.x, position.y, position.z, 5, 5, 5);
@@ -681,7 +682,7 @@
                     );
                     this.vertices.push(vertex);
                 }
-                this.nextIndex = Math.round(this.vertices.length / 3);
+                this.nextIndex = Math.round(this.vertices.length);
                 this.indices = [...geometry.index.array];
 
                 const groupEls = document.querySelectorAll("[grass-particles]");
@@ -709,20 +710,91 @@
                     faceIndex: Math.round(i / 3),
                 };
             }
-            insertPoint(point, faceIndex, face) {
-                this.nextIndex = Math.round(this.vertices.length / 3);
-                this.vertices.push(point.clone());
-                this.indices.splice(faceIndex, 3,
-                    this.nextIndex, face.a, face.b,
-                    this.nextIndex, face.b, face.c,
-                    this.nextIndex, face.c, face.a
-                );
-                this.faces.splice(faceIndex, 1, this.makeFaceObject(faceIndex * 3), this.makeFaceObject(faceIndex * 3 + 3), this.makeFaceObject(faceIndex * 3 + 6));
-                for (let i = faceIndex + 3; i < this.faces.length; i++) {
-                    this.faces[i].faceIndex += 2;
+            computeCircumcircle(face) {
+                const a = this.vertices[face.a].clone().normalize();
+                const b = this.vertices[face.b].clone().normalize();
+                const c = this.vertices[face.c].clone().normalize();
+
+                const computeCenterMaths = [() => {
+                    const v1 = a.clone().sub(b.clone());
+                    const v2 = a.clone().sub(c.clone());
+                    return new THREE.Vector3().crossVectors(
+                        v1,
+                        v2
+                    ).normalize();
+                }, () => {
+                    const v1 = b.clone().sub(c.clone());
+                    const v2 = b.clone().sub(a.clone());
+                    return new THREE.Vector3().crossVectors(
+                        v1,
+                        v2
+                    ).normalize();
+                }, () => {
+                    const v1 = c.clone().sub(a.clone());
+                    const v2 = c.clone().sub(b.clone());
+                    return new THREE.Vector3().crossVectors(
+                        v1,
+                        v2
+                    ).normalize();
+                }]
+                for (const math of computeCenterMaths) {
+                    const center = math();
+                    if (isNaN(center.x) || isNaN(center.y) || isNaN(center.z)) {
+                        // skip insertion if normal is NaN.
+                        continue;
+                    }
+                    const radius = center.clone().dot(a.clone());
+                    const rb = center.clone().dot(b.clone());
+                    const rc = center.clone().dot(c.clone());
+                    if (Math.abs(rb - radius) < 0.01 && Math.abs(rc - radius) < 0.01) {
+                        return {
+                            center,
+                            radius,
+                        };
+                    }
                 }
+                return null;
             }
-            insertMesh(mesh, matrixWorld) {
+            insertPoint(point, faceIndex, face, closestGroup) {
+                this.nextIndex = Math.round(this.vertices.length);
+                this.vertices.push(point.clone());
+
+                // compute size of hole in graph for bowyer-watson algorithm
+                const {
+                    center,
+                    radius,
+                } = this.computeCircumcircle(face);
+
+                // create hole in graph
+                const intersectingFaces = closestGroup.faces.filter(x => x.centroid.clone().normalize().dot(center.clone()) >= radius && Math.abs(this.vertices[x.a].clone().length() - this.vertices[x.b].clone().length()) < 0.1 && Math.abs(this.vertices[x.b].clone().length() - this.vertices[x.c].clone().length()) < 0.1);
+                const edges = intersectingFaces.reduce((acc, x) => [...acc, [x.a, x.b, x], [x.b, x.c, x], [x.c, x.a, x]], []);
+                const badEdges = [...edges.filter(([a,b],i,arr) => arr.some(([c,d]) => a === d && b === c))].sort(([,,a], [,,b]) => b.faceIndex - a.faceIndex);
+                const goodEdges = [...edges.filter(([a,b],i,arr) => !arr.some(([c,d]) => a === d && b === c))].sort(([,,a], [,,b]) => b.faceIndex - a.faceIndex);
+
+                // create new indices
+                const uniqueFacesToCull = new Set();
+                for (const [,,badFace] of badEdges) {
+                    const faceIndex = badFace.faceIndex;
+                    if (uniqueFacesToCull.has(faceIndex)) {
+                        continue;
+                    }
+                    uniqueFacesToCull.add(faceIndex);
+                    this.faces.splice(faceIndex, 1);
+                    this.indices.splice(faceIndex * 3, 3);
+                }
+                for (const [a,b] of goodEdges) {
+                    const currentIndex = this.indices.length;
+                    this.indices.push(this.nextIndex, a, b);
+                    this.faces.push(this.makeFaceObject(currentIndex / 3));
+                }
+
+                // fix data after procedure
+                for (let i = 0; i < this.faces.length; i++) {
+                    this.faces[i].faceIndex = i;
+                }
+                this.nextIndex = Math.round(this.vertices.length);
+            }
+            insertMesh(el) {
                 const scene = document.querySelector("a-scene");
                 if (!scene) {
                     return;
@@ -732,24 +804,38 @@
                     return;
                 }
 
-                const geometry = mesh.geometry;
-                geometry.computeBoundingBox();
+                const meshes = [];
+                el.object3D.traverse(n => {
+                    if (n.isMesh) {
+                        meshes.push(n);
+                    }
+                });
 
-                const obb = new OBB();
-                const position = new THREE.Vector3();
-                position.setFromMatrixPosition(matrixWorld);
-                obb.center.copy(geometry.boundingBox.getCenter(new THREE.Vector3()).add(position.clone()));
-                obb.halfSize.copy(geometry.boundingBox.getSize(new THREE.Vector3()).multiplyScalar(0.5));
-                obb.rotation.copy(new THREE.Matrix3().setFromMatrix4(matrixWorld));
+                for (const mesh of meshes) {
+                    const geometry = mesh.geometry;
+                    geometry.computeBoundingBox();
+                }
+
+                const obbs = meshes.map(mesh => {
+                    const matrixWorld = new THREE.Matrix4().copy(mesh.matrixWorld);
+                    const geometry = mesh.geometry;
+                    const obb = new OBB();
+
+                    obb.center.copy(geometry.boundingBox.getCenter(new THREE.Vector3()).applyMatrix4(matrixWorld));
+                    obb.halfSize.copy(geometry.boundingBox.getSize(new THREE.Vector3()).multiplyScalar(0.5));
+                    obb.rotation.copy(new THREE.Matrix3().setFromMatrix4(matrixWorld));
+
+                    return obb;
+                });
 
                 // Function to get OBB corner points
                 function getOBBPoints(obb) {
                     const points = [];
                     const dirs = [
-                        // new THREE.Vector3(-1, -1, -1),
-                        // new THREE.Vector3( 1, -1, -1),
-                        // new THREE.Vector3( 1,  1, -1),
-                        // new THREE.Vector3(-1,  1, -1),
+                        new THREE.Vector3(-1, -1, -1),
+                        new THREE.Vector3( 1, -1, -1),
+                        new THREE.Vector3( 1,  1, -1),
+                        new THREE.Vector3(-1,  1, -1),
                         new THREE.Vector3(-1, -1,  1),
                         new THREE.Vector3( 1, -1,  1),
                         new THREE.Vector3( 1,  1,  1),
@@ -770,8 +856,8 @@
                     return points;
                 }
 
-// Get and log OBB points
-                const obbPoints = getOBBPoints(obb);
+                // Get and log OBB points
+                const obbPoints = obbs.reduce((acc, obb) => [...acc, ...getOBBPoints(obb)], []);
                 const pp = obbPoints[0];
                 if (!pp) {
                     return;
@@ -797,7 +883,7 @@
                             ]);
                             if (intersections[0]) {
                                 const ip = intersections[0].point.clone();
-                                this.insertPoint(ip, intersections[0].faceIndex, this.faces[intersections[0].faceIndex]);
+                                this.insertPoint(ip, f.faceIndex, f, closestGroup);
                                 break;
                             }
                         }
@@ -823,12 +909,12 @@
 
                 const inner = crossProducts.every(cc => {
                     const c = cc.clone();
-                    const p = point.clone();
+                    const p = point.clone().normalize();
                     return c.x * p.x + c.y * p.y + c.z * p.z > 0;
                 });
                 const outer = crossProducts.every(cc => {
                     const c = cc.clone();
-                    const p = point.clone();
+                    const p = point.clone().normalize();
                     return c.x * p.x + c.y * p.y + c.z * p.z < 0;
                 });
                 return inner || outer;
@@ -1587,8 +1673,6 @@
                 this.el.setAttribute("instanced-mesh-member", `mesh: #${id}; memberMesh: ${data.memberMesh};`);
 
                 if (data.ghostBuilding) {
-                    const scene = document.querySelector("a-scene");
-                    scene.systems['globe-nav'].insertGhostBuilding(gltf, this.el.object3D.matrixWorld);
                 }
 
                 this.done = true;
@@ -2946,12 +3030,12 @@
                 this.agents = new Set();
             },
 
-            insertGhostBuilding: function (mesh, matrixWorld) {
+            insertGhostBuilding: function (el) {
                 if (!this.dynamicMap) {
                     return;
                 }
 
-                this.dynamicMap.insertMesh(mesh, matrixWorld);
+                this.dynamicMap.insertMesh(el);
                 const newGeometry = this.dynamicMap.getGeometry();
                 this.setNavMeshGeometry(newGeometry);
             },
@@ -6124,6 +6208,9 @@
                 }
 
                 if (this.begin && !this.active) {
+                    const scene = document.querySelector("a-scene");
+                    scene.systems['globe-nav'].insertGhostBuilding(this.el);
+
                     this.done = true;
                 }
             },
