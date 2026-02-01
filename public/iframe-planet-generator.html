@@ -772,12 +772,10 @@
                 this.vertices.push(point.clone());
 
                 // create hole in graph
-                const intersectingFaces = closestGroup.faces.filter(x => x.centroid.clone().normalize().dot(point.clone().normalize()) >= x.radius && Math.abs(this.vertices[x.a].clone().length() - this.vertices[x.b].clone().length()) < 0.1 && Math.abs(this.vertices[x.b].clone().length() - this.vertices[x.c].clone().length()) < 0.1);
+                const intersectingFaces = closestGroup.faces.filter(x => x.center.clone().normalize().dot(point.clone().normalize()) >= x.radius && Math.abs(this.vertices[x.a].clone().length() - this.vertices[x.b].clone().length()) < 0.1 && Math.abs(this.vertices[x.b].clone().length() - this.vertices[x.c].clone().length()) < 0.1);
                 const edges = intersectingFaces.reduce((acc, x) => [...acc, [x.a, x.b, x], [x.b, x.c, x], [x.c, x.a, x]], []);
                 const badEdges = [...edges.filter(([a,b],i,arr) => arr.some(([c,d]) => a === d && b === c))].sort(([,,a], [,,b]) => b.faceIndex - a.faceIndex);
                 const goodEdges = [...edges.filter(([a,b],i,arr) => !arr.some(([c,d]) => a === d && b === c))].sort(([,,a], [,,b]) => b.faceIndex - a.faceIndex);
-
-                console.log("POINT", point, intersectingFaces.length, badEdges, goodEdges);
 
                 // create new indices
                 const uniqueFacesToCull = new Set();
@@ -845,14 +843,14 @@
                         // new THREE.Vector3( 1,  1, -1),
                         // new THREE.Vector3(-1,  1, -1),
 
-                        // new THREE.Vector3(-1, -1,  1),
+                        new THREE.Vector3(-1, -1,  1),
                         // new THREE.Vector3( 0, -1,  1),
-                        // new THREE.Vector3( 1, -1,  1),
+                        new THREE.Vector3( 1, -1,  1),
                         // new THREE.Vector3( 1,  0,  1),
-                        // new THREE.Vector3( 1,  1,  1),
+                        new THREE.Vector3( 1,  1,  1),
                         // new THREE.Vector3( 0,  1,  1),
                         new THREE.Vector3(-1,  1,  1),
-                        new THREE.Vector3(-1,  0,  1),
+                        // new THREE.Vector3(-1,  0,  1),
                     ];
                     dirs.reverse();
 
@@ -906,8 +904,6 @@
                             vertex: x.vertex,
                             faces: this.faces.filter(y => y.centroid.distanceTo(x.vertex) < 30),
                         }));
-
-                        scene.systems["globe-nav"].setNavMeshGeometry(this.getGeometry());
                     }
                 }
             }
