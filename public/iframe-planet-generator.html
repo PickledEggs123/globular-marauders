@@ -704,11 +704,23 @@
                 const b = this.indices[i + 1];
                 const c = this.indices[i + 2];
                 const centroid = new THREE.Vector3().add(this.vertices[a]).add(this.vertices[b]).add(this.vertices[c]).multiplyScalar(1/3);
-                return {
+
+                const f = {
                     a, b, c,
                     centroid,
                     faceIndex: Math.round(i / 3),
+                    center: centroid,
+                    radius: 1,
                 };
+
+                // compute size of hole in graph for bowyer-watson algorithm
+                const {
+                    center,
+                    radius,
+                } = this.computeCircumcircle(f);
+                f.center = center;
+                f.radius = radius;
+                return f;
             }
             computeCircumcircle(face) {
                 const a = this.vertices[face.a].clone().normalize();
@@ -716,22 +728,22 @@
                 const c = this.vertices[face.c].clone().normalize();
 
                 const computeCenterMaths = [() => {
-                    const v1 = a.clone().sub(b.clone());
-                    const v2 = a.clone().sub(c.clone());
+                    const v1 = a.clone().sub(b.clone()).normalize();
+                    const v2 = a.clone().sub(c.clone()).normalize();
                     return new THREE.Vector3().crossVectors(
                         v1,
                         v2
                     ).normalize();
                 }, () => {
-                    const v1 = b.clone().sub(c.clone());
-                    const v2 = b.clone().sub(a.clone());
+                    const v1 = b.clone().sub(c.clone()).normalize();
+                    const v2 = b.clone().sub(a.clone()).normalize();
                     return new THREE.Vector3().crossVectors(
                         v1,
                         v2
                     ).normalize();
                 }, () => {
-                    const v1 = c.clone().sub(a.clone());
-                    const v2 = c.clone().sub(b.clone());
+                    const v1 = c.clone().sub(a.clone()).normalize();
+                    const v2 = c.clone().sub(b.clone()).normalize();
                     return new THREE.Vector3().crossVectors(
                         v1,
                         v2
@@ -755,21 +767,17 @@
                 }
                 return null;
             }
-            insertPoint(point, faceIndex, face, closestGroup) {
+            insertPoint(point, closestGroup) {
                 this.nextIndex = Math.round(this.vertices.length);
                 this.vertices.push(point.clone());
 
-                // compute size of hole in graph for bowyer-watson algorithm
-                const {
-                    center,
-                    radius,
-                } = this.computeCircumcircle(face);
-
                 // create hole in graph
-                const intersectingFaces = closestGroup.faces.filter(x => x.centroid.clone().normalize().dot(center.clone()) >= radius && Math.abs(this.vertices[x.a].clone().length() - this.vertices[x.b].clone().length()) < 0.1 && Math.abs(this.vertices[x.b].clone().length() - this.vertices[x.c].clone().length()) < 0.1);
+                const intersectingFaces = closestGroup.faces.filter(x => x.centroid.clone().normalize().dot(point.clone().normalize()) >= x.radius && Math.abs(this.vertices[x.a].clone().length() - this.vertices[x.b].clone().length()) < 0.1 && Math.abs(this.vertices[x.b].clone().length() - this.vertices[x.c].clone().length()) < 0.1);
                 const edges = intersectingFaces.reduce((acc, x) => [...acc, [x.a, x.b, x], [x.b, x.c, x], [x.c, x.a, x]], []);
                 const badEdges = [...edges.filter(([a,b],i,arr) => arr.some(([c,d]) => a === d && b === c))].sort(([,,a], [,,b]) => b.faceIndex - a.faceIndex);
                 const goodEdges = [...edges.filter(([a,b],i,arr) => !arr.some(([c,d]) => a === d && b === c))].sort(([,,a], [,,b]) => b.faceIndex - a.faceIndex);
+
+                console.log("POINT", point, intersectingFaces.length, badEdges, goodEdges);
 
                 // create new indices
                 const uniqueFacesToCull = new Set();
@@ -832,15 +840,21 @@
                 function getOBBPoints(obb) {
                     const points = [];
                     const dirs = [
-                        new THREE.Vector3(-1, -1, -1),
-                        new THREE.Vector3( 1, -1, -1),
-                        new THREE.Vector3( 1,  1, -1),
-                        new THREE.Vector3(-1,  1, -1),
-                        new THREE.Vector3(-1, -1,  1),
-                        new THREE.Vector3( 1, -1,  1),
-                        new THREE.Vector3( 1,  1,  1),
+                        // new THREE.Vector3(-1, -1, -1),
+                        // new THREE.Vector3( 1, -1, -1),
+                        // new THREE.Vector3( 1,  1, -1),
+                        // new THREE.Vector3(-1,  1, -1),
+
+                        // new THREE.Vector3(-1, -1,  1),
+                        // new THREE.Vector3( 0, -1,  1),
+                        // new THREE.Vector3( 1, -1,  1),
+                        // new THREE.Vector3( 1,  0,  1),
+                        // new THREE.Vector3( 1,  1,  1),
+                        // new THREE.Vector3( 0,  1,  1),
                         new THREE.Vector3(-1,  1,  1),
+                        new THREE.Vector3(-1,  0,  1),
                     ];
+                    dirs.reverse();
 
                     for (let dir of dirs) {
                         const corner = new THREE.Vector3().copy(obb.center);
@@ -875,30 +889,27 @@
                 }
 
                 for (const p of obbPoints) {
-                    for (const f of closestGroup.faces) {
-                        if (this.isPointInFace(f, p)) {
-                            const raycaster = new THREE.Raycaster(p.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), p.clone().negate());
-                            const intersections = raycaster.intersectObjects([
-                                scene.systems['globe-nav'].getNavMesh(),
-                            ]);
-                            if (intersections[0]) {
-                                const ip = intersections[0].point.clone();
-                                this.insertPoint(ip, f.faceIndex, f, closestGroup);
-                                break;
-                            }
-                        }
+                    const raycaster = new THREE.Raycaster(p.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), p.clone().negate());
+                    const intersections = raycaster.intersectObjects([
+                        scene.systems['globe-nav'].getNavMesh(),
+                    ]);
+                    if (intersections[0]) {
+                        const ip = intersections[0].point.clone();
+                        this.insertPoint(ip, closestGroup);
+
+                        const groupEls = document.querySelectorAll("[grass-particles]");
+                        const groups = [...groupEls].map(x => ({
+                            vertex: new THREE.Vector3().copy(x.components["grass-particles"].data.origin),
+                            faces: [],
+                        }));
+                        this.groups = groups.map(x => ({
+                            vertex: x.vertex,
+                            faces: this.faces.filter(y => y.centroid.distanceTo(x.vertex) < 30),
+                        }));
+
+                        scene.systems["globe-nav"].setNavMeshGeometry(this.getGeometry());
                     }
                 }
-
-                const groupEls = document.querySelectorAll("[grass-particles]");
-                const groups = [...groupEls].map(x => ({
-                    vertex: new THREE.Vector3().copy(x.components["grass-particles"].data.origin),
-                    faces: [],
-                }));
-                this.groups = groups.map(x => ({
-                    vertex: x.vertex,
-                    faces: this.faces.filter(y => y.centroid.distanceTo(x.vertex) < 30),
-                }));
             }
             isPointInFace(face, point) {
                 const crossProducts = [
@@ -1871,11 +1882,7 @@
                         const shape = new CANNON.Trimesh(vertices, indices);
                         this.el.components['static-body'].addShape(shape, offset, orientation);
                     }
-                    return;
                 }
-                setTimeout(() => {
-                    this.addShapes.call(this, body, result);
-                }, 10);
             },
         });
 
@@ -3061,6 +3068,7 @@
                     const material = new THREE.LineBasicMaterial({ color: 0xff0000ff, lineWidth: 1 });
                     const g = this.dynamicMap.getLineSegmentGeometry();
                     this.debugMesh = new THREE.LineSegments(g, material);
+                    this.debugMesh.scale.set(1.001, 1.001, 1.001);
                     scene.add(this.debugMesh);
                 }
 
