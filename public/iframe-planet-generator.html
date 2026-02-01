@@ -785,13 +785,14 @@
                         continue;
                     }
                     uniqueFacesToCull.add(faceIndex);
+
                     this.faces.splice(faceIndex, 1);
                     this.indices.splice(faceIndex * 3, 3);
                 }
                 for (const [a,b] of goodEdges) {
                     const currentIndex = this.indices.length;
                     this.indices.push(this.nextIndex, a, b);
-                    this.faces.push(this.makeFaceObject(currentIndex / 3));
+                    this.faces.push(this.makeFaceObject(currentIndex));
                 }
 
                 // fix data after procedure
@@ -844,13 +845,13 @@
                         // new THREE.Vector3(-1,  1, -1),
 
                         new THREE.Vector3(-1, -1,  1),
-                        // new THREE.Vector3( 0, -1,  1),
+                        new THREE.Vector3( 0, -1,  1),
                         new THREE.Vector3( 1, -1,  1),
-                        // new THREE.Vector3( 1,  0,  1),
+                        new THREE.Vector3( 1,  0,  1),
                         new THREE.Vector3( 1,  1,  1),
-                        // new THREE.Vector3( 0,  1,  1),
+                        new THREE.Vector3( 0,  1,  1),
                         new THREE.Vector3(-1,  1,  1),
-                        // new THREE.Vector3(-1,  0,  1),
+                        new THREE.Vector3(-1,  0,  1),
                     ];
                     dirs.reverse();
 
