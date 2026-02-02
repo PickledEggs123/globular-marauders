@@ -698,6 +698,8 @@
                     vertex: x.vertex,
                     faces: this.faces.filter(y => y.centroid.distanceTo(x.vertex) < 30),
                 }));
+
+                this.obbs = [];
             }
             makeFaceObject(i) {
                 const a = this.indices[i];
@@ -834,6 +836,7 @@
 
                     return obb;
                 });
+                this.obbs.push(...obbs);
 
                 // Function to get OBB corner points
                 function getOBBPoints(obb) {
@@ -852,6 +855,7 @@
                         new THREE.Vector3( 0,  1,  1),
                         new THREE.Vector3(-1,  1,  1),
                         new THREE.Vector3(-1,  0,  1),
+                        new THREE.Vector3( 0,  0,  1),
                     ];
                     dirs.reverse();
 
@@ -908,24 +912,8 @@
                     }
                 }
             }
-            isPointInFace(face, point) {
-                const crossProducts = [
-                    new THREE.Vector3().crossVectors(this.vertices[face.a].clone().normalize(), this.vertices[face.b].clone().normalize()),
-                    new THREE.Vector3().crossVectors(this.vertices[face.b].clone().normalize(), this.vertices[face.c].clone().normalize()),
-                    new THREE.Vector3().crossVectors(this.vertices[face.c].clone().normalize(), this.vertices[face.a].clone().normalize()),
-                ];
-
-                const inner = crossProducts.every(cc => {
-                    const c = cc.clone();
-                    const p = point.clone().normalize();
-                    return c.x * p.x + c.y * p.y + c.z * p.z > 0;
-                });
-                const outer = crossProducts.every(cc => {
-                    const c = cc.clone();
-                    const p = point.clone().normalize();
-                    return c.x * p.x + c.y * p.y + c.z * p.z < 0;
-                });
-                return inner || outer;
+            isPointInObb(obb, point) {
+                return obb.clone().containsPoint(point.clone());
             }
             getGeometry() {
                 const ix = [];
@@ -947,9 +935,26 @@
                 g.setIndex(new THREE.BufferAttribute(new Uint32Array(ix), 1));
                 return g;
             }
-            getLineSegmentGeometry() {
+            getLineSegmentGeometry(includeObb = false) {
                 const ix = [];
                 for (let i = 0; i < this.indices.length; i += 3) {
+                    // check if face is in obb
+                    const ip = this.faces[i / 3].centroid.multiplyScalar(1.001);
+                    let obbHit = false;
+                    if (includeObb) {
+                        if (this.obbs.every(obb => !this.isPointInObb(obb, ip))) {
+                            obbHit = true;
+                        }
+                    } else {
+                        if (this.obbs.some(obb => this.isPointInObb(obb, ip))) {
+                            obbHit = true;
+                        }
+                    }
+                    if (obbHit) {
+                        continue;
+                    }
+
+                    // insert face
                     const a = this.indices[i];
                     const b = this.indices[i + 1]
                     const c = this.indices[i + 2];
@@ -3056,17 +3061,31 @@
 
                 if (this.data.debug) {
                     const scene = document.querySelector("a-scene").object3D;
+
+                    // draw blue mesh for obb hit
                     if (this.debugMesh) {
                         this.debugMesh.parent.remove(this.debugMesh);
                         this.debugMesh?.material.dispose();
                         this.debugMesh?.geometry.dispose();
                         this.debugMesh = null;
                     }
-                    const material = new THREE.LineBasicMaterial({ color: 0xff0000ff, lineWidth: 1 });
+                    const material = new THREE.LineBasicMaterial({ color: 0xff0000ff });
                     const g = this.dynamicMap.getLineSegmentGeometry();
                     this.debugMesh = new THREE.LineSegments(g, material);
                     this.debugMesh.scale.set(1.001, 1.001, 1.001);
                     scene.add(this.debugMesh);
+
+                    if (this.debugObbMesh) {
+                        this.debugObbMesh.parent.remove(this.debugObbMesh);
+                        this.debugObbMesh?.material.dispose();
+                        this.debugObbMesh?.geometry.dispose();
+                        this.debugObbMesh = null;
+                    }
+                    const material2 = new THREE.LineBasicMaterial({ color: 0xffff0000 });
+                    const g2 = this.dynamicMap.getLineSegmentGeometry(true);
+                    this.debugObbMesh = new THREE.LineSegments(g2, material2);
+                    this.debugObbMesh.scale.set(1.001, 1.001, 1.001);
+                    scene.add(this.debugObbMesh);
                 }
 
                 pathfinder.setZoneData(ZONE, threePathfinding.Pathfinding.createZone(geometry));
