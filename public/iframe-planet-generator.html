@@ -911,7 +911,7 @@
                             faces: this.faces.filter(y => y.centroid.distanceTo(x.vertex) < 30),
                         }));
 
-                        scene.systems['globe-nav'].setNavMeshGeometry(this.getGeometry(false));
+                        scene.systems['globe-nav'].setNavMeshGeometry(this.getGeometry(true));
                     }
                 }
             }
@@ -3060,19 +3060,16 @@
                 }
 
                 this.dynamicMap.insertMesh(el);
-                const newGeometry = this.dynamicMap.getGeometry(false);
-                this.setNavMeshGeometry(newGeometry);
+                this.setNavMeshGeometry(null);
             },
 
             /**
-             * @param {THREE.Geometry} geometry
+             * @param {THREE.Geometry | null} geometry
              */
             setNavMeshGeometry: function (geometry) {
-                if (!this.dynamicMap) {
+                if (!this.dynamicMap && geometry) {
                     this.dynamicMap = new window.NavMeshTriangles(geometry);
                 }
-
-                this.navMesh = new THREE.Mesh(geometry);
 
                 if (this.data.debug) {
                     const scene = document.querySelector("a-scene").object3D;
@@ -3105,6 +3102,11 @@
 
                 }
 
+                if (!geometry) {
+                    geometry = this.dynamicMap.getGeometry(false);
+                }
+
+                this.navMesh = new THREE.Mesh(geometry);
                 pathfinder.setZoneData(ZONE, threePathfinding.Pathfinding.createZone(geometry));
                 Array.from(this.agents).forEach((agent) => agent.updateNavLocation());
             },
@@ -8013,7 +8015,7 @@
     </style>
 </head>
 <body>
-    <a-scene click-manager onclick="isDemoMode === false && playMusic === true ? window.musicPlayer.start() : undefined" draw-ship-indicator draw-npc-indicator coin-purse respawn physics="driver: local; gravity: 0 0 0;" globe-nav="debug: false;" globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
+    <a-scene click-manager onclick="isDemoMode === false && playMusic === true ? window.musicPlayer.start() : undefined" draw-ship-indicator draw-npc-indicator coin-purse respawn physics="driver: local; gravity: 0 0 0;" globe-nav="debug: true;" globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
         <a-assets>
             <template id="avatar-template">
                 <a-entity class="avatar" networked-audio-source>
