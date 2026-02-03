@@ -794,7 +794,9 @@
                 for (const [a,b] of goodEdges) {
                     const currentIndex = this.indices.length;
                     this.indices.push(this.nextIndex, a, b);
-                    this.faces.push(this.makeFaceObject(currentIndex));
+                    const f = this.makeFaceObject(currentIndex);
+                    this.faces.push(f);
+                    closestGroup.faces.push(f);
                 }
 
                 // fix data after procedure
@@ -880,19 +882,19 @@
                     return;
                 }
 
-                for (const p of obbPoints) {
-                    const [,closestGroup] = this.groups.reduce((acc, x) => {
-                        const d = x.vertex.distanceTo(pp);
-                        if (acc[0] > d) {
-                            return [d, x];
-                        } else {
-                            return acc;
-                        }
-                    }, [Infinity, null]);
-                    if (!closestGroup) {
-                        continue;
+                const [,closestGroup] = this.groups.reduce((acc, x) => {
+                    const d = x.vertex.distanceTo(pp);
+                    if (acc[0] > d) {
+                        return [d, x];
+                    } else {
+                        return acc;
                     }
+                }, [Infinity, null]);
+                if (!closestGroup) {
+                    return;
+                }
 
+                for (const p of obbPoints) {
                     const raycaster = new THREE.Raycaster(p.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), p.clone().negate());
                     const intersections = raycaster.intersectObjects([
                         scene.systems['globe-nav'].getNavMesh(),
