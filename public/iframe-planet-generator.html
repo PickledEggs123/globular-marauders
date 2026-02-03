@@ -911,16 +911,28 @@
                             faces: this.faces.filter(y => y.centroid.distanceTo(x.vertex) < 30),
                         }));
 
-                        scene.systems['globe-nav'].setNavMeshGeometry(this.getGeometry());
+                        scene.systems['globe-nav'].setNavMeshGeometry(this.getGeometry(false));
                     }
                 }
             }
             isPointInObb(obb, point) {
                 return obb.clone().containsPoint(point.clone());
             }
-            getGeometry() {
+            getGeometry(includeObb = false) {
                 const ix = [];
                 for (let i = 0; i < this.indices.length; i += 3) {
+                    // check if face is in obb
+                    const ip = this.faces[i / 3].centroid.clone().multiplyScalar(1.001);
+                    let obbHit = false;
+                    if (!includeObb) {
+                        if (this.obbs.some(obb => this.isPointInObb(obb, ip))) {
+                            obbHit = true;
+                        }
+                    }
+                    if (obbHit) {
+                        continue;
+                    }
+
                     const a = this.indices[i];
                     const b = this.indices[i + 1]
                     const c = this.indices[i + 2];
@@ -3048,7 +3060,7 @@
                 }
 
                 this.dynamicMap.insertMesh(el);
-                const newGeometry = this.dynamicMap.getGeometry();
+                const newGeometry = this.dynamicMap.getGeometry(false);
                 this.setNavMeshGeometry(newGeometry);
             },
 
@@ -3065,7 +3077,20 @@
                 if (this.data.debug) {
                     const scene = document.querySelector("a-scene").object3D;
 
-                    // draw blue mesh for obb hit
+                    // draw red mesh for obb block
+                    if (this.debugObbMesh) {
+                        this.debugObbMesh.parent.remove(this.debugObbMesh);
+                        this.debugObbMesh?.material.dispose();
+                        this.debugObbMesh?.geometry.dispose();
+                        this.debugObbMesh = null;
+                    }
+                    const material2 = new THREE.LineBasicMaterial({ color: 0xffff0000 });
+                    const g2 = this.dynamicMap.getLineSegmentGeometry(true);
+                    this.debugObbMesh = new THREE.LineSegments(g2, material2);
+                    this.debugObbMesh.scale.set(1.001, 1.001, 1.001);
+                    scene.add(this.debugObbMesh);
+
+                    // draw blue mesh
                     if (this.debugMesh) {
                         this.debugMesh.parent.remove(this.debugMesh);
                         this.debugMesh?.material.dispose();
@@ -3078,17 +3103,6 @@
                     this.debugMesh.scale.set(1.001, 1.001, 1.001);
                     scene.add(this.debugMesh);
 
-                    if (this.debugObbMesh) {
-                        this.debugObbMesh.parent.remove(this.debugObbMesh);
-                        this.debugObbMesh?.material.dispose();
-                        this.debugObbMesh?.geometry.dispose();
-                        this.debugObbMesh = null;
-                    }
-                    const material2 = new THREE.LineBasicMaterial({ color: 0xffff0000 });
-                    const g2 = this.dynamicMap.getLineSegmentGeometry(true);
-                    this.debugObbMesh = new THREE.LineSegments(g2, material2);
-                    this.debugObbMesh.scale.set(1.001, 1.001, 1.001);
-                    scene.add(this.debugObbMesh);
                 }
 
                 pathfinder.setZoneData(ZONE, threePathfinding.Pathfinding.createZone(geometry));
@@ -7999,7 +8013,7 @@
     </style>
 </head>
 <body>
-    <a-scene click-manager onclick="isDemoMode === false && playMusic === true ? window.musicPlayer.start() : undefined" draw-ship-indicator draw-npc-indicator coin-purse respawn physics="driver: local; gravity: 0 0 0;" globe-nav="debug: true;" globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
+    <a-scene click-manager onclick="isDemoMode === false && playMusic === true ? window.musicPlayer.start() : undefined" draw-ship-indicator draw-npc-indicator coin-purse respawn physics="driver: local; gravity: 0 0 0;" globe-nav="debug: false;" globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
         <a-assets>
             <template id="avatar-template">
                 <a-entity class="avatar" networked-audio-source>
