@@ -5699,6 +5699,9 @@
                 dataEl.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; memberMesh: ${memberMesh};`);
                 dataEl.setAttribute("shadow", "");
                 rootGoldCoin.appendChild(dataEl);
+                rootGoldCoin.setAttribute("block-nav-mesh", {
+                    enabled: false
+                });
             } else {
                 getBuildingLodHash(str, 2000, "auto");
                 rootGoldCoin.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; capacity: 2000; memberMesh: ${memberMesh};`);
@@ -5817,6 +5820,9 @@
                                 {
                                     component: 'rotation',
                                     requiresNetworkUpdate: NAF.utils.vectorRequiresUpdate(0.5)
+                                },
+                                {
+                                    component: 'block-nav-mesh',
                                 },
                                 {
                                     selector: '.data',
@@ -6207,6 +6213,50 @@
             arr2.forEach(a => scene.removeChild(a));
         }
 
+        AFRAME.registerComponent('block-nav-mesh', {
+            schema: {
+                enabled: {
+                    type: "boolean",
+                    default: false,
+                },
+            },
+            init: function () {
+                this.done = false;
+                this.begin = false;
+            },
+            tick: function () {
+                if (this.done) {
+                    return;
+                }
+
+                const meshes = [];
+                this.el.object3D.traverse((x) => {
+                    if (x.isMesh) {
+                        meshes.push(x);
+                    }
+                });
+
+                if (meshes.length <= 0) {
+                    return;
+                }
+
+                if (!this.begin && !this.data.enabled) {
+                    return;
+                }
+
+                if (!this.begin && this.data.enabled) {
+                    this.begin = true;
+                }
+
+                if (this.begin) {
+                    const scene = document.querySelector("a-scene");
+                    scene.systems['globe-nav'].insertGhostBuilding(this.el);
+
+                    this.done = true;
+                }
+            },
+        });
+
         AFRAME.registerComponent("rise-out-of-ground", {
             schema: {
                 position: {
@@ -6254,8 +6304,9 @@
                 }
 
                 if (this.begin && !this.active) {
-                    const scene = document.querySelector("a-scene");
-                    scene.systems['globe-nav'].insertGhostBuilding(this.el);
+                    this.el.setAttribute("block-nav-mesh", {
+                        enabled: true,
+                    });
 
                     this.done = true;
                 }
@@ -6291,6 +6342,9 @@
                 const lookAt = new THREE.Vector3(0, 0, -1).applyQuaternion(rootHouse.components["orthographic-camera-building"].camera.getWorldQuaternion(new THREE.Quaternion()));
                 rootHouse.setAttribute("rise-out-of-ground", {
                     position,
+                });
+                rootHouse.setAttribute("block-nav-mesh", {
+                    enabled: false
                 });
 
                 const rootModel = document.createElement("a-entity");
