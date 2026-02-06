@@ -4106,7 +4106,10 @@
 
                             const buildMenuState = document.querySelector("#build-menu-state");
                             if (buildMenuState.hasAttribute("wizard-tower-build")) {
-                                addGhostBuilding(destination1.clone());
+                                addGhostBuilding(destination1.clone(), "WIZARD_TOWER");
+                            }
+                            if (buildMenuState.hasAttribute("wall-build")) {
+                                addGhostBuilding(destination1.clone(), "WALL");
                             }
                         }
                     }, "go-on-land");
@@ -5690,7 +5693,7 @@
                 rootGoldCoin.setAttribute("networked-ship-health", "");
                 rootGoldCoin.setAttribute("cannonball-collider", "");
                 rootGoldCoin.appendChild(dataEl);
-            } else if (charModelId === "WIZARD_TOWER") {
+            } else if (charModelId === "WIZARD_TOWER" || charModelId === "WALL") {
                 const dataEl = document.createElement("a-entity");
                 dataEl.setAttribute("class", "data");
                 dataEl.setAttribute("scale", "1 1 1");
@@ -5808,7 +5811,7 @@
                             ]
                         });
                     }
-                } else if (charModelId === "WIZARD_TOWER") {
+                } else if (charModelId === "WIZARD_TOWER" || charModelId === "WALL") {
                     if (!NAF.schemas.hasTemplate(`#${templateId}`)) {
                         NAF.schemas.add({
                             template: `#${templateId}`,
@@ -6314,15 +6317,21 @@
         });
 
         let ghostBuilding = null;
-
-        function addGhostBuilding(position) {
+        // Function to convert a string to Pascal Case
+        function toPascalCase(input) {
+            return input
+                .match(/[a-zA-Z0-9]+/g) // Match words (alphanumeric sequences)
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()) // Capitalize first letter
+                .join(''); // Concatenate without spaces
+        }
+        function addGhostBuilding(position, type) {
             const scene = document.querySelector("a-scene");
 
             const rootHouse = document.createElement("a-entity");
-            rootHouse.setAttribute("class", "wizard-tower");
+            rootHouse.setAttribute("class", type.toLowerCase().replace("_", "-"));
             rootHouse.setAttribute("position", position);
             rootHouse.setAttribute("orthographic-camera-building", "");
-            rootHouse.setAttribute("projected-texture__wizard-tower", "image: /meshes/WizardTowerProjection.png; enabled: true");
+            rootHouse.setAttribute("projected-texture__building", `image: /meshes/${toPascalCase(type).replace("_", "")}Projection.png; enabled: true`);
 
             scene.appendChild(rootHouse);
             if (ghostBuilding) {
@@ -6332,11 +6341,10 @@
             ghostBuilding = rootHouse;
 
             rootHouse.buildActivate = () => {
-                rootHouse.setAttribute("projected-texture__wizard-tower", {
+                rootHouse.setAttribute("projected-texture__building", {
                     enabled: false,
                 });
 
-                const type = "WIZARD_TOWER";
                 const str = characterModels.get(type).split("|")[0];
                 const point = [position.x, position.y, position.z];
                 const lookAt = new THREE.Vector3(0, 0, -1).applyQuaternion(rootHouse.components["orthographic-camera-building"].camera.getWorldQuaternion(new THREE.Quaternion()));
@@ -6515,6 +6523,10 @@
                 }
                 case "WIZARD_TOWER": {
                     addTemplate("wizard-tower-template", "WIZARD_TOWER", "wizard-tower-model", false);
+                    break;
+                }
+                case "WALL": {
+                    addTemplate("wall-template", "WALL", "wall-model", false);
                     break;
                 }
             }
@@ -7077,18 +7089,28 @@
                     buildMenuState.removeAttribute("show-hammer");
                     buildMenuState.setAttribute("show-build", "");
                     buildMenuState.setAttribute("wizard-tower-build", "");
+                    buildMenuState.removeAttribute("wall-build");
 
-                }  else if (this.data.selector === "hammer-build") {
+                } else if (this.data.selector === "wall-build") {
+                    const buildMenuState = document.querySelector("#build-menu-state");
+                    buildMenuState.removeAttribute("show-hammer");
+                    buildMenuState.setAttribute("show-build", "");
+                    buildMenuState.removeAttribute("wizard-tower-build");
+                    buildMenuState.setAttribute("wall-build", "");
+
+                } else if (this.data.selector === "hammer-build") {
                     const buildMenuState = document.querySelector("#build-menu-state");
                     buildMenuState.setAttribute("show-hammer", "");
                     buildMenuState.removeAttribute("show-build");
                     buildMenuState.removeAttribute("wizard-tower-build");
+                    buildMenuState.removeAttribute("wall-build");
 
                 } else if (this.data.selector === "cancel-build") {
                     const buildMenuState = document.querySelector("#build-menu-state");
                     buildMenuState.removeAttribute("show-hammer");
                     buildMenuState.removeAttribute("show-build");
                     buildMenuState.removeAttribute("wizard-tower-build");
+                    buildMenuState.removeAttribute("wall-build");
                     const scene = document.querySelector("a-scene");
                     if (ghostBuilding) {
                         scene.removeChild(ghostBuilding);
@@ -7106,6 +7128,7 @@
                     buildMenuState.removeAttribute("show-hammer");
                     buildMenuState.removeAttribute("show-build");
                     buildMenuState.removeAttribute("wizard-tower-build");
+                    buildMenuState.removeAttribute("wall-build");
 
                 } else if (this.data.selector === "forward-attack") {
                     const selector = `.${scene.components['coin-purse'].getUnit()} .wizard-area-of-effect`;
@@ -8161,7 +8184,8 @@
                 <a-entity id="hammer-build" align-with-projection="offset: -0.05 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03; wizardShow: true; menuShow: true;" gltf-model="/meshes/ui/build/Hammer.glb" select-cannon-side="selector: hammer-build" ui-clicked></a-entity>
                 <a-entity id="ok-build" align-with-projection="offset: -0.03 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03; wizardShow: true; buildShow: true;" gltf-model="/meshes/ui/build/Ok.glb" select-cannon-side="selector: ok-build" ui-clicked></a-entity>
                 <a-entity id="cancel-build" align-with-projection="offset: 0.03 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03; wizardShow: true; buildShow: true;" gltf-model="/meshes/ui/build/Cancel.glb" select-cannon-side="selector: cancel-build" ui-clicked></a-entity>
-                <a-entity id="wizard-tower-build" align-with-projection="offset: 0.06 -0.4 -1; rotation: 0 -90 0; scale: 0.015 0.015 0.015; wizardShow: true; hammerShow: true;" gltf-model="/meshes/WizardTower.glb" select-cannon-side="selector: wizard-tower-build" ui-clicked></a-entity>
+                <a-entity id="wizard-tower-build" align-with-projection="offset: 0.10 -0.4 -1; rotation: 0 -90 0; scale: 0.015 0.015 0.015; wizardShow: true; hammerShow: true;" gltf-model="/meshes/WizardTower.glb" select-cannon-side="selector: wizard-tower-build" ui-clicked></a-entity>
+                <a-entity id="wall-build" align-with-projection="offset: 0.03 -0.4 -1; rotation: 0 -90 0; scale: 0.015 0.015 0.015; wizardShow: true; hammerShow: true;" gltf-model="/meshes/Wall.glb" select-cannon-side="selector: wall-build" ui-clicked></a-entity>
                 <a-entity id="build-menu-state"></a-entity>
             </a-entity>
         </a-entity>
