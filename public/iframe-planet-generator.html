@@ -675,6 +675,7 @@
             static GROUP_SIZE = 30;
 
             constructor(geometry) {
+                // setup vertices
                 this.vertices = [];
                 for (let i = 0; i < geometry.attributes.position.array.length; i += 3) {
                     const vertex = new THREE.Vector3(
@@ -685,23 +686,41 @@
                     this.vertices.push(vertex);
                 }
                 this.nextIndex = Math.round(this.vertices.length);
+
+                // setup indices
                 this.indices = [...geometry.index.array];
 
+                // init setup groups
                 const groupEls = document.querySelectorAll("[grass-particles]");
                 const groups = [...groupEls].map(x => ({
                     vertex: new THREE.Vector3().copy(x.components["grass-particles"].data.origin),
                     faces: [],
                 }));
+
+                // init setup faces and groups
                 this.faces = [];
-                for (let i = 0; i < this.indices.length; i += 3) {
-                    this.faces.push(this.makeFaceObject(i));
-                }
                 this.groups = groups.map(x => ({
                     vertex: x.vertex,
                     faces: this.faces.filter(y => y.centroid.distanceTo(x.vertex) < NavMeshTriangles.GROUP_SIZE),
                     obbs: [],
                 }));
 
+                // create faces
+                for (let i = 0; i < this.indices.length; i += 3) {
+                    this.faces.push(this.makeFaceObject(i));
+                }
+
+                // create groups final
+                this.groups.forEach(x => {
+                    x.faces = this.faces.filter(y => y.centroid.distanceTo(x.vertex) < NavMeshTriangles.GROUP_SIZE);
+                });
+
+                // create faces final
+                this.faces.forEach(face => {
+                    face.groups = this.groups.filter(y => y.vertex.distanceTo(face.centroid) < NavMeshTriangles.GROUP_SIZE);
+                });
+
+                // create obbs
                 this.obbs = [];
             }
             makeFaceObject(i) {
@@ -725,6 +744,7 @@
                 } = this.computeCircumcircle(f);
                 f.center = center;
                 f.radius = radius;
+                f.groups = this.groups.filter(x => f.centroid.distanceTo(x.vertex) < NavMeshTriangles.GROUP_SIZE);
                 return f;
             }
             computeCircumcircle(face) {
@@ -777,19 +797,18 @@
                 this.vertices.push(point.clone());
 
                 // create hole in graph
-                const intersectingFaces = closestGroup.faces.filter(x => x.center.clone().normalize().dot(point.clone().normalize()) >= x.radius && Math.abs(this.vertices[x.a].clone().length() - this.vertices[x.b].clone().length()) < 0.1 && Math.abs(this.vertices[x.b].clone().length() - this.vertices[x.c].clone().length()) < 0.1);
-                if (intersectingFaces.length > 100) {
+                const intersectingFaces = closestGroup.faces.map((x) => [x, x.faceIndex]).filter(([x]) => x.center.clone().normalize().dot(point.clone().normalize()) >= x.radius && Math.abs(this.vertices[x.a].clone().length() - this.vertices[x.b].clone().length()) < 0.1 && Math.abs(this.vertices[x.b].clone().length() - this.vertices[x.c].clone().length()) < 0.1);
+                if (intersectingFaces.length > 300) {
                     throw new Error("Too Many Intersecting Faces in Delaunay Triangulation Insertion");
                 }
-                const edges = intersectingFaces.reduce((acc, x) => [...acc, [x.a, x.b, x], [x.b, x.c, x], [x.c, x.a, x]], []);
-                const badEdges = [...edges.filter(([a,b],i,arr) => arr.some(([c,d]) => a === d && b === c))].sort(([,,a], [,,b]) => b.faceIndex - a.faceIndex);
-                const goodEdges = [...edges.filter(([a,b],i,arr) => !arr.some(([c,d]) => a === d && b === c))].sort(([,,a], [,,b]) => b.faceIndex - a.faceIndex);
+                const edges = intersectingFaces.reduce((acc, [x, i]) => [...acc, [x.a, x.b, x, i], [x.b, x.c, x, i], [x.c, x.a, x, i]], []);
+                const badEdges = [...edges.filter(([a,b],_,arr) => arr.some(([c,d]) => a === d && b === c))].reverse();
+                const goodEdges = [...edges.filter(([a,b],_,arr) => !arr.some(([c,d]) => a === d && b === c))].reverse();
 
                 // create new indices
                 const uniqueFacesToCull = new Set();
                 const badFaces = [];
-                for (const [,,badFace] of badEdges) {
-                    const faceIndex = badFace.faceIndex;
+                for (const [,,badFace,faceIndex] of badEdges) {
                     if (uniqueFacesToCull.has(faceIndex)) {
                         continue;
                     }
@@ -945,7 +964,7 @@
                     const ip = this.faces[i / 3].centroid.clone().multiplyScalar(1.001);
                     let obbHit = false;
                     if (!includeObb) {
-                        if (this.obbs.some(obb => this.isPointInObb(obb, ip))) {
+                        if (this.faces[i / 3].groups.reduce((acc, g) => acc.concat(g.obbs), []).some(obb => this.isPointInObb(obb, ip))) {
                             obbHit = true;
                         }
                     }
@@ -978,11 +997,11 @@
                     const ip = this.faces[i / 3].centroid.clone().multiplyScalar(1.001);
                     let obbHit = false;
                     if (includeObb) {
-                        if (this.obbs.every(obb => !this.isPointInObb(obb, ip))) {
+                        if (this.faces[i / 3].groups.reduce((acc, g) => acc.concat(g.obbs), []).every(obb => !this.isPointInObb(obb, ip))) {
                             obbHit = true;
                         }
                     } else {
-                        if (this.obbs.some(obb => this.isPointInObb(obb, ip))) {
+                        if (this.faces[i / 3].groups.reduce((acc, g) => acc.concat(g.obbs), []).some(obb => this.isPointInObb(obb, ip))) {
                             obbHit = true;
                         }
                     }
