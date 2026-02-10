@@ -143,6 +143,7 @@ export const PlanetGenerator = () => {
             context.gameData = data;
 
             const staticMeshPaths = [
+                "/meshes/Blacksmith.glb",
                 "/meshes/Wall.glb",
                 "/meshes/WizardTower.glb",
                 "/meshes/ui/healthbar/HealthBar.glb",
@@ -211,6 +212,7 @@ export const PlanetGenerator = () => {
                 }
 
                 const warriorDataUri = gltf[gltf.length - 7] as string;
+                addCharacterModel(iframeRef.current, "BLACKSMITH", new Array(3).fill(gltf[gltf.length - 26] as string).join("|"));
                 addCharacterModel(iframeRef.current, "WALL", new Array(3).fill(gltf[gltf.length - 25] as string).join("|"));
                 addCharacterModel(iframeRef.current, "WIZARD_TOWER", new Array(3).fill(gltf[gltf.length - 24] as string).join("|"));
                 addCharacterModel(iframeRef.current, "HEALTHBAR", gltf[gltf.length - 23] as string);
