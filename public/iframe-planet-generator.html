@@ -5717,7 +5717,7 @@
             }
         });
 
-        function addTemplate(templateId, charModelId, instanceModelId, memberMesh) {
+        function addTemplate(templateId, charModelId, memberMesh) {
             const scene = document.querySelector("a-scene");
 
             const str = characterModels.get(charModelId).split("|")[0];
@@ -6520,60 +6520,13 @@
 
         function addCharacterModel(item) {
             const {
-                data: str, type
+                data: str, type, networked
             } = JSON.parse(item);
 
             characterModels.set(type, str);
 
-            switch (type) {
-                case "WIZARD": {
-                    addTemplate("wizard-template", "WIZARD", "wizard-model", false);
-                    break;
-                }
-                case "WARRIOR": {
-                    addTemplate("warrior-template", "WARRIOR", "warrior-model", false);
-                    break;
-                }
-                case "PERSON": {
-                    addTemplate("person-template", "PERSON", "person-model", false);
-                    break;
-                }
-                case "ARROW": {
-                    addTemplate("arrow-template", "ARROW", "arrow-model", false);
-                    break;
-                }
-                case "FIREBALL": {
-                    addTemplate("fireball-template", "FIREBALL", "fireball-model", false);
-                    break;
-                }
-                case "CANNONBALL": {
-                    addTemplate("cannonball-template", "CANNONBALL", "cannonball-model", false);
-                    break;
-                }
-                case "GOLD_COIN": {
-                    addTemplate("gold-coin-template", "GOLD_COIN", "gold-coin-model", false);
-                    break;
-                }
-                case "SHIP": {
-                    addTemplate("ship-template", "SHIP", "ship-model", false);
-                    break;
-                }
-                case "PIRATE_SHIP": {
-                    addTemplate("pirate-ship-template", "PIRATE_SHIP", "pirate-ship-model", false);
-                    break;
-                }
-                case "WIZARD_TOWER": {
-                    addTemplate("wizard-tower-template", "WIZARD_TOWER", "wizard-tower-model", false);
-                    break;
-                }
-                case "WALL": {
-                    addTemplate("wall-template", "WALL", "wall-model", false);
-                    break;
-                }
-                case "BLACKSMITH": {
-                    addTemplate("blacksmith-template", "BLACKSMITH", "blacksmith-model", false);
-                    break;
-                }
+            if (networked) {
+                addTemplate(`${type.toLowerCase().replace("_", "-")}-template`, type, false);
             }
         }
 

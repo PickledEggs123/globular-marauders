@@ -71,9 +71,9 @@ export const PlanetGenerator = () => {
             return btoa(result);
         };
 
-        const addCharacterModel = (iframe: HTMLIFrameElement, type: string, data: string) => {
+        const addCharacterModel = (iframe: HTMLIFrameElement, type: string, data: string, networked: boolean) => {
             // @ts-ignore
-            iframe.contentWindow?.addCharacterModel(JSON.stringify({ type, data }));
+            iframe.contentWindow?.addCharacterModel(JSON.stringify({ type, data, networked }));
         };
 
         const addBuildings = (iframe: HTMLIFrameElement, buildings: IGameBuilding[], dataUris: string[]) => {
@@ -93,7 +93,7 @@ export const PlanetGenerator = () => {
             };
 
             Object.entries(buildingTypeMap).forEach(([type, uris]) => {
-                addCharacterModel(iframe, type, uris.join("|"));
+                addCharacterModel(iframe, type, uris.join("|"), false);
             });
 
             houseArray.forEach(house => {
@@ -204,7 +204,7 @@ export const PlanetGenerator = () => {
                 const shipDataUri = gltf[gltf.length - 13] as string;
                 if (spawnPoints[0]) {
                     const spawnPoint = spawnPoints[0];
-                    addCharacterModel(iframeRef.current, "SHIP", shipDataUri);
+                    addCharacterModel(iframeRef.current, "SHIP", shipDataUri, true);
                     await contentWindow?.addShip(JSON.stringify({
                         data: shipDataUri,
                         point: spawnPoint.point.map(x => x * PLANET_SIZE)
@@ -212,22 +212,22 @@ export const PlanetGenerator = () => {
                 }
 
                 const warriorDataUri = gltf[gltf.length - 7] as string;
-                addCharacterModel(iframeRef.current, "BLACKSMITH", new Array(3).fill(gltf[gltf.length - 26] as string).join("|"));
-                addCharacterModel(iframeRef.current, "WALL", new Array(3).fill(gltf[gltf.length - 25] as string).join("|"));
-                addCharacterModel(iframeRef.current, "WIZARD_TOWER", new Array(3).fill(gltf[gltf.length - 24] as string).join("|"));
-                addCharacterModel(iframeRef.current, "HEALTHBAR", gltf[gltf.length - 23] as string);
-                addCharacterModel(iframeRef.current, "MANABAR", gltf[gltf.length - 22] as string);
-                addCharacterModel(iframeRef.current, "FIREBALL", gltf[gltf.length - 21] as string);
-                addCharacterModel(iframeRef.current, "WIZARD", gltf[gltf.length - 20] as string);
-                addCharacterModel(iframeRef.current, "NPC_DESTINATION", gltf[gltf.length - 19] as string);
-                addCharacterModel(iframeRef.current, "SHIP_DESTINATION", gltf[gltf.length - 18] as string);
-                addCharacterModel(iframeRef.current, "WARRIOR", warriorDataUri);
-                addCharacterModel(iframeRef.current, "PIRATE_SHIP", gltf[gltf.length - 17] as string);
-                addCharacterModel(iframeRef.current, "PERSON", gltf[gltf.length - 11] as string);
-                addCharacterModel(iframeRef.current, "ARROW", gltf[gltf.length - 12] as string);
-                addCharacterModel(iframeRef.current, "GOLD_COIN", gltf[gltf.length - 14] as string);
-                addCharacterModel(iframeRef.current, "CANNONBALL", gltf[gltf.length - 15] as string);
-                addCharacterModel(iframeRef.current, "HELM", gltf[gltf.length - 16] as string);
+                addCharacterModel(iframeRef.current, "BLACKSMITH", new Array(3).fill(gltf[gltf.length - 26] as string).join("|"), true);
+                addCharacterModel(iframeRef.current, "WALL", new Array(3).fill(gltf[gltf.length - 25] as string).join("|"), true);
+                addCharacterModel(iframeRef.current, "WIZARD_TOWER", new Array(3).fill(gltf[gltf.length - 24] as string).join("|"), true);
+                addCharacterModel(iframeRef.current, "HEALTHBAR", gltf[gltf.length - 23] as string, false);
+                addCharacterModel(iframeRef.current, "MANABAR", gltf[gltf.length - 22] as string, false);
+                addCharacterModel(iframeRef.current, "FIREBALL", gltf[gltf.length - 21] as string, true);
+                addCharacterModel(iframeRef.current, "WIZARD", gltf[gltf.length - 20] as string, true);
+                addCharacterModel(iframeRef.current, "NPC_DESTINATION", gltf[gltf.length - 19] as string, false);
+                addCharacterModel(iframeRef.current, "SHIP_DESTINATION", gltf[gltf.length - 18] as string, false);
+                addCharacterModel(iframeRef.current, "WARRIOR", warriorDataUri, true);
+                addCharacterModel(iframeRef.current, "PIRATE_SHIP", gltf[gltf.length - 17] as string, true);
+                addCharacterModel(iframeRef.current, "PERSON", gltf[gltf.length - 11] as string, true);
+                addCharacterModel(iframeRef.current, "ARROW", gltf[gltf.length - 12] as string, true);
+                addCharacterModel(iframeRef.current, "GOLD_COIN", gltf[gltf.length - 14] as string, true);
+                addCharacterModel(iframeRef.current, "CANNONBALL", gltf[gltf.length - 15] as string, true);
+                addCharacterModel(iframeRef.current, "HELM", gltf[gltf.length - 16] as string, false);
 
                 if (buildings.length) {
                     addBuildings(iframeRef.current, buildings, [
