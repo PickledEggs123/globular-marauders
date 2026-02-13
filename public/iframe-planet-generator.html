@@ -741,7 +741,14 @@
                 const {
                     center,
                     radius,
+                    invert,
                 } = this.computeCircumcircle(f);
+
+                console.assert("radius is not negative", f.radius > 0);
+                console.assert("face index point to index array correctly a", f.a === this.indices[i]);
+                console.assert("face index point to index array correctly b", f.b === this.indices[i + 1]);
+                console.assert("face index point to index array correctly c", f.c === this.indices[i + 2]);
+
                 f.center = center;
                 f.radius = radius;
                 f.groups = this.groups.filter(x => f.centroid.distanceTo(x.vertex) < NavMeshTriangles.GROUP_SIZE);
@@ -773,6 +780,27 @@
                         v1,
                         v2
                     ).normalize();
+                }, () => {
+                    const v1 = a.clone().sub(b.clone()).normalize();
+                    const v2 = a.clone().sub(c.clone()).normalize();
+                    return new THREE.Vector3().crossVectors(
+                        v2,
+                        v1
+                    ).normalize();
+                }, () => {
+                    const v1 = b.clone().sub(c.clone()).normalize();
+                    const v2 = b.clone().sub(a.clone()).normalize();
+                    return new THREE.Vector3().crossVectors(
+                        v2,
+                        v1
+                    ).normalize();
+                }, () => {
+                    const v1 = c.clone().sub(a.clone()).normalize();
+                    const v2 = c.clone().sub(b.clone()).normalize();
+                    return new THREE.Vector3().crossVectors(
+                        v2,
+                        v1
+                    ).normalize();
                 }]
                 for (const math of computeCenterMaths) {
                     const center = math();
@@ -780,14 +808,33 @@
                         // skip insertion if normal is NaN.
                         continue;
                     }
+                    const centerFaceDot = center.clone().dot(face.centroid.clone().normalize())
+                    if (centerFaceDot < 0.85) {
+                        continue;
+                    }
+
                     const radius = center.clone().dot(a.clone());
                     const rb = center.clone().dot(b.clone());
                     const rc = center.clone().dot(c.clone());
-                    if (Math.abs(rb - radius) < 0.01 && Math.abs(rc - radius) < 0.01) {
+                    if (Math.abs(rb - radius) < 0.01 && Math.abs(rc - radius) < 0.01 && radius > 0) {
                         return {
                             center,
                             radius,
+                            invert: false,
                         };
+                    }
+                    if (Math.abs(rb - radius) < 0.01 && Math.abs(rc - radius) < 0.01 && radius <= 0) {
+                        const centerInvert = center.clone().negate();
+                        const radiusInvert = centerInvert.clone().dot(a.clone());
+                        const rbInvert = centerInvert.clone().dot(b.clone());
+                        const rcInvert = centerInvert.clone().dot(c.clone());
+                        if (Math.abs(rbInvert - radiusInvert) < 0.01 && Math.abs(rcInvert - radiusInvert) < 0.01 && radiusInvert > 0) {
+                            return {
+                                center: centerInvert,
+                                radius: radiusInvert,
+                                invert: true,
+                            };
+                        }
                     }
                 }
                 return null;
@@ -804,6 +851,8 @@
                 const edges = intersectingFaces.reduce((acc, [x, i]) => [...acc, [x.a, x.b, x, i], [x.b, x.c, x, i], [x.c, x.a, x, i]], []);
                 const badEdges = [...edges.filter(([a,b],_,arr) => arr.some(([c,d]) => a === d && b === c))].reverse();
                 const goodEdges = [...edges.filter(([a,b],_,arr) => !arr.some(([c,d]) => a === d && b === c))].reverse();
+
+                console.assert("edges split correctly into good and bad", edges.length === (goodEdges.length + badEdges.length));
 
                 // create new indices
                 const uniqueFacesToCull = new Set();
@@ -8169,7 +8218,6 @@
             <img id="fog" src="/assets/fog.png" alt="fog"/>
             <img id="blob" src="/assets/blob.png" alt="blob"/>
         </a-assets>
-        <a-sphere color="black" radius="0.01" id="cursor" port-show></a-sphere>
         <a-entity light="type: ambient; color: #CCC"></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.8; castShadow: true; shadowCameraBottom: -150; shadowCameraTop: 150; shadowCameraLeft: -150; shadowCameraRight: 150; shadowCameraNear: -150; shadowCameraFar: 150; shadowMapWidth: 1024; shadowMapHeight: 1024;" position="0 1 0" handle-shadow-parameter></a-entity>
         <a-entity light="type: directional; color: #EEE; intensity: 0.15" position="0 -1 0"></a-entity>
@@ -8181,7 +8229,7 @@
         <a-entity id="tree-mesh" gltf-model="/meshes/Model_Redo/stylished_fir/Tree.glb" instanced-mesh="capacity: 2048; positioning: world;"></a-entity>
         <a-entity id="camera-rig" position="0 105 5" networked="template: #avatar-template; attachTemplateToLocal: false;">
             <a-entity camera globe-look-controls="mouseEnabled: false; touchEnabled: false;" position="0 1.6 0" cursor-updater cursor="rayOrigin: mouse" raycaster="far: 50; interval: 100; objects: .clickable">
-                <a-entity id="port-menu" align-with-projection="offset: 0.25 0.2 -0.5; rotation: 0 0 0; portShow: true" port-show html="cursor:#cursor;html:#my-interface" class="clickable"></a-entity>
+                <a-entity id="port-menu" align-with-projection="offset: 0.25 0.2 -0.5; rotation: 0 0 0; portShow: true" port-show class="clickable"></a-entity>
                 <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
                 <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
                 <a-entity id="health-bar" align-with-projection="offset: 0 -0.25 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03;" gltf-model="/meshes/ui/healthbar/HealthBar.glb" health-bar></a-entity>
