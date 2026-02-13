@@ -1949,12 +1949,20 @@
         AFRAME.registerComponent('globe-trimesh', {
             schema: {},
             init: function () {
-                this.el.addEventListener('model-loaded', () => {
-                    const obj = this.el.getObject3D('mesh');
+                const obj = this.el.getObject3D('mesh');
+                const addShapeOuter = (obj) => {
                     const result = threeToCannon.getShapeParameters(obj, { type: threeToCannon.ShapeType.MESH });
                     const body = this.el.components['static-body'].body;
                     this.addShapes.call(this, body, result);
-                });
+                };
+                if (obj) {
+                    addShapeOuter(obj);
+                } else {
+                    this.el.addEventListener('model-loaded', () => {
+                        const obj = this.el.getObject3D('mesh');
+                        addShapeOuter(obj);
+                    });
+                }
             },
             addShapes: function (body, result) {
                 if (body) {
@@ -4537,6 +4545,26 @@
             },
         });
 
+        AFRAME.registerComponent('has-terrain-tile-physics', {
+            schema: {},
+            init: function () {
+                this.addPhysics = () => {
+                    this.el.setAttribute("static-body", "shape: none;");
+                    this.el.setAttribute("globe-trimesh", "");
+                };
+                this.removePhysics = () => {
+                    this.el.removeAttribute("static-body");
+                    this.el.removeAttribute("globe-trimesh");
+                }
+                this.el.addEventListener('add-physics', this.addPhysics);
+                this.el.addEventListener('remove-physics', this.removePhysics);
+            },
+            remove: function () {
+                this.el.removeEventListener('add-physics', this.addPhysics);
+                this.el.removeEventListener('remove-physics', this.removePhysics);
+            },
+        });
+
         AFRAME.registerComponent('terrain-tile', {
             schema: {
                 type: "string",
@@ -4573,6 +4601,9 @@
                     if (this.el.components['tree-particles']) {
                         this.el.emit("add-tree");
                     }
+                    if (this.el.components['has-terrain-tile-physics']) {
+                        this.el.emit("add-physics");
+                    }
                 } else if (!(cameraPos.dot(tilePos) > cos45) && this.el.classList.contains(className)) {
                     this.el.classList.remove(className);
                     if (this.el.components['grass-particles']) {
@@ -4580,6 +4611,9 @@
                     }
                     if (this.el.components['tree-particles']) {
                         this.el.emit("remove-tree");
+                    }
+                    if (this.el.components['has-terrain-tile-physics']) {
+                        this.el.emit("remove-physics");
                     }
                 }
             }
@@ -6520,15 +6554,13 @@
                 rootTerrain.setAttribute("go-to-sea", "");
             } else if (collidable) {
                 // physics land
-                rootTerrain.setAttribute("static-body", "shape: none;");
-                rootTerrain.setAttribute("globe-trimesh", "");
+                rootTerrain.setAttribute("has-terrain-tile-physics", "");
                 rootTerrain.setAttribute("go-on-land", "");
                 rootTerrain.setAttribute("grass-particles", `origin: ${vertex[0] * PLANET_SIZE} ${vertex[1] * PLANET_SIZE} ${vertex[2] * PLANET_SIZE}`);
                 rootTerrain.setAttribute("tree-particles", `origin: ${vertex[0] * PLANET_SIZE} ${vertex[1] * PLANET_SIZE} ${vertex[2] * PLANET_SIZE}`);
             } else {
                 // physics ocean bottom
-                rootTerrain.setAttribute("static-body", "shape: none;");
-                rootTerrain.setAttribute("globe-trimesh", "");
+                rootTerrain.setAttribute("has-terrain-tile-physics", "");
             }
 
             const scene = document.querySelector("a-scene");
