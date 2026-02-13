@@ -132,7 +132,7 @@
                         break;
                     }
                     case "smoke": {
-                        const imageElement = document.querySelector("#fog");
+                        const imageElement = document.querySelector("#fog"); // ok performance
                         const textureLoader = new THREE.TextureLoader();
                         const map = textureLoader.load(imageElement.src);
                         this.mesh = new THREE.Mesh(
@@ -147,7 +147,7 @@
                         break;
                     }
                     case "dirt": {
-                        const imageElement = document.querySelector("#blob");
+                        const imageElement = document.querySelector("#blob"); // ok performance
                         const textureLoader = new THREE.TextureLoader();
                         const map = textureLoader.load(imageElement.src);
                         this.mesh = new THREE.Mesh(
@@ -162,7 +162,7 @@
                         break;
                     }
                     case "water": {
-                        const imageElement = document.querySelector("#fog");
+                        const imageElement = document.querySelector("#fog"); // ok performance
                         const textureLoader = new THREE.TextureLoader();
                         const map = textureLoader.load(imageElement.src);
                         this.mesh = new THREE.Mesh(
@@ -674,7 +674,9 @@
         class NavMeshTriangles {
             static GROUP_SIZE = 30;
 
-            constructor(geometry) {
+            constructor(geometry, sceneEl) {
+                this.sceneEl = sceneEl;
+
                 // setup vertices
                 this.vertices = [];
                 for (let i = 0; i < geometry.attributes.position.array.length; i += 3) {
@@ -691,7 +693,7 @@
                 this.indices = [...geometry.index.array];
 
                 // init setup groups
-                const groupEls = document.querySelectorAll("[grass-particles]");
+                const groupEls = document.querySelectorAll("[grass-particles]"); // ok performance
                 const groups = [...groupEls].map(x => ({
                     vertex: new THREE.Vector3().copy(x.components["grass-particles"].data.origin),
                     faces: [],
@@ -889,7 +891,7 @@
                 this.nextIndex = Math.round(this.vertices.length);
             }
             insertMesh(el) {
-                const scene = document.querySelector("a-scene");
+                const scene = this.sceneEl;
                 if (!scene) {
                     return;
                 }
@@ -1440,8 +1442,8 @@
         let isDemoMode = true;
         function setDemo(b) {
             isDemoMode = b;
-            if (document.querySelector("#port-menu")) {
-                document.querySelector("a-scene").setAttribute("xr-mode-ui", "enabled: false");
+            if (document.querySelector("#port-menu")) { // ok performance
+                document.querySelector("a-scene").setAttribute("xr-mode-ui", "enabled: false"); // ok performance
             } else {
                 setTimeout(() => {
                     setDemo(b);
@@ -1449,11 +1451,11 @@
             }
         }
         function addMovingCamera() {
-            const scene = document.querySelector("a-scene");
+            const scene = document.querySelector("a-scene"); // ok performance
             if (scene) {
-                const cameraRig = scene.querySelector("#camera-rig");
-                const demoNode = scene.querySelector("#demo-node");
-                const demoNodePosition = scene.querySelector("#demo-node-position");
+                const cameraRig = scene.querySelector("#camera-rig"); // ok performance
+                const demoNode = scene.querySelector("#demo-node"); // ok performance
+                const demoNodePosition = scene.querySelector("#demo-node-position"); // ok performance
                 if (cameraRig && demoNode && demoNodePosition) {
                     cameraRig.setAttribute("look-at-box", "#demo-node");
                     demoNode.setAttribute("moving-camera", "");
@@ -1731,7 +1733,7 @@
             } else {
                 buildingLodHashmap.set(url, randomString);
 
-                const scene = document.querySelector("a-scene");
+                const scene = document.querySelector("a-scene"); // ok performance
                 const entity = document.createElement("a-entity");
                 entity.setAttribute("id", randomString);
                 entity.setAttribute("gltf-model", url);
@@ -1762,8 +1764,8 @@
                 const id = getBuildingLodHash(data.meshUrl, data.capacity, data.updateMode);
                 let mesh;
                 try {
-                    const scene = document.querySelector("a-scene");
-                    mesh = scene.querySelector(`#${id}`);
+                    const scene = this.el.sceneEl;
+                    mesh = scene.querySelector(`#${id}`); // ok performance
                 } catch {}
                 if (!mesh) {
                     return;
@@ -1947,6 +1949,7 @@
         });
 
         AFRAME.registerComponent('globe-trimesh', {
+            dependencies: ["static-body"],
             schema: {},
             init: function () {
                 const obj = this.el.getObject3D('mesh');
@@ -3150,7 +3153,7 @@
              */
             setNavMeshGeometry: function (geometry) {
                 if (!this.dynamicMap && geometry) {
-                    this.dynamicMap = new window.NavMeshTriangles(geometry);
+                    this.dynamicMap = new window.NavMeshTriangles(geometry, this.sceneEl);
                 }
 
                 if (this.data.debug) {
@@ -4342,6 +4345,7 @@
         }
 
         AFRAME.registerComponent('grass-particles', {
+            dependencies: ["terrain-tile", "position"],
             schema: {
                 origin: { type: 'vec3', default: {x: 0, y: 0, z: 0} },
             },
@@ -4416,6 +4420,7 @@
         });
 
         AFRAME.registerComponent('tree-particles', {
+            dependencies: ["terrain-tile", "position"],
             schema: {
                 origin: { type: 'vec3', default: {x: 0, y: 0, z: 0} },
             },
