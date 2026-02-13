@@ -741,7 +741,6 @@
                 const {
                     center,
                     radius,
-                    invert,
                 } = this.computeCircumcircle(f);
 
                 console.assert("radius is not negative", f.radius > 0);
@@ -820,21 +819,7 @@
                         return {
                             center,
                             radius,
-                            invert: false,
                         };
-                    }
-                    if (Math.abs(rb - radius) < 0.01 && Math.abs(rc - radius) < 0.01 && radius <= 0) {
-                        const centerInvert = center.clone().negate();
-                        const radiusInvert = centerInvert.clone().dot(a.clone());
-                        const rbInvert = centerInvert.clone().dot(b.clone());
-                        const rcInvert = centerInvert.clone().dot(c.clone());
-                        if (Math.abs(rbInvert - radiusInvert) < 0.01 && Math.abs(rcInvert - radiusInvert) < 0.01 && radiusInvert > 0) {
-                            return {
-                                center: centerInvert,
-                                radius: radiusInvert,
-                                invert: true,
-                            };
-                        }
                     }
                 }
                 return null;
@@ -3192,7 +3177,7 @@
                 }
 
                 if (!geometry) {
-                    geometry = this.dynamicMap.getGeometry(true);
+                    geometry = this.dynamicMap.getGeometry();
                 }
 
                 this.navMesh = new THREE.Mesh(geometry);
