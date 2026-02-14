@@ -7387,12 +7387,39 @@
             },
         });
 
+        AFRAME.registerSystem("cannonball-hit-ready", {
+            schema: {},
+            init: function () {
+                this.cannonBalls = [];
+            },
+            registerMe: function (el) {
+                this.cannonBalls.push(el);
+            },
+            unregisterMe: function (el) {
+                const arr = this.cannonBalls;
+                const idx = arr.indexOf(el);
+                if (idx >= 0) {
+                    arr.splice(idx, 1);
+                }
+            },
+            getCannonBallsReady: function () {
+                return this.cannonBalls;
+            }
+        });
+
         AFRAME.registerComponent("cannonball-hit-ready", {
             schema: {
                 damage: {
                     type: 'number',
                     default: 10,
                 },
+            },
+            init: function () {
+                this.system = this.el.sceneEl.systems["cannonball-hit-ready"];
+                this.system.registerMe(this.el);
+            },
+            remove: function () {
+                this.system.unregisterMe(this.el);
             },
         });
 
@@ -7404,7 +7431,7 @@
             },
             tick: function (t, dt) {
                 const shipPosition = this.el.object3D.getWorldPosition(new THREE.Vector3());
-                const cannonballs = Array.from(document.querySelectorAll("[cannonball-hit-ready]"));
+                const cannonballs = this.el.sceneEl.systems["cannonball-hit-ready"].getCannonBallsReady();
                 cannonballs.filter(x => {
                     return x.components['npc-faction'].data !== this.el.components['npc-faction'].data;
                 }).forEach((cannonball) => {
