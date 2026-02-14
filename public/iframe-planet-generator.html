@@ -2622,6 +2622,7 @@
                 this.mainKeys = {};
                 this.velocity = new THREE.Vector3();
                 this.rotation = new THREE.Vector3();
+                this.sceneEl = this.el.sceneEl;
 
                 // Bind methods and add event listeners.
                 this.onBlur = bind(this.onBlur, this);
@@ -2634,8 +2635,8 @@
                 this.throttle = throttle(250, function () {
                     const destination1 = this.el.object3D.position.clone();
                     setTimeout(() => {
-                        const scene = document.querySelector("a-scene");
-                        const shipEls = Array.from(document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`));
+                        const scene = this.sceneEl;
+                        const shipEls = scene.systems['active-unit-marker'].ships;
                         shipEls.slice(1).forEach(shipEl => {
                             const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), destination1.clone().negate());
                             const m = findParentScene(shipEl)?.systems['globe-ocean-nav'].getNavMesh();
@@ -2651,7 +2652,7 @@
                     }, 125);
                     setTimeout(() => {
                         const scene = document.querySelector("a-scene");
-                        const shipEls = Array.from(document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`));
+                        const shipEls = scene.systems['active-unit-marker'].ships;
                         shipEls.slice(1).forEach(shipEl => {
                             const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), destination1.clone().negate());
                             const m = findParentScene(shipEl)?.systems['globe-ocean-nav'].getNavMesh();
@@ -2820,7 +2821,7 @@
                     }
                 }
 
-                const scene = document.querySelector("a-scene");
+                const scene = el.sceneEl;
                 const ships = Array.from(scene.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`));
                 if (el === ships[0]) {
                     if (!event.synthetic) {
@@ -2847,7 +2848,7 @@
                 if (!shouldCaptureKeyEvent(event)) { return; }
                 code = event.code || KEYCODE_TO_CODE[event.keyCode];
 
-                const scene = document.querySelector("a-scene");
+                const scene = el.sceneEl;
                 const ships = Array.from(scene.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`));
                 if (el === ships[0]) {
                     if (!event.synthetic) {
@@ -2985,28 +2986,10 @@
                 code = event.code || KEYCODE_TO_CODE[event.keyCode];
 
                 if (code === "KeyE") {
-                    // forward attack
-
-                    // if (event.synthetic) {
-                    //     this.el.emit("fire-cannons", "left-cannon");
-                    // } else {
-                    //     const leftCannonFire = document.querySelector("#left-cannon-fire");
-                    //     leftCannonFire.click();
-                    // }
-
                     const forwardAttackFire = document.querySelector("#forward-attack-fire");
                     forwardAttackFire.click();
                 }
                 if (code === "KeyQ") {
-                    // area attack
-
-                    // if (event.synthetic) {
-                    //     this.el.emit("fire-cannons", "right-cannon");
-                    // } else {
-                    //     const rightCannonFire = document.querySelector("#right-cannon-fire");
-                    //     rightCannonFire.click();
-                    // }
-
                     const areaAttackFire = document.querySelector("#area-attack-fire");
                     areaAttackFire.click();
                 }
@@ -3025,25 +3008,16 @@
                 const destination1 = new THREE.Vector3().copy(e.detail);
 
                 // set moba target
-                const scene = document.querySelector("a-scene");
-                const wizard = scene.querySelector(`.${scene.components['coin-purse'].activeUnit}-wizard`);
-                wizard.querySelector("[update-wizard-position-entity]").setAttribute("update-wizard-position-entity", {
+                const scene = this.el.sceneEl;
+                const wizard = scene.systems['active-unit-marker'].wizards[0];
+                wizard?.querySelector("[update-wizard-position-entity]").setAttribute("update-wizard-position-entity", {
                     destination: destination1,
                 });
 
                 // navigate to moba target
-                wizard.setAttribute("globe-nav-agent", `active: true; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
+                wizard?.setAttribute("globe-nav-agent", `active: true; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
 
                 // set camera to start behind wizard facing moba target
-
-
-                // detect attacks
-                // apply projection onto land
-                // apply attacks 1 second later
-
-                // q area attack
-
-                // e forward attack
             },
         });
 
@@ -6297,6 +6271,7 @@
             rootNpc.setAttribute("health", "");
             rootNpc.setAttribute("shadow", "");
             rootNpc.setAttribute("hide-trees-from-camera", "");
+            rootNpc.setAttribute("active-unit-marker", "");
 
             if (characterModels.has("WARRIOR")) {
                 const str = characterModels.get("WARRIOR");
@@ -6366,7 +6341,7 @@
                 }
 
                 if (this.begin) {
-                    const scene = document.querySelector("a-scene");
+                    const scene = this.el.sceneEl;
                     scene.systems['globe-nav'].insertGhostBuilding(this.el);
 
                     this.done = true;
@@ -6500,6 +6475,7 @@
             rootNpc.setAttribute("shadow", "");
             rootNpc.setAttribute("globe-moba-controls", "");
             rootNpc.setAttribute("hide-trees-from-camera", "");
+            rootNpc.setAttribute("active-unit-marker", "");
 
             if (characterModels.has("WIZARD")) {
                 const str = characterModels.get("WIZARD");
@@ -6834,6 +6810,7 @@
             rootShip.setAttribute("npc-faction", "player");
             rootShip.setAttribute("cannonball-collider", "");
             rootShip.setAttribute("pirate-finder", "active: false;");
+            rootShip.setAttribute("active-unit-marker", "");
 
             const rootModel = document.createElement("a-entity");
             rootModel.setAttribute("class", "data");
@@ -6967,21 +6944,25 @@
                     default: false,
                 },
             },
+            init: function () {
+                this.buildMenuStateEl = this.el.sceneEl.querySelector("#build-menu-state"); // ok performance
+                this.cameraLookControlsEl = this.el.sceneEl.querySelector('[globe-look-controls]'); // ok performance
+            },
             tick: function (t, dt) {
-                const scene = document.querySelector("a-scene");
+                const scene = this.el.sceneEl;
                 if (!this.data.portShow) {
                     if (isDemoMode) {
                         this.el.object3D.visible = false;
                         return;
                     } else {
-                        const wizard = scene.querySelector(`.${scene.components['coin-purse'].activeUnit}-wizard`);
+                        const wizard = scene.systems['active-unit-marker'].wizards[0];
                         if (this.data.wizardShow) {
                             this.el.object3D.visible = !!wizard;
                         } else {
                             this.el.object3D.visible = !wizard;
                         }
 
-                        const buildMenuState = scene.querySelector("#build-menu-state");
+                        const buildMenuState = this.buildMenuStateEl;
                         if (this.data.menuShow && this.data.wizardShow) {
                             this.el.object3D.visible = !buildMenuState.hasAttribute("show-build") && !buildMenuState.hasAttribute("show-hammer");
                         }
@@ -6997,7 +6978,7 @@
                 const camera = scene.camera;
 
                 // do nothing if it is mobile
-                const cameraLookControlsEl = document.querySelector('[globe-look-controls]');
+                const cameraLookControlsEl = this.cameraLookControlsEl;
 
                 // align with camera in desktop
                 const position = new THREE.Vector3(0, 0, 0);
@@ -7041,16 +7022,7 @@
                         scene.components['coin-purse'].shipCount = 1;
                         scene.components['coin-purse'].buyShips();
                     } else {
-                        const ships = [];
-                        const activeUnits = [
-                            'ship-1',
-                            'ship-2',
-                            'ship-3',
-                        ];
-                        for (const activeUnit of activeUnits) {
-                            const s = Array.from(document.querySelectorAll(`.${activeUnit}`));
-                            ships.push(...s);
-                        }
+                        const ships = this.el.sceneEl.systems['active-unit-marker'].ships;
                         if (ships.length === 0 && !!window.shipModelStr) {
                             this.respawnTick = time + this.respawnTime;
                             this.activeRespawn = true;
@@ -7498,6 +7470,56 @@
                     this.emitSound = true;
                 }
             }
+        });
+
+        AFRAME.registerSystem('active-unit-marker', {
+            schema: {},
+            init: function () {
+                this.ships = [];
+                this.wizards = [];
+                this.knights = [];
+            },
+            registerMe: function (el) {
+                if (el.className.includes("ship")) {
+                    this.ships.push(el);
+                } else if (el.className.includes("wizard")) {
+                    this.wizards.push(el);
+                } else if (el.className.includes("raider")) {
+                    this.knights.push(el);
+                }
+            },
+            unregisterMe: function (el) {
+                if (el.className.includes("ship")) {
+                    const arr = this.ships;
+                    const idx = arr.indexOf(el);
+                    if (idx >= 0) {
+                        arr.splice(idx, 1);
+                    }
+                } else if (el.className.includes("wizard")) {
+                    const arr = this.wizards;
+                    const idx = arr.indexOf(el);
+                    if (idx >= 0) {
+                        arr.splice(idx, 1);
+                    }
+                } else if (el.className.includes("raider")) {
+                    const arr = this.knights;
+                    const idx = arr.indexOf(el);
+                    if (idx >= 0) {
+                        arr.splice(idx, 1);
+                    }
+                }
+            },
+        });
+
+        AFRAME.registerComponent("active-unit-marker", {
+            schema: {},
+            init: function () {
+                this.system = this.el.sceneEl.systems['active-unit-marker'];
+                this.system.registerMe(this.el);
+            },
+            remove: function () {
+                this.system.unregisterMe(this.el);
+            },
         });
 
         AFRAME.registerComponent('coin-purse', {
@@ -8118,8 +8140,8 @@
             tick: function(t, dt) {
                 const scene = document.querySelector("a-scene");
                 const shipEls = [
-                    ...Array.from(document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}-wizard`)),
-                    ...Array.from(document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`)),
+                    ...scene.systems['active-unit-marker'].wizards,
+                    ...scene.systems['active-unit-marker'].ships,
                 ];
                 const ship = shipEls.slice(0, 1)[0];
 
@@ -8150,7 +8172,7 @@
             tick: function(t, dt) {
                 const scene = document.querySelector("a-scene");
                 const shipEls = [
-                    ...Array.from(document.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}-wizard`)),
+                    ...scene.systems['active-unit-marker'].wizards,
                 ];
                 const ship = shipEls.slice(0, 1)[0];
 
