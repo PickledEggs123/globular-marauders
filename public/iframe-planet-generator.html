@@ -1798,6 +1798,8 @@
                     return;
                 }
 
+                this.lastDistance = Infinity;
+
                 const lod0Mesh = getBuildingLodHash(data[0], 3000, "manual");
                 const lod1Mesh = getBuildingLodHash(data[1], 3000, "manual");
                 const lod2Mesh = getBuildingLodHash(data[2], 3000, "manual");
@@ -1846,42 +1848,70 @@
                     return;
                 }
                 if (distance >= 40) {
-                    lod0.setAttribute("visible", "false");
-                    lod1.setAttribute("visible", "false");
-                    lod2.setAttribute("visible", "false");
-                    lod0.components.visible.update();
-                    lod1.components.visible.update();
-                    lod2.components.visible.update();
-                    lod0.emit("object3DUpdated");
-                    lod1.emit("object3DUpdated");
-                    lod2.emit("object3DUpdated");
+                    let shouldEmit = false;
+                    if (this.lastDistance !== 40) {
+                        this.lastDistance = 40;
+                        shouldEmit = true;
+                    }
+                    if (shouldEmit) {
+                        lod0.setAttribute("visible", "false");
+                        lod1.setAttribute("visible", "false");
+                        lod2.setAttribute("visible", "false");
+                        lod0.components.visible.update();
+                        lod1.components.visible.update();
+                        lod2.components.visible.update();
+                        lod0.emit("object3DUpdated");
+                        lod1.emit("object3DUpdated");
+                        lod2.emit("object3DUpdated");
+                    }
                 } else if (distance >= 20) {
-                    lod0.setAttribute("visible", "false");
-                    lod1.setAttribute("visible", "false");
-                    lod2.setAttribute("visible", "true");
-                    lod0.components.visible.update();
-                    lod1.components.visible.update();
-                    lod2.components.visible.update();
-                    lod0.emit("object3DUpdated");
-                    lod1.emit("object3DUpdated");
-                    lod2.emit("object3DUpdated");
+                    let shouldEmit = false;
+                    if (this.lastDistance !== 20) {
+                        this.lastDistance = 20;
+                        shouldEmit = true;
+                    }
+                    if (shouldEmit) {
+                        lod0.setAttribute("visible", "false");
+                        lod1.setAttribute("visible", "false");
+                        lod2.setAttribute("visible", "true");
+                        lod0.components.visible.update();
+                        lod1.components.visible.update();
+                        lod2.components.visible.update();
+                        lod0.emit("object3DUpdated");
+                        lod1.emit("object3DUpdated");
+                        lod2.emit("object3DUpdated");
+                    }
                 } else if (distance >= 10) {
-                    lod0.setAttribute("visible", "false");
-                    lod1.setAttribute("visible", "true");
-                    lod2.setAttribute("visible", "false");
-                    lod0.components.visible.update();
-                    lod1.components.visible.update();
-                    lod2.components.visible.update();
-                    lod0.emit("object3DUpdated");
-                    lod1.emit("object3DUpdated");
-                    lod2.emit("object3DUpdated");
+                    let shouldEmit = false;
+                    if (this.lastDistance !== 10) {
+                        this.lastDistance = 10;
+                        shouldEmit = true;
+                    }
+                    if (shouldEmit) {
+                        lod0.setAttribute("visible", "false");
+                        lod1.setAttribute("visible", "true");
+                        lod2.setAttribute("visible", "false");
+                        lod0.components.visible.update();
+                        lod1.components.visible.update();
+                        lod2.components.visible.update();
+                        lod0.emit("object3DUpdated");
+                        lod1.emit("object3DUpdated");
+                        lod2.emit("object3DUpdated");
+                    }
                 } else if (distance >= 0) {
-                    lod0.setAttribute("visible", "true");
-                    lod1.setAttribute("visible", "false");
-                    lod2.setAttribute("visible", "false");
-                    lod0.emit("object3DUpdated");
-                    lod1.emit("object3DUpdated");
-                    lod2.emit("object3DUpdated");
+                    let shouldEmit = false;
+                    if (this.lastDistance !== 0) {
+                        this.lastDistance = 0;
+                        shouldEmit = true;
+                    }
+                    if (shouldEmit) {
+                        lod0.setAttribute("visible", "true");
+                        lod1.setAttribute("visible", "false");
+                        lod2.setAttribute("visible", "false");
+                        lod0.emit("object3DUpdated");
+                        lod1.emit("object3DUpdated");
+                        lod2.emit("object3DUpdated");
+                    }
                 }
 
                 // auto update clickable
@@ -2623,6 +2653,9 @@
                 this.velocity = new THREE.Vector3();
                 this.rotation = new THREE.Vector3();
                 this.sceneEl = this.el.sceneEl;
+                this.leftCannonFireEl = document.querySelector("#left-cannon-fire");
+                this.rightCannonFireEl = document.querySelector("#right-cannon-fire");
+                this.noneCannonFireEl = document.querySelector("#none-cannon-fire");
 
                 // Bind methods and add event listeners.
                 this.onBlur = bind(this.onBlur, this);
@@ -2800,7 +2833,7 @@
                     if (event.synthetic) {
                         this.el.emit("fire-cannons", "left-cannon");
                     } else if (!this.data.npc && this.data.enabled) {
-                        const leftCannonFire = document.querySelector("#left-cannon-fire");
+                        const leftCannonFire = this.leftCannonFireEl;
                         leftCannonFire.click();
                     }
                 }
@@ -2808,7 +2841,7 @@
                     if (event.synthetic) {
                         this.el.emit("fire-cannons", "right-cannon");
                     } else if (!this.data.npc && this.data.enabled) {
-                        const rightCannonFire = document.querySelector("#right-cannon-fire");
+                        const rightCannonFire = this.rightCannonFireEl;
                         rightCannonFire.click();
                     }
                 }
@@ -2816,13 +2849,13 @@
                     if (event.synthetic) {
                         this.el.emit("fire-cannons", "none-cannon");
                     } else if (!this.data.npc && this.data.enabled) {
-                        const noneCannonFire = document.querySelector("#none-cannon-fire");
+                        const noneCannonFire = this.noneCannonFireEl;
                         noneCannonFire.click();
                     }
                 }
 
                 const scene = el.sceneEl;
-                const ships = Array.from(scene.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`));
+                const ships = scene.systems['active-unit-marker'].ships;
                 if (el === ships[0]) {
                     if (!event.synthetic) {
                         if (KEYS.indexOf(code) !== -1) { this.mainKeys[code] = true; }
@@ -2849,7 +2882,7 @@
                 code = event.code || KEYCODE_TO_CODE[event.keyCode];
 
                 const scene = el.sceneEl;
-                const ships = Array.from(scene.querySelectorAll(`.${scene.components['coin-purse'].activeUnit}`));
+                const ships = scene.systems['active-unit-marker'].ships;
                 if (el === ships[0]) {
                     if (!event.synthetic) {
                         delete this.mainKeys[code];
@@ -4462,6 +4495,7 @@
             schema: {},
             init: function () {
                 this.elSet = new Set();
+                this.lastVisible = false;
             },
             addTree: function (el) {
                 this.elSet.add(el);
@@ -4473,7 +4507,15 @@
             },
             updateVisible: function () {
                 this.el.object3D.visible = this.elSet.size === 0;
-                this.el.emit("object3DUpdated");
+
+                let shouldEmit = false;
+                if (this.lastVisible !== this.el.object3D.visible) {
+                    shouldEmit = true;
+                    this.lastVisible = this.el.object3D.visible;
+                }
+                if (shouldEmit) {
+                    this.el.emit("object3DUpdated");
+                }
             }
         });
 
@@ -7106,6 +7148,7 @@
                     this.innerDebounce.trigger();
                 };
                 this.el.addEventListener("click", this.innerSelectCannonSide);
+                this.lastVisible = false;
             },
             remove: function () {
                 this.el.removeEventListener("click", this.innerSelectCannonSide);
@@ -7115,7 +7158,15 @@
                 const unit = scene.components['coin-purse'].getUnit();
                 const visible = unit.startsWith("ship");
                 this.el.setAttribute("visible", visible);
-                this.el.emit("object3DUpdated");
+
+                let shouldEmit = false;
+                if (this.lastVisible !== visible) {
+                    shouldEmit = true;
+                    this.lastVisible = visible;
+                }
+                if (shouldEmit) {
+                    this.el.emit("object3DUpdated");
+                }
             },
             selectCannonSide: function () {
                 if (this.data.selector === "none-cannon") {
@@ -8300,7 +8351,6 @@
         <a-entity id="tree-mesh" gltf-model="/meshes/Model_Redo/stylished_fir/Tree.glb" instanced-mesh="capacity: 2048; positioning: world;"></a-entity>
         <a-entity id="camera-rig" position="0 105 5" networked="template: #avatar-template; attachTemplateToLocal: false;">
             <a-entity camera globe-look-controls="mouseEnabled: false; touchEnabled: false;" position="0 1.6 0" cursor-updater cursor="rayOrigin: mouse" raycaster="far: 50; interval: 100; objects: .clickable">
-                <a-entity id="port-menu" align-with-projection="offset: 0.25 0.2 -0.5; rotation: 0 0 0; portShow: true" port-show class="clickable"></a-entity>
                 <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
                 <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
                 <a-entity id="health-bar" align-with-projection="offset: 0 -0.25 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03;" gltf-model="/meshes/ui/healthbar/HealthBar.glb" health-bar></a-entity>
