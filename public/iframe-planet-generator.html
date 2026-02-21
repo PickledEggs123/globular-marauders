@@ -2054,38 +2054,47 @@
         AFRAME.registerComponent('look-at-box', {
             schema: {
                 type: "string",
-                default: ".ship-1:first-of-type",
+                default: "",
             },
             init: function () {
                 this.dtSumTickSize = 5000;
                 this.dtSum = this.dtSumTickSize + 1;
                 this.heightDiff = 5;
                 this.heightDiffLerp = 5;
+                this.box = [];
+                this.boxPos = [];
             },
             update(oldData) {
                 this.dtSum = this.dtSumTickSize + 1;
+
+                if (oldData !== this.data) {
+                    // get elements
+                    let [dataItem, dataPostfix] = this.data.split(":");
+                    let otherClassName = "";
+                    if (dataPostfix) {
+                        [dataPostfix, otherClassName] = dataPostfix.split(" ", 2);
+                        dataPostfix = `:${dataPostfix}`;
+                        if (otherClassName) {
+                            otherClassName = ` ${otherClassName}`;
+                        } else {
+                            otherClassName = "";
+                        }
+                    }
+                    const boxSelector = `${dataItem}${otherClassName}`;
+                    const boxPosSelector = `${dataItem}${otherClassName}-position`;
+                    this.box = Array.from(document.querySelectorAll(boxSelector)).map(el => el.object3D);
+                    this.boxPos = Array.from(document.querySelectorAll(boxPosSelector)).map(el => el.object3D);
+                    this.dataPostfix = dataPostfix;
+                }
             },
             tick: function (t, dt) {
-                // get elements
-                let [dataItem, dataPostfix] = this.data.split(":");
-                let otherClassName = "";
-                if (dataPostfix) {
-                    [dataPostfix, otherClassName] = dataPostfix.split(" ", 2);
-                    dataPostfix = `:${dataPostfix}`;
-                    if (otherClassName) {
-                        otherClassName = ` ${otherClassName}`;
-                    } else {
-                        otherClassName = "";
-                    }
-                }
-                const boxSelector = `${dataItem}${otherClassName}`;
-                const boxPosSelector = `${dataItem}${otherClassName}-position`;
-                const box = Array.from(document.querySelectorAll(boxSelector)).map(el => el.object3D);
-                const boxPos = Array.from(document.querySelectorAll(boxPosSelector)).map(el => el.object3D);
+                const box = [...this.box];
+                const boxPos = [...this.boxPos];
                 if (!box.length || !boxPos.length) {
                     return;
                 }
-                if (dataPostfix) {
+
+                if (this.dataPostfix) {
                     box.splice(1, box.length - 1);
                     boxPos.splice(1, boxPos.length - 1);
                 }
