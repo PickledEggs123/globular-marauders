@@ -194,7 +194,6 @@ export const PlanetGenerator = () => {
 
             if (iframeRef.current) {
                 const contentWindow = iframeRef.current.contentWindow as IFrameWindow;
-                contentWindow?.setDemo(false);
                 contentWindow?.clearTerrain();
 
                 worldMeshes.forEach(w => {

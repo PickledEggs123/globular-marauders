@@ -1439,17 +1439,6 @@
             }
         }
 
-        let isDemoMode = true;
-        function setDemo(b) {
-            isDemoMode = b;
-            if (document.querySelector("#port-menu")) { // ok performance
-                document.querySelector("a-scene").setAttribute("xr-mode-ui", "enabled: false"); // ok performance
-            } else {
-                setTimeout(() => {
-                    setDemo(b);
-                }, 10);
-            }
-        }
         function addMovingCamera() {
             const scene = document.querySelector("a-scene"); // ok performance
             if (scene) {
@@ -1479,8 +1468,6 @@
                 console.log(this.el.object3D.position)
             },
         });
-
-        setDemo(isDemoMode);
 
         const PLANET_SIZE = 100;
 
@@ -3370,7 +3357,7 @@
 
                 const el = this.el;
                 const data = this.data;
-                const time = (+new Date() - data.startTime) / 1000;
+                const time = t / 1000 - data.startTime / 1000;
                 const pathDistance = data.speed * time;
 
                 if (!data.active) return;
@@ -4617,25 +4604,49 @@
             },
         });
 
+        AFRAME.registerSystem('terrain-tile', {
+            schema: {},
+            init: function () {
+                this.cameraPos = new THREE.Vector3();
+            },
+            tick: function (t, dt) {
+                const cameraEl = document.querySelector("#camera-rig");
+                let cameraPos = cameraEl.object3D.getWorldPosition(new THREE.Vector3());
+                cameraPos = cameraPos.normalize();
+                this.cameraPos = cameraPos;
+            },
+            getCameraPos: function () {
+                return this.cameraPos.clone();
+            },
+        });
+
         AFRAME.registerComponent('terrain-tile', {
             schema: {
                 type: "string",
                 default: ""
             },
             init: function () {
+                this.tilePos = null;
+                this.system = this.el.sceneEl.systems['terrain-tile'];
             },
-            tick: function (t, dt) {
+            update: function (oldData) {
                 if (!this.data) {
+                    this.tilePos = null;
                     return;
                 }
-
-                const cameraEl = document.querySelector("#camera-rig");
-                let cameraPos = cameraEl.object3D.getWorldPosition(new THREE.Vector3());
-                cameraPos = cameraPos.normalize();
                 let tilePos = new THREE.Vector3();
                 tilePos = tilePos.set.apply(tilePos, this.data.split(" "));
                 tilePos = tilePos.normalize();
+                this.tilePos = tilePos;
+            },
+            tick: function (t, dt) {
+                const data = this.tilePos;
+                if (!data) {
+                    return;
+                }
 
+                const tilePos = data;
+                const cameraPos = this.system.getCameraPos();
                 const cos45 = Math.acos(Math.PI / 4);
                 if (cameraPos.dot(tilePos) > cos45) {
                     this.el.setAttribute("visible", "true");
@@ -4668,7 +4679,7 @@
                         this.el.emit("remove-physics");
                     }
                 }
-            }
+            },
         });
 
         AFRAME.registerSystem('building', {
@@ -4944,7 +4955,8 @@
                 }, 10_000);
             },
             transition: function (evt) {
-                const npcId = evt?.detail ?? null;
+                const npcId = evt?.detail?.npcId ?? null;
+                const startTime = evt?.detail?.startTime ?? null
                 if (!this.isReady) {
                     setTimeout(() => {
                         this.innerTransition(evt);
@@ -4966,17 +4978,17 @@
                     if (this.otherBuilding) {
                         this.isHome = false;
                         if (this.currentNpcId) {
-                            updateWalkingNpc(this.currentNpcId, this.otherBuilding);
+                            updateWalkingNpc(this.currentNpcId, this.otherBuilding, startTime);
                         } else {
-                            this.currentNpcId = addWalkingNpc(this.elId, this.el, this.otherBuilding);
+                            this.currentNpcId = addWalkingNpc(this.elId, this.el, this.otherBuilding, startTime);
                         }
                     }
                 } else {
                     this.isHome = true;
                     if (this.currentNpcId) {
-                        updateWalkingNpc(this.currentNpcId, this.el);
+                        updateWalkingNpc(this.currentNpcId, this.el, startTime);
                     } else {
-                        this.currentNpcId = addWalkingNpc(this.elId, this.otherBuilding, this.el);
+                        this.currentNpcId = addWalkingNpc(this.elId, this.otherBuilding, this.el, startTime);
                     }
                     this.otherBuilding = undefined;
                 }
@@ -5099,16 +5111,23 @@
                 building: {type: 'selector'}
             },
             init: function () {
+                this.startTime = null;
                 this.innerBeginTransition = this.beginTransition.bind(this);
                 this.innerHandleDead = this.handleDead.bind(this);
                 this.el.addEventListener("navigation-end", this.innerBeginTransition);
                 this.el.addEventListener("dead", this.innerHandleDead);
             },
+            tick: function (t, dt) {
+                this.startTime = t;
+            },
             beginTransition: function () {
                 if (!this.data.building) {
                     return;
                 }
-                this.data.building.emit('transition', this.el.id);
+                this.data.building.emit('transition', {
+                    npcId: this.el.id,
+                    startTime: this.startTime,
+                });
             },
             handleDead: function () {
                 if (!this.data.building) {
@@ -5890,7 +5909,7 @@
                 rootGoldCoin.setAttribute("npc-faction", "native");
                 rootGoldCoin.setAttribute("npc-finder", "active: false;");
                 rootGoldCoin.setAttribute("networked-health", "");
-                rootGoldCoin.setAttribute("networked-globe-nav-agent", `active: false; startTime: ${+new Date()}; speed: 1;`);
+                rootGoldCoin.setAttribute("networked-globe-nav-agent", `active: false; speed: 1;`);
                 rootGoldCoin.setAttribute("position", "");
                 rootGoldCoin.setAttribute("rotation", "");
             }
@@ -6184,7 +6203,7 @@
             return id;
         }
 
-        function addWalkingNpc(buildingId, buildingEl, destinationEl) {
+        function addWalkingNpc(buildingId, buildingEl, destinationEl, startTime) {
             const scene = document.querySelector("a-scene");
 
             const rootNpc = document.createElement("a-entity");
@@ -6206,7 +6225,7 @@
                 rootNpc.setAttribute("networked-globe-nav-agent", {
                     active: true,
                     start: pos,
-                    startTime: +new Date(),
+                    startTime: startTime + 2000,
                     destination: destination2,
                     speed: 1,
                 });
@@ -6232,7 +6251,7 @@
             return id;
         }
 
-        function updateWalkingNpc(npcId, destinationEl) {
+        function updateWalkingNpc(npcId, destinationEl, startTime) {
             const rootNpc = document.querySelector(`#${npcId}`);
             const destination2 = destinationEl.components['position'].data;
             rootNpc.setAttribute("networked-globe-nav-agent", {active: false});
@@ -6245,7 +6264,7 @@
                 rootNpc.setAttribute("networked-globe-nav-agent", {
                     active: true,
                     start,
-                    startTime: +new Date(),
+                    startTime: startTime + 2000,
                     destination: destination2,
                     speed: 1,
                 });
@@ -6435,7 +6454,7 @@
                 this.active = false;
                 this.maxHeight = -100;
             },
-            tick: function () {
+            tick: function (t, dt) {
                 if (this.done) {
                     return;
                 }
@@ -6453,14 +6472,14 @@
 
                 if (!this.begin && !this.active) {
                     this.maxHeight = meshes.reduce((acc, x) => Math.max(acc, x.geometry.boundingBox.max.z), -100);
-                    this.startTime = +new Date() / 1000;
-                    this.endTime = (+new Date() / 1000) + this.maxHeight;
+                    this.startTime = t / 1000;
+                    this.endTime = (t / 1000) + this.maxHeight;
                     this.begin = true;
                     this.active = true;
                 }
 
                 if (this.begin && this.active) {
-                    const l = THREE.MathUtils.mapLinear(+new Date() / 1000, this.startTime, this.endTime, -this.maxHeight, 0);
+                    const l = THREE.MathUtils.mapLinear(t / 1000, this.startTime, this.endTime, -this.maxHeight, 0);
                     const c = THREE.MathUtils.clamp(l, -this.maxHeight, 0);
                     this.el.object3D.position.copy(this.data.position).add(new THREE.Vector3().copy(this.data.position).normalize().multiplyScalar(c));
                     if (c >= 0) {
@@ -7024,27 +7043,22 @@
             tick: function (t, dt) {
                 const scene = this.el.sceneEl;
                 if (!this.data.portShow) {
-                    if (isDemoMode) {
-                        this.el.object3D.visible = false;
-                        return;
+                    const wizard = scene.systems['active-unit-marker'].wizards[0];
+                    if (this.data.wizardShow) {
+                        this.el.object3D.visible = !!wizard;
                     } else {
-                        const wizard = scene.systems['active-unit-marker'].wizards[0];
-                        if (this.data.wizardShow) {
-                            this.el.object3D.visible = !!wizard;
-                        } else {
-                            this.el.object3D.visible = !wizard;
-                        }
+                        this.el.object3D.visible = !wizard;
+                    }
 
-                        const buildMenuState = this.buildMenuStateEl;
-                        if (this.data.menuShow && this.data.wizardShow) {
-                            this.el.object3D.visible = !buildMenuState.hasAttribute("show-build") && !buildMenuState.hasAttribute("show-hammer");
-                        }
-                        if (this.data.buildShow && this.data.wizardShow) {
-                            this.el.object3D.visible = buildMenuState.hasAttribute("show-build");
-                        }
-                        if (this.data.hammerShow && this.data.wizardShow) {
-                            this.el.object3D.visible = buildMenuState.hasAttribute("show-hammer");
-                        }
+                    const buildMenuState = this.buildMenuStateEl;
+                    if (this.data.menuShow && this.data.wizardShow) {
+                        this.el.object3D.visible = !buildMenuState.hasAttribute("show-build") && !buildMenuState.hasAttribute("show-hammer");
+                    }
+                    if (this.data.buildShow && this.data.wizardShow) {
+                        this.el.object3D.visible = buildMenuState.hasAttribute("show-build");
+                    }
+                    if (this.data.hammerShow && this.data.wizardShow) {
+                        this.el.object3D.visible = buildMenuState.hasAttribute("show-hammer");
                     }
                 }
 
@@ -8308,7 +8322,7 @@
     </style>
 </head>
 <body>
-    <a-scene click-manager onclick="isDemoMode === false && playMusic === true ? window.musicPlayer.start() : undefined" draw-ship-indicator draw-npc-indicator coin-purse respawn physics="driver: local; gravity: 0 0 0;" globe-nav="debug: true;" globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
+    <a-scene click-manager onclick="playMusic === true ? window.musicPlayer.start() : undefined" draw-ship-indicator draw-npc-indicator coin-purse respawn physics="driver: local; gravity: 0 0 0;" globe-nav="debug: true;" globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
         <a-assets>
             <template id="avatar-template">
                 <a-entity class="avatar" networked-audio-source>
