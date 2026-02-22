@@ -6221,15 +6221,14 @@
             rootNpc.setAttribute("spawn-gold", "");
             rootNpc.setAttribute("networked-globe-nav-agent", {active: false});
             rootNpc.setAttribute("shadow", "");
-            setTimeout(() => {
-                rootNpc.setAttribute("networked-globe-nav-agent", {
-                    active: true,
-                    start: pos,
-                    startTime: startTime + 2000,
-                    destination: destination2,
-                    speed: 1,
-                });
-            }, 2000);
+
+            rootNpc.setAttribute("networked-globe-nav-agent", {
+                active: true,
+                start: pos,
+                startTime: startTime + 2000,
+                destination: destination2,
+                speed: 1,
+            });
 
             if (characterModels.has("PERSON")) {
                 const str = characterModels.get("PERSON");
@@ -6255,20 +6254,19 @@
             const rootNpc = document.querySelector(`#${npcId}`);
             const destination2 = destinationEl.components['position'].data;
             rootNpc.setAttribute("networked-globe-nav-agent", {active: false});
-            setTimeout(() => {
-                const start = new THREE.Vector3().copy(rootNpc.components['networked-globe-nav-agent'].data.destination);
-                if (start.length() <= 0) {
-                    start.copy(destination2);
-                    rootNpc.components['position'].data = start.clone();
-                }
-                rootNpc.setAttribute("networked-globe-nav-agent", {
-                    active: true,
-                    start,
-                    startTime: startTime + 2000,
-                    destination: destination2,
-                    speed: 1,
-                });
-            }, 2000);
+
+            const start = new THREE.Vector3().copy(rootNpc.components['networked-globe-nav-agent'].data.destination);
+            if (start.length() <= 0) {
+                start.copy(destination2);
+                rootNpc.components['position'].data = start.clone();
+            }
+            rootNpc.setAttribute("networked-globe-nav-agent", {
+                active: true,
+                start,
+                startTime: startTime + 2000,
+                destination: destination2,
+                speed: 1,
+            });
         }
 
         function addPirateShipSpawnPoint(data) {
