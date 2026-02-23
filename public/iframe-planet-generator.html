@@ -3357,10 +3357,9 @@
 
                 const el = this.el;
                 const data = this.data;
+                if (!data.active) return;
                 const time = t / 1000 - data.startTime / 1000;
                 const pathDistance = data.speed * time;
-
-                if (!data.active) return;
 
                 const object3D = this.el.object3D;
                 const pos = object3D.getWorldPosition(new THREE.Vector3());
@@ -3395,7 +3394,7 @@
                     return;
                 }
 
-                while (this.path.length && pathDistance - this.pathDistance >= 0) {
+                while (this.path.length && pathDistance >= 0 && pathDistance - this.pathDistance >= 0) {
                     // Current segment is a vector from current position to next waypoint.
                     const vCurrent = el.object3D.position;
                     const vWaypoint = this.path[0];
@@ -3491,9 +3490,8 @@
 
                 const el = this.el;
                 const data = this.data;
-                const speed = data.speed * dt / 1000;
-
                 if (!data.active) return;
+                const speed = data.speed * dt / 1000;
 
                 const object3D = this.el.object3D;
                 const pos = object3D.getWorldPosition(new THREE.Vector3());
@@ -3754,9 +3752,9 @@
 
                 const el = this.el;
                 const data = this.data;
+                if (!data.active) return;
                 const speed = data.speed * dt / 1000;
 
-                if (!data.active) return;
                 if (!el.components['globe-keyboard-controls']) return;
 
                 // Use PatrolJS pathfinding system to get the shortest path to target.
