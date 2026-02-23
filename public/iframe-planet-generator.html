@@ -7040,21 +7040,26 @@
                 const scene = this.el.sceneEl;
                 if (!this.data.portShow) {
                     const wizard = scene.systems['active-unit-marker'].wizards[0];
-                    if (this.data.wizardShow) {
-                        this.el.object3D.visible = !!wizard;
-                    } else {
-                        this.el.object3D.visible = !wizard;
-                    }
 
                     const buildMenuState = this.buildMenuStateEl;
-                    if (this.data.menuShow && this.data.wizardShow) {
-                        this.el.object3D.visible = !buildMenuState.hasAttribute("show-build") && !buildMenuState.hasAttribute("show-hammer");
-                    }
-                    if (this.data.buildShow && this.data.wizardShow) {
-                        this.el.object3D.visible = buildMenuState.hasAttribute("show-build");
-                    }
-                    if (this.data.hammerShow && this.data.wizardShow) {
-                        this.el.object3D.visible = buildMenuState.hasAttribute("show-hammer");
+                    const npcDestinationIndicator = scene.components['draw-npc-indicator'];
+                    const hasNpcMode = !!npcDestinationIndicator.currentIndicator;
+                    if (hasNpcMode && this.data.wizardShow) {
+                        if (this.data.menuShow) {
+                            this.el.object3D.visible = !buildMenuState.hasAttribute("show-build") && !buildMenuState.hasAttribute("show-hammer");
+                        }
+                        if (this.data.buildShow) {
+                            this.el.object3D.visible = buildMenuState.hasAttribute("show-build");
+                        }
+                        if (this.data.hammerShow) {
+                            this.el.object3D.visible = buildMenuState.hasAttribute("show-hammer");
+                        }
+                    } else {
+                        if (this.data.wizardShow) {
+                            this.el.object3D.visible = !!wizard;
+                        } else {
+                            this.el.object3D.visible = !wizard;
+                        }
                     }
                 }
 
