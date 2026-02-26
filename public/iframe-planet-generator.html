@@ -724,7 +724,7 @@
                 // create obbs
                 this.obbs = [];
             }
-            makeFaceObject(i) {
+            makeFaceObject(i, newFace = false) {
                 const a = this.indices[i];
                 const b = this.indices[i + 1];
                 const c = this.indices[i + 2];
@@ -736,6 +736,7 @@
                     faceIndex: Math.round(i / 3),
                     center: centroid,
                     radius: 1,
+                    newFace,
                 };
 
                 // compute size of hole in graph for bowyer-watson algorithm
@@ -826,7 +827,7 @@
 
                 throw new Error("Failed to compute circumcircle");
             }
-            insertPoint(point, closestGroup, spawnPoint) {
+            insertPoint(point, closestGroup) {
                 this.nextIndex = this.vertices.length;
                 this.vertices.push(point.clone());
 
@@ -853,13 +854,7 @@
                     badFaces.push(badFace);
 
                     this.faces.splice(faceIndex, 1);
-                    const oldIdxes = this.indices.splice(faceIndex * 3, 3);
-                    const oldVertices = oldIdxes.map(x => this.vertices[x]);
-                    updateSpawnPoint = oldVertices.some(x => x.equals(spawnPoint) || spawnPoint.length() === 0);
-                }
-
-                if (updateSpawnPoint) {
-                    spawnPoint = this.vertices[this.nextIndex];
+                    this.indices.splice(faceIndex * 3, 3);
                 }
 
                 // remove old face from each matching group
@@ -876,7 +871,7 @@
                 for (const [a,b] of goodEdges) {
                     const currentIndex = this.indices.length;
                     this.indices.push(this.nextIndex, a, b);
-                    const f = this.makeFaceObject(currentIndex);
+                    const f = this.makeFaceObject(currentIndex, true);
                     this.faces.push(f);
                     goodFaces.push(f);
                 }
@@ -896,8 +891,6 @@
                     this.faces[i].faceIndex = i;
                 }
                 this.nextIndex = this.vertices.length;
-
-                return spawnPoint;
             }
             insertMesh(el) {
                 const scene = this.sceneEl;
@@ -995,8 +988,22 @@
                     ]);
                     if (intersections[0]) {
                         const ip = intersections[0].point.clone();
-                        spawnPoint = this.insertPoint(ip, closestGroup, spawnPoint);
+                        this.insertPoint(ip, closestGroup);
                     }
+                }
+
+                // update spawn point
+                // create hole in graph
+                const intersectingFaces = closestGroup.faces.map((x) => [x, x.faceIndex]).filter(([x]) => x.newFace);
+                const edges = intersectingFaces.reduce((acc, [x, i]) => [...acc, [x.a, x.b, x, i], [x.b, x.c, x, i], [x.c, x.a, x, i]], []);
+                const goodEdges = [...edges.filter(([a,b],_,arr) => !arr.some(([c,d]) => a === d && b === c))].reverse();
+                const goodVertex = goodEdges[0];
+                if (goodVertex) {
+                    const [goodIndex] = goodVertex;
+                    spawnPoint = this.vertices[goodIndex];
+                }
+                for (let i = 0; i < this.faces.length; i++) {
+                    this.faces[i].newFace = false;
                 }
 
                 scene.systems['globe-nav'].setNavMeshGeometry(this.getGeometry(true));
@@ -2059,7 +2066,7 @@
                 default: "",
             },
             init: function () {
-                this.dtSumTickSize = 5000;
+                this.dtSumTickSize = 1000;
                 this.dtSum = this.dtSumTickSize + 1;
                 this.heightDiff = 5;
                 this.heightDiffLerp = 5;
