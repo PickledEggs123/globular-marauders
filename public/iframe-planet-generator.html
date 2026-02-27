@@ -756,72 +756,159 @@
                 return f;
             }
             computeCircumcircle(face) {
-                const a = this.vertices[face.a].clone().normalize();
-                const b = this.vertices[face.b].clone().normalize();
-                const c = this.vertices[face.c].clone().normalize();
+                const a = this.vertices[face.a].clone();
+                const b = this.vertices[face.b].clone();
+                const c = this.vertices[face.c].clone();
 
                 const computeCenterMaths = [() => {
-                    const v1 = a.clone().sub(b.clone()).normalize();
-                    const v2 = a.clone().sub(c.clone()).normalize();
-                    return new THREE.Vector3().crossVectors(
+                    const v1 = a.clone().normalize().sub(b.clone().normalize());
+                    const v2 = a.clone().normalize().sub(c.clone().normalize());
+                    const v = new THREE.Vector3().crossVectors(
                         v1,
                         v2
                     ).normalize();
+                    return {
+                        v,
+                    };
                 }, () => {
-                    const v1 = b.clone().sub(c.clone()).normalize();
-                    const v2 = b.clone().sub(a.clone()).normalize();
-                    return new THREE.Vector3().crossVectors(
+                    const v1 = b.clone().normalize().sub(c.clone().normalize());
+                    const v2 = b.clone().normalize().sub(a.clone().normalize());
+                    const v = new THREE.Vector3().crossVectors(
                         v1,
                         v2
                     ).normalize();
+                    return {
+                        v,
+                    };
                 }, () => {
-                    const v1 = c.clone().sub(a.clone()).normalize();
-                    const v2 = c.clone().sub(b.clone()).normalize();
-                    return new THREE.Vector3().crossVectors(
+                    const v1 = c.clone().normalize().sub(a.clone().normalize());
+                    const v2 = c.clone().normalize().sub(b.clone().normalize());
+                    const v = new THREE.Vector3().crossVectors(
                         v1,
                         v2
                     ).normalize();
+                    return {
+                        v,
+                    };
                 }, () => {
-                    const v1 = a.clone().sub(b.clone()).normalize();
-                    const v2 = a.clone().sub(c.clone()).normalize();
-                    return new THREE.Vector3().crossVectors(
+                    const v1 = a.clone().normalize().sub(b.clone().normalize());
+                    const v2 = a.clone().normalize().sub(c.clone().normalize());
+                    const v = new THREE.Vector3().crossVectors(
                         v2,
                         v1
                     ).normalize();
+                    return {
+                        v,
+                    };
                 }, () => {
-                    const v1 = b.clone().sub(c.clone()).normalize();
-                    const v2 = b.clone().sub(a.clone()).normalize();
-                    return new THREE.Vector3().crossVectors(
+                    const v1 = b.clone().normalize().sub(c.clone().normalize());
+                    const v2 = b.clone().normalize().sub(a.clone().normalize());
+                    const v = new THREE.Vector3().crossVectors(
                         v2,
                         v1
                     ).normalize();
+                    return {
+                        v,
+                    };
                 }, () => {
-                    const v1 = c.clone().sub(a.clone()).normalize();
-                    const v2 = c.clone().sub(b.clone()).normalize();
-                    return new THREE.Vector3().crossVectors(
+                    const v1 = c.clone().normalize().sub(a.clone().normalize());
+                    const v2 = c.clone().normalize().sub(b.clone().normalize());
+                    const v = new THREE.Vector3().crossVectors(
                         v2,
                         v1
                     ).normalize();
-                }]
+                    return {
+                        v,
+                    };
+                }, () => {
+                    const v1 = a.clone().sub(b.clone());
+                    const v2 = a.clone().sub(c.clone());
+                    const v = new THREE.Vector3().crossVectors(
+                        v1,
+                        v2
+                    ).normalize();
+                    return {
+                        v,
+                    };
+                }, () => {
+                    const v1 = b.clone().sub(c.clone());
+                    const v2 = b.clone().sub(a.clone());
+                    const v = new THREE.Vector3().crossVectors(
+                        v1,
+                        v2
+                    ).normalize();
+                    return {
+                        v,
+                    };
+                }, () => {
+                    const v1 = c.clone().sub(a.clone());
+                    const v2 = c.clone().sub(b.clone());
+                    const v = new THREE.Vector3().crossVectors(
+                        v1,
+                        v2
+                    ).normalize();
+                    return {
+                        v,
+                    };
+                }, () => {
+                    const v1 = a.clone().sub(b.clone());
+                    const v2 = a.clone().sub(c.clone());
+                    const v = new THREE.Vector3().crossVectors(
+                        v2,
+                        v1
+                    ).normalize();
+                    return {
+                        v,
+                    };
+                }, () => {
+                    const v1 = b.clone().sub(c.clone());
+                    const v2 = b.clone().sub(a.clone());
+                    const v = new THREE.Vector3().crossVectors(
+                        v2,
+                        v1
+                    ).normalize();
+                    return {
+                        v,
+                    };
+                }, () => {
+                    const v1 = c.clone().sub(a.clone());
+                    const v2 = c.clone().sub(b.clone());
+                    const v = new THREE.Vector3().crossVectors(
+                        v2,
+                        v1
+                    ).normalize();
+                    return {
+                        v,
+                    };
+                }];
+
+                const mathDump = [];
+
                 for (const math of computeCenterMaths) {
-                    const center = math();
+                    const {
+                        v: center,
+                    } = math();
                     if (isNaN(center.x) || isNaN(center.y) || isNaN(center.z)) {
                         // skip insertion if normal is NaN.
+                        mathDump.push(`center contains NaN ${center.toString()}`);
                         continue;
                     }
                     const centerFaceDot = center.clone().dot(face.centroid.clone().normalize())
                     if (centerFaceDot < 0.85) {
+                        mathDump.push(`center and centroid not aligned ${centerFaceDot}`);
                         continue;
                     }
 
-                    const radius = center.clone().dot(a.clone());
-                    const rb = center.clone().dot(b.clone());
-                    const rc = center.clone().dot(c.clone());
+                    const radius = center.clone().dot(a.clone().normalize());
+                    const rb = center.clone().dot(b.clone().normalize());
+                    const rc = center.clone().dot(c.clone().normalize());
                     if (Math.abs(rb - radius) < 0.01 && Math.abs(rc - radius) < 0.01 && radius > 0) {
                         return {
                             center,
                             radius,
                         };
+                    } else {
+                        mathDump.push(`center and radius not aligned ${center.toString()} ${radius} ${rb} ${rc}`);
                     }
                 }
 
@@ -835,6 +922,9 @@
                 const intersectingFaces = closestGroup.faces.map((x) => [x, x.faceIndex]).filter(([x]) => x.center.clone().normalize().dot(point.clone().normalize()) >= x.radius && Math.abs(this.vertices[x.a].clone().length() - this.vertices[x.b].clone().length()) < 0.1 && Math.abs(this.vertices[x.b].clone().length() - this.vertices[x.c].clone().length()) < 0.1);
                 if (intersectingFaces.length > 300) {
                     throw new Error("Too Many Intersecting Faces in Delaunay Triangulation Insertion");
+                }
+                if (intersectingFaces.length === 0) {
+                    throw new Error("Failed to find intersecting faces, there should always be at least 1");
                 }
                 const edges = intersectingFaces.reduce((acc, [x, i]) => [...acc, [x.a, x.b, x, i], [x.b, x.c, x, i], [x.c, x.a, x, i]], []);
                 const badEdges = [...edges.filter(([a,b],_,arr) => arr.some(([c,d]) => a === d && b === c))].reverse();
@@ -1992,17 +2082,27 @@
             schema: {},
             init: function () {
                 const obj = this.el.getObject3D('mesh');
-                const addShapeOuter = (obj) => {
+                const body = this.el.components['static-body']?.body;
+                const addShapeOuter = (obj, body) => {
                     const result = threeToCannon.getShapeParameters(obj, { type: threeToCannon.ShapeType.MESH });
-                    const body = this.el.components['static-body'].body;
                     this.addShapes.call(this, body, result);
                 };
-                if (obj) {
-                    addShapeOuter(obj);
+                if (obj && body) {
+                    addShapeOuter(obj, body);
                 } else {
                     this.el.addEventListener('model-loaded', () => {
                         const obj = this.el.getObject3D('mesh');
-                        addShapeOuter(obj);
+                        const body = this.el.components['static-body']?.body;
+                        if (obj && body) {
+                            addShapeOuter(obj, body);
+                        }
+                    });
+                    this.el.addEventListener('body-loaded', () => {
+                        const obj = this.el.getObject3D('mesh');
+                        const body = this.el.components['static-body']?.body;
+                        if (obj && body) {
+                            addShapeOuter(obj, body);
+                        }
                     });
                 }
             },
