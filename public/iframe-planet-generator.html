@@ -894,7 +894,7 @@
                         continue;
                     }
                     const centerFaceDot = center.clone().dot(face.centroid.clone().normalize())
-                    if (centerFaceDot < 0.85) {
+                    if (centerFaceDot < 0.90) {
                         mathDump.push(`center and centroid not aligned ${centerFaceDot}`);
                         continue;
                     }
@@ -902,7 +902,10 @@
                     const radius = center.clone().dot(a.clone().normalize());
                     const rb = center.clone().dot(b.clone().normalize());
                     const rc = center.clone().dot(c.clone().normalize());
-                    if (Math.abs(rb - radius) < 0.01 && Math.abs(rc - radius) < 0.01 && radius > 0) {
+                    if (Math.abs(rb - radius) < 0.001 && Math.abs(rc - radius) < 0.001 && radius > 0) {
+                        console.assert("vertex a unchanged", this.vertices[face.a].length() >= 2);
+                        console.assert("vertex b unchanged", this.vertices[face.b].length() >= 2);
+                        console.assert("vertex c unchanged", this.vertices[face.c].length() >= 2);
                         return {
                             center,
                             radius,
