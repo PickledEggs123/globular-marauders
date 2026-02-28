@@ -760,6 +760,27 @@
                 const b = this.vertices[face.b].clone();
                 const c = this.vertices[face.c].clone();
 
+                /**
+                 * Imagine a triangle on the surface of a sphere. Create a vector for one side of the triangle. Create
+                 * another vector for the other side of the triangle. Then compute the cross product. That cross product
+                 * is the normalized and the result is the circumcenter of the circumcircle of the spherical triangle.
+                 *
+                 * Proof:
+                 *
+                 * 1. Making one side of the triangle longer will change the cross product.
+                 * 2. Move the triangle into the center of the sphere.
+                 * 3. The normal of the triangle/cross product of the triangle becomes the transition axis.
+                 * 4. The normal is perpendicular or exact same angle from all 3 vertices of the triangle.
+                 * 5. Slide the triangle across the normal until it touches the surface of the unit circle.
+                 * 6. The triangle now touches the surface of the sphere but the angle between each vertex and the normal
+                 *    Remains the same, similar angular radius.
+                 * 7. It concludes that the normal of the triangle or cross product of the triangle is the same distance
+                 *    away from the vertices and represents the circumcenter of the circumcircle of the spherical triangle.
+                 *
+                 * EDQ
+                 * @type {((function(): {v: *})|(function(): {v: *})|(function(): {v: *})|(function(): {v: *})|(function(): {v: *}))[]}
+                 */
+
                 const computeCenterMaths = [() => {
                     const v1 = a.clone().normalize().sub(b.clone().normalize());
                     const v2 = a.clone().normalize().sub(c.clone().normalize());
@@ -915,6 +936,9 @@
                     }
                 }
 
+                for (const data of mathDump) {
+                    console.error(data);
+                }
                 throw new Error("Failed to compute circumcircle");
             }
             insertPoint(point, closestGroup) {
