@@ -4527,6 +4527,33 @@
             },
         });
 
+        AFRAME.registerSystem('tree-particles', {
+            schema: {},
+            init: function () {
+                this.treeMap = new Map();
+            },
+            registerTree: function (tEl, el) {
+                if (!this.treeMap.has(tEl)) {
+                    this.treeMap.set(tEl, []);
+                }
+                this.treeMap.get(tEl).push(el);
+            },
+            unregisterTree: function (tEl, el) {
+                if (!this.treeMap.has(tEl)) {
+                    return;
+                }
+                const arr = this.treeMap.get(tEl);
+                const idx = arr.indexOf(el);
+                if (idx >= 0) {
+                    arr.splice(idx, 1);
+                }
+            },
+            getHiddenObjects(position) {
+                const tEls = Array.from(this.treeMap.entries()).filter(([tEl]) => new THREE.Vector3().copy(tEl.components['tree-particles'].data.origin).distanceTo(position) <= 30);
+                return tEls.reduce((acc, [,arr]) => [...acc, ...arr], []);
+            },
+        });
+
         AFRAME.registerComponent('tree-particles', {
             dependencies: ["terrain-tile", "position"],
             schema: {
@@ -4537,6 +4564,7 @@
                 this.innerRemoveGrass = this.removeGrass.bind(this);
                 this.el.addEventListener('add-tree', this.innerAddGrass);
                 this.el.addEventListener('remove-tree', this.innerRemoveGrass);
+                this.system = this.el.sceneEl.systems['tree-particles'];
             },
             addGrass: function () {
                 const meshes = [];
@@ -4566,6 +4594,7 @@
                             model.object3D.updateMatrix();
                             particle.components.position.update({x: 0, y: 0, z: 0});
                             particle.object3D.updateMatrix();
+                            this.system.registerTree(this.el, particle);
                         }
                     };
                     const treeMesh = document.querySelector("#tree-mesh");
@@ -4584,6 +4613,7 @@
                 const trees = Array.from(this.el.querySelectorAll('.tree'));
                 for (const tree of trees) {
                     tree.parentNode.removeChild(tree);
+                    this.system.unregisterTree(this.el, tree);
                 }
             },
             remove: function () {
@@ -4593,6 +4623,7 @@
         });
 
         AFRAME.registerSystem('hide-from-camera', {
+            dependencies: ['tree-particles'],
             schema: {},
             init: function () {
                 this.hiddenObjects = [];
@@ -4671,7 +4702,7 @@
                 const threeCamera = this.el.sceneEl.camera;
                 const cameraDirection = threeCamera.getWorldPosition(new THREE.Vector3()).sub(origin.clone());
                 const raycaster = new THREE.Raycaster(origin, cameraDirection.clone().normalize(), 0, cameraDirection.length());
-                const objects = this.el.sceneEl.systems['hide-from-camera'].getHiddenObjects().map(x => x.object3D);
+                const objects = this.el.sceneEl.systems['tree-particles'].getHiddenObjects(origin).map(x => x.object3D);
                 const newIntersections = raycaster.intersectObjects(objects, true).map(x => x.object);
 
                 const newSet = new Set(newIntersections);
