@@ -946,13 +946,13 @@
                 this.vertices.push(point.clone());
 
                 // create hole in graph
-                const intersectingFaces = closestGroup.faces.map((x) => [x, x.faceIndex]).filter(([x]) => x.center.clone().normalize().dot(point.clone().normalize()) >= x.radius && Math.abs(this.vertices[x.a].clone().length() - this.vertices[x.b].clone().length()) < 0.1 && Math.abs(this.vertices[x.b].clone().length() - this.vertices[x.c].clone().length()) < 0.1);
+                const intersectingFaces = closestGroup.faces.map((x) => [x, x.faceIndex]).filter(([x]) => x.center.clone().normalize().dot(point.clone().normalize()) >= x.radius);
                 if (intersectingFaces.length > 300) {
                     throw new Error("Too Many Intersecting Faces in Delaunay Triangulation Insertion");
                 }
-                if (intersectingFaces.length === 0) {
-                    throw new Error("Failed to find intersecting faces, there should always be at least 1");
-                }
+                // if (intersectingFaces.length === 0) {
+                //     throw new Error("Failed to find intersecting faces, there should always be at least 1");
+                // }
                 const edges = intersectingFaces.reduce((acc, [x, i]) => [...acc, [x.a, x.b, x, i], [x.b, x.c, x, i], [x.c, x.a, x, i]], []);
                 const badEdges = [...edges.filter(([a,b],_,arr) => arr.some(([c,d]) => a === d && b === c))].reverse();
                 const goodEdges = [...edges.filter(([a,b],_,arr) => !arr.some(([c,d]) => a === d && b === c))].reverse();
@@ -961,7 +961,6 @@
 
                 // create new indices
                 const uniqueFacesToCull = new Set();
-                let updateSpawnPoint = false;
                 const badFaces = [];
                 for (const [,,badFace,faceIndex] of badEdges) {
                     if (uniqueFacesToCull.has(faceIndex)) {
@@ -1083,6 +1082,8 @@
                 if (!pp) {
                     return;
                 }
+
+                // get closest group
                 const [,closestGroup] = this.groups.reduce((acc, x) => {
                     const d = x.vertex.distanceTo(pp);
                     if (acc[0] > d) {
@@ -1097,11 +1098,13 @@
 
                 let spawnPoint = new THREE.Vector3(0, 0, 0);
 
+                // insert points into nav mesh
                 for (const p of obbPoints) {
 
                     const raycaster = new THREE.Raycaster(p.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), p.clone().negate());
                     const intersections = raycaster.intersectObjects([
                         scene.systems['globe-nav'].getNavMesh(),
+                        scene.systems['globe-ocean-nav'].getNavMesh(),
                     ]);
                     if (intersections[0]) {
                         const ip = intersections[0].point.clone();
