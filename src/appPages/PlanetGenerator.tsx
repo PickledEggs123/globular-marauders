@@ -149,7 +149,7 @@ export const PlanetGenerator = () => {
                 "/meshes/ui/healthbar/HealthBar.glb",
                 "/meshes/ui/healthbar/ManaBar.glb",
                 "/meshes/EpicStore/Fireball/source/Fireball.glb",
-                "/meshes/Model_Redo/Warrior/Wizard.glb",
+                "/meshes/Model_Redo/Wizard/Wizard.glb",
                 "/meshes/Model_Redo/indicators/npc indicator/NpcDestination.glb",
                 "/meshes/Model_Redo/indicators/ship indicator/ShipDestination.glb",
                 "/meshes/Model_Redo/piratesloop/sloop.glb",
