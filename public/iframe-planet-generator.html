@@ -667,8 +667,8 @@
                         ratio: 0.2,
                     });
                 }
-            }
-        })
+            },
+        });
 
         class NavMeshTriangles {
             static GROUP_SIZE = 30;
@@ -2198,10 +2198,24 @@
             init: function () {
                 this.dtSumTickSize = 1000;
                 this.dtSum = this.dtSumTickSize + 1;
+                this.heightFactor = 5;
                 this.heightDiff = 5;
                 this.heightDiffLerp = 5;
                 this.box = [];
                 this.boxPos = [];
+
+                this.mousewheelEventHandler = event => {
+                    if (!event.target.tagName.toLowerCase().includes('canvas')) {
+                        return;
+                    }
+                    event.preventDefault();
+                    const delta = Math.sign(event.wheelDelta);
+                    this.heightFactor = THREE.MathUtils.clamp(this.heightFactor + delta * 0.5, 0.5, 25);
+                };
+                window.addEventListener("mousewheel", this.mousewheelEventHandler, {passive: false});
+            },
+            remove: function () {
+                window.removeEventListener('mousewheel', this.mousewheelEventHandler, {passive: false});
             },
             update(oldData) {
                 this.dtSum = this.dtSumTickSize + 1;
@@ -2258,7 +2272,7 @@
                 // update info
                 const quaternion = new THREE.Quaternion().setFromUnitVectors(objectWorldPos.clone().normalize(), boxPosWorldPos.clone().normalize());
                 const slerp = new THREE.Quaternion().slerp(quaternion, 0.03 * 60 * dt / 1000);
-                let destination1 = objectWorldPos.clone().normalize().multiplyScalar(height + 5).applyQuaternion(slerp);
+                let destination1 = objectWorldPos.clone().normalize().multiplyScalar(height + this.heightFactor).applyQuaternion(slerp);
 
                 // compute raycast towards ground
                 let finalPosition;
@@ -2269,7 +2283,7 @@
                         destination1 = intersections[0].point.clone();
                     }
                     finalPosition = destination1.clone().add(destination1.clone().normalize().multiplyScalar(5));
-                    this.heightDiff = THREE.MathUtils.clamp(new THREE.Vector3().distanceTo(finalPosition) - (height + 5), -5, 5);
+                    this.heightDiff = THREE.MathUtils.clamp(new THREE.Vector3().distanceTo(finalPosition) - (height + this.heightFactor), -5, 50);
                     this.heightDiffLerp = 0.1 * this.heightDiff + 0.9 * this.heightDiffLerp;
                     this.dtSum = 0;
                 } else {
@@ -2278,7 +2292,7 @@
                     } else {
                         this.heightDiffLerp = 0.01 * this.heightDiff + 0.99 * this.heightDiffLerp;
                     }
-                    finalPosition = objectWorldPos.clone().normalize().multiplyScalar(this.heightDiffLerp + height + 5).applyQuaternion(slerp);
+                    finalPosition = objectWorldPos.clone().normalize().multiplyScalar(this.heightDiffLerp + height + this.heightFactor).applyQuaternion(slerp);
                     this.dtSum += dt;
                 }
 
@@ -7142,7 +7156,7 @@
             }
 
             const scene = document.querySelector("a-scene");
-            scene.setAttribute("networked-scene", `room: ${roomId}; adapter: ws; debug: true;`);
+            scene.setAttribute("networked-scene", `room: ${roomId}; adapter: ws; debug: false;`);
         }
 
         window.didSpawnNpcsFlag = false;
@@ -8531,7 +8545,7 @@
     </style>
 </head>
 <body>
-    <a-scene click-manager onclick="playMusic === true ? window.musicPlayer.start() : undefined" draw-ship-indicator draw-npc-indicator coin-purse respawn physics="driver: local; gravity: 0 0 0;" globe-nav="debug: true;" globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
+    <a-scene click-manager onclick="playMusic === true ? window.musicPlayer.start() : undefined" draw-ship-indicator draw-npc-indicator coin-purse respawn physics="driver: local; gravity: 0 0 0;" globe-nav="debug: false;" globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
         <a-assets>
             <template id="avatar-template">
                 <a-entity class="avatar" networked-audio-source>
