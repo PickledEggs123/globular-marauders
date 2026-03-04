@@ -6756,7 +6756,7 @@
                 rootModel.setAttribute("rotation", "-90 0 0");
                 rootModel.setAttribute("position", "0 0 0");
                 rootHouse.appendChild(rootModel);
-                rootHouse.setAttribute("networked", "template: #wizard-tower-template; attachTemplateToLocal: false;");
+                rootHouse.setAttribute("networked", `template: #${type.toLowerCase().replace("_", "-")}-template; attachTemplateToLocal: false;`);
                 if (type === "BLACKSMITH") {
                     rootHouse.setAttribute("ghost-building", {
                         maxNpcs: 20,
