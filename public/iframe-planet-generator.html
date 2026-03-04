@@ -4305,6 +4305,9 @@
                             if (buildMenuState.hasAttribute("blacksmith-build")) {
                                 addGhostBuilding(destination1.clone(), "BLACKSMITH");
                             }
+                            if (buildMenuState.hasAttribute("apothecary-build")) {
+                                addGhostBuilding(destination1.clone(), "APOTHECARY");
+                            }
                         }
                     }, "go-on-land");
                 });
@@ -6081,7 +6084,7 @@
                 rootGoldCoin.setAttribute("networked-ship-health", "");
                 rootGoldCoin.setAttribute("cannonball-collider", "");
                 rootGoldCoin.appendChild(dataEl);
-            } else if (charModelId === "WIZARD_TOWER" || charModelId === "WALL" || charModelId === "BLACKSMITH") {
+            } else if (charModelId === "WIZARD_TOWER" || charModelId === "WALL" || charModelId === "BLACKSMITH" || charModelId === "APOTHECARY") {
                 const dataEl = document.createElement("a-entity");
                 dataEl.setAttribute("class", "data");
                 dataEl.setAttribute("scale", "1 1 1");
@@ -6199,7 +6202,7 @@
                             ]
                         });
                     }
-                } else if (charModelId === "WIZARD_TOWER" || charModelId === "WALL" || charModelId === "BLACKSMITH") {
+                } else if (charModelId === "WIZARD_TOWER" || charModelId === "WALL" || charModelId === "BLACKSMITH" || charModelId === "APOTHECARY") {
                     if (!NAF.schemas.hasTemplate(`#${templateId}`)) {
                         NAF.schemas.add({
                             template: `#${templateId}`,
@@ -7451,6 +7454,7 @@
                     buildMenuState.setAttribute("wizard-tower-build", "");
                     buildMenuState.removeAttribute("wall-build");
                     buildMenuState.removeAttribute("blacksmith-build");
+                    buildMenuState.removeAttribute("apothecary-build");
 
                 } else if (this.data.selector === "wall-build") {
                     const buildMenuState = document.querySelector("#build-menu-state");
@@ -7459,6 +7463,7 @@
                     buildMenuState.removeAttribute("wizard-tower-build");
                     buildMenuState.setAttribute("wall-build", "");
                     buildMenuState.removeAttribute("blacksmith-build");
+                    buildMenuState.removeAttribute("apothecary-build");
 
                 } else if (this.data.selector === "blacksmith-build") {
                     const buildMenuState = document.querySelector("#build-menu-state");
@@ -7467,6 +7472,16 @@
                     buildMenuState.removeAttribute("wizard-tower-build");
                     buildMenuState.removeAttribute("wall-build");
                     buildMenuState.setAttribute("blacksmith-build", "");
+                    buildMenuState.removeAttribute("apothecary-build");
+
+                } else if (this.data.selector === "apothecary-build") {
+                    const buildMenuState = document.querySelector("#build-menu-state");
+                    buildMenuState.removeAttribute("show-hammer");
+                    buildMenuState.setAttribute("show-build", "");
+                    buildMenuState.removeAttribute("wizard-tower-build");
+                    buildMenuState.removeAttribute("wall-build");
+                    buildMenuState.removeAttribute("blacksmith-build");
+                    buildMenuState.setAttribute("apothecary-build", "");
 
                 } else if (this.data.selector === "hammer-build") {
                     const buildMenuState = document.querySelector("#build-menu-state");
@@ -7475,6 +7490,7 @@
                     buildMenuState.removeAttribute("wizard-tower-build");
                     buildMenuState.removeAttribute("wall-build");
                     buildMenuState.removeAttribute("blacksmith-build");
+                    buildMenuState.removeAttribute("apothecary-build");
 
                 } else if (this.data.selector === "cancel-build") {
                     const buildMenuState = document.querySelector("#build-menu-state");
@@ -7483,6 +7499,7 @@
                     buildMenuState.removeAttribute("wizard-tower-build");
                     buildMenuState.removeAttribute("wall-build");
                     buildMenuState.removeAttribute("blacksmith-build");
+                    buildMenuState.removeAttribute("apothecary-build");
                     const scene = document.querySelector("a-scene");
                     if (ghostBuilding) {
                         scene.removeChild(ghostBuilding);
@@ -7502,6 +7519,7 @@
                     buildMenuState.removeAttribute("wizard-tower-build");
                     buildMenuState.removeAttribute("wall-build");
                     buildMenuState.removeAttribute("blacksmith-build");
+                    buildMenuState.removeAttribute("apothecary-build");
 
                 } else if (this.data.selector === "forward-attack") {
                     const selector = `.${scene.components['coin-purse'].getUnit()} .wizard-area-of-effect`;
@@ -8635,6 +8653,7 @@
                 <a-entity id="wizard-tower-build" align-with-projection="offset: 0.10 -0.4 -1; rotation: 0 -90 0; scale: 0.015 0.015 0.015; wizardShow: true; hammerShow: true;" gltf-model="/meshes/WizardTower.glb" select-cannon-side="selector: wizard-tower-build" ui-clicked></a-entity>
                 <a-entity id="wall-build" align-with-projection="offset: 0.03 -0.4 -1; rotation: 0 -90 0; scale: 0.015 0.015 0.015; wizardShow: true; hammerShow: true;" gltf-model="/meshes/Wall.glb" select-cannon-side="selector: wall-build" ui-clicked></a-entity>
                 <a-entity id="blacksmith-build" align-with-projection="offset: -0.03 -0.4 -1; rotation: 0 -90 0; scale: 0.015 0.015 0.015; wizardShow: true; hammerShow: true;" gltf-model="/meshes/Blacksmith.glb" select-cannon-side="selector: blacksmith-build" ui-clicked></a-entity>
+                <a-entity id="apothecary-build" align-with-projection="offset: -0.09 -0.4 -1; rotation: 0 -90 0; scale: 0.015 0.015 0.015; wizardShow: true; hammerShow: true;" gltf-model="/meshes/Apothecary.glb" select-cannon-side="selector: apothecary-build" ui-clicked></a-entity>
                 <a-entity id="build-menu-state"></a-entity>
             </a-entity>
         </a-entity>
