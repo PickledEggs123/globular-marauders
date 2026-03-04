@@ -4,6 +4,7 @@ const prisma = new PrismaClient();
 export async function GET(req: Request) {
     let previewUrl = "";
     let gameUrl = "";
+    let error = undefined;
 
     try {
         const max = await prisma.planet.count();
@@ -12,12 +13,15 @@ export async function GET(req: Request) {
         gameUrl = planet.meshesUrl;
     } catch (e) {
         console.log(e);
+        // @ts-ignore
+        error = e.message;
     }
 
     return new Response(JSON.stringify({
         previewUrl,
         gameUrl,
+        error,
     }), {
-        status: 200,
+        status: error ? 500 : 200,
     });
 }

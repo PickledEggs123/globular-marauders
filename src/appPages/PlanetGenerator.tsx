@@ -402,6 +402,29 @@ export const PlanetGenerator = () => {
                                 </CardContent>
                             </Card>
                         </Grid>
+                        <Grid item xs={12}>
+                            <Card>
+                                <CardHeader title="Todo List" subheader="Things to add to the game to make it RTS/MOBA like"></CardHeader>
+                                <CardContent>
+                                    <Typography variant="body1">
+                                        - Create a building that respawns wizards if the wizard dies or place them into towers.
+                                    </Typography>
+                                    <Typography variant="body1">
+                                        - The ability to destroy buildings. You gain an advantage by destroying buildings and
+                                        destroying the capital ends the game.
+                                    </Typography>
+                                    <Typography variant="body1">
+                                        - Make the main island/continent castles/temples and the other islands natives with gold.
+                                    </Typography>
+                                    <Typography variant="body1">
+                                        - Add ability to move near building by clicking on it.
+                                    </Typography>
+                                    <Typography variant="body1">
+                                        - Fix 1 pixel wide land bridge bug so ships can sail around islands better.
+                                    </Typography>
+                                </CardContent>
+                            </Card>
+                        </Grid>
                     </Grid>
                 </Container>
             }/>

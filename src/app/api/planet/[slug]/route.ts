@@ -4,6 +4,7 @@ const prisma = new PrismaClient();
 export async function GET(req: Request, { params }: { params: Promise<{ slug: string }> }) {
     let previewUrl = "";
     let gameUrl = "";
+    let error = undefined;
 
     try {
         const availableRoom = await prisma.room.findFirstOrThrow({
@@ -19,12 +20,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
         gameUrl = availableRoom.planet.meshesUrl;
     } catch (e) {
         console.log(e);
+        // @ts-ignore
+        error = e.message;
     }
 
     return new Response(JSON.stringify({
         previewUrl,
         gameUrl,
+        error,
     }), {
-        status: 200,
+        status: error ? 500 : 200,
     });
 }

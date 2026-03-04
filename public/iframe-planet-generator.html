@@ -5858,6 +5858,88 @@
             },
         });
 
+        AFRAME.registerComponent('building-health', {
+            schema: {
+                health: { type: 'number', default: 1000 }
+            },
+            init: function () {
+                this.innerHandleHit = this.handleHit.bind(this);
+                this.el.addEventListener('hit', this.innerHandleHit);
+
+                this.maxHealth = this.data.health;
+                this.healTickDelay = 10;
+                this.healTickCount = this.healTickDelay;
+                this.healTickAmount = this.maxHealth / 10;
+                this.el.setAttribute("set-follow-id", "");
+            },
+            remove: function () {
+                this.el.removeEventListener('hit', this.innerHandleHit);
+            },
+            tick: function (t, dt) {
+                if (this.data.health >= this.maxHealth) {
+                    return;
+                }
+
+                if (this.healTickCount >= 0) {
+                    this.healTickCount -= dt / 1000;
+                    return;
+                }
+
+                const oldHealth = this.data.health;
+                const newHealth = Math.min(oldHealth + this.healTickAmount, this.maxHealth);
+                this.el.setAttribute("building-health", `health: ${newHealth}`);
+                addRepairSound(this.el);
+            },
+            update(oldData) {
+                this.healTickCount = this.healTickDelay;
+            },
+            handleHit: function (evt) {
+                const hit = evt.detail;
+                const oldHealth = this.data.health;
+                const newHealth = this.data.health - hit;
+                this.el.setAttribute("building-health", `health: ${newHealth}`);
+
+                if (newHealth <= 0 && oldHealth > 0) {
+                    this.el.emit('dead');
+                }
+            },
+        });
+
+        AFRAME.registerComponent('networked-building-health', {
+            schema: {
+            },
+            init: function () {
+                this.innerHandleHit = this.handleHit.bind(this);
+                this.el.addEventListener('hit', this.innerHandleHit);
+            },
+            remove: function () {
+                this.el.removeEventListener('hit', this.innerHandleHit);
+            },
+            handleHit: function (evt) {
+                const hit = evt.detail;
+                const senderId = this.el.components['networked'].data.owner;
+                const networkId = this.el.components['networked'].data.networkId;
+                NAF.connection.sendDataGuaranteed(senderId, "networkedBuildingHealth", {
+                    networkId,
+                    hit,
+                });
+            },
+        });
+
+        AFRAME.registerComponent("building-death", {
+            schema: {},
+            init: function () {
+                this.innerHandleDeath = this.handleDeath.bind(this);
+                this.el.addEventListener('dead', this.innerHandleDeath);
+            },
+            remove: function () {
+                this.el.removeEventListener('dead', this.innerHandleDeath);
+            },
+            handleDeath: function () {
+                this.el.setAttribute("despawn", "");
+            },
+        });
+
         AFRAME.registerComponent('ship-health', {
             schema: {
                 health: { type: 'number', default: 4000 }
@@ -6096,6 +6178,7 @@
                 rootGoldCoin.setAttribute("block-nav-mesh", {
                     enabled: false
                 });
+                rootGoldCoin.setAttribute("networked-building-health", "");
             } else {
                 getBuildingLodHash(str, 2000, "auto");
                 rootGoldCoin.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; capacity: 2000; memberMesh: ${memberMesh};`);
@@ -6725,6 +6808,7 @@
             rootHouse.setAttribute("position", position);
             rootHouse.setAttribute("orthographic-camera-building", "");
             rootHouse.setAttribute("projected-texture__building", `image: /meshes/${toPascalCase(type).replace("_", "")}Projection.png; enabled: true`);
+            rootHouse.setAttribute("building-health", "");
 
             scene.appendChild(rootHouse);
             if (ghostBuilding) {
@@ -7191,6 +7275,17 @@
             });
 
             NAF.connection.subscribeToDataChannel('networkedHealth', function (sender, dataType, data, targetId) {
+                const {
+                    networkId,
+                    hit,
+                } = data;
+                const entity = NAF.entities.entities[networkId];
+                if (entity) {
+                    entity.emit("hit", hit);
+                }
+            });
+
+            NAF.connection.subscribeToDataChannel('networkedBuildingHealth', function (sender, dataType, data, targetId) {
                 const {
                     networkId,
                     hit,
