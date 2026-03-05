@@ -1117,10 +1117,21 @@
                 const intersectingFaces = closestGroup.faces.map((x) => [x, x.faceIndex]).filter(([x]) => x.newFace);
                 const edges = intersectingFaces.reduce((acc, [x, i]) => [...acc, [x.a, x.b, x, i], [x.b, x.c, x, i], [x.c, x.a, x, i]], []);
                 const goodEdges = [...edges.filter(([a,b],_,arr) => !arr.some(([c,d]) => a === d && b === c))].reverse();
-                const goodVertex = goodEdges[0];
+                const buildingNodes = goodEdges.map(([,,x]) => this.vertices[x.a].clone());
+                const goodVertex = buildingNodes[0];
                 if (goodVertex) {
-                    const [goodIndex] = goodVertex;
-                    spawnPoint = this.vertices[goodIndex];
+                    spawnPoint = goodVertex;
+                    for (const vertex of buildingNodes) {
+                        const entity = document.createElement("a-entity");
+                        entity.setAttribute("npc-faction", el.components['npc-faction'].data);
+                        entity.setAttribute("npc-finder", "active: false;");
+                        entity.setAttribute("building-npc-node", "");
+                        entity.setAttribute("set-building-id", "");
+                        el.sceneEl.object3D.add(entity.object3D);
+                        entity.object3D.position.copy(vertex);
+                        el.sceneEl.object3D.remove(entity.object3D);
+                        el.appendChild(entity);
+                    }
                 }
                 for (let i = 0; i < this.faces.length; i++) {
                     this.faces[i].newFace = false;
@@ -5619,7 +5630,12 @@
                 }
             },
             tick: function (t, dt) {
-                if (this.data.target && ((this.data.target.components['health'] && this.data.target.components['health'].data.health > 0) || this.data.target.components['networked-health'])) {
+                if (this.data.target && (
+                    (this.data.target.components['health'] && this.data.target.components['health'].data.health > 0) ||
+                    this.data.target.components['networked-health']) ||
+                    (this.data.target.parentNode.components['building-health'] && this.data.target.parentNode.components['building-health'].data.health > 0) ||
+                    this.data.target.parentNode.components['networked-building-health']
+                ) {
                     // go to target
                     this.goToTarget.call(this, t, dt);
 
@@ -5858,9 +5874,24 @@
             },
         });
 
+        AFRAME.registerComponent('building-npc-node', {
+            schema: {},
+            init: function () {
+                this.building = this.el.parentNode;
+                this.innerHandleHit = this.handleHit.bind(this);
+                this.el.addEventListener('hit', this.innerHandleHit);
+            },
+            remove: function () {
+                this.el.removeEventListener('hit', this.innerHandleHit);
+            },
+            handleHit: function (evt) {
+                this.building.emit('hit', evt.detail);
+            },
+        });
+
         AFRAME.registerComponent('building-health', {
             schema: {
-                health: { type: 'number', default: 1000 }
+                health: { type: 'number', default: 4000 }
             },
             init: function () {
                 this.innerHandleHit = this.handleHit.bind(this);
@@ -6178,6 +6209,8 @@
                 rootGoldCoin.setAttribute("block-nav-mesh", {
                     enabled: false
                 });
+                rootGoldCoin.setAttribute("npc-faction", "other-players");
+                rootGoldCoin.setAttribute("npc-finder", "active: false;");
                 rootGoldCoin.setAttribute("networked-building-health", "");
             } else {
                 getBuildingLodHash(str, 2000, "auto");
@@ -6808,7 +6841,10 @@
             rootHouse.setAttribute("position", position);
             rootHouse.setAttribute("orthographic-camera-building", "");
             rootHouse.setAttribute("projected-texture__building", `image: /meshes/${toPascalCase(type).replace("_", "")}Projection.png; enabled: true`);
+            rootHouse.setAttribute("npc-faction", "player");
             rootHouse.setAttribute("building-health", "");
+            rootHouse.setAttribute("building-death", "");
+            rootHouse.setAttribute("shadow", "");
 
             scene.appendChild(rootHouse);
             if (ghostBuilding) {
