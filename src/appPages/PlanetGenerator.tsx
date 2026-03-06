@@ -45,256 +45,254 @@ const useStyles = makeStyles((theme) =>
 );
 
 export const PlanetGenerator = () => {
-    const [context] = useState<{ preview: IGameMesh | null, gameData: IGameMesh[] } | null>({ preview: null, gameData: [] });
+    const [context] = useState<{ preview: IGameMesh | null, gameData: IGameMesh[], loading: boolean } | null>({ preview: null, gameData: [], loading: true });
     const [playMusic, setPlayMusic] = useState<boolean>(true);
     const [clientSecret] = useState(Math.random().toString(36).substring(2, 9));
     const [loadMessage, setLoadMessage] = useState<string>("No data loaded...");
     const classes = useStyles();
     const iframeRef = useRef<HTMLIFrameElement | null>(null);
-    const drawGraph = useCallback(() => {
+
+
+    const Uint8ToBase64 = (u8Arr: Uint8Array): string => {
+        const CHUNK_SIZE = 0x8000;
+        let index = 0;
+        const length = u8Arr.length;
+        let result = '';
+        while (index < length) {
+            const slice = u8Arr.subarray(index, Math.min(index + CHUNK_SIZE, length));
+            result += String.fromCharCode.apply(null, Array.from(slice));
+            index += CHUNK_SIZE;
+        }
+        return btoa(result);
+    };
+
+    const addCharacterModel = (iframe: HTMLIFrameElement, type: string, data: string, networked: boolean) => {
         // @ts-ignore
-        if (global.use_ssr || !context) {
-            return;
+        iframe.contentWindow?.addCharacterModel(JSON.stringify({ type, data, networked }));
+    };
+
+    const addBuildings = (iframe: HTMLIFrameElement, buildings: IGameBuilding[], dataUris: string[]) => {
+        const houseArray = buildings.map(building => {
+            const { point, lookAt, type } = building;
+            return JSON.stringify({
+                type: type.toUpperCase(),
+                point: point.map(x => x * PLANET_SIZE),
+                lookAt: lookAt.map(x => x * PLANET_SIZE)
+            });
+        });
+
+        const buildingTypeMap: Record<string, string[]> = {
+            PORT: [dataUris[0], dataUris[1], dataUris[2]],
+            HOUSE: [dataUris[3], dataUris[4], dataUris[5]],
+            TEMPLE: [dataUris[6], dataUris[7], dataUris[8]]
+        };
+
+        Object.entries(buildingTypeMap).forEach(([type, uris]) => {
+            addCharacterModel(iframe, type, uris.join("|"), false);
+        });
+
+        houseArray.forEach(house => {
+            // @ts-ignore
+            iframe.contentWindow?.addHouse(house);
+        });
+    };
+
+    const handleData = async (
+        inputData: { meshes: IGameMesh[], spawnPoints: IGameSpawnPoint[], buildings: IGameBuilding[] },
+        { roomId }: { roomId: string }
+    ) => {
+        const { meshes, spawnPoints, buildings } = inputData;
+        let data: IGameMesh[] = meshes.map((mesh: IGameMesh) => ({
+            ...mesh,
+            attributes: mesh.attributes.map(attr =>
+                attr.id === "aPosition"
+                    ? { ...attr, buffer: attr.buffer.map(x => x * PLANET_SIZE) }
+                    : attr
+            )
+        }));
+        data = data.map((x: IGameMesh): IGameMesh[] => {
+            if (x.navmesh) {
+                return [{
+                    ...x,
+                    attributes: [...x.attributes.filter(x => x.id !== "aNormal")],
+                    // @ts-ignore
+                    navmesh: true,
+                }, {
+                    ...x,
+                    // @ts-ignore
+                    projected: true,
+                    navmesh: false,
+                }];
+            } else if (x.oceanNavmesh) {
+                return [{
+                    ...x,
+                    attributes: [...x.attributes.filter(x => x.id !== "aNormal")],
+                    // @ts-ignore
+                    oceanNavmesh: true,
+                }];
+            } else {
+                return [x];
+            }
+        }).flat();
+        setLoadMessage("Data Loaded");
+
+        // @ts-ignore
+        context.gameData = data;
+
+        const staticMeshPaths = [
+            "/meshes/Apothecary.glb",
+            "/meshes/Blacksmith.glb",
+            "/meshes/Wall.glb",
+            "/meshes/WizardTower.glb",
+            "/meshes/ui/healthbar/HealthBar.glb",
+            "/meshes/ui/healthbar/ManaBar.glb",
+            "/meshes/EpicStore/Fireball/source/Fireball.glb",
+            "/meshes/Model_Redo/Wizard/Wizard.glb",
+            "/meshes/Model_Redo/indicators/npc indicator/NpcDestination.glb",
+            "/meshes/Model_Redo/indicators/ship indicator/ShipDestination.glb",
+            "/meshes/Model_Redo/piratesloop/sloop.glb",
+            "/meshes/Model_Redo/Ship Wheel/ShipWheel.glb",
+            "/meshes/Model_Redo/Cannon_Ball/CannonBall.glb",
+            "/meshes/Model_Redo/Gold Coin/GoldCoin.glb",
+            "/meshes/ships/sloop.glb",
+            "/meshes/Model_Redo/Arrow/Arrow.glb",
+            "/meshes/Model_Redo/Villagers/Villager.glb",
+            "/meshes/Model_Redo/Port/Port.glb",
+            "/meshes/Model_Redo/Port/Port.glb",
+            "/meshes/Model_Redo/Port/Port.glb",
+            "/meshes/Model_Redo/Warrior/Warrior.glb",
+            "/meshes/Model_Redo/House/House.glb",
+            "/meshes/Model_Redo/House/House.glb",
+            "/meshes/Model_Redo/House/House.glb",
+            "/meshes/Model_Redo/Temple/Temple.glb",
+            "/meshes/Model_Redo/Temple/Temple.glb",
+            "/meshes/Model_Redo/Temple/Temple.glb",
+        ];
+
+        const gltf = await Promise.all<Uint8Array | string>([
+            ...data.map(m => generatePlanetGltf(m, m.ocean, m.navmesh || m.oceanNavmesh)),
+            ...staticMeshPaths
+        ]);
+
+        const worldMeshes: [string, boolean?, boolean?, boolean?, boolean?, [number, number, number]?, boolean?][] = [];
+        for (let i = 0; i < data.length; i++) {
+            const dataUri = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[i] as Uint8Array)}`;
+            worldMeshes.push([
+                dataUri,
+                data[i].collidable,
+                data[i].navmesh,
+                data[i].ocean,
+                data[i].oceanNavmesh,
+                // @ts-ignore
+                data[i].vertex,
+                // @ts-ignore
+                data[i].projected,
+            ]);
         }
 
-        setLoadMessage("No data loaded...");
-        const Uint8ToBase64 = (u8Arr: Uint8Array): string => {
-            const CHUNK_SIZE = 0x8000;
-            let index = 0;
-            const length = u8Arr.length;
-            let result = '';
-            while (index < length) {
-                const slice = u8Arr.subarray(index, Math.min(index + CHUNK_SIZE, length));
-                result += String.fromCharCode.apply(null, Array.from(slice));
-                index += CHUNK_SIZE;
+        if (iframeRef.current) {
+            const contentWindow = iframeRef.current.contentWindow as IFrameWindow;
+            contentWindow?.clearTerrain();
+
+            worldMeshes.forEach(w => {
+                contentWindow?.addTerrain(JSON.stringify(w));
+            });
+
+            const shipDataUri = gltf[gltf.length - 13] as string;
+            if (spawnPoints[0]) {
+                const spawnPoint = spawnPoints[0];
+                addCharacterModel(iframeRef.current, "SHIP", shipDataUri, true);
+                await contentWindow?.addShip(JSON.stringify({
+                    data: shipDataUri,
+                    point: spawnPoint.point.map(x => x * PLANET_SIZE)
+                }));
             }
-            return btoa(result);
-        };
 
-        const addCharacterModel = (iframe: HTMLIFrameElement, type: string, data: string, networked: boolean) => {
-            // @ts-ignore
-            iframe.contentWindow?.addCharacterModel(JSON.stringify({ type, data, networked }));
-        };
+            const warriorDataUri = gltf[gltf.length - 7] as string;
+            addCharacterModel(iframeRef.current, "APOTHECARY", new Array(3).fill(gltf[gltf.length - 27] as string).join("|"), true);
+            addCharacterModel(iframeRef.current, "BLACKSMITH", new Array(3).fill(gltf[gltf.length - 26] as string).join("|"), true);
+            addCharacterModel(iframeRef.current, "WALL", new Array(3).fill(gltf[gltf.length - 25] as string).join("|"), true);
+            addCharacterModel(iframeRef.current, "WIZARD_TOWER", new Array(3).fill(gltf[gltf.length - 24] as string).join("|"), true);
+            addCharacterModel(iframeRef.current, "HEALTHBAR", gltf[gltf.length - 23] as string, false);
+            addCharacterModel(iframeRef.current, "MANABAR", gltf[gltf.length - 22] as string, false);
+            addCharacterModel(iframeRef.current, "FIREBALL", gltf[gltf.length - 21] as string, true);
+            addCharacterModel(iframeRef.current, "WIZARD", gltf[gltf.length - 20] as string, true);
+            addCharacterModel(iframeRef.current, "NPC_DESTINATION", gltf[gltf.length - 19] as string, false);
+            addCharacterModel(iframeRef.current, "SHIP_DESTINATION", gltf[gltf.length - 18] as string, false);
+            addCharacterModel(iframeRef.current, "WARRIOR", warriorDataUri, true);
+            addCharacterModel(iframeRef.current, "PIRATE_SHIP", gltf[gltf.length - 17] as string, true);
+            addCharacterModel(iframeRef.current, "PERSON", gltf[gltf.length - 11] as string, true);
+            addCharacterModel(iframeRef.current, "ARROW", gltf[gltf.length - 12] as string, true);
+            addCharacterModel(iframeRef.current, "GOLD_COIN", gltf[gltf.length - 14] as string, true);
+            addCharacterModel(iframeRef.current, "CANNONBALL", gltf[gltf.length - 15] as string, true);
+            addCharacterModel(iframeRef.current, "HELM", gltf[gltf.length - 16] as string, false);
 
-        const addBuildings = (iframe: HTMLIFrameElement, buildings: IGameBuilding[], dataUris: string[]) => {
-            const houseArray = buildings.map(building => {
-                const { point, lookAt, type } = building;
-                return JSON.stringify({
-                    type: type.toUpperCase(),
-                    point: point.map(x => x * PLANET_SIZE),
-                    lookAt: lookAt.map(x => x * PLANET_SIZE)
-                });
-            });
-
-            const buildingTypeMap: Record<string, string[]> = {
-                PORT: [dataUris[0], dataUris[1], dataUris[2]],
-                HOUSE: [dataUris[3], dataUris[4], dataUris[5]],
-                TEMPLE: [dataUris[6], dataUris[7], dataUris[8]]
-            };
-
-            Object.entries(buildingTypeMap).forEach(([type, uris]) => {
-                addCharacterModel(iframe, type, uris.join("|"), false);
-            });
-
-            houseArray.forEach(house => {
-                // @ts-ignore
-                iframe.contentWindow?.addHouse(house);
-            });
-        };
-
-        const handleData = async (
-            inputData: { meshes: IGameMesh[], spawnPoints: IGameSpawnPoint[], buildings: IGameBuilding[] },
-            { roomId }: { roomId: string }
-        ) => {
-            const { meshes, spawnPoints, buildings } = inputData;
-            let data: IGameMesh[] = meshes.map((mesh: IGameMesh) => ({
-                ...mesh,
-                attributes: mesh.attributes.map(attr =>
-                    attr.id === "aPosition"
-                        ? { ...attr, buffer: attr.buffer.map(x => x * PLANET_SIZE) }
-                        : attr
-                )
-            }));
-            data = data.map((x: IGameMesh): IGameMesh[] => {
-                if (x.navmesh) {
-                    return [{
-                        ...x,
-                        attributes: [...x.attributes.filter(x => x.id !== "aNormal")],
-                        // @ts-ignore
-                        navmesh: true,
-                    }, {
-                        ...x,
-                        // @ts-ignore
-                        projected: true,
-                        navmesh: false,
-                    }];
-                } else if (x.oceanNavmesh) {
-                    return [{
-                        ...x,
-                        attributes: [...x.attributes.filter(x => x.id !== "aNormal")],
-                        // @ts-ignore
-                        oceanNavmesh: true,
-                    }];
-                } else {
-                    return [x];
-                }
-            }).flat();
-            setLoadMessage("Data Loaded");
-            context.gameData = data;
-
-            const staticMeshPaths = [
-                "/meshes/Apothecary.glb",
-                "/meshes/Blacksmith.glb",
-                "/meshes/Wall.glb",
-                "/meshes/WizardTower.glb",
-                "/meshes/ui/healthbar/HealthBar.glb",
-                "/meshes/ui/healthbar/ManaBar.glb",
-                "/meshes/EpicStore/Fireball/source/Fireball.glb",
-                "/meshes/Model_Redo/Wizard/Wizard.glb",
-                "/meshes/Model_Redo/indicators/npc indicator/NpcDestination.glb",
-                "/meshes/Model_Redo/indicators/ship indicator/ShipDestination.glb",
-                "/meshes/Model_Redo/piratesloop/sloop.glb",
-                "/meshes/Model_Redo/Ship Wheel/ShipWheel.glb",
-                "/meshes/Model_Redo/Cannon_Ball/CannonBall.glb",
-                "/meshes/Model_Redo/Gold Coin/GoldCoin.glb",
-                "/meshes/ships/sloop.glb",
-                "/meshes/Model_Redo/Arrow/Arrow.glb",
-                "/meshes/Model_Redo/Villagers/Villager.glb",
-                "/meshes/Model_Redo/Port/Port.glb",
-                "/meshes/Model_Redo/Port/Port.glb",
-                "/meshes/Model_Redo/Port/Port.glb",
-                "/meshes/Model_Redo/Warrior/Warrior.glb",
-                "/meshes/Model_Redo/House/House.glb",
-                "/meshes/Model_Redo/House/House.glb",
-                "/meshes/Model_Redo/House/House.glb",
-                "/meshes/Model_Redo/Temple/Temple.glb",
-                "/meshes/Model_Redo/Temple/Temple.glb",
-                "/meshes/Model_Redo/Temple/Temple.glb",
-            ];
-
-            const gltf = await Promise.all<Uint8Array | string>([
-                ...data.map(m => generatePlanetGltf(m, m.ocean, m.navmesh || m.oceanNavmesh)),
-                ...staticMeshPaths
-            ]);
-
-            const worldMeshes: [string, boolean?, boolean?, boolean?, boolean?, [number, number, number]?, boolean?][] = [];
-            for (let i = 0; i < data.length; i++) {
-                const dataUri = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[i] as Uint8Array)}`;
-                worldMeshes.push([
-                    dataUri,
-                    data[i].collidable,
-                    data[i].navmesh,
-                    data[i].ocean,
-                    data[i].oceanNavmesh,
-                    // @ts-ignore
-                    data[i].vertex,
-                    // @ts-ignore
-                    data[i].projected,
+            if (buildings.length) {
+                addBuildings(iframeRef.current, buildings, [
+                    gltf[gltf.length - 10] as string,
+                    gltf[gltf.length - 9] as string,
+                    gltf[gltf.length - 8] as string,
+                    gltf[gltf.length - 6] as string,
+                    gltf[gltf.length - 5] as string,
+                    gltf[gltf.length - 4] as string,
+                    gltf[gltf.length - 3] as string,
+                    gltf[gltf.length - 2] as string,
+                    gltf[gltf.length - 1] as string
                 ]);
             }
 
-            if (iframeRef.current) {
-                const contentWindow = iframeRef.current.contentWindow as IFrameWindow;
-                contentWindow?.clearTerrain();
-
-                worldMeshes.forEach(w => {
-                    contentWindow?.addTerrain(JSON.stringify(w));
-                });
-
-                const shipDataUri = gltf[gltf.length - 13] as string;
-                if (spawnPoints[0]) {
-                    const spawnPoint = spawnPoints[0];
-                    addCharacterModel(iframeRef.current, "SHIP", shipDataUri, true);
-                    await contentWindow?.addShip(JSON.stringify({
-                        data: shipDataUri,
+            if (spawnPoints.length) {
+                for (const spawnPoint of spawnPoints.slice(1).reduce((acc, x, i) => (i % 4 === 0) ? [...acc, x] : acc, [] as IGameSpawnPoint[])) {
+                    contentWindow?.addPirateShipSpawnPoint(JSON.stringify({
                         point: spawnPoint.point.map(x => x * PLANET_SIZE)
                     }));
                 }
-
-                const warriorDataUri = gltf[gltf.length - 7] as string;
-                addCharacterModel(iframeRef.current, "APOTHECARY", new Array(3).fill(gltf[gltf.length - 27] as string).join("|"), true);
-                addCharacterModel(iframeRef.current, "BLACKSMITH", new Array(3).fill(gltf[gltf.length - 26] as string).join("|"), true);
-                addCharacterModel(iframeRef.current, "WALL", new Array(3).fill(gltf[gltf.length - 25] as string).join("|"), true);
-                addCharacterModel(iframeRef.current, "WIZARD_TOWER", new Array(3).fill(gltf[gltf.length - 24] as string).join("|"), true);
-                addCharacterModel(iframeRef.current, "HEALTHBAR", gltf[gltf.length - 23] as string, false);
-                addCharacterModel(iframeRef.current, "MANABAR", gltf[gltf.length - 22] as string, false);
-                addCharacterModel(iframeRef.current, "FIREBALL", gltf[gltf.length - 21] as string, true);
-                addCharacterModel(iframeRef.current, "WIZARD", gltf[gltf.length - 20] as string, true);
-                addCharacterModel(iframeRef.current, "NPC_DESTINATION", gltf[gltf.length - 19] as string, false);
-                addCharacterModel(iframeRef.current, "SHIP_DESTINATION", gltf[gltf.length - 18] as string, false);
-                addCharacterModel(iframeRef.current, "WARRIOR", warriorDataUri, true);
-                addCharacterModel(iframeRef.current, "PIRATE_SHIP", gltf[gltf.length - 17] as string, true);
-                addCharacterModel(iframeRef.current, "PERSON", gltf[gltf.length - 11] as string, true);
-                addCharacterModel(iframeRef.current, "ARROW", gltf[gltf.length - 12] as string, true);
-                addCharacterModel(iframeRef.current, "GOLD_COIN", gltf[gltf.length - 14] as string, true);
-                addCharacterModel(iframeRef.current, "CANNONBALL", gltf[gltf.length - 15] as string, true);
-                addCharacterModel(iframeRef.current, "HELM", gltf[gltf.length - 16] as string, false);
-
-                if (buildings.length) {
-                    addBuildings(iframeRef.current, buildings, [
-                        gltf[gltf.length - 10] as string,
-                        gltf[gltf.length - 9] as string,
-                        gltf[gltf.length - 8] as string,
-                        gltf[gltf.length - 6] as string,
-                        gltf[gltf.length - 5] as string,
-                        gltf[gltf.length - 4] as string,
-                        gltf[gltf.length - 3] as string,
-                        gltf[gltf.length - 2] as string,
-                        gltf[gltf.length - 1] as string
-                    ]);
-                }
-
-                if (spawnPoints.length) {
-                    for (const spawnPoint of spawnPoints.slice(1).reduce((acc, x, i) => (i % 4 === 0) ? [...acc, x] : acc, [] as IGameSpawnPoint[])) {
-                        contentWindow?.addPirateShipSpawnPoint(JSON.stringify({
-                            point: spawnPoint.point.map(x => x * PLANET_SIZE)
-                        }));
-                    }
-                }
-
-                contentWindow?.addClientSecret(JSON.stringify({ roomId, clientSecret }));
-            }
-        };
-
-        (async () => {
-            // get room which contains map
-            const roomResponse = await fetch(`/api/room/${clientSecret}`);
-            const roomJson = await roomResponse.json();
-            let roomId = null;
-            if (roomJson) {
-                const {
-                    id
-                } = roomJson;
-                roomId = id;
             }
 
-            // get map
-            let planetJson;
-            if (roomId) {
-                const planetResponse = await fetch(`/api/planet/${roomId}`);
-                planetJson = await planetResponse.json();
-            } else {
-                const planetResponse = await fetch("/api/planet");
-                planetJson = await planetResponse.json();
-            }
-
-            // parse map data
-            if (planetJson) {
-                const {
-                    previewUrl,
-                    gameUrl,
-                } = planetJson;
-                const [previewResponse, gameResponse] = await Promise.all([fetch(previewUrl), fetch(gameUrl)]);
-                const previewJson = await previewResponse.json();
-                const gameJson = await gameResponse.json();
-
-                context.preview = previewJson as IGameMesh;
-                await handleData(gameJson as {meshes: IGameMesh[], spawnPoints: IGameSpawnPoint[], buildings: IGameBuilding[]}, {roomId});
-            }
-        })();
-    }, [context]);
+            contentWindow?.addClientSecret(JSON.stringify({ roomId, clientSecret }));
+        }
+    };
     useEffect(() => {
-        drawGraph();
+        if (context?.loading && !context?.gameData.length) {
+            context.loading = false;
+            (async () => {
+                // get room which contains map
+                const roomResponse = await fetch(`/api/room/${clientSecret}`);
+                const roomJson = await roomResponse.json();
+                let roomId = null;
+                if (roomJson) {
+                    const {
+                        id
+                    } = roomJson;
+                    roomId = id;
+                }
+
+                // get map
+                let planetJson;
+                if (roomId) {
+                    const planetResponse = await fetch(`/api/planet/${roomId}`);
+                    planetJson = await planetResponse.json();
+                } else {
+                    const planetResponse = await fetch("/api/planet");
+                    planetJson = await planetResponse.json();
+                }
+
+                // parse map data
+                if (planetJson) {
+                    const {
+                        previewUrl,
+                        gameUrl,
+                    } = planetJson;
+                    const [previewResponse, gameResponse] = await Promise.all([fetch(previewUrl), fetch(gameUrl)]);
+                    const previewJson = await previewResponse.json();
+                    const gameJson = await gameResponse.json();
+
+                    // @ts-ignore
+                    context.preview = previewJson as IGameMesh;
+                    await handleData(gameJson as {meshes: IGameMesh[], spawnPoints: IGameSpawnPoint[], buildings: IGameBuilding[]}, {roomId});
+                }
+            })();
+        }
     }, []);
     const download = async () => {
         const data: IGameMesh = context!.preview!;
@@ -359,11 +357,6 @@ export const PlanetGenerator = () => {
                                 <CardContent>
                                     <Typography>Load Status: {loadMessage}</Typography>
                                     <Grid container gap={2}>
-                                        <Grid item xs={6}>
-                                            <Button variant="contained" fullWidth onClick={() => {
-                                                drawGraph();
-                                            }}>Refresh</Button>
-                                        </Grid>
                                         <Grid item xs={6}>
                                             <Button variant="contained" fullWidth onClick={download}>Download</Button>
                                         </Grid>
