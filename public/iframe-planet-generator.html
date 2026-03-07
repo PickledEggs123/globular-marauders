@@ -313,11 +313,11 @@
                     this.el.appendChild(this.fireball);
 
                     if (this.fireball.getObject3D("mesh")) {
-                        this.startTime = (+new Date() / 1000);
+                        this.startTime = (t / 1000);
                         this.endTime = this.startTime + this.data.speed;
                     } else {
                         this.fireball.addEventListener("model-loaded", () => {
-                            this.startTime = (+new Date() / 1000);
+                            this.startTime = (t / 1000);
                             this.endTime = this.startTime + this.data.speed;
                         });
                     }
@@ -2079,6 +2079,11 @@
                 ship: {type: 'boolean', default: false},
                 buoyancy: {type: 'boolean', default: true},
             },
+            init: function () {
+                this.el.addEventListener('collidestart', (e) => {
+                    console.log(e);
+                });
+            },
             tick: function (t, dt) {
                 const object3D = this.el.object3D;
                 const trueUpDistance = object3D.getWorldPosition(new THREE.Vector3());
@@ -2089,40 +2094,40 @@
                 const diffUp = trueUp.clone().sub(currentUp.clone());
 
                 // apply gravity force
-                const gravityForce = this.el.body.getCenterOfMassTransform().getOrigin().length() * 10;
-                this.el.body.applyForce(new CANNON.Vec3(-trueUp.x, -trueUp.y, -trueUp.z).scale(gravityForce * 60 * dt / 1000).toAmmo(), new CANNON.Vec3(0, 0, 0).toAmmo());
+                const gravityForce = 10;
+                this.el.body.applyCentralForce(new CANNON.Vec3(-trueUp.x, -trueUp.y, -trueUp.z).scale(gravityForce * 60 * dt / 1000).toAmmo());
 
                 // apply drag
-                this.el.body.applyForce(convertAmmoToCannon(this.el.body.getLinearVelocity()).clone().scale(-25).toAmmo(), new CANNON.Vec3(0, 0, 0).toAmmo());
+                this.el.body.applyCentralForce(convertAmmoToCannon(this.el.body.getLinearVelocity()).clone().scale(-25).toAmmo());
 
                 if (this.data.ship) {
                     if (this.data.buoyancy) {
                         // apply sideways tilt force
-                        const sidewaysTilt = convertAmmoToCannon(this.el.body.getLinearVelocity()).clone().scale(100).dot(currentRight.clone());
+                        const sidewaysTilt = convertAmmoToCannon(this.el.body.getLinearVelocity()).clone().scale(1).dot(currentRight.clone());
                         const tiltForce = new CANNON.Vec3(currentRight.x, currentRight.y, currentRight.z).scale(sidewaysTilt);
                         const tiltPoint = new CANNON.Vec3(currentUp.x, currentUp.y, currentUp.z);
                         this.el.body.applyForce(tiltForce.clone().scale(60 * dt / 1000).toAmmo(), tiltPoint.clone().toAmmo());
                         this.el.body.applyForce(tiltForce.clone().scale(-60 * dt / 1000).toAmmo(), tiltPoint.clone().scale(-1).toAmmo());
 
                         // apply up right force
-                        const springForce = 300;
+                        const springForce = 3;
                         const rotateForce = new CANNON.Vec3(diffUp.x, diffUp.y, diffUp.z).scale(springForce);
                         const rotatePoint = new CANNON.Vec3(currentUp.x, currentUp.y, currentUp.z);
-                        const dragForce = convertAmmoToCannon(this.el.body.getAngularVelocity()).clone().cross(rotatePoint.clone()).scale(100);
+                        const dragForce = convertAmmoToCannon(this.el.body.getAngularVelocity()).clone().cross(rotatePoint.clone()).scale(1);
                         this.el.body.applyForce(rotateForce.clone().vsub(dragForce).scale(60 * dt / 1000).toAmmo(), rotatePoint.clone().toAmmo());
                         this.el.body.applyForce(rotateForce.clone().vsub(dragForce).scale(-60 * dt / 1000).toAmmo(), rotatePoint.clone().scale(-1).toAmmo());
 
                         // apply horizontal drag
                         const horizontalRotatePoint = new CANNON.Vec3(currentForward.x, currentForward.y, currentForward.z);
-                        const horizontalDragForce = convertAmmoToCannon(this.el.body.getAngularVelocity()).clone().cross(horizontalRotatePoint.clone()).scale(100);
+                        const horizontalDragForce = convertAmmoToCannon(this.el.body.getAngularVelocity()).clone().cross(horizontalRotatePoint.clone()).scale(1);
                         this.el.body.applyForce(horizontalDragForce.clone().scale(-1).toAmmo(), horizontalRotatePoint.clone().toAmmo());
                         this.el.body.applyForce(horizontalDragForce.clone().toAmmo(), horizontalRotatePoint.clone().scale(-1).toAmmo());
                     }
 
                     if (trueUpDistance.length() < PLANET_SIZE + 1) {
                         const trueUpMagnitude = -(trueUpDistance.length() - PLANET_SIZE - 1);
-                        const trueUpForce = new CANNON.Vec3(trueUp.x, trueUp.y, trueUp.z).scale(trueUpMagnitude * (this.data.buoyancy ? 1000 : 10));
-                        this.el.body.applyForce(trueUpForce.scale(60 * dt / 1000).toAmmo(), new CANNON.Vec3(0, 0, 0).toAmmo());
+                        const trueUpForce = new CANNON.Vec3(trueUp.x, trueUp.y, trueUp.z).scale(trueUpMagnitude * (this.data.buoyancy ? 10 : 1));
+                        this.el.body.applyCentralForce(trueUpForce.scale(60 * dt / 1000).toAmmo());
                     }
                 }
             }
@@ -2843,18 +2848,14 @@
                 this.updateVelocity(dt);
 
                 // Get movement vector and translate position.
-                body.applyForce(this.getMovementVector(dt).clone().toAmmo(), new CANNON.Vec3(0, 0, 0).toAmmo());
+                body.applyCentralForce(this.getMovementVector(dt).clone().toAmmo());
 
-                const transform = body.getWorldTransform();
-
-                if (this.rotation.clone().y && !!transform) {
+                if (this.rotation.clone().y) {
                     // apply rotation force
-                    const a1 = transform * new CANNON.Vec3(this.rotation.clone().y * 60 * dt, 0, 0).toAmmo();
-                    const a2 = transform * new CANNON.Vec3(-this.rotation.clone().y * 60 * dt, 0, 0).toAmmo();
-                    const b1 = transform * new CANNON.Vec3(0, 0, 1).toAmmo();
-                    const b2 = transform * new CANNON.Vec3(0, 0, -1).toAmmo();
-                    body.applyForce(a1, b1);
-                    body.applyForce(a2, b2);
+                    const b1 = new CANNON.Vec3(0, 0, this.rotation.clone().y * 60 * dt).toAmmo();
+                    const b2 = new CANNON.Vec3(0, 0, -this.rotation.clone().y * 60 * dt).toAmmo();
+                    body.applyLocalTorque(b1);
+                    body.applyLocalTorque(b2);
                 }
 
                 if (Object.keys(this.mainKeys).length) {
@@ -2894,10 +2895,10 @@
                 if (keys.KeyW || keys.ArrowUp) { velocity.z = -acceleration; }
                 if (keys.KeyS || keys.ArrowDown) { velocity.z = acceleration; }
 
-                const bodyWorldVelocity = convertAmmoToThree(this.el.body.getLinearVelocity()).clone();
-                const bodyWorldQuat = convertAmmoToCannon(this.el.body.getWorldTransform().getRotation()).clone().inverse();
-                const bodyVelocity = new THREE.Vector3(bodyWorldVelocity.x, bodyWorldVelocity.y, bodyWorldVelocity.z).applyQuaternion(new THREE.Quaternion(bodyWorldQuat.x, bodyWorldQuat.y, bodyWorldQuat.z, bodyWorldQuat.w));
-                velocity.sub(new THREE.Vector3(bodyVelocity.x, bodyVelocity.y, bodyVelocity.z).multiplyScalar(1));
+                // const bodyWorldVelocity = convertAmmoToThree(this.el.body.getLinearVelocity()).clone();
+                // const bodyWorldQuat = convertAmmoToCannon(this.el.body.getWorldTransform().getRotation()).clone().inverse();
+                // const bodyVelocity = new THREE.Vector3(bodyWorldVelocity.x, bodyWorldVelocity.y, bodyWorldVelocity.z).applyQuaternion(new THREE.Quaternion(bodyWorldQuat.x, bodyWorldQuat.y, bodyWorldQuat.z, bodyWorldQuat.w));
+                // velocity.sub(new THREE.Vector3(bodyVelocity.x, bodyVelocity.y, bodyVelocity.z).multiplyScalar(1));
             },
 
             getMovementVector: (function () {
@@ -4720,8 +4721,17 @@
         AFRAME.registerComponent('has-terrain-tile-physics', {
             schema: {},
             init: function () {
-                // this.el.setAttribute("ammo-body", "type: static;");
-                // this.el.setAttribute("ammo-shape", "type: mesh;");
+                if (this.el.getObject3D("mesh")) {
+                    this.addPhysics();
+                } else {
+                    this.el.addEventListener("model-loaded", this.addPhysics.bind(this));
+                }
+            },
+            addPhysics: function () {
+                if (this.el.getObject3D("mesh")) {
+                    this.el.setAttribute("ammo-shape", "type: mesh; fit: auto;");
+                    this.el.setAttribute("ammo-body", "type: static; gravity: 0 0 0;");
+                }
             },
             remove: function () {
             },
@@ -5583,8 +5593,8 @@
                 if (this.data.target && (
                     (this.data.target.components['health'] && this.data.target.components['health'].data.health > 0) ||
                     this.data.target.components['networked-health']) ||
-                    (this.data.target.parentNode.components['building-health'] && this.data.target.parentNode.components['building-health'].data.health > 0) ||
-                    this.data.target.parentNode.components['networked-building-health']
+                    (this.data.target.parentNode?.components['building-health'] && this.data.target.parentNode.components['building-health'].data.health > 0) ||
+                    this.data.target.parentNode?.components['networked-building-health']
                 ) {
                     // go to target
                     this.goToTarget.call(this, t, dt);
@@ -5979,6 +5989,10 @@
                 this.el.removeEventListener('hit', this.innerHandleHit);
             },
             handleHit: function (evt) {
+                if (!this?.el?.components?.hasOwnProperty("networked")) {
+                    return;
+                }
+
                 const hit = evt.detail;
                 const senderId = this.el.components['networked'].data.owner;
                 const networkId = this.el.components['networked'].data.networkId;
@@ -6049,7 +6063,7 @@
                     bPosNorm.normalize();
                     impulse.normalize();
                     impulse.vadd(bPosNorm, impulse);
-                    impulse.scale(300, impulse);
+                    impulse.scale(30, impulse);
                     const bPosOffset = new CANNON.Vec3().set(getRandom1to1(), getRandom1to1(), getRandom1to1());
                     bPosOffset.normalize();
                     bPosOffset.scale(0.5, bPosOffset);
@@ -6354,8 +6368,8 @@
             pos.add(pos.clone().normalize());
             rootGoldCoin.setAttribute("position", `${pos.x} ${pos.y} ${pos.z}`);
             rootGoldCoin.setAttribute("rotation", "0 0 0");
-            rootGoldCoin.setAttribute("ammo-body", "type: dynamic; mass: 100");
-            rootGoldCoin.setAttribute("ammo-shape", "type: sphere; sphereRadius: 0.5");
+            rootGoldCoin.setAttribute("ammo-body", "type: dynamic; mass: 10; gravity: 0 0 0; emitCollisionEvents: true;");
+            rootGoldCoin.setAttribute("ammo-shape", "type: sphere; sphereRadius: 0.5; fit: manual;");
             rootGoldCoin.setAttribute("globe-gravity", "");
             rootGoldCoin.setAttribute("collision-filter", "group: gold-coin; ");
             rootGoldCoin.setAttribute("gold-coin-movement", "");
@@ -6449,8 +6463,8 @@
             rootProjectile.setAttribute("position", `${pos.x} ${pos.y} ${pos.z}`);
             rootProjectile.setAttribute("rotation", "0 0 0");
             rootProjectile.setAttribute("shadow", "");
-            rootProjectile.setAttribute("ammo-body", "type: dynamic; mass: 5");
-            rootProjectile.setAttribute("ammo-shape", "type: sphere; sphereRadius: 0.5");
+            rootProjectile.setAttribute("ammo-body", "type: dynamic; mass: 5; gravity: 0 0 0; emitCollisionEvents: true;");
+            rootProjectile.setAttribute("ammo-shape", "type: sphere; sphereRadius: 0.5; fit: manual;");
             rootProjectile.setAttribute("globe-gravity", "");
             rootProjectile.setAttribute("collision-filter", "group: cannonball; collidesWith: default");
             rootProjectile.setAttribute("initial-velocity", `${velocity.x} ${velocity.y} ${velocity.z}`);
@@ -6577,8 +6591,8 @@
             const destination2 = destinationEl.components['position'].data;
             const pos = buildingEl.components['position'].data;
 
-            rootShip.setAttribute("ammo-body", "type: dynamic; mass: 100");
-            rootShip.setAttribute("ammo-shape", "type: sphere; sphereRadius: 1");
+            rootShip.setAttribute("ammo-body", "type: dynamic; mass: 10; gravity: 0 0 0; emitCollisionEvents: true;");
+            rootShip.setAttribute("ammo-shape", "type: sphere; sphereRadius: 1; fit: manual;");
             rootShip.setAttribute("collision-filter", "group: ship; collidesWith: default");
             rootShip.setAttribute("globe-gravity", "ship: true;");
             rootShip.setAttribute("ship-health", "");
@@ -7181,8 +7195,8 @@
 
             const rootShip = document.createElement("a-entity");
             rootShip.setAttribute("class", `${scene.components['coin-purse'].activeUnit} clickable`);
-            rootShip.setAttribute("ammo-body", "type: dynamic; mass: 100");
-            rootShip.setAttribute("ammo-shape", "type: sphere; sphereRadius: 1");
+            rootShip.setAttribute("ammo-body", "type: dynamic; mass: 10; gravity: 0 0 0; emitCollisionEvents: true;");
+            rootShip.setAttribute("ammo-shape", "type: sphere; sphereRadius: 1; fit: manual;");
             rootShip.setAttribute("collision-filter", "group: ship; collidesWith: default");
             rootShip.setAttribute("globe-gravity", "ship: true;");
             rootShip.setAttribute("globe-keyboard-controls", "enabled: true; fly: true");
@@ -7725,7 +7739,9 @@
             tickSum: 2,
             tick: function (t, dt) {
                 if (this.el.body && this.tickSum >= 0) {
-                    this.el.body.applyForce(new CANNON.Vec3(this.data.x, this.data.y, this.data.z).scale(dt / 1000 * (1000 / 60)).toAmmo(), new CANNON.Vec3(0, 0, 0).toAmmo());
+                    // apply rotation force
+                    const a1 = new CANNON.Vec3(this.data.x, this.data.y, this.data.z).scale(dt / 1000 * (1000 / 60)).toAmmo();
+                    this.el.body.applyCentralLocalForce(a1);
                     this.tickSum -= dt / 1000;
                 }
                 if (this.el.body && this.tickSum < 0) {
@@ -7864,10 +7880,10 @@
                         this.el.removeAttribute("cannonball-collider-water");
                     }
                 };
-                this.el.body.addEventListener("collide", this.eventHandler);
+                this.el.addEventListener("collidestart", this.eventHandler);
             },
             remove: function () {
-                this.el?.body?.removeEventListener("collide", this.eventHandler);
+                this.el?.removeEventListener("collidestart", this.eventHandler);
             }
         });
 
@@ -8648,7 +8664,7 @@
     </style>
 </head>
 <body>
-    <a-scene click-manager onclick="playMusic === true ? window.musicPlayer.start() : undefined" draw-ship-indicator draw-npc-indicator coin-purse respawn physics="driver: ammo; gravity: 0 0 0; debug: true; debugDrawMode: 1;" globe-nav="debug: false;" globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
+    <a-scene click-manager onclick="playMusic === true ? window.musicPlayer.start() : undefined" draw-ship-indicator draw-npc-indicator coin-purse respawn physics="driver: ammo; gravity: 0 0 0; debug: true; debugDrawMode: 4294967295;" globe-nav="debug: false;" globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
         <a-assets>
             <template id="avatar-template">
                 <a-entity class="avatar" networked-audio-source>
