@@ -130,6 +130,15 @@ export const PlanetGenerator = () => {
                     // @ts-ignore
                     oceanNavmesh: true,
                 }];
+            } else if (x.collidable) {
+                return [{
+                    ...x,
+                    attributes: [...x.attributes.filter(x => x.id === "aPosition")],
+                    // @ts-ignore
+                    physics: true,
+                    // @ts-ignore
+                    collidable: false,
+                }, x];
             } else {
                 return [x];
             }
@@ -174,7 +183,7 @@ export const PlanetGenerator = () => {
             ...staticMeshPaths
         ]);
 
-        const worldMeshes: [string, boolean?, boolean?, boolean?, boolean?, [number, number, number]?, boolean?][] = [];
+        const worldMeshes: [string, boolean?, boolean?, boolean?, boolean?, [number, number, number]?, boolean?, boolean?][] = [];
         for (let i = 0; i < data.length; i++) {
             const dataUri = `data:application/octet-stream;base64,${Uint8ToBase64(gltf[i] as Uint8Array)}`;
             worldMeshes.push([
@@ -187,6 +196,8 @@ export const PlanetGenerator = () => {
                 data[i].vertex,
                 // @ts-ignore
                 data[i].projected,
+                // @ts-ignore
+                data[i].physics,
             ]);
         }
 
