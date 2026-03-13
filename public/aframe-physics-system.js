@@ -14109,7 +14109,7 @@ let AmmoBody = {
     });
 
     // bug fix for loading geometry
-    if (!vertices.length) {
+    if (!vertices.length && shapeComponent.data.type === SHAPE.MESH) {
         return;
     }
 
