@@ -2080,9 +2080,6 @@
                 buoyancy: {type: 'boolean', default: true},
             },
             init: function () {
-                this.el.addEventListener('collidestart', (e) => {
-                    console.log(e);
-                });
             },
             tick: function (t, dt) {
                 if (!this.el?.body) {
@@ -6114,6 +6111,9 @@
             },
             applyImpulse: function () {
                 if (this.el.body) {
+                    const localToWorld = (v) => {
+                        return this.el.body.el.object3D.localToWorld(new THREE.Vector3().copy(v));
+                    }
                     const getRandom1to1 = () => (Math.random() * 2) - 1;
                     const bPos = convertAmmoToThree(this.el.body.getWorldTransform().getOrigin()).clone();
                     const impulse = new CANNON.Vec3().set(getRandom1to1(), getRandom1to1(), getRandom1to1());
@@ -6122,10 +6122,9 @@
                     impulse.normalize();
                     impulse.vadd(bPosNorm, impulse);
                     impulse.scale(300, impulse);
-                    const bPosOffset = new CANNON.Vec3().set(getRandom1to1(), getRandom1to1(), getRandom1to1());
-                    bPosOffset.normalize();
-                    bPosOffset.scale(0.5, bPosOffset);
-                    this.el.body.applyLocalImpulse(impulse.toAmmo(), bPosOffset.toAmmo());
+                    const ci = localToWorld(impulse).toAmmo();
+                    this.el.body.applyCentralImpulse(ci);
+                    Ammo.destroy(ci);
                     this.interval = setTimeout(this.removeGoldCoin.bind(this), 10_000);
                 } else {
                     this.interval = setTimeout(this.applyImpulse.bind(this), 100);
@@ -7799,10 +7798,12 @@
                 if (this.el.body && this.tickSum >= 0) {
                     // apply rotation force
                     const localToWorld = (v) => {
-                        return this.el.body.el.object3D.localToWorld(new THREE.Vector3().copy(v));
+                        return this.el.object3D.localToWorld(new THREE.Vector3().copy(v));
                     }
                     const a1 = new CANNON.Vec3(this.data.x, this.data.y, this.data.z);
-                    this.el.body.applyCentralImpulse(localToWorld(a1).toAmmo());
+                    const ci = localToWorld(a1).toAmmo();
+                    this.el.body.applyCentralImpulse(ci);
+                    Ammo.destroy(ci);
                     this.tickSum -= dt / 1000;
                 }
                 if (this.el.body && this.tickSum < 0) {
@@ -7936,10 +7937,11 @@
         AFRAME.registerComponent("cannonball-collider-ground", {
             init: function () {
                 this.eventHandler = (e) => {
-                    if (e.body.el.components["go-on-land"]) {
-                        addCannonballThump(this.el);
-                        this.el.removeAttribute("cannonball-collider-water");
-                    }
+                    // TODO: fix collision handler
+                    // if (e.body.el.components["go-on-land"]) {
+                    //     addCannonballThump(this.el);
+                    //     this.el.removeAttribute("cannonball-collider-water");
+                    // }
                 };
                 this.el.addEventListener("collidestart", this.eventHandler);
             },
