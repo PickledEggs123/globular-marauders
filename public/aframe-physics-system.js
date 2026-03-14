@@ -14227,11 +14227,11 @@ let AmmoBody = {
       Ammo.destroy(this.body);
       delete this.body;
     }
-    Ammo.destroy(this.rbInfo);
-    Ammo.destroy(this.msTransform);
-    Ammo.destroy(this.motionState);
-    Ammo.destroy(this.localInertia);
-    Ammo.destroy(this.rotation);
+    if (this.rbInfo) Ammo.destroy(this.rbInfo);
+    if (this.msTransform) Ammo.destroy(this.msTransform);
+    if (this.motionState) Ammo.destroy(this.motionState);
+    if (this.localInertia) Ammo.destroy(this.localInertia);
+    if (this.rotation) Ammo.destroy(this.rotation);
   },
 
   beforeStep: function() {
