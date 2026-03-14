@@ -7806,7 +7806,6 @@
                     }
                     const a1 = new CANNON.Vec3(this.data.x, this.data.y, this.data.z);
                     const ci = localToWorld(a1).toAmmo();
-                    console.log(a1, ci.x(), ci.y(), ci.z());
                     this.el.body.applyCentralImpulse(ci);
                     Ammo.destroy(ci);
                     this.el.removeAttribute("initial-velocity");
@@ -7939,11 +7938,10 @@
         AFRAME.registerComponent("cannonball-collider-ground", {
             init: function () {
                 this.eventHandler = (e) => {
-                    // TODO: fix collision handler
-                    // if (e.body.el.components["go-on-land"]) {
-                    //     addCannonballThump(this.el);
-                    //     this.el.removeAttribute("cannonball-collider-water");
-                    // }
+                    if (e.detail.targetEl.body.el.components["go-on-land"]) {
+                        addCannonballThump(this.el);
+                        this.el.removeAttribute("cannonball-collider-water");
+                    }
                 };
                 this.el.addEventListener("collidestart", this.eventHandler);
             },
