@@ -6112,7 +6112,9 @@
             applyImpulse: function () {
                 if (this.el.body) {
                     const localToWorld = (v) => {
-                        return this.el.body.el.object3D.localToWorld(new THREE.Vector3().copy(v));
+                        const q = this.el.object3D.getWorldQuaternion(new THREE.Quaternion());
+                        const v2 = new THREE.Vector3().copy(v).applyQuaternion(q);
+                        return v2;
                     }
                     const getRandom1to1 = () => (Math.random() * 2) - 1;
                     const bPos = convertAmmoToThree(this.el.body.getWorldTransform().getOrigin()).clone();
@@ -6523,7 +6525,7 @@
             rootProjectile.setAttribute("ammo-body", "mass: 5; gravity: 0 0 0; emitCollisionEvents: true;");
             rootProjectile.setAttribute("ammo-shape", "type: sphere; sphereRadius: 0.1; fit: manual;");
             rootProjectile.setAttribute("globe-gravity", "");
-            rootProjectile.setAttribute("collision-filter", "group: cannonball; collidesWith: default");
+            rootProjectile.setAttribute("collision-filter", "group: cannonball; collidesWith: ship");
             rootProjectile.setAttribute("initial-velocity", `${velocity.x} ${velocity.y} ${velocity.z}`);
             rootProjectile.setAttribute("cannonball-collider-ground", "");
             rootProjectile.setAttribute("cannonball-collider-water", "");
@@ -6650,7 +6652,7 @@
 
             rootShip.setAttribute("ammo-body", "mass: 10; gravity: 0 0 0; emitCollisionEvents: true;");
             rootShip.setAttribute("ammo-shape", "type: sphere; sphereRadius: 1; fit: manual;");
-            rootShip.setAttribute("collision-filter", "group: ship; collidesWith: default");
+            rootShip.setAttribute("collision-filter", "group: ship; collidesWith: cannonball, terrain");
             rootShip.setAttribute("globe-gravity", "ship: true;");
             rootShip.setAttribute("ship-health", "");
             rootShip.setAttribute("ship-death", "");
@@ -6993,6 +6995,7 @@
             } else if (physics) {
                 // physics ocean bottom
                 rootTerrain.setAttribute("has-terrain-tile-physics", "");
+                rootTerrain.setAttribute("collision-filter", "group: terrain; collidesWith: cannonball, ship, player-ship");
                 rootTerrain.setAttribute("go-on-land", "");
             } else if (collidable) {
                 // physics land
@@ -7254,7 +7257,7 @@
             rootShip.setAttribute("class", `${scene.components['coin-purse'].activeUnit} clickable`);
             rootShip.setAttribute("ammo-body", "mass: 10; gravity: 0 0 0; emitCollisionEvents: true;");
             rootShip.setAttribute("ammo-shape", "type: sphere; sphereRadius: 1; fit: manual;");
-            rootShip.setAttribute("collision-filter", "group: ship; collidesWith: default");
+            rootShip.setAttribute("collision-filter", "group: player-ship; collidesWith: terrain");
             rootShip.setAttribute("globe-gravity", "ship: true;");
             rootShip.setAttribute("globe-keyboard-controls", "enabled: true; fly: true");
             rootShip.setAttribute("ship-health", "");
@@ -7781,7 +7784,7 @@
                     const worldPosition = cannon.object3D.getWorldPosition(new THREE.Vector3());
                     worldPosition.add(worldPosition.clone().normalize().multiplyScalar(1.2));
                     const cannonBallOrientation = cannon.object3D.getWorldQuaternion(new THREE.Quaternion());
-                    const velocity = new THREE.Vector3(0, 1, e.detail.includes("left") ? -30 : 30).applyQuaternion(cannonBallOrientation);
+                    const velocity = new THREE.Vector3(0, 10, e.detail.includes("left") ? -300 : 300).applyQuaternion(cannonBallOrientation);
 
                     addCannonBall(worldPosition, velocity, cannon, this.el.components['cannonball-damage'].data.damage);
                 });
@@ -7793,20 +7796,19 @@
                 type: "vec3",
                 default: "0 0 0",
             },
-            tickSum: 2,
             tick: function (t, dt) {
-                if (this.el.body && this.tickSum >= 0) {
+                if (this.el.body) {
                     // apply rotation force
                     const localToWorld = (v) => {
-                        return this.el.object3D.localToWorld(new THREE.Vector3().copy(v));
+                        const q = this.el.object3D.getWorldQuaternion(new THREE.Quaternion());
+                        const v2 = new THREE.Vector3().copy(v).applyQuaternion(q);
+                        return v2;
                     }
                     const a1 = new CANNON.Vec3(this.data.x, this.data.y, this.data.z);
                     const ci = localToWorld(a1).toAmmo();
+                    console.log(a1, ci.x(), ci.y(), ci.z());
                     this.el.body.applyCentralImpulse(ci);
                     Ammo.destroy(ci);
-                    this.tickSum -= dt / 1000;
-                }
-                if (this.el.body && this.tickSum < 0) {
                     this.el.removeAttribute("initial-velocity");
                 }
             },
