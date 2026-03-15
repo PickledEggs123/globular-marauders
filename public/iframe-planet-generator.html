@@ -2869,17 +2869,16 @@
                 }
 
                 // Update velocity.
-                dt = dt / 1000;
-                this.updateVelocity(dt);
+                this.updateVelocity();
 
                 // Get movement vector and translate position.
-                const mf = this.getMovementVector(dt).clone().multiplyScalar(1).toAmmo();
+                const mf = this.getMovementVector().clone().multiplyScalar(1).toAmmo();
                 body.applyCentralForce(mf);
                 Ammo.destroy(mf);
 
                 if (this.rotation.clone().y) {
                     // apply rotation force
-                    const rf = new CANNON.Vec3(0, this.rotation.clone().y * 60 * dt, 0).scale(0.03).toAmmo();
+                    const rf = new CANNON.Vec3(0, this.rotation.clone().y, 0).scale(0.03).toAmmo();
                     body.applyLocalTorque(rf);
                     Ammo.destroy(rf);
                 }
@@ -2903,7 +2902,7 @@
                 this.removeKeyEventListeners();
             },
 
-            updateVelocity: function (delta) {
+            updateVelocity: function () {
                 var acceleration;
                 var data = this.data;
                 var keys = this.keys;
@@ -2925,7 +2924,7 @@
             getMovementVector: (function () {
                 var directionVector = new THREE.Vector3(0, 0, 0);
 
-                return function (dt) {
+                return function () {
                     var velocity = this.velocity;
                     var rotation = this.el.object3D.getWorldQuaternion(new THREE.Quaternion());
 
