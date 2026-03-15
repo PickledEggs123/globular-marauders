@@ -2095,6 +2095,7 @@
                 const diffUp = trueUp.clone().sub(currentUp.clone());
 
                 // apply gravity force
+                this.el.body.activate();
                 const gravityForce = 30;
                 const gf = new CANNON.Vec3(-trueUp.x, -trueUp.y, -trueUp.z).scale(gravityForce * 60 * dt / 1000).toAmmo();
                 this.el.body.applyCentralForce(gf);
