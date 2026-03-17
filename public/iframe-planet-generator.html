@@ -7775,7 +7775,7 @@
                     const worldPosition = cannon.object3D.getWorldPosition(new THREE.Vector3());
                     worldPosition.add(worldPosition.clone().normalize().multiplyScalar(1.2));
                     const cannonBallOrientation = cannon.object3D.getWorldQuaternion(new THREE.Quaternion());
-                    const velocity = new THREE.Vector3(0, 10, e.detail.includes("left") ? -300 : 300).applyQuaternion(cannonBallOrientation);
+                    const velocity = new THREE.Vector3(0, 0, e.detail.includes("left") ? -300 : 300).applyQuaternion(cannonBallOrientation);
 
                     addCannonBall(worldPosition, velocity, cannon, this.el.components['cannonball-damage'].data.damage);
                 });
@@ -7881,6 +7881,14 @@
             init: function () {
                 this.system = this.el.sceneEl.systems["cannonball-hit-ready"];
                 this.system.registerMe(this.el);
+                this.initBody = false;
+            },
+            tick: function () {
+                if (this.el.body && !this.initBody) {
+                    this.el.body.setCcdMotionThreshold(0.25);
+                    this.el.body.setCcdSweptSphereRadius(0.25);
+                    this.initBody = true;
+                }
             },
             remove: function () {
                 this.system.unregisterMe(this.el);
