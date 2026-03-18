@@ -2284,7 +2284,7 @@
                     if (intersections[0]) {
                         destination1 = intersections[0].point.clone();
                     }
-                    finalPosition = destination1.clone().add(destination1.clone().normalize().multiplyScalar(5));
+                    finalPosition = destination1.clone().add(destination1.clone().normalize().multiplyScalar(5 + this.heightFactor));
                     this.heightDiff = THREE.MathUtils.clamp(new THREE.Vector3().distanceTo(finalPosition) - (height + this.heightFactor), -5, 50);
                     this.heightDiffLerp = 0.1 * this.heightDiff + 0.9 * this.heightDiffLerp;
                     this.dtSum = 0;
@@ -6117,7 +6117,7 @@
                     bPosNorm.normalize();
                     impulse.normalize();
                     impulse.vadd(bPosNorm, impulse);
-                    impulse.scale(300, impulse);
+                    impulse.scale(30, impulse);
                     const ci = localToWorld(impulse).toAmmo();
                     this.el.body.applyCentralImpulse(ci);
                     Ammo.destroy(ci);
