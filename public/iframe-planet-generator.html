@@ -2078,6 +2078,7 @@
             schema: {
                 ship: {type: 'boolean', default: false},
                 buoyancy: {type: 'boolean', default: true},
+                activeObject: {type: 'boolean', default: false},
             },
             init: function () {
             },
@@ -2095,7 +2096,9 @@
                 const diffUp = trueUp.clone().sub(currentUp.clone());
 
                 // apply gravity force
-                this.el.body.activate();
+                if (this.data.activeObject && this.el.body.isActive() === false) {
+                    this.el.body.activate();
+                }
                 const gravityForce = 30;
                 const gf = new CANNON.Vec3(-trueUp.x, -trueUp.y, -trueUp.z).scale(gravityForce * 60 * dt / 1000).toAmmo();
                 this.el.body.applyCentralForce(gf);
@@ -2147,7 +2150,7 @@
 
                     if (trueUpDistance.length() < PLANET_SIZE + 1) {
                         const trueUpMagnitude = -(trueUpDistance.length() - PLANET_SIZE - 1);
-                        const trueUpForce = new CANNON.Vec3(trueUp.x, trueUp.y, trueUp.z).scale(trueUpMagnitude * (this.data.buoyancy ? 100 : 10));
+                        const trueUpForce = new CANNON.Vec3(trueUp.x, trueUp.y, trueUp.z).scale(trueUpMagnitude * (this.data.buoyancy ? 30 : 10));
                         const bf = trueUpForce.scale(60 * dt / 1000).toAmmo();
                         this.el.body.applyCentralForce(bf);
                         Ammo.destroy(bf);
@@ -6060,7 +6063,7 @@
             },
             handleDeath: function () {
                 this.el.setAttribute("despawn", "");
-                this.el.setAttribute("globe-gravity", "ship: true; buoyancy: false;");
+                this.el.setAttribute("globe-gravity", "ship: true; buoyancy: false; activeObject: false;");
             },
         });
 
@@ -6644,7 +6647,7 @@
             rootShip.setAttribute("ammo-body", "mass: 10; gravity: 0 0 0; emitCollisionEvents: true;");
             rootShip.setAttribute("ammo-shape", "type: sphere; sphereRadius: 1; fit: manual;");
             rootShip.setAttribute("collision-filter", "group: ship; collidesWith: cannonball, terrain");
-            rootShip.setAttribute("globe-gravity", "ship: true;");
+            rootShip.setAttribute("globe-gravity", "ship: true; activeObject: true;");
             rootShip.setAttribute("ship-health", "");
             rootShip.setAttribute("ship-death", "");
             rootShip.setAttribute("cannonball-damage", "damage: 50;");
@@ -6986,7 +6989,7 @@
             } else if (physics) {
                 // physics ocean bottom
                 rootTerrain.setAttribute("has-terrain-tile-physics", "");
-                rootTerrain.setAttribute("collision-filter", "group: terrain; collidesWith: cannonball, ship, player-ship");
+                rootTerrain.setAttribute("collision-filter", "group: terrain; collidesWith: default");
                 rootTerrain.setAttribute("go-on-land", "");
             } else if (collidable) {
                 // physics land
@@ -7249,7 +7252,7 @@
             rootShip.setAttribute("ammo-body", "mass: 10; gravity: 0 0 0; emitCollisionEvents: true;");
             rootShip.setAttribute("ammo-shape", "type: sphere; sphereRadius: 1; fit: manual;");
             rootShip.setAttribute("collision-filter", "group: player-ship; collidesWith: terrain");
-            rootShip.setAttribute("globe-gravity", "ship: true;");
+            rootShip.setAttribute("globe-gravity", "ship: true; activeObject: true;");
             rootShip.setAttribute("globe-keyboard-controls", "enabled: true; fly: true");
             rootShip.setAttribute("ship-health", "");
             rootShip.setAttribute("ship-death", "");
