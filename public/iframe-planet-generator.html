@@ -3215,6 +3215,18 @@
                 wizard?.setAttribute("globe-nav-agent", `active: true; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
 
                 // set camera to start behind wizard facing moba target
+                for (const wizardOther of scene.systems['active-unit-marker'].wizards.slice(1)) {
+                    const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3).add(new THREE.Vector3().random().multiplyScalar(2).subScalar(1)), destination1.clone().negate());
+                    const m = findParentScene(this.el)?.systems['globe-nav'].getNavMesh();
+                    if (!m) {
+                        return;
+                    }
+                    const intersections = raycaster.intersectObject(m);
+                    if (intersections[0]) {
+                        const destination2 = intersections[0].point.clone();
+                        wizardOther?.setAttribute("globe-nav-agent", `active: true; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2;`);
+                    }
+                }
             },
         });
 
@@ -3768,7 +3780,7 @@
                 if (intersections[0]) {
                     const destination2 = intersections[0].point.clone();
                     if (wizardWalk) {
-                        this.el.emit("moba-move", destination2.clone());
+                        this.el.emit("moba-move", destination1.clone());
                     } else {
                         this.el.setAttribute("globe-nav-agent", `active: ${active}; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2; razeTarget: #${this.el.id};`);
                     }
@@ -4910,6 +4922,10 @@
 
         AFRAME.registerComponent('ghost-building', {
             schema: {
+                npcType: {
+                    type: "string",
+                    default: "",
+                },
                 maxNpcs: {
                     type: "number",
                     default: 10,
@@ -4929,7 +4945,7 @@
             tick: function (t, dt) {
                 const scene = this.el.sceneEl;
                 const npcEls = [
-                    ...scene.systems['active-unit-marker'].knights,
+                    ...(this.data.npcType === "WIZARD" ? scene.systems['active-unit-marker'].wizards : scene.systems['active-unit-marker'].knights),
                 ];
 
                 if (npcEls.length < this.data.maxNpcs && this.startTimer === null) {
@@ -4947,7 +4963,7 @@
                 const elapsedTime = time - this.startTimer;
                 if (elapsedTime >= this.data.timeBetweenSpawns) {
                     this.startTimer = null;
-                    const npc = addNpc();
+                    const npc = (this.data.npcType === "WIZARD" ? addWizardNpc() : addNpc());
                     npc.components['globe-nav-agent'].walkToDestination(new THREE.Vector3().copy(this.data.spawnPoint), true, false);
                     setTimeout(() => {
                         const scene = npc.sceneEl;
@@ -6899,7 +6915,14 @@
                 rootHouse.setAttribute("networked", `template: #${type.toLowerCase().replace("_", "-")}-template; attachTemplateToLocal: false;`);
                 if (type === "BLACKSMITH") {
                     rootHouse.setAttribute("ghost-building", {
+                        npcType: "WARRIOR",
                         maxNpcs: 20,
+                        timeBetweenSpawns: 10
+                    });
+                }if (type === "APOTHECARY") {
+                    rootHouse.setAttribute("ghost-building", {
+                        npcType: "WIZARD",
+                        maxNpcs: 4,
                         timeBetweenSpawns: 10
                     });
                 }
