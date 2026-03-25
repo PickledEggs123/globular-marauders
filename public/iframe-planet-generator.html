@@ -943,7 +943,11 @@
                 throw new Error("Failed to compute circumcircle");
             }
             deletePoint(point, closestGroup) {
-                const vertexIdx = this.vertices.findIndex(x => x.clone().normalize().dot(point.clone().normalize()) >= 0.99999);
+                const vertexIdxData = this.vertices.map((x, i) => [i, x.clone().normalize().dot(point.clone().normalize())]).filter(([,p]) => p >= 0.999);
+                const vertexIdx = vertexIdxData.reduce((acc, [i,p]) => p > acc[1] ? [i,p] : acc, [-1,-1])[0];
+                if (vertexIdx < 0) {
+                    throw new Error("Could not find vertex to delete");
+                }
                 const badFaces = closestGroup.faces.map((x) => [x, x.faceIndex]).filter(([x]) => x.a === vertexIdx || x.b === vertexIdx || x.c === vertexIdx);
                 if (badFaces.length > 300) {
                     throw new Error("Too many bad faces to remove one point");
@@ -1168,8 +1172,8 @@
             getOBBPoints(obb) {
                 const points = [];
                 const dirs = [];
-                for (let x = -1; x <= 1; x += 0.5) {
-                    for (let y = -1; y <= 1; y += 0.5) {
+                for (let x = -1; x <= 1.0001; x += 0.5) {
+                    for (let y = -1; y <= 1.0001; y += 0.5) {
                         const vv = new THREE.Vector3().set(x, y,  1);
                         dirs.push(vv);
                     }
@@ -1237,13 +1241,13 @@
                 }
 
                 // Get and log OBB points
-                const obbPoints = obbs.reduce((acc, obb) => [...acc, ...this.getOBBPoints(obb)], []);
+                const obbPoints = obbs.reduce((acc, obb) => [...acc, ...this.getOBBPoints(obb)], []).reverse();
                 const pp = obbPoints[0];
                 if (!pp) {
                     return;
                 }
 
-                // get closest group
+                // get the closest group
                 const [,closestGroup] = this.groups.reduce((acc, x) => {
                     const d = x.vertex.distanceTo(pp);
                     if (acc[0] > d) {
@@ -1267,6 +1271,8 @@
                     if (intersections[0]) {
                         const ip = intersections[0].point.clone();
                         this.deletePoint(ip, closestGroup);
+                    } else {
+                        this.deletePoint(p.clone(), closestGroup);
                     }
                 }
 
@@ -1330,7 +1336,7 @@
                     return;
                 }
 
-                // get closest group
+                // get the closest group
                 const [,closestGroup] = this.groups.reduce((acc, x) => {
                     const d = x.vertex.distanceTo(pp);
                     if (acc[0] > d) {
@@ -7038,9 +7044,11 @@
             update: function (oldData) {
                 if (this.data.enabled && !oldData.enabled) {
                     this.done = false;
+                    this.begin = false;
                 }
                 if (this.data.destroyed && !oldData.destroyed) {
                     this.done = false;
+                    this.begin = false;
                 }
             },
             tick: function () {
@@ -7067,16 +7075,15 @@
                     this.begin = true;
                 }
 
-                if (this.begin && this.data.enabled) {
-                    const scene = this.el.sceneEl;
-                    scene.systems['globe-nav'].insertGhostBuilding(this.el);
-
-                    this.done = true;
-                }
-
                 if (this.begin && this.data.destroyed) {
                     const scene = this.el.sceneEl;
                     scene.systems['globe-nav'].removeGhostBuilding(this.el);
+
+                    this.done = true;
+                }
+                if (this.begin && this.data.enabled) {
+                    const scene = this.el.sceneEl;
+                    scene.systems['globe-nav'].insertGhostBuilding(this.el);
 
                     this.done = true;
                 }
@@ -7130,6 +7137,13 @@
                     this.endTime = (t / 1000) + this.maxHeight;
                     this.begin = true;
                     this.active = true;
+
+                    if (this.reverse) {
+                        this.el.setAttribute("block-nav-mesh", {
+                            enabled: false,
+                            destroyed: true,
+                        });
+                    }
                 }
 
                 if (this.begin && this.active) {
@@ -7156,12 +7170,6 @@
                         this.el.setAttribute("block-nav-mesh", {
                             enabled: true,
                             destroyed: false,
-                        });
-                    }
-                    if (this.reverse) {
-                        this.el.setAttribute("block-nav-mesh", {
-                            enabled: false,
-                            destroyed: true,
                         });
                     }
 
