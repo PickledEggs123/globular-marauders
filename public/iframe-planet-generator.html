@@ -1351,9 +1351,9 @@
 
                 let spawnPoint = new THREE.Vector3(0, 0, 0);
 
-                // insert points into nav mesh
+                // get mesh intersections
+                const ips = [];
                 for (const p of obbPoints) {
-
                     const raycaster = new THREE.Raycaster(p.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), p.clone().negate());
                     const intersections = raycaster.intersectObjects([
                         scene.systems['globe-nav'].getNavMesh(),
@@ -1361,8 +1361,14 @@
                     ]);
                     if (intersections[0]) {
                         const ip = intersections[0].point.clone();
-                        this.insertPoint(ip, closestGroup);
+                        ips.push(ip);
+                    } else {
+                        return;
                     }
+                }
+                // insert points into nav mesh
+                for (const ip of ips) {
+                    this.insertPoint(ip, closestGroup);
                 }
 
                 // update spawn point
@@ -3577,12 +3583,16 @@
 
             insertGhostBuilding: function (el) {
                 if (!this.dynamicMap) {
-                    return;
+                    return false;
                 }
 
+                const ret = this.dynamicMap.insertMesh(el);
+                if (!ret) {
+                    return false;
+                }
                 const {
                     spawnPoint,
-                } = this.dynamicMap.insertMesh(el);
+                } = ret;
                 if (el.hasAttribute("ghost-building")) {
                     el.setAttribute("ghost-building", {
                         spawnPoint,
@@ -3590,6 +3600,7 @@
                 }
 
                 this.setNavMeshGeometry(null);
+                return true;
             },
 
             removeGhostBuilding: function (el) {
@@ -6255,7 +6266,7 @@
                 this.el.removeEventListener('dead', this.innerHandleDeath);
             },
             handleDeath: function () {
-                this.el.emit('sink');
+                this.el.emit('sink', true);
                 this.el.setAttribute("despawn", "");
             },
         });
@@ -7083,9 +7094,13 @@
                 }
                 if (this.begin && this.data.enabled) {
                     const scene = this.el.sceneEl;
-                    scene.systems['globe-nav'].insertGhostBuilding(this.el);
+                    const success = scene.systems['globe-nav'].insertGhostBuilding(this.el);
 
                     this.done = true;
+
+                    if (!success) {
+                        this.el.emit('sink', false);
+                    }
                 }
             },
         });
@@ -7103,13 +7118,16 @@
                 this.active = false;
                 this.maxHeight = -100;
                 this.reverse = false;
+                this.skipNavMeshDeletion = false;
                 this.innerSink = this.sink.bind(this);
                 this.el.addEventListener("sink", this.innerSink);
             },
             remove: function () {
                 this.el.removeEventListener("sink", this.innerSink);
             },
-            sink: function () {
+            sink: function (evt) {
+                const sinkWasSuccessInit = evt.detail;
+                this.skipNavMeshDeletion = !sinkWasSuccessInit;
                 this.done = false;
                 this.begin = false;
                 this.active = false;
@@ -7138,11 +7156,14 @@
                     this.begin = true;
                     this.active = true;
 
-                    if (this.reverse) {
+                    if (this.reverse && !this.skipNavMeshDeletion) {
                         this.el.setAttribute("block-nav-mesh", {
                             enabled: false,
                             destroyed: true,
                         });
+                    }
+                    if (this.reverse && this.skipNavMeshDeletion) {
+                        this.el.setAttribute("despawn", "");
                     }
                 }
 
@@ -7194,8 +7215,7 @@
             rootHouse.setAttribute("position", position);
             rootHouse.setAttribute("orthographic-camera-building", "");
             rootHouse.setAttribute("projected-texture__building", `image: /meshes/${toPascalCase(type).replace("_", "")}Projection.png; enabled: true`);
-            rootHouse.setAttribute("npc-faction", "ddd");
-            // TODO: REVERT TO PLAYER
+            rootHouse.setAttribute("npc-faction", "player");
             rootHouse.setAttribute("building-health", "");
             rootHouse.setAttribute("building-death", "");
             rootHouse.setAttribute("shadow", "");

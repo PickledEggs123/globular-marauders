@@ -1,6 +1,6 @@
 'use client';
 
-import React, {useContext, useEffect, useRef, useState} from "react";
+import React, {useCallback, useContext, useEffect, useRef, useState} from "react";
 import {
     AppBar, Button, Container,
     Drawer, FormControl, FormControlLabel,
@@ -54,16 +54,17 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
     const [email, setEmail] = useState("");
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
-    const [backgroundImage, setBackgroundImage] = useState("");
+    const [backgroundImage, setBackgroundImage] = useState(backgroundImages[0]);
 
+    const updateBackgroundImage = () => {
+        const a = backgroundImages;
+        const b = backgroundImage;
+        const index = a.indexOf(b) === -1 || a.indexOf(b) === a.length - 1 ? 0 : a.indexOf(b) + 1;
+        setBackgroundImage(backgroundImages[index]);
+    };
     useEffect(() => {
-        {
-            const index = Math.floor(Math.random() * backgroundImages.length);
-            setBackgroundImage(backgroundImages[index]);
-        }
         const interval = setInterval(() => {
-            const index = Math.floor(Math.random() * backgroundImages.length);
-            setBackgroundImage(backgroundImages[index]);
+            updateBackgroundImage();
         }, 10_000);
 
         return () => {
