@@ -7492,7 +7492,7 @@
                 const otherHouses = Array.from(document.querySelectorAll(".house"));
                 const otherHousePositions = otherHouses.map(x => new THREE.Vector3().copy(x.components['position'].data));
                 for (const otherHousePosition of otherHousePositions) {
-                    if (otherHousePosition.distanceTo(position) < 10) {
+                    if (otherHousePosition.distanceTo(position) < 15) {
                         continue;
                     }
                 }
