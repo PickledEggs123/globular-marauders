@@ -782,7 +782,8 @@
                  * @type {((function(): {v: *})|(function(): {v: *})|(function(): {v: *})|(function(): {v: *})|(function(): {v: *}))[]}
                  */
 
-                const computeCenterMaths = [() => {
+                const computeCenterMaths = [
+                () => {
                     const v1 = a.clone().normalize().sub(b.clone().normalize());
                     const v2 = a.clone().normalize().sub(c.clone().normalize());
                     const v = new THREE.Vector3().crossVectors(
@@ -842,7 +843,8 @@
                     return {
                         v,
                     };
-                }, () => {
+                },
+                () => {
                     const v1 = a.clone().sub(b.clone());
                     const v2 = a.clone().sub(c.clone());
                     const v = new THREE.Vector3().crossVectors(
@@ -924,7 +926,7 @@
                     const radius = center.clone().dot(a.clone().normalize());
                     const rb = center.clone().dot(b.clone().normalize());
                     const rc = center.clone().dot(c.clone().normalize());
-                    if (Math.abs(rb - radius) < 0.001 && Math.abs(rc - radius) < 0.001 && radius > 0) {
+                    if (Math.abs(rb - radius) < 0.0000001 && Math.abs(rc - radius) < 0.0000001 && radius > 0) {
                         console.assert("vertex a unchanged", this.vertices[face.a].length() >= 2);
                         console.assert("vertex b unchanged", this.vertices[face.b].length() >= 2);
                         console.assert("vertex c unchanged", this.vertices[face.c].length() >= 2);
@@ -933,7 +935,7 @@
                             radius,
                         };
                     } else {
-                        mathDump.push(`center and radius not aligned ${center.toString()} ${radius} ${rb} ${rc}`);
+                        mathDump.push(`center and radius not aligned ${center.x},${center.y},${center.z} ${radius} ${rb} ${rc}`);
                     }
                 }
 
@@ -949,9 +951,9 @@
                     throw new Error("Could not find vertex to delete");
                 }
                 const badFaces = closestGroup.faces.map((x) => [x, x.faceIndex]).filter(([x]) => x.a === vertexIdx || x.b === vertexIdx || x.c === vertexIdx);
-                if (badFaces.length > 300) {
-                    throw new Error("Too many bad faces to remove one point");
-                }
+                // if (badFaces.length > 300) {
+                //     throw new Error("Too many bad faces to remove one point");
+                // }
                 // if (badFaces.length === 0) {
                 //     throw new Error("Failed to find deleting faces, there should always be at least 1");
                 // }
@@ -1172,9 +1174,10 @@
             getOBBPoints(obb) {
                 const points = [];
                 const dirs = [];
-                for (let x = -1; x <= 1.0001; x += 0.5) {
-                    for (let y = -1; y <= 1.0001; y += 0.5) {
-                        const vv = new THREE.Vector3().set(x, y,  1);
+                // TODO: restore to 0.5
+                for (let x = -1; x <= 1.0001; x += 1) {
+                    for (let y = -1; y <= 1.0001; y += 1) {
+                        const vv = new THREE.Vector3().set(x, y, 1);
                         dirs.push(vv);
                     }
                 }
@@ -1214,7 +1217,7 @@
                     geometry.computeBoundingBox();
                 }
 
-                const obbs = meshes.map(mesh => {
+                const obbs = [meshes.map(mesh => {
                     const matrixWorld = new THREE.Matrix4().copy(mesh.matrixWorld);
                     const geometry = mesh.geometry;
                     const obb = new OBB();
@@ -1224,7 +1227,11 @@
                     obb.rotation.copy(new THREE.Matrix3().setFromMatrix4(matrixWorld));
 
                     return obb;
-                });
+                }).reduce((acc, x) => {
+                    const a = acc.halfSize.x * acc.halfSize.y * acc.halfSize.z;
+                    const b = x.halfSize.x * acc.halfSize.y * acc.halfSize.z;
+                    return b > a ? x : acc;
+                })];
                 for (const obb of obbs) {
                     const idx = this.obbs.findIndex(x => x.center.clone().normalize().dot(obb.center.clone().normalize()) > 0.99999);
                     if (idx >= 0) {
@@ -1308,7 +1315,7 @@
                     geometry.computeBoundingBox();
                 }
 
-                const obbs = meshes.map(mesh => {
+                const obbs = [meshes.map(mesh => {
                     const matrixWorld = new THREE.Matrix4().copy(mesh.matrixWorld);
                     const geometry = mesh.geometry;
                     const obb = new OBB();
@@ -1318,7 +1325,11 @@
                     obb.rotation.copy(new THREE.Matrix3().setFromMatrix4(matrixWorld));
 
                     return obb;
-                });
+                }).reduce((acc, x) => {
+                    const a = acc.halfSize.x * acc.halfSize.y * acc.halfSize.z;
+                    const b = x.halfSize.x * acc.halfSize.y * acc.halfSize.z;
+                    return b > a ? x : acc;
+                })];
                 this.obbs.push(...obbs);
                 for (const obb of obbs) {
                     for (const group of this.groups) {
@@ -1367,8 +1378,15 @@
                     }
                 }
                 // insert points into nav mesh
-                for (const ip of ips) {
-                    this.insertPoint(ip, closestGroup);
+                let alreadyInsertedIps = [];
+                try {
+                    for (const ip of ips) {
+                        this.insertPoint(ip, closestGroup);
+                        alreadyInsertedIps.push(ip);
+                    }
+                } catch (err) {
+                    const arr = Array.from(document.querySelectorAll(".house"));
+                    console.error(err.message, "house index", arr.indexOf(el));
                 }
 
                 // update spawn point
@@ -5070,6 +5088,7 @@
             schema: {},
             init: function () {
                 this.cameraPos = new THREE.Vector3();
+                this.terrain = new Map();
             },
             tick: function (t, dt) {
                 const cameraEl = document.querySelector("#camera-rig");
@@ -5080,26 +5099,47 @@
             getCameraPos: function () {
                 return this.cameraPos.clone();
             },
+            getTerrainTiles: function () {
+                return this.terrain;
+            },
         });
 
         AFRAME.registerComponent('terrain-tile', {
             schema: {
-                type: "string",
-                default: ""
+                position: {
+                    type: "string",
+                    default: ""
+                },
+                type: {
+                    oneOf: ['none', 'terrain', 'port'],
+                    default: 'none',
+                },
             },
             init: function () {
                 this.tilePos = null;
                 this.system = this.el.sceneEl.systems['terrain-tile'];
             },
             update: function (oldData) {
-                if (!this.data) {
+                if (oldData.type === "terrain" && this.data.type !== "terrain") {
+                    const m = this.system.getTerrainTiles();
+                    m.delete(this.el);
+                }
+                if (!this.data.position) {
                     this.tilePos = null;
+                    if (this.data.type === "terrain") {
+                        const m = this.system.getTerrainTiles();
+                        m.set(this.el, null);
+                    }
                     return;
                 }
                 let tilePos = new THREE.Vector3();
-                tilePos = tilePos.set.apply(tilePos, this.data.split(" "));
+                tilePos = tilePos.set.apply(tilePos, this.data.position.split(" "));
                 tilePos = tilePos.normalize();
                 this.tilePos = tilePos;
+                if (this.data.type === "terrain") {
+                    const m = this.system.getTerrainTiles();
+                    m.set(this.el, this.tilePos);
+                }
             },
             tick: function (t, dt) {
                 const data = this.tilePos;
@@ -6505,7 +6545,7 @@
                 rootGoldCoin.setAttribute("networked-ship-health", "");
                 rootGoldCoin.setAttribute("cannonball-collider", "");
                 rootGoldCoin.appendChild(dataEl);
-            } else if (charModelId === "WIZARD_TOWER" || charModelId === "WALL" || charModelId === "BLACKSMITH" || charModelId === "APOTHECARY") {
+            } else if (charModelId === "WIZARD_TOWER" || charModelId === "WALL" || charModelId === "BLACKSMITH" || charModelId === "APOTHECARY" || charModelId === "HOUSE" || charModelId === "TEMPLE" || charModelId === "PORT") {
                 const dataEl = document.createElement("a-entity");
                 dataEl.setAttribute("class", "data");
                 dataEl.setAttribute("scale", "1 1 1");
@@ -6514,10 +6554,12 @@
                 dataEl.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; memberMesh: ${memberMesh};`);
                 dataEl.setAttribute("shadow", "");
                 rootGoldCoin.appendChild(dataEl);
-                rootGoldCoin.setAttribute("block-nav-mesh", {
-                    enabled: false,
-                    destroyed: false,
-                });
+                if (charModelId !== "PORT") {
+                    rootGoldCoin.setAttribute("block-nav-mesh", {
+                        enabled: false,
+                        destroyed: false,
+                    });
+                }
                 rootGoldCoin.setAttribute("npc-faction", "other-players");
                 rootGoldCoin.setAttribute("npc-finder", "active: false;");
                 rootGoldCoin.setAttribute("networked-building-health", "");
@@ -6627,7 +6669,7 @@
                             ]
                         });
                     }
-                } else if (charModelId === "WIZARD_TOWER" || charModelId === "WALL" || charModelId === "BLACKSMITH" || charModelId === "APOTHECARY") {
+                } else if (charModelId === "WIZARD_TOWER" || charModelId === "WALL" || charModelId === "BLACKSMITH" || charModelId === "APOTHECARY" || charModelId === "HOUSE" || charModelId === "TEMPLE" || charModelId === "PORT") {
                     if (!NAF.schemas.hasTemplate(`#${templateId}`)) {
                         NAF.schemas.add({
                             template: `#${templateId}`,
@@ -6918,7 +6960,10 @@
             const entity = document.createElement("a-entity");
             entity.setAttribute("class", "pirate-ship-spawn");
             entity.setAttribute("building-id", "");
-            entity.setAttribute("terrain-tile", `${point[0]} ${point[1]} ${point[2]}`);
+            entity.setAttribute("terrain-tile", {
+                position: `${point[0]} ${point[1]} ${point[2]}`,
+                type: 'port',
+            });
             entity.setAttribute("position", `${point[0]} ${point[1]} ${point[2]}`);
             entity.setAttribute("pirate-port", "");
             terrain.appendChild(entity);
@@ -7171,7 +7216,15 @@
                     if (!this.reverse) {
                         const l = THREE.MathUtils.mapLinear(t / 1000, this.startTime, this.endTime, -this.maxHeight, 0);
                         const c = THREE.MathUtils.clamp(l, -this.maxHeight, 0);
+                        const parent = this.el.object3D.parent;
+                        if (parent) {
+                            const scene = this.el.sceneEl.object3D;
+                            scene.attach(this.el.object3D);
+                        }
                         this.el.object3D.position.copy(this.data.position).add(new THREE.Vector3().copy(this.data.position).normalize().multiplyScalar(c));
+                        if (parent) {
+                            parent.attach(this.el.object3D);
+                        }
                         if (c >= 0) {
                             this.active = false;
                         }
@@ -7179,7 +7232,15 @@
                     if (this.reverse) {
                         const l = THREE.MathUtils.mapLinear(t / 1000, this.startTime, this.endTime, 0, -this.maxHeight);
                         const c = THREE.MathUtils.clamp(l, -this.maxHeight, 0);
+                        const parent = this.el.object3D.parent;
+                        if (parent) {
+                            const scene = this.el.sceneEl.object3D;
+                            scene.attach(this.el.object3D);
+                        }
                         this.el.object3D.position.copy(this.data.position).add(new THREE.Vector3().copy(this.data.position).normalize().multiplyScalar(c));
+                        if (parent) {
+                            parent.attach(this.el.object3D);
+                        }
                         if (c <= -this.maxHeight) {
                             this.active = false;
                         }
@@ -7333,7 +7394,10 @@
             rootTerrain.addEventListener("model-loaded", buildBoundsTree);
             rootTerrain.setAttribute("position", "0 0 0");
             rootTerrain.setAttribute("shadow", "");
-            rootTerrain.setAttribute("terrain-tile", (vertex ?? []).join(" "));
+            rootTerrain.setAttribute("terrain-tile", {
+                position: (vertex ?? []).join(" "),
+                type: 'terrain',
+            });
             if (oceanNavmesh) {
                 // ocean nav mesh
                 rootTerrain.setAttribute("go-to-sea", "");
@@ -7411,77 +7475,93 @@
 
         }
 
+        /**
+         * A list of houses to generate when there is a host or new host,
+         * the reason for this list is that now houses are a type of NPC, but they look like buildings
+         *
+         * They are networked over the websocket connection.
+         * @type {*[]}
+         */
+        const houseList = [];
+        function spawnHouses() {
+            for (const house of houseList) {
+                const {
+                    type, point, lookAt
+                } = house;
+                const position = new THREE.Vector3(point[0], point[1], point[2]);
+                const otherHouses = Array.from(document.querySelectorAll(".house"));
+                const otherHousePositions = otherHouses.map(x => new THREE.Vector3().copy(x.components['position'].data));
+                for (const otherHousePosition of otherHousePositions) {
+                    if (otherHousePosition.distanceTo(position) < 10) {
+                        continue;
+                    }
+                }
+
+                const rootHouse = document.createElement("a-entity");
+                rootHouse.setAttribute("class", "house");
+                rootHouse.setAttribute("position", `${point[0]} ${point[1]} ${point[2]}`);
+                // rootHouse.setAttribute("building", type.toString().toLowerCase());
+                rootHouse.setAttribute("npc-faction", "native");
+                rootHouse.setAttribute("building-health", "");
+                rootHouse.setAttribute("building-death", "");
+                rootHouse.setAttribute("shadow", "");
+
+                const str = characterModels.get(type).split("|")[0];
+                if (type !== "PORT") {
+                    rootHouse.setAttribute("rise-out-of-ground", {
+                        position,
+                    });
+                    // rootHouse.setAttribute("block-nav-mesh", {
+                    //     enabled: false,
+                    //     destroyed: false,
+                    // });
+                }
+
+                const rootModel = document.createElement("a-entity");
+                rootModel.setAttribute("class", "data");
+                getBuildingLodHash(str, 1000, "auto");
+                rootModel.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; capacity: 1000; memberMesh: true; ghostBuilding: true;`);
+                rootModel.setAttribute("scale", "1 1 1");
+                rootModel.setAttribute("rotation", "-90 0 0");
+                rootModel.setAttribute("position", "0 0 0");
+                rootHouse.appendChild(rootModel);
+                rootHouse.setAttribute("networked", `template: #${type.toLowerCase().replace("_", "-")}-template; attachTemplateToLocal: false;`);
+                if (type === "PORT") {
+                    rootModel.setAttribute("scale", "0.1 0.1 0.1");
+                    rootModel.setAttribute("rotation", "90 0 0");
+                    rootModel.setAttribute("position", "0 -1.35 -0.5");
+                } else {
+                    rootModel.setAttribute("scale", "1 1 1");
+                    rootModel.setAttribute("rotation", "90 0 0");
+                    rootModel.setAttribute("position", "0 0 0");
+                }
+
+                rootHouse.object3D.up = new THREE.Vector3(point[0], point[1], point[2]).normalize();
+                rootHouse.object3D.lookAt(new THREE.Vector3(lookAt[0], lookAt[1], lookAt[2]));
+
+                const scene = document.querySelector("a-scene");
+                const terrainTile = Array.from(scene.systems['terrain-tile'].getTerrainTiles().entries()).reduce(([acc, dist], [el, pos]) => {
+                    if (!pos) {
+                        return [acc, dist];
+                    }
+                    const d = new THREE.Vector3().copy(pos).dot(new THREE.Vector3().copy(rootHouse.components['position'].data).normalize());
+                    if (d > dist) {
+                        return [el, d];
+                    }
+                    return [acc, dist];
+                }, [null, -1])[0];
+                terrainTile.appendChild(rootHouse);
+            }
+        }
+
         function addHouse(item) {
             const {
                 type, point, lookAt
             } = JSON.parse(item);
 
-            const rootHouse = document.createElement("a-entity");
-            rootHouse.setAttribute("class", "house");
-            rootHouse.setAttribute("position", `${point[0]} ${point[1]} ${point[2]}`);
-            rootHouse.setAttribute("terrain-tile", "");
-            rootHouse.setAttribute("building", type.toString().toLowerCase());
-
-            const rootModel = document.createElement("a-entity");
-            rootModel.setAttribute("globe-lod", characterModels.get(type));
-            if (type === "PORT") {
-                rootModel.setAttribute("scale", "0.1 0.1 0.1");
-                rootModel.setAttribute("rotation", "90 0 0");
-                rootModel.setAttribute("position", "0 -1.35 -0.5");
-            } else {
-                rootModel.setAttribute("scale", "1 1 1");
-                rootModel.setAttribute("rotation", "90 0 0");
-                rootModel.setAttribute("position", "0 0 0");
-            }
-            rootModel.components.scale.update({x: 1, y: 1, z: 1});
-            rootModel.components.rotation.update({x: 0, y: 0, z: 0});
-            rootModel.components.position.update({x: 0, y: 0, z: 0});
-            rootModel.object3D.updateMatrix();
-            rootHouse.appendChild(rootModel);
-
-            const lod0 = document.createElement("a-entity");
-            lod0.setAttribute("class", `lod0 clickable${type === "PORT" ? " port" : ""}`);
-            if (type !== "PORT") {
-                lod0.setAttribute("go-on-land", "raze: true");
-                lod0.setAttribute("spawn-gold", "");
-                lod0.setAttribute("set-building-id", "");
-            }
-            lod0.setAttribute("shadow", "");
-            rootModel.appendChild(lod0);
-
-            const lod1 = document.createElement("a-entity");
-            lod1.setAttribute("class", `lod1 clickable${type === "PORT" ? " port" : ""}`);
-            if (type !== "PORT") {
-                lod1.setAttribute("go-on-land", "raze: true");
-                lod1.setAttribute("spawn-gold", "");
-                lod1.setAttribute("set-building-id", "");
-            }
-            lod1.setAttribute("shadow", "");
-            rootModel.appendChild(lod1);
-
-            const lod2 = document.createElement("a-entity");
-            lod2.setAttribute("class", `lod2 clickable${type === "PORT" ? " port" : ""}`);
-            if (type !== "PORT") {
-                lod2.setAttribute("go-on-land", "raze: true");
-                lod2.setAttribute("spawn-gold", "");
-                lod2.setAttribute("set-building-id", "");
-            }
-            lod2.setAttribute("shadow", "");
-            rootModel.appendChild(lod2);
-
-            const scene = document.querySelector("a-scene");
-            const terrainFolder = scene.querySelector("#terrain");
-            terrainFolder.appendChild(rootHouse);
-
-            rootHouse.object3D.up = new THREE.Vector3(point[0], point[1], point[2]).normalize();
-            rootHouse.object3D.lookAt(new THREE.Vector3(lookAt[0], lookAt[1], lookAt[2]));
-            rootHouse.components.position.update({x: 0, y: 0, z: 0});
-            rootHouse.object3D.updateMatrix();
-            rootHouse.object3D.updateWorldMatrix(false, true);
-            rootHouse.object3D.matrixAutoUpdate = false;
-            rootHouse.object3D.matrixWorldAutoUpdate = false;
-            rootModel.object3D.matrixAutoUpdate = false;
-            rootModel.object3D.matrixWorldAutoUpdate = false;
+            houseList.push({
+                type, point, lookAt
+            });
         }
 
         function addCannonballFire(el) {
@@ -7671,6 +7751,7 @@
             if (!window.didSpawnNpcsFlag) {
                 window.spawnNpcsFlag = true;
                 window.didSpawnNpcsFlag = true;
+                spawnHouses();
             }
         }
 

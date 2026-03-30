@@ -81,15 +81,15 @@ export const PlanetGenerator = () => {
             });
         });
 
-        const buildingTypeMap: Record<string, string[]> = {
-            PORT: [dataUris[0], dataUris[1], dataUris[2]],
-            HOUSE: [dataUris[3], dataUris[4], dataUris[5]],
-            TEMPLE: [dataUris[6], dataUris[7], dataUris[8]]
-        };
+        // const buildingTypeMap: Record<string, string[]> = {
+        //     PORT: [dataUris[0], dataUris[1], dataUris[2]],
+        //     HOUSE: [dataUris[3], dataUris[4], dataUris[5]],
+        //     TEMPLE: [dataUris[6], dataUris[7], dataUris[8]]
+        // };
 
-        Object.entries(buildingTypeMap).forEach(([type, uris]) => {
-            addCharacterModel(iframe, type, uris.join("|"), false);
-        });
+        // Object.entries(buildingTypeMap).forEach(([type, uris]) => {
+        //     addCharacterModel(iframe, type, uris.join("|"), false);
+        // });
 
         houseArray.forEach(house => {
             // @ts-ignore
@@ -149,6 +149,9 @@ export const PlanetGenerator = () => {
         context.gameData = data;
 
         const staticMeshPaths = [
+            "/meshes/Model_Redo/Port/Port.glb",
+            "/meshes/Model_Redo/House/House.glb",
+            "/meshes/Model_Redo/Temple/Temple.glb",
             "/meshes/Apothecary.glb",
             "/meshes/Blacksmith.glb",
             "/meshes/Wall.glb",
@@ -220,6 +223,9 @@ export const PlanetGenerator = () => {
             }
 
             const warriorDataUri = gltf[gltf.length - 7] as string;
+            addCharacterModel(iframeRef.current, "PORT", new Array(3).fill(gltf[gltf.length - 30] as string).join("|"), true);
+            addCharacterModel(iframeRef.current, "HOUSE", new Array(3).fill(gltf[gltf.length - 29] as string).join("|"), true);
+            addCharacterModel(iframeRef.current, "TEMPLE", new Array(3).fill(gltf[gltf.length - 28] as string).join("|"), true);
             addCharacterModel(iframeRef.current, "APOTHECARY", new Array(3).fill(gltf[gltf.length - 27] as string).join("|"), true);
             addCharacterModel(iframeRef.current, "BLACKSMITH", new Array(3).fill(gltf[gltf.length - 26] as string).join("|"), true);
             addCharacterModel(iframeRef.current, "WALL", new Array(3).fill(gltf[gltf.length - 25] as string).join("|"), true);
