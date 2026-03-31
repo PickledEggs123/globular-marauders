@@ -68,6 +68,7 @@ export async function UPGRADE(
     client: any,
     server: any,
 ) {
+    console.log("WS Getting Headers");
     await headers();
 
 
@@ -77,6 +78,7 @@ export async function UPGRADE(
 
 
     // connect to Redis
+    console.log("WS connect to Redis");
     let pub: any, sub: any;
     try {
         pub = createClient({
