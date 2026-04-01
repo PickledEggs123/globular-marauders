@@ -724,6 +724,9 @@
 
                 // create obbs
                 this.obbs = [];
+
+                this.innerUpdateNavMesh = debounce(this.updateNavMesh.bind(this), 500);
+                this.innerUpdateEntireNavMesh = debounce(this.updateEntireNavMesh.bind(this), 500);
             }
             makeFaceObject(i, newFace = false) {
                 const a = this.indices[i];
@@ -1272,7 +1275,6 @@
                         const raycaster = new THREE.Raycaster(p.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), p.clone().negate());
                         const intersections = raycaster.intersectObjects([
                             scene.systems['globe-nav'].getNavMesh(),
-                            scene.systems['globe-ocean-nav'].getNavMesh(),
                         ]);
                         if (intersections[0]) {
                             const ip = intersections[0].point.clone();
@@ -1294,7 +1296,21 @@
                     this.faces[i].newFace = false;
                 }
 
+                this.innerUpdateNavMesh();
+            }
+            updateNavMesh() {
+                const scene = this.sceneEl;
+                if (!scene) {
+                    return;
+                }
                 scene.systems['globe-nav'].setNavMeshGeometry(this.getGeometry(true));
+            }
+            updateEntireNavMesh() {
+                const scene = this.sceneEl;
+                if (!scene) {
+                    return;
+                }
+                scene.systems['globe-nav'].setNavMeshGeometry(null);
             }
             insertMesh(el) {
                 const scene = this.sceneEl;
@@ -1362,7 +1378,6 @@
                     const raycaster = new THREE.Raycaster(p.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), p.clone().negate());
                     const intersections = raycaster.intersectObjects([
                         scene.systems['globe-nav'].getNavMesh(),
-                        scene.systems['globe-ocean-nav'].getNavMesh(),
                     ]);
                     if (intersections[0]) {
                         const ip = intersections[0].point.clone();
@@ -1418,7 +1433,7 @@
                     this.faces[i].newFace = false;
                 }
 
-                scene.systems['globe-nav'].setNavMeshGeometry(this.getGeometry(true));
+                this.innerUpdateNavMesh();
 
                 return {
                     spawnPoint,
@@ -3530,7 +3545,13 @@
              * @param {THREE.Geometry} geometry
              */
             setNavMeshGeometry: function (geometry) {
+                if (this.navMesh?.geometry.boundsTree) {
+                    this.navMesh.geometry.disposeBoundsTree();
+                }
                 this.navMesh = new THREE.Mesh(geometry);
+                if (!this.navMesh.geometry.boundsTree) {
+                    this.navMesh.geometry.computeBoundsTree();
+                }
             },
 
             /**
@@ -3620,7 +3641,7 @@
                     });
                 }
 
-                this.setNavMeshGeometry(null);
+                this.dynamicMap.innerUpdateEntireNavMesh();
                 return true;
             },
 
@@ -3631,7 +3652,7 @@
 
                 this.dynamicMap.removeMesh(el);
 
-                this.setNavMeshGeometry(null);
+                this.dynamicMap.innerUpdateEntireNavMesh();
             },
 
             /**
@@ -3677,7 +3698,13 @@
                     geometry = this.dynamicMap.getGeometry();
                 }
 
+                if (this.navMesh?.geometry.boundsTree) {
+                    this.navMesh.geometry.disposeBoundsTree();
+                }
                 this.navMesh = new THREE.Mesh(geometry);
+                if (!this.navMesh.geometry.boundsTree) {
+                    this.navMesh.geometry.computeBoundsTree();
+                }
                 geometry = geometry.clone();
                 pathfinder.setZoneData(ZONE, threePathfinding.Pathfinding.createZone(geometry));
                 Array.from(this.agents).forEach((agent) => agent.updateNavLocation());
@@ -4100,7 +4127,13 @@
              * @param {THREE.Geometry} geometry
              */
             setNavMeshGeometry: function (geometry) {
+                if (this.navMesh?.geometry.boundsTree) {
+                    this.navMesh.geometry.disposeBoundsTree();
+                }
                 this.navMesh = new THREE.Mesh(geometry);
+                if (!this.navMesh.geometry.boundsTree) {
+                    this.navMesh.geometry.computeBoundsTree();
+                }
                 oceanPathfinder.setZoneData(ZONE, threePathfinding.Pathfinding.createZone(geometry));
                 Array.from(this.agents).forEach((agent) => agent.updateNavLocation());
             },
