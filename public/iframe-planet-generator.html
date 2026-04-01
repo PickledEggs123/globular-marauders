@@ -7818,6 +7818,7 @@
             NAF.connection.subscribeToDataChannel('isHost', function (sender, dataType, data, targetId) {
                 const hostSpanEle = document.getElementById("host-span");
                 hostSpanEle.textContent = "HOST";
+                console.log("IS HOST NOW");
                 spawnNpcsNow();
             });
 
