@@ -7487,6 +7487,8 @@
          */
         const houseList = [];
         function spawnHouses() {
+            console.log("SPAWNING HOUSES");
+
             for (const house of houseList) {
                 const {
                     type, point, lookAt
@@ -7759,7 +7761,10 @@
             if (!window.didSpawnNpcsFlag) {
                 window.spawnNpcsFlag = true;
                 window.didSpawnNpcsFlag = true;
-                spawnHouses();
+                const hostSpanEle = document.getElementById("host-span");
+                if (hostSpanEle.textContent === "HOST") {
+                    spawnHouses();
+                }
             }
         }
 
