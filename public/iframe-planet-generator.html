@@ -2385,9 +2385,10 @@
                 const object3D = this.el.object3D;
                 const trueUpDistance = object3D.getWorldPosition(new THREE.Vector3());
                 const trueUp = trueUpDistance.clone().normalize();
-                const currentUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
-                const currentForward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
-                const currentRight = new THREE.Vector3(1, 0, 0).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
+                const worldQuaternion = this.el.object3D.getWorldQuaternion(new THREE.Quaternion());
+                const currentUp = new THREE.Vector3(0, 1, 0).applyQuaternion(worldQuaternion);
+                const currentForward = new THREE.Vector3(0, 0, -1).applyQuaternion(worldQuaternion);
+                const currentRight = new THREE.Vector3(1, 0, 0).applyQuaternion(worldQuaternion);
                 const diffUp = trueUp.clone().sub(currentUp.clone());
 
                 // apply gravity force
@@ -5186,9 +5187,10 @@
                 const tilePos = data;
                 const cameraPos = this.system.getCameraPos();
                 const cos45 = Math.acos(Math.PI / 4);
-                if (cameraPos.dot(tilePos) > cos45) {
+                if (cameraPos.dot(tilePos) > cos45 && this.el.object3D.visible === false) {
                     this.el.setAttribute("visible", "true");
-                } else {
+                }
+                if (cameraPos.dot(tilePos) <= cos45 && this.el.object3D.visible === true) {
                     this.el.setAttribute("visible", "false");
                 }
 
