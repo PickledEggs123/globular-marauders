@@ -3563,6 +3563,33 @@
             },
         });
 
+        AFRAME.registerComponent('model-loaded-bvh', {
+            schema: {},
+            init: function () {
+                const updateTerrainWithGrass = () => {
+                    const meshes = [];
+                    this.el.object3D.traverse((node) => {
+                        if (node.isMesh) {
+                            meshes.push(node);
+                        }
+                    });
+                    for (const mesh of meshes) {
+                        if (!mesh.geometry.boundsTree) {
+                            mesh.geometry.computeBoundsTree();
+                        }
+                    }
+                };
+                const grassMesh = this.el;
+                if (grassMesh.getObject3D("mesh")) {
+                    updateTerrainWithGrass();
+                } else {
+                    grassMesh.addEventListener("model-loaded", () => {
+                        updateTerrainWithGrass();
+                    });
+                }
+            }
+        })
+
         AFRAME.registerComponent('globe-nav-projected-mesh', {
             schema: {
                 nodeName: {type: 'string'}
@@ -4945,6 +4972,7 @@
                     const randomPoints = getRandomPointsOnMesh(mesh, this.data.origin, 16);
 
                     const updateTerrainWithGrass = () => {
+                        const particles = [];
                         for (const {point, normal} of randomPoints) {
                             const particle = document.createElement('a-entity');
                             particle.setAttribute('class', 'tree');
@@ -4962,7 +4990,17 @@
                             particle.components.position.update({x: 0, y: 0, z: 0});
                             particle.object3D.updateMatrix();
                             this.system.registerTree(this.el, particle);
+                            particles.push(particle);
                         }
+                        this.el.object3D.parent.matrixWorldAutoUpdate = true;
+                        this.el.object3D.matrixWorldAutoUpdate = true;
+                        this.el.object3D.updateWorldMatrix(false, true);
+                        for (const particle of particles) {
+                            particle.object3D.matrixAutoUpdate = false;
+                            particle.object3D.matrixWorldAutoUpdate = false;
+                        }
+                        this.el.object3D.matrixWorldAutoUpdate = false;
+                        this.el.object3D.parent.matrixWorldAutoUpdate = false;
                     };
                     const treeMesh = document.querySelector("#tree-mesh");
                     if (treeMesh.getObject3D("mesh")) {
@@ -7263,6 +7301,7 @@
                         if (parent) {
                             parent.attach(this.el.object3D);
                         }
+                        this.el.object3D.updateWorldMatrix(false, true);
                         if (c >= 0) {
                             this.active = false;
                         }
@@ -7279,6 +7318,7 @@
                         if (parent) {
                             parent.attach(this.el.object3D);
                         }
+                        this.el.object3D.updateWorldMatrix(false, true);
                         if (c <= -this.maxHeight) {
                             this.active = false;
                         }
@@ -7472,6 +7512,12 @@
             init: function () {
                 this.el.object3D.matrixAutoUpdate = false;
                 this.el.object3D.matrixWorldAutoUpdate = false;
+                this.el.object3D.updateMatrixWorld = function () { /* no op */ }
+            },
+            tick: function () {
+                this.el.object3D.matrixAutoUpdate = false;
+                this.el.object3D.matrixWorldAutoUpdate = false;
+                this.el.object3D.updateMatrixWorld = function () { /* no op */ }
             },
         });
 
@@ -9291,8 +9337,8 @@
             <a-entity id="demo-node-position" position="0 0 -5"></a-entity>
         </a-entity>
         <a-entity id="terrain" terrain-folder-optimization></a-entity>
-        <a-entity id="grass-mesh" gltf-model="/meshes/Model_Redo/Grass/Grass.glb" instanced-mesh="capacity: 20480; positioning: world;"></a-entity>
-        <a-entity id="tree-mesh" gltf-model="/meshes/Model_Redo/stylished_fir/Tree.glb" instanced-mesh="capacity: 2048; positioning: world;"></a-entity>
+        <a-entity id="grass-mesh" gltf-model="/meshes/Model_Redo/Grass/Grass.glb" model-loaded-bvh instanced-mesh="capacity: 20480; positioning: world;"></a-entity>
+        <a-entity id="tree-mesh" gltf-model="/meshes/Model_Redo/stylished_fir/Tree.glb" model-loaded-bvh instanced-mesh="capacity: 2048; positioning: world;"></a-entity>
         <a-entity id="camera-rig" position="0 105 5" networked="template: #avatar-template; attachTemplateToLocal: false;">
             <a-entity camera globe-look-controls="mouseEnabled: false; touchEnabled: false;" position="0 1.6 0" cursor-updater cursor="rayOrigin: mouse" raycaster="far: 50; interval: 100; objects: .clickable">
                 <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
