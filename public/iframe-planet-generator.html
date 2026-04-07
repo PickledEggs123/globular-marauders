@@ -4612,11 +4612,27 @@
                 this.currentIndicator = null;
                 this.dataEntity = null;
                 this.setNpcIndicator = (e) => {
-                    const p = e.detail;
+                    const destination1 = e.detail?.point;
+                    const immediate = e.detail?.immediate;
+                    const self = e.detail?.self;
                     if (!this.currentIndicator) {
-                        this.createIndicator(p);
+                        this.createIndicator(destination1);
                     }
-                    this.updateIndicator(p);
+                    this.updateIndicator(destination1);
+
+                    if (immediate) {
+                        self.walkToDestination(destination1, true, true);
+                    } else {
+                        setTimeout(() => {
+                            self.walkToDestination(destination1, false, false);
+                        }, 500);
+                        setTimeout(() => {
+                            self.walkToDestination(destination1, true, false);
+                        }, 750);
+                        setTimeout(() => {
+                            self.walkToDestination(destination1, true, true);
+                        }, 1000);
+                    }
                 };
                 this.clearNpcIndicator = () => {
                     this.removeIndicator();
@@ -4713,22 +4729,19 @@
                         }
 
                         if (addedNpcs) {
-
-                            setTimeout(() => {
-                                self.walkToDestination(destination1, false, false);
-                            }, 500);
-                            setTimeout(() => {
-                                self.walkToDestination(destination1, true, false);
-                            }, 750);
-                            setTimeout(() => {
-                                self.walkToDestination(destination1, true, true);
-                                scene.emit("clear-ship-indicator");
-                                scene.emit("set-npc-indicator", destination1.clone());
-                            }, 1000);
-                        } else {
-                            self.walkToDestination(destination1, true, true);
                             scene.emit("clear-ship-indicator");
-                            scene.emit("set-npc-indicator", destination1.clone());
+                            scene.emit("set-npc-indicator", {
+                                point: destination1.clone(),
+                                immediate: false,
+                                self,
+                            });
+                        } else {
+                            scene.emit("clear-ship-indicator");
+                            scene.emit("set-npc-indicator", {
+                                point: destination1.clone(),
+                                immediate: true,
+                                self,
+                            });
 
                             const buildMenuState = document.querySelector("#build-menu-state");
                             if (buildMenuState.hasAttribute("wizard-tower-build")) {
@@ -7603,7 +7616,7 @@
                 const otherHousePositions = otherHouses.map(x => new THREE.Vector3().copy(x.components['position'].data));
                 let skipHouse = false;
                 for (const otherHousePosition of otherHousePositions) {
-                    if (otherHousePosition.distanceTo(position) < 2) {
+                    if (otherHousePosition.distanceTo(position) < 3) {
                         skipHouse = true;
                         break;
                     }
