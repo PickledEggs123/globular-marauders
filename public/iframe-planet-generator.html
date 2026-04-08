@@ -4584,9 +4584,6 @@
                     arr.splice(idx, 1);
                 }
             },
-            getNpcIndicatorGroups: function () {
-                return this.npcIndicatorGroups;
-            },
             setActiveNpcIndicator: function (el) {
                 const idx = this.npcIndicatorGroups.indexOf(el);
                 if (idx >= 0) {
@@ -4632,6 +4629,10 @@
                     }
                     this.updateIndicator(destination1);
 
+                    if (this.system.activeNpcIndicator !== this) {
+                        return;
+                    }
+
                     if (immediate) {
                         self.walkToDestination(destination1, true, true);
                     } else {
@@ -4674,7 +4675,7 @@
             schema: {
             },
             multiple: true,
-            tick: function (t, dt) {
+            tick: function (t) {
                 if (this.currentIndicator) {
                     const cameraEl = document.querySelector("#camera-rig");
                     let cameraPos = cameraEl.object3D.getWorldPosition(new THREE.Vector3());
@@ -4685,6 +4686,17 @@
                 if (this.dataEntity) {
                     this.dataEntity.object3D.rotation.set(0, Math.PI / 2, 0, 'YXZ');
                     this.dataEntity.object3D.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), (Math.PI * t / 1000) % (Math.PI * 2)));
+                }
+                if (!NpcGroupDictionary.instance.data.has(this.groupId)) {
+                    if (this.system.activeNpcIndicator === this) {
+                        this.system.activeNpcIndicator = this.system.npcIndicatorGroups[0] ?? null;
+                    }
+                    Array.from(document.querySelectorAll("[ghost-building]")).map(el => el.components['ghost-building']).forEach(c => {
+                        if (c.currentSpawnIndicator === this) {
+                            c.currentSpawnIndicator = null;
+                        }
+                    });
+                    this.el.removeAttribute(`draw-npc-indicator__${this.groupId}`);
                 }
             },
             updateIndicator: function (p) {
@@ -4823,7 +4835,7 @@
                         let removedNpcs = false;
                         const npcs = document.querySelectorAll(`.${unitMap.get(scene.components['coin-purse'].activeUnit)}`);
                         if (npcs.length !== 0) {
-                            removeNpc();
+                            removeNpcs();
                             removedNpcs = true;
                         }
 
@@ -5386,16 +5398,17 @@
             init: function () {
                 this.startTimer = null;
                 this.npcMarkerId = null;
+                this.currentSpawnIndicator = null;
             },
             tick: function (t) {
                 if (!this.data.npcType || new THREE.Vector3().copy(this.data.spawnPoint).length() === 0) {
                     return;
                 }
-                if (!this.npcMarkerId) {
+                if (!this.npcMarkerId || !NpcGroupDictionary.instance.data.has(this.npcMarkerId)) {
                     this.npcMarkerId = NpcGroupDictionary.instance.addNpcMarkerData({knights: [], wizards: []});
                 }
 
-                const npcElsData = NpcGroupDictionary.instance.data.get(this.npcMarkerId);
+                const npcElsData = NpcGroupDictionary.instance.data.get(this.npcMarkerId) ?? {wizards: [], knights: []};
                 const npcEls = [
                     ...(this.data.npcType === "WIZARD" ? npcElsData.wizards : npcElsData.knights),
                 ];
@@ -5417,16 +5430,20 @@
                     this.startTimer = null;
                     const npc = this.data.npcType === "WIZARD" ? addWizardNpc() : addNpc();
                     NpcGroupDictionary.instance.addNpc(this.npcMarkerId, npc);
-                    npc.components['globe-nav-agent'].walkToDestination(new THREE.Vector3().copy(this.data.spawnPoint), true, false);
+                    const spawnPoint = new THREE.Vector3().copy(this.data.spawnPoint);
+                    npc.components['globe-nav-agent'].walkToDestination(spawnPoint, true, false);
                     setTimeout(() => {
                         const scene = npc.sceneEl;
-                        const npcDestinationIndicator = scene.systems['draw-npc-indicator'].activeNpcIndicator;
-                        const p = npcDestinationIndicator?.currentIndicator?.object3D.position.clone();
-                        if (!p) {
-                            return;
+                        if (!this.currentSpawnIndicator && this.npcMarkerId) {
+                            const groupId = this.npcMarkerId;
+                            scene.setAttribute(`draw-npc-indicator__${groupId}`, "");
+                            this.currentSpawnIndicator = scene.components[`draw-npc-indicator__${groupId}`];
+                            scene.components[`draw-npc-indicator__${groupId}`].groupId = groupId;
                         }
-
-                        npc.components['globe-nav-agent'].walkToDestination(p, true, false);
+                        const self = document.querySelector("[go-on-land]")?.components['go-on-land'];
+                        if (self) {
+                            this.currentSpawnIndicator.setNpcIndicator({detail: { point: spawnPoint, immediate: true, self }});
+                        }
                     }, 500);
                 }
             }
@@ -7214,12 +7231,13 @@
             return rootNpc;
         }
 
-        function removeNpc() {
+        function removeNpcs() {
             const scene = document.querySelector("a-scene");
-            const arr = Array.from(document.querySelectorAll(`.${unitMap.get(scene.components['coin-purse'].activeUnit)}`));
-            arr.forEach(a => scene.removeChild(a));
-            const arr2 = Array.from(document.querySelectorAll(`.${unitMap.get(scene.components['coin-purse'].activeUnit)}-wizard`));
-            arr2.forEach(a => scene.removeChild(a));
+
+            const arr = (NpcGroupDictionary.instance.data.get(scene.systems['draw-npc-indicator'].activeNpcIndicator?.groupId ?? "")?.knights ?? []);
+            const arr2 = (NpcGroupDictionary.instance.data.get(scene.systems['draw-npc-indicator'].activeNpcIndicator?.groupId ?? "")?.wizards ?? []);
+            arr.forEach(a => a.attachedToParent && scene.removeChild(a));
+            arr2.forEach(a => a.attachedToParent && scene.removeChild(a));
         }
 
         AFRAME.registerComponent('block-nav-mesh', {
