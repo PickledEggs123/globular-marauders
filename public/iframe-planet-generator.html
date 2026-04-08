@@ -4479,10 +4479,10 @@
                 });
             }
             addNpc(id, npc) {
-                if (npc.classList.includes("knight")) {
+                if (npc.classList.contains("knight")) {
                     this.data.get(id).knights.push(npc);
                 }
-                if (npc.classList.includes("wizard")) {
+                if (npc.classList.contains("wizard")) {
                     this.data.get(id).wizards.push(npc);
                 }
             }
@@ -5379,7 +5379,7 @@
                 this.npcMarkerId = null;
             },
             tick: function (t) {
-                if (!this.data.npcType || this.data.spawnPoint.length() === 0) {
+                if (!this.data.npcType || new THREE.Vector3().copy(this.data.spawnPoint).length() === 0) {
                     return;
                 }
                 if (!this.npcMarkerId) {
@@ -5411,8 +5411,8 @@
                     npc.components['globe-nav-agent'].walkToDestination(new THREE.Vector3().copy(this.data.spawnPoint), true, false);
                     setTimeout(() => {
                         const scene = npc.sceneEl;
-                        const npcDestinationIndicator = scene.components['draw-npc-indicator'];
-                        const p = npcDestinationIndicator.currentIndicator?.object3D.position.clone();
+                        const npcDestinationIndicator = scene.systems['draw-npc-indicator'].activeNpcIndicator;
+                        const p = npcDestinationIndicator?.currentIndicator?.object3D.position.clone();
                         if (!p) {
                             return;
                         }
@@ -6317,6 +6317,7 @@
                 if (newHealth <= 0 && oldHealth > 0) {
                     this.el.emit('dead');
                     addWilhelmScream(this.el);
+                    NpcGroupDictionary.instance.removeNpc(this.el);
                     this.el.parentNode.removeChild(this.el);
                 }
             },
