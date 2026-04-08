@@ -2188,147 +2188,6 @@
             }
         });
 
-        AFRAME.registerComponent('globe-lod', {
-            schema: {
-                default: "",
-            },
-            counter: 1,
-            update: function () {
-                const data = this.data.split("|");
-
-                const lod0 = this.el.querySelector(".lod0");
-                const lod1 = this.el.querySelector(".lod1");
-                const lod2 = this.el.querySelector(".lod2");
-                if (!lod0 || !lod1 || !lod2) {
-                    return;
-                }
-
-                this.lastDistance = Infinity;
-
-                const lod0Mesh = getBuildingLodHash(data[0], 3000, "manual");
-                const lod1Mesh = getBuildingLodHash(data[1], 3000, "manual");
-                const lod2Mesh = getBuildingLodHash(data[2], 3000, "manual");
-
-                const checkLoadedModel = (lodNode, id) => {
-                    const interval = setInterval(() => {
-                        let mesh;
-                        try {
-                            const scene = document.querySelector("a-scene");
-                            mesh = scene.querySelector(`#${id}`);
-                        } catch {}
-                        if (!mesh) {
-                            return;
-                        }
-                        const gltf = mesh.getObject3D("mesh");
-                        if (!gltf) {
-                            return;
-                        }
-                        lodNode.setAttribute("instanced-mesh-member", `mesh: #${id}; memberMesh: true;`);
-                        clearInterval(interval);
-                    }, 10);
-                };
-                checkLoadedModel(lod0, lod0Mesh);
-                checkLoadedModel(lod1, lod1Mesh);
-                checkLoadedModel(lod2, lod2Mesh);
-            },
-            tick: function (t, dt) {
-                if (this.counter > 0) {
-                    this.counter -= dt / 1000;
-                    return;
-                }
-                this.counter = 1;
-
-                const object3D = this.el.object3D;
-                const pos = object3D.getWorldPosition(new THREE.Vector3());
-
-                const cameraEl = document.querySelector("#camera-rig");
-                const cameraPos = cameraEl.object3D.getWorldPosition(new THREE.Vector3());
-
-                const distance = pos.distanceTo(cameraPos);
-
-                const lod0 = this.el.querySelector(".lod0");
-                const lod1 = this.el.querySelector(".lod1");
-                const lod2 = this.el.querySelector(".lod2");
-                if (!lod0 || !lod1 || !lod2) {
-                    return;
-                }
-                if (distance >= 40) {
-                    let shouldEmit = false;
-                    if (this.lastDistance !== 40) {
-                        this.lastDistance = 40;
-                        shouldEmit = true;
-                    }
-                    if (shouldEmit) {
-                        lod0.setAttribute("visible", "false");
-                        lod1.setAttribute("visible", "false");
-                        lod2.setAttribute("visible", "false");
-                        lod0.components.visible.update();
-                        lod1.components.visible.update();
-                        lod2.components.visible.update();
-                        lod0.emit("object3DUpdated");
-                        lod1.emit("object3DUpdated");
-                        lod2.emit("object3DUpdated");
-                    }
-                } else if (distance >= 20) {
-                    let shouldEmit = false;
-                    if (this.lastDistance !== 20) {
-                        this.lastDistance = 20;
-                        shouldEmit = true;
-                    }
-                    if (shouldEmit) {
-                        lod0.setAttribute("visible", "false");
-                        lod1.setAttribute("visible", "false");
-                        lod2.setAttribute("visible", "true");
-                        lod0.components.visible.update();
-                        lod1.components.visible.update();
-                        lod2.components.visible.update();
-                        lod0.emit("object3DUpdated");
-                        lod1.emit("object3DUpdated");
-                        lod2.emit("object3DUpdated");
-                    }
-                } else if (distance >= 10) {
-                    let shouldEmit = false;
-                    if (this.lastDistance !== 10) {
-                        this.lastDistance = 10;
-                        shouldEmit = true;
-                    }
-                    if (shouldEmit) {
-                        lod0.setAttribute("visible", "false");
-                        lod1.setAttribute("visible", "true");
-                        lod2.setAttribute("visible", "false");
-                        lod0.components.visible.update();
-                        lod1.components.visible.update();
-                        lod2.components.visible.update();
-                        lod0.emit("object3DUpdated");
-                        lod1.emit("object3DUpdated");
-                        lod2.emit("object3DUpdated");
-                    }
-                } else if (distance >= 0) {
-                    let shouldEmit = false;
-                    if (this.lastDistance !== 0) {
-                        this.lastDistance = 0;
-                        shouldEmit = true;
-                    }
-                    if (shouldEmit) {
-                        lod0.setAttribute("visible", "true");
-                        lod1.setAttribute("visible", "false");
-                        lod2.setAttribute("visible", "false");
-                        lod0.emit("object3DUpdated");
-                        lod1.emit("object3DUpdated");
-                        lod2.emit("object3DUpdated");
-                    }
-                }
-
-                // auto update clickable
-                const className = "clickable";
-                if (distance >= 40 && this.el.classList.contains(className)) {
-                    this.el.classList.remove(className);
-                } else if (!(distance >= 40) && !this.el.classList.contains(className)) {
-                    this.el.classList.add(className);
-                }
-            }
-        });
-
         function convertCannonToAmmo(v) {
             if (v instanceof CANNON.Vec3) {
                 return new Ammo.btVector3(v.x, v.y, v.z);
@@ -3497,7 +3356,8 @@
 
                 // set moba target
                 const scene = this.el.sceneEl;
-                const wizard = scene.systems['active-unit-marker'].wizards[0];
+                const wizards = (NpcGroupDictionary.instance.data.get(scene.systems['draw-npc-indicator'].activeNpcIndicator?.groupId ?? "")?.wizards ?? []);
+                const wizard = wizards[0];
                 wizard?.querySelector("[update-wizard-position-entity]").setAttribute("update-wizard-position-entity", {
                     destination: destination1,
                 });
@@ -3506,7 +3366,7 @@
                 wizard?.setAttribute("globe-nav-agent", `active: true; destination: ${destination1.x} ${destination1.y} ${destination1.z}; speed: 2;`);
 
                 // set camera to start behind wizard facing moba target
-                for (const wizardOther of scene.systems['active-unit-marker'].wizards.slice(1)) {
+                for (const wizardOther of wizards.slice(1)) {
                     const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3).add(new THREE.Vector3().random().multiplyScalar(2).subScalar(1)), destination1.clone().negate());
                     const m = findParentScene(this.el)?.systems['globe-nav'].getNavMesh();
                     if (!m) {
@@ -4588,11 +4448,149 @@
             }
         });
 
+        class NpcGroupDictionary {
+            static {
+                NpcGroupDictionary.instance = new NpcGroupDictionary();
+            }
+            constructor() {
+                this.data = new Map();
+            }
+            generateNewId() {
+                return 'npc-group-' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+            }
+            removeNpc(npc) {
+                Array.from(this.data.values()).forEach((value) => {
+                    const {
+                        knights,
+                        wizards,
+                    } = value;
+                    {
+                        const idx = knights.indexOf(npc);
+                        if (idx >= 0) {
+                            knights.splice(idx, 1);
+                        }
+                    }
+                    {
+                        const idx = wizards.indexOf(npc);
+                        if (idx >= 0) {
+                            wizards.splice(idx, 1);
+                        }
+                    }
+                });
+            }
+            addNpc(id, npc) {
+                if (npc.classList.includes("knight")) {
+                    this.data.get(id).knights.push(npc);
+                }
+                if (npc.classList.includes("wizard")) {
+                    this.data.get(id).wizards.push(npc);
+                }
+            }
+            addDefaultGroup() {
+                const wizards = [addWizardNpc()];
+                const scene = document.querySelector("a-scene");
+                const id = this.generateNewId();
+                const raiderAmount = scene.components['coin-purse'].getRaiderAmount();
+                const knights = new Array(raiderAmount).fill(0).map(() => addNpc());
+                this.data.set(id, {
+                    wizards,
+                    knights,
+                });
+                return id;
+            }
+            addNpcMarkerData(npcs) {
+                const {
+                    knights,
+                    wizards,
+                } = npcs;
+                const id = this.generateNewId();
+                this.data.set(id, {
+                    knights,
+                    wizards,
+                });
+                return id;
+            }
+            split(id) {
+                const {
+                    knights,
+                    wizards,
+                } = this.data.get(id);
+
+                const aKnights = Math.round(knights.length / 2);
+                const bKnights = knights.length - aKnights;
+                const aWizards = Math.round(wizards.length / 2);
+                const bWizards = wizards.length - bWizards;
+
+                if ((aKnights === 0 && aWizards === 0) || (bKnights === 0 && bWizards === 0)) {
+                    return {
+                        success: false,
+                    };
+                }
+
+                const newKnights = knights.splice(0, bKnights);
+                const newWizards = wizards.splice(0, bWizards);
+                const newId = this.addNpcMarkerData({
+                    knights: newKnights,
+                    wizards: newWizards,
+                });
+                return {
+                    success: true,
+                    newId,
+                };
+            }
+            merge(aId, bId) {
+                const {
+                    knights: aKnights,
+                    wizards: aWizards,
+                } = this.data.get(aId);
+                const {
+                    knights: bKnights,
+                    wizards: bWizards,
+                } = this.data.get(bId);
+
+                aKnights.push(...bKnights.splice(0, bKnights.length));
+                aWizards.push(...bWizards.splice(0, bWizards.length));
+                this.data.delete(bId);
+
+                return {
+                    success: true,
+                    newId: aId,
+                };
+            }
+        }
+
+        AFRAME.registerSystem('draw-npc-indicator', {
+            schema: {},
+            init: function () {
+                this.npcIndicatorGroups = [];
+                this.activeNpcIndicator = null;
+            },
+            registerMe: function (el) {
+                this.npcIndicatorGroups.push(el);
+            },
+            unregisterMe: function (el) {
+                const arr = this.npcIndicatorGroups;
+                const idx = arr.indexOf(el);
+                if (idx >= 0) {
+                    arr.splice(idx, 1);
+                }
+            },
+            getNpcIndicatorGroups: function () {
+                return this.npcIndicatorGroups;
+            },
+            setActiveNpcIndicator: function (el) {
+                const idx = this.npcIndicatorGroups.indexOf(el);
+                if (idx >= 0) {
+                    this.activeNpcIndicator = el;
+                }
+            },
+        });
+
         AFRAME.registerComponent('draw-npc-indicator', {
             createIndicator: function (p) {
                 const str = characterModels.get("NPC_DESTINATION");
                 if (str) {
-                    const scene = document.querySelector("a-scene");
+                    const scene = this.el.sceneEl;
                     const entity = document.createElement("a-entity");
                     const data = document.createElement("a-entity");
                     data.setAttribute("gltf-model", str);
@@ -4604,13 +4602,18 @@
                     this.currentIndicator = entity;
                     this.dataEntity = data;
                     scene.appendChild(entity);
+                    if (!scene.systems['draw-npc-indicator'].activeNpcIndicator) {
+                        scene.systems['draw-npc-indicator'].setActiveNpcIndicator(this);
+                    }
                 }
             },
             currentIndicator: null,
             dataEntity: null,
             init: function () {
+                this.system = this.el.sceneEl.systems['draw-npc-indicator'];
                 this.currentIndicator = null;
                 this.dataEntity = null;
+                this.groupId = null;
                 this.setNpcIndicator = (e) => {
                     const destination1 = e.detail?.point;
                     const immediate = e.detail?.immediate;
@@ -4639,6 +4642,7 @@
                 };
                 this.el.addEventListener('set-npc-indicator', this.setNpcIndicator);
                 this.el.addEventListener('clear-npc-indicator', this.clearNpcIndicator);
+                this.system.registerMe(this);
             },
             remove: function () {
                 this.el.removeEventListener('set-npc-indicator', this.setNpcIndicator);
@@ -4646,6 +4650,7 @@
                 if (this.currentIndicator) {
                     this.removeIndicator();
                 }
+                this.system.unregisterMe(this);
             },
             removeIndicator: function () {
                 if (this.currentIndicator) {
@@ -4654,8 +4659,11 @@
                     this.currentIndicator = null;
                     this.dataEntity = null;
                 }
+                NpcGroupDictionary.instance.data.delete(this.groupId);
+                this.groupId = null;
             },
-            schema: {},
+            schema: {
+            },
             multiple: true,
             tick: function (t, dt) {
                 if (this.currentIndicator) {
@@ -4720,11 +4728,10 @@
                         let addedNpcs = false;
                         const npcs = [...activeUnitMarker.wizards, ...activeUnitMarker.knights];
                         if (npcs.length === 0) {
-                            addWizardNpc();
-                            const raiderAmount = scene.components['coin-purse'].getRaiderAmount();
-                            for (let i = 0; i < raiderAmount; i++) {
-                                addNpc();
-                            }
+                            const groupId = NpcGroupDictionary.instance.addDefaultGroup();
+                            scene.setAttribute(`draw-npc-indicator__${groupId}`, "");
+                            this.el.sceneEl.systems['draw-npc-indicator'].setActiveNpcIndicator(scene.components[`draw-npc-indicator__${groupId}`]);
+                            scene.components[`draw-npc-indicator__${groupId}`].groupId = groupId;
                             addedNpcs = true;
                         }
 
@@ -4765,14 +4772,15 @@
                     const cameraEl = document.querySelector("#camera-rig");
                     cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].getUnit()}`);
                 }
-                const npcEls = this.activeUnitMarker.knights;
-                npcEls.forEach(npcEl => {
+
+                const knights = (NpcGroupDictionary.instance.data.get(scene.systems['draw-npc-indicator'].activeNpcIndicator?.groupId ?? "")?.knights ?? []);
+                knights.forEach(npcEl => {
                     npcEl.components['globe-nav-agent'].walkToDestination(destination1, active, false);
                 });
 
                 if (wizardWalk) {
-                    const wizardEls = this.activeUnitMarker.wizards;
-                    wizardEls.forEach(wizardEl => {
+                    const wizards = (NpcGroupDictionary.instance.data.get(scene.systems['draw-npc-indicator'].activeNpcIndicator?.groupId ?? "")?.wizards ?? []);
+                        wizards.forEach(wizardEl => {
                         wizardEl.components['globe-nav-agent'].walkToDestination(destination1, active, wizardWalk);
                     });
                 }
@@ -5368,11 +5376,19 @@
             },
             init: function () {
                 this.startTimer = null;
+                this.npcMarkerId = null;
             },
-            tick: function (t, dt) {
-                const scene = this.el.sceneEl;
+            tick: function (t) {
+                if (!this.data.npcType || this.data.spawnPoint.length() === 0) {
+                    return;
+                }
+                if (!this.npcMarkerId) {
+                    this.npcMarkerId = NpcGroupDictionary.instance.addNpcMarkerData({knights: [], wizards: []});
+                }
+
+                const npcElsData = NpcGroupDictionary.instance.data.get(this.npcMarkerId);
                 const npcEls = [
-                    ...(this.data.npcType === "WIZARD" ? scene.systems['active-unit-marker'].wizards : scene.systems['active-unit-marker'].knights),
+                    ...(this.data.npcType === "WIZARD" ? npcElsData.wizards : npcElsData.knights),
                 ];
 
                 if (npcEls.length < this.data.maxNpcs && this.startTimer === null) {
@@ -5390,7 +5406,8 @@
                 const elapsedTime = time - this.startTimer;
                 if (elapsedTime >= this.data.timeBetweenSpawns) {
                     this.startTimer = null;
-                    const npc = (this.data.npcType === "WIZARD" ? addWizardNpc() : addNpc());
+                    const npc = this.data.npcType === "WIZARD" ? addWizardNpc() : addNpc();
+                    NpcGroupDictionary.instance.addNpc(this.npcMarkerId, npc);
                     npc.components['globe-nav-agent'].walkToDestination(new THREE.Vector3().copy(this.data.spawnPoint), true, false);
                     setTimeout(() => {
                         const scene = npc.sceneEl;
@@ -7147,7 +7164,7 @@
             const scene = document.querySelector("a-scene");
 
             const rootNpc = document.createElement("a-entity");
-            rootNpc.setAttribute("class", `${scene.components['coin-purse'].activeUnit}`);
+            rootNpc.setAttribute("class", `${scene.components['coin-purse'].activeUnit} knight`);
             rootNpc.setAttribute("globe-nav-agent", "");
             rootNpc.setAttribute("position", "0 0 0");
             rootNpc.setAttribute("rotation", "0 0 0");
@@ -7451,7 +7468,7 @@
             const scene = document.querySelector("a-scene");
 
             const rootNpc = document.createElement("a-entity");
-            rootNpc.setAttribute("class", `${scene.components['coin-purse'].activeUnit}-wizard`);
+            rootNpc.setAttribute("class", `${scene.components['coin-purse'].activeUnit}-wizard wizard`);
             rootNpc.setAttribute("globe-nav-agent", "");
             rootNpc.setAttribute("position", "0 0 0");
             rootNpc.setAttribute("rotation", "0 0 0");
@@ -7989,14 +8006,14 @@
                 this.buildMenuStateEl = this.el.sceneEl.querySelector("#build-menu-state"); // ok performance
                 this.cameraLookControlsEl = this.el.sceneEl.querySelector('[globe-look-controls]'); // ok performance
             },
-            tick: function (t, dt) {
+            tick: function () {
                 const scene = this.el.sceneEl;
                 if (!this.data.portShow) {
-                    const wizard = scene.systems['active-unit-marker'].wizards[0];
+                    const wizards = (NpcGroupDictionary.instance.data.get(scene.systems['draw-npc-indicator'].activeNpcIndicator?.groupId ?? "")?.wizards ?? []);
+                    const wizard = wizards[0];
 
                     const buildMenuState = this.buildMenuStateEl;
-                    const npcDestinationIndicator = scene.components['draw-npc-indicator'];
-                    const hasNpcMode = !!npcDestinationIndicator.currentIndicator;
+                    const hasNpcMode = !!scene.systems['draw-npc-indicator'].activeNpcIndicator?.currentIndicator;
                     if (hasNpcMode && this.data.wizardShow) {
                         if (this.data.menuShow) {
                             this.el.object3D.visible = !buildMenuState.hasAttribute("show-build") && !buildMenuState.hasAttribute("show-hammer");
@@ -9208,17 +9225,17 @@
 
         AFRAME.registerComponent("click-manager", {
             schema: {},
-            tick: function(t, dt) {
+            tick: function() {
                 ClickManager.iterateQueue();
             },
         });
 
         AFRAME.registerComponent("health-bar", {
             schema: {},
-            tick: function(t, dt) {
-                const scene = document.querySelector("a-scene");
+            tick: function() {
+                const scene = this.el.sceneEl;
                 const shipEls = [
-                    ...scene.systems['active-unit-marker'].wizards,
+                    ...(NpcGroupDictionary.instance.data.get(scene.systems['draw-npc-indicator'].activeNpcIndicator?.groupId ?? "")?.wizards ?? []),
                     ...scene.systems['active-unit-marker'].ships,
                 ];
                 const ship = shipEls.slice(0, 1)[0];
@@ -9236,8 +9253,7 @@
                         const healthComponent = ship.components['ship-health'] || ship.components['health'];
                         const maxHealth = healthComponent.maxHealth;
                         const health = healthComponent.data.health;
-                        const ratio = health / maxHealth;
-                        mesh.morphTargetInfluences[0] = ratio;
+                        mesh.morphTargetInfluences[0] = health / maxHealth;
                     } else {
                         mesh.morphTargetInfluences[0] = 0;
                     }
@@ -9247,10 +9263,10 @@
 
         AFRAME.registerComponent("mana-bar", {
             schema: {},
-            tick: function(t, dt) {
-                const scene = document.querySelector("a-scene");
+            tick: function() {
+                const scene = this.el.sceneEl;
                 const shipEls = [
-                    ...scene.systems['active-unit-marker'].wizards,
+                    ...(NpcGroupDictionary.instance.data.get(scene.systems['draw-npc-indicator'].activeNpcIndicator?.groupId ?? "")?.wizards ?? []),
                 ];
                 const ship = shipEls.slice(0, 1)[0];
 
@@ -9268,8 +9284,7 @@
                         const endTime = healthComponent.endTime;
                         const startTime = healthComponent.startTime;
                         const time = +new Date();
-                        const ratio = Math.min((time - startTime) / (endTime - startTime), 1);
-                        mesh.morphTargetInfluences[0] = ratio;
+                        mesh.morphTargetInfluences[0] = Math.min((time - startTime) / (endTime - startTime), 1);
                     } else {
                         mesh.morphTargetInfluences[0] = 0;
                     }
@@ -9304,7 +9319,7 @@
     </style>
 </head>
 <body>
-    <a-scene click-manager onclick="playMusic === true ? window.musicPlayer.start() : undefined" draw-ship-indicator draw-npc-indicator coin-purse respawn physics="driver: ammo; gravity: 0 0 0; debug: false; debugDrawMode: 4294967295;" globe-nav="debug: true;" globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
+    <a-scene click-manager onclick="playMusic === true ? window.musicPlayer.start() : undefined" draw-ship-indicator coin-purse respawn physics="driver: ammo; gravity: 0 0 0; debug: false; debugDrawMode: 4294967295;" globe-nav="debug: true;" globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
         <a-assets>
             <template id="avatar-template">
                 <a-entity class="avatar" networked-audio-source>
