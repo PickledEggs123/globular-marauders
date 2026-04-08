@@ -4459,7 +4459,8 @@
                 return 'npc-group-' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
             }
             removeNpc(npc) {
-                Array.from(this.data.values()).forEach((value) => {
+                const removeKeys = [];
+                Array.from(this.data.entries()).forEach(([key, value]) => {
                     const {
                         knights,
                         wizards,
@@ -4476,7 +4477,15 @@
                             wizards.splice(idx, 1);
                         }
                     }
+
+                    if (knights === 0 && wizards === 0) {
+                        removeKeys.push(key);
+                    }
                 });
+
+                for (const key of removeKeys) {
+                    this.data.delete(key);
+                }
             }
             addNpc(id, npc) {
                 if (npc.classList.contains("knight")) {
