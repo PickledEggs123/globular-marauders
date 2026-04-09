@@ -4618,11 +4618,23 @@
                     data.setAttribute("rotation", "90 0 0");
                     data.addEventListener("model-loaded", buildBoundsTree);
                     entity.appendChild(data);
-                    entity.setAttribute("class", "npc-destination-indicator clickable");
+                    entity.setAttribute("ui-clicked", "");
                     entity.addEventListener("click", () => {
                         if (!this.data.isSpawn) {
                             scene.systems['draw-npc-indicator'].setActiveNpcIndicator(this);
-                            alert("SWITCHED");
+                        }
+                        if (this.data.isSpawn) {
+                            scene.systems['draw-npc-indicator'].setActiveNpcIndicator(this);
+
+                            Array.from(document.querySelectorAll("[ghost-building]")).map(el => el.components['ghost-building']).forEach(c => {
+                                if (c.currentSpawnIndicator === this) {
+                                    c.currentSpawnIndicator = null;
+                                    c.npcMarkerId = "";
+                                }
+                            });
+
+                            const groupId = this.groupId;
+                            scene.setAttribute(`draw-npc-indicator__${groupId}`, "isSpawn: false;");
                         }
                     });
                     entity.object3D.position.copy(p.clone().normalize().setLength(p.clone().length() + 1));
@@ -9075,7 +9087,7 @@
                 this.onCursorDown = this.onCursorDown.bind(this);
 
                 this.intersections = [];
-                this.raycaster = new THREE.Raycaster(this.el.sceneEl.camera);
+                this.raycaster = new THREE.Raycaster();
 
                 // Debounce.
                 this.updateCanvasBounds = debounce(() => {
@@ -9088,6 +9100,7 @@
                 this.el.removeEventListener("model-loaded", buildBoundsTree);
             },
             play: function () {
+                this.canvasBounds = this.el.sceneEl.canvas.getBoundingClientRect()
                 this.el.sceneEl.addEventListener('rendererresize', this.updateCanvasBounds);
                 window.addEventListener('resize', this.updateCanvasBounds);
                 window.addEventListener('scroll', this.updateCanvasBounds);
@@ -9107,80 +9120,78 @@
                 this.el.sceneEl.canvas.removeEventListener('mousemove', this.onMouseMove);
                 this.el.sceneEl.canvas.removeEventListener('click', this.onCursorDown);
             },
-            onMouseMove: (function () {
-                var direction = new THREE.Vector3();
-                var mouse = new THREE.Vector2();
-                var origin = new THREE.Vector3();
-                var rayCasterConfig = {origin: origin, direction: direction};
+            onMouseMove: function (evt) {
+                const direction = new THREE.Vector3();
+                const mouse = new THREE.Vector2();
+                const origin = new THREE.Vector3();
+                const rayCasterConfig = {origin: origin, direction: direction};
+                const self = this;
+                let bounds = self.canvasBounds;
+                let camera = self.el.sceneEl.camera;
+                let cameraElParent;
+                let left;
+                let point;
+                let top;
 
-                return function (evt) {
-                    var bounds = this.canvasBounds;
-                    var camera = this.el.sceneEl.camera;
-                    var cameraElParent;
-                    var left;
-                    var point;
-                    var top;
+                let frame;
+                let inputSource;
+                let referenceSpace;
+                let pose;
+                let transform;
 
-                    var frame;
-                    var inputSource;
-                    var referenceSpace;
-                    var pose;
-                    var transform;
+                camera.parent.updateMatrixWorld();
 
-                    camera.parent.updateMatrixWorld();
+                // Calculate mouse position based on the canvas element
+                if (evt.type === 'touchmove' || evt.type === 'touchstart') {
+                    // Track the first touch for simplicity.
+                    point = evt.touches.item(0);
+                } else {
+                    point = evt;
+                }
 
-                    // Calculate mouse position based on the canvas element
-                    if (evt.type === 'touchmove' || evt.type === 'touchstart') {
-                        // Track the first touch for simplicity.
-                        point = evt.touches.item(0);
-                    } else {
-                        point = evt;
+                if (!bounds) {
+                    return;
+                }
+
+                left = point.clientX - bounds.left;
+                top = point.clientY - bounds.top;
+                mouse.x = (left / bounds.width) * 2 - 1;
+                mouse.y = -(top / bounds.height) * 2 + 1;
+
+                if (this.data.rayOrigin === 'xrselect' && (evt.type === 'selectstart' || evt.type === 'fakeselectevent')) {
+                    frame = evt.frame;
+                    inputSource = evt.inputSource;
+                    referenceSpace = self.el.sceneEl.renderer.xr.getReferenceSpace();
+                    pose = frame.getPose(inputSource.targetRaySpace, referenceSpace);
+                    if (pose) {
+                        transform = pose.transform;
+                        direction.set(0, 0, -1);
+                        direction.applyQuaternion(transform.orientation);
+                        origin.copy(transform.position);
+
+                        // Transform XRPose into world space
+                        cameraElParent = camera.el.object3D.parent;
+                        cameraElParent.localToWorld(origin);
+                        direction.transformDirection(cameraElParent.matrixWorld);
                     }
+                } else if (evt.type === 'fakeselectout') {
+                    direction.set(0, 1, 0);
+                    origin.set(0, 9999, 0);
+                } else if (camera && camera.isPerspectiveCamera) {
+                    origin.setFromMatrixPosition(camera.matrixWorld);
+                    direction.set(mouse.x, mouse.y, 0.5).unproject(camera).sub(origin).normalize();
+                } else if (camera && camera.isOrthographicCamera) {
+                    origin.set(mouse.x, mouse.y, (camera.near + camera.far) / (camera.near - camera.far)).unproject(camera); // set origin in plane of camera
+                    direction.set(0, 0, -1).transformDirection(camera.matrixWorld);
+                } else {
+                    console.error('AFRAME.Raycaster: Unsupported camera type: ' + camera.type);
+                }
 
-                    if (!bounds) {
-                        return;
-                    }
-
-                    left = point.clientX - bounds.left;
-                    top = point.clientY - bounds.top;
-                    mouse.x = (left / bounds.width) * 2 - 1;
-                    mouse.y = -(top / bounds.height) * 2 + 1;
-
-                    if (this.data.rayOrigin === 'xrselect' && (evt.type === 'selectstart' || evt.type === 'fakeselectevent')) {
-                        frame = evt.frame;
-                        inputSource = evt.inputSource;
-                        referenceSpace = this.el.sceneEl.renderer.xr.getReferenceSpace();
-                        pose = frame.getPose(inputSource.targetRaySpace, referenceSpace);
-                        if (pose) {
-                            transform = pose.transform;
-                            direction.set(0, 0, -1);
-                            direction.applyQuaternion(transform.orientation);
-                            origin.copy(transform.position);
-
-                            // Transform XRPose into world space
-                            cameraElParent = camera.el.object3D.parent;
-                            cameraElParent.localToWorld(origin);
-                            direction.transformDirection(cameraElParent.matrixWorld);
-                        }
-                    } else if (evt.type === 'fakeselectout') {
-                        direction.set(0, 1, 0);
-                        origin.set(0, 9999, 0);
-                    } else if (camera && camera.isPerspectiveCamera) {
-                        origin.setFromMatrixPosition(camera.matrixWorld);
-                        direction.set(mouse.x, mouse.y, 0.5).unproject(camera).sub(origin).normalize();
-                    } else if (camera && camera.isOrthographicCamera) {
-                        origin.set(mouse.x, mouse.y, (camera.near + camera.far) / (camera.near - camera.far)).unproject(camera); // set origin in plane of camera
-                        direction.set(0, 0, -1).transformDirection(camera.matrixWorld);
-                    } else {
-                        console.error('AFRAME.Raycaster: Unsupported camera type: ' + camera.type);
-                    }
-
-                    //this.el.setAttribute('raycaster', rayCasterConfig);
-                    this.raycaster.ray.origin.copy(rayCasterConfig.origin);
-                    this.raycaster.ray.direction.copy(rayCasterConfig.direction);
-                    if (evt.type === 'touchmove') { evt.preventDefault(); }
-                };
-            })(),
+                //this.el.setAttribute('raycaster', rayCasterConfig);
+                self.raycaster.ray.origin.copy(rayCasterConfig.origin);
+                self.raycaster.ray.direction.copy(rayCasterConfig.direction);
+                if (evt.type === 'touchmove') { evt.preventDefault(); }
+            },
 
             /**
              * Trigger mousedown and keep track of the mousedowned entity.
@@ -9195,7 +9206,15 @@
                 if (this.data.rayOrigin === 'mouse' && (evt.type === 'touchstart' || evt.type === 'click')) {
                     this.onMouseMove(evt);
                     this.intersections.length = 0;
-                    this.raycaster.intersectObject(this.el.object3D, true, this.intersections);
+
+                    const meshes = [];
+                    this.el.object3D.traverse((node) => {
+                        if (node.isMesh) {
+                            meshes.push(node);
+                        }
+                    });
+
+                    this.raycaster.intersectObjects(meshes, true, this.intersections);
                     this.intersectedEl = this.intersections[0] || null;
                     evt.preventDefault();
                 }
