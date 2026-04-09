@@ -4602,6 +4602,12 @@
         });
 
         AFRAME.registerComponent('draw-npc-indicator', {
+            schema: {
+                isSpawn: {
+                    type: "boolean",
+                    default: false,
+                },
+            },
             createIndicator: function (p) {
                 const str = characterModels.get("NPC_DESTINATION");
                 if (str) {
@@ -4612,12 +4618,18 @@
                     data.setAttribute("rotation", "90 0 0");
                     data.addEventListener("model-loaded", buildBoundsTree);
                     entity.appendChild(data);
+                    entity.setAttribute("ui-clicked", "");
+                    entity.addEventListener("click", () => {
+                        ClickManager.addToQueue(() => {
+                            scene.systems['draw-npc-indicator'].setActiveNpcIndicator(this);
+                        }, "ui-clicked");
+                    });
                     entity.object3D.position.copy(p.clone().normalize().setLength(p.clone().length() + 1));
                     entity.object3D.up = p.clone().normalize();
                     this.currentIndicator = entity;
                     this.dataEntity = data;
                     scene.appendChild(entity);
-                    if (!scene.systems['draw-npc-indicator'].activeNpcIndicator) {
+                    if (!scene.systems['draw-npc-indicator'].activeNpcIndicator && !this.data.isSpawn) {
                         scene.systems['draw-npc-indicator'].setActiveNpcIndicator(this);
                     }
                 }
@@ -4640,7 +4652,7 @@
                     }
                     this.updateIndicator(destination1);
 
-                    if (this.system.activeNpcIndicator !== this) {
+                    if (this.system.activeNpcIndicator !== this && !this.data.isSpawn) {
                         this.system.setActiveNpcIndicator(this);
                     }
 
@@ -4686,8 +4698,6 @@
                 NpcGroupDictionary.instance.data.delete(this.groupId);
                 this.groupId = null;
             },
-            schema: {
-            },
             multiple: true,
             tick: function (t) {
                 if (this.currentIndicator) {
@@ -4703,7 +4713,7 @@
                 }
                 if (!NpcGroupDictionary.instance.data.has(this.groupId)) {
                     if (this.system.activeNpcIndicator === this) {
-                        this.system.activeNpcIndicator = this.system.npcIndicatorGroups[0] ?? null;
+                        this.system.activeNpcIndicator = this.system.npcIndicatorGroups.find(x => !x.data.isSpawn) ?? null;
                     }
                     Array.from(document.querySelectorAll("[ghost-building]")).map(el => el.components['ghost-building']).forEach(c => {
                         if (c.currentSpawnIndicator === this) {
@@ -4761,10 +4771,10 @@
                         checkBox.click();
 
                         let addedNpcs = false;
-                        const npcs = [...activeUnitMarker.wizards, ...activeUnitMarker.knights];
-                        if (npcs.length === 0) {
+                        const noShoreParties = !NpcGroupDictionary.instance.data.has(this.el.sceneEl.systems['draw-npc-indicator'].activeNpcIndicator?.groupId ?? "");
+                        if (noShoreParties) {
                             const groupId = NpcGroupDictionary.instance.addDefaultGroup();
-                            scene.setAttribute(`draw-npc-indicator__${groupId}`, "");
+                            scene.setAttribute(`draw-npc-indicator__${groupId}`, "isSpawn: false;");
                             this.el.sceneEl.systems['draw-npc-indicator'].setActiveNpcIndicator(scene.components[`draw-npc-indicator__${groupId}`]);
                             scene.components[`draw-npc-indicator__${groupId}`].groupId = groupId;
                             addedNpcs = true;
@@ -5454,7 +5464,7 @@
                         const scene = npc.sceneEl;
                         if (!this.currentSpawnIndicator && this.npcMarkerId) {
                             const groupId = this.npcMarkerId;
-                            scene.setAttribute(`draw-npc-indicator__${groupId}`, "");
+                            scene.setAttribute(`draw-npc-indicator__${groupId}`, "isSpawn: true;");
                             this.currentSpawnIndicator = scene.components[`draw-npc-indicator__${groupId}`];
                             scene.components[`draw-npc-indicator__${groupId}`].groupId = groupId;
                         }
