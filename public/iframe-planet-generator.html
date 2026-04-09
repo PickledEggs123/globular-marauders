@@ -2373,26 +2373,32 @@
                 this.dtSum = this.dtSumTickSize + 1;
 
                 if (oldData !== this.data) {
-                    // get elements
-                    let [dataItem, dataPostfix] = this.data.split(":");
-                    let otherClassName = "";
-                    if (dataPostfix) {
-                        [dataPostfix, otherClassName] = dataPostfix.split(" ", 2);
-                        dataPostfix = `:${dataPostfix}`;
-                        if (otherClassName) {
-                            otherClassName = ` ${otherClassName}`;
-                        } else {
-                            otherClassName = "";
-                        }
-                    }
-                    const boxSelector = `${dataItem}${otherClassName}`;
-                    const boxPosSelector = `${dataItem}${otherClassName}-position`;
-                    this.box = Array.from(document.querySelectorAll(boxSelector)).map(el => el.object3D);
-                    this.boxPos = Array.from(document.querySelectorAll(boxPosSelector)).map(el => el.object3D);
-                    this.dataPostfix = dataPostfix;
+                    this.getElements();
                 }
             },
+            getElements: function () {
+                // get elements
+                let [dataItem, dataPostfix] = this.data.split(":");
+                let otherClassName = "";
+                if (dataPostfix) {
+                    [dataPostfix, otherClassName] = dataPostfix.split(" ", 2);
+                    dataPostfix = `:${dataPostfix}`;
+                    if (otherClassName) {
+                        otherClassName = ` ${otherClassName}`;
+                    } else {
+                        otherClassName = "";
+                    }
+                }
+                const boxSelector = `${dataItem}${otherClassName}`;
+                const boxPosSelector = `${dataItem}${otherClassName}-position`;
+                this.box = Array.from(document.querySelectorAll(boxSelector)).map(el => el.object3D);
+                this.boxPos = Array.from(document.querySelectorAll(boxPosSelector)).map(el => el.object3D);
+                this.dataPostfix = dataPostfix;
+            },
             tick: function (t, dt) {
+                if (!this.box.length || !this.boxPos.length) {
+                    this.getElements();
+                }
                 const box = [...this.box];
                 const boxPos = [...this.boxPos];
                 if (!box.length || !boxPos.length) {
@@ -4489,22 +4495,25 @@
             }
             addNpc(id, npc) {
                 if (npc.classList.contains("knight")) {
+                    npc.classList.add(id);
                     this.data.get(id).knights.push(npc);
                 }
                 if (npc.classList.contains("wizard")) {
+                    npc.classList.add(id);
+                    const positionEl = npc.querySelector(`.${scene.components['coin-purse'].activeUnit}-wizard-position`);
+                    positionEl.classList.add(id);
                     this.data.get(id).wizards.push(npc);
                 }
             }
             addDefaultGroup() {
-                const wizards = [addWizardNpc()];
                 const scene = document.querySelector("a-scene");
-                const id = this.generateNewId();
                 const raiderAmount = scene.components['coin-purse'].getRaiderAmount();
-                const knights = new Array(raiderAmount).fill(0).map(() => addNpc());
-                this.data.set(id, {
-                    wizards,
-                    knights,
+                const npcs = [addWizardNpc(), ...new Array(raiderAmount).fill(0).map(() => addNpc())];
+                const id = this.addNpcMarkerData({
+                    wizards: [],
+                    knights: [],
                 });
+                npcs.forEach(n => this.addNpc(id, n));
                 return id;
             }
             addNpcMarkerData(npcs) {
@@ -4624,13 +4633,15 @@
                     const destination1 = e.detail?.point;
                     const immediate = e.detail?.immediate;
                     const self = e.detail?.self;
+                    const groupId = e.detail?.groupId;
+                    if (groupId !== this.groupId) return;
                     if (!this.currentIndicator) {
                         this.createIndicator(destination1);
                     }
                     this.updateIndicator(destination1);
 
                     if (this.system.activeNpcIndicator !== this) {
-                        return;
+                        this.system.setActiveNpcIndicator(this);
                     }
 
                     if (immediate) {
@@ -4648,6 +4659,9 @@
                     }
                 };
                 this.clearNpcIndicator = () => {
+                    if (this.system.activeNpcIndicator !== this) {
+                        return;
+                    }
                     this.removeIndicator();
                 };
                 this.el.addEventListener('set-npc-indicator', this.setNpcIndicator);
@@ -4758,17 +4772,21 @@
 
                         if (addedNpcs) {
                             scene.emit("clear-ship-indicator");
+                            const groupId = scene.systems['draw-npc-indicator'].activeNpcIndicator?.groupId;
                             scene.emit("set-npc-indicator", {
                                 point: destination1.clone(),
                                 immediate: false,
                                 self,
+                                groupId,
                             });
                         } else {
                             scene.emit("clear-ship-indicator");
+                            const groupId = scene.systems['draw-npc-indicator'].activeNpcIndicator?.groupId;
                             scene.emit("set-npc-indicator", {
                                 point: destination1.clone(),
                                 immediate: true,
                                 self,
+                                groupId,
                             });
 
                             const buildMenuState = document.querySelector("#build-menu-state");
@@ -5442,7 +5460,7 @@
                         }
                         const self = document.querySelector("[go-on-land]")?.components['go-on-land'];
                         if (self) {
-                            this.currentSpawnIndicator.setNpcIndicator({detail: { point: spawnPoint, immediate: true, self }});
+                            this.currentSpawnIndicator.setNpcIndicator({detail: { point: spawnPoint, immediate: true, self, groupId: this.npcMarkerId }});
                         }
                     }, 500);
                 }
@@ -8265,6 +8283,10 @@
                     buildMenuState.removeAttribute("blacksmith-build");
                     buildMenuState.removeAttribute("apothecary-build");
 
+                } else if (this.data.selector === "split-npcs") {
+
+                } else if (this.data.selector === "merge-npcs") {
+
                 } else if (this.data.selector === "cancel-build") {
                     const buildMenuState = document.querySelector("#build-menu-state");
                     buildMenuState.removeAttribute("show-hammer");
@@ -8711,8 +8733,10 @@
                 this.activeUnit = u;
             },
             getUnit: function () {
-                const postfix = this.activeUnit.startsWith("ship") ? ":first-of-type" : "-wizard";
-                return this.activeUnit + postfix;
+                const scene = this.el.sceneEl;
+                const npcIndicatorId = scene.systems['draw-npc-indicator'].activeNpcIndicator?.groupId ?? "";
+                const postfix = this.activeUnit.startsWith("ship") ? ":first-of-type" : `-wizard`;
+                return `${npcIndicatorId}${npcIndicatorId ? "." : ""}${this.activeUnit}${postfix}`;
             },
             buyShips: function () {
                 const numShips = this.shipCount;
@@ -9432,6 +9456,8 @@
                 <a-entity id="area-attack-fire" align-with-projection="offset: 0.2 -0.2 -0.5; rotation: 90 0 0; scale: 0.015 0.015 0.015; wizardShow: true;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" select-cannon-side="selector: area-attack" play-all-animations ui-clicked></a-entity>
                 <a-entity id="forward-attack-fire" align-with-projection="offset: -0.2 -0.2 -0.5; rotation: 0 90 0; scale: 0.015 0.015 0.015; wizardShow: true;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" select-cannon-side="selector: forward-attack" play-all-animations ui-clicked></a-entity>
                 <a-entity id="hammer-build" align-with-projection="offset: -0.05 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03; wizardShow: true; menuShow: true;" gltf-model="/meshes/ui/build/Hammer.glb" select-cannon-side="selector: hammer-build" ui-clicked></a-entity>
+                <a-entity id="split-npcs" align-with-projection="offset: -0.00 -0.2 -0.5; rotation: 0 -90 0; scale: 0.045 0.045 0.045; wizardShow: true; menuShow: true;" gltf-model="/meshes/ui/build/Split.glb" select-cannon-side="selector: split-npcs" ui-clicked></a-entity>
+                <a-entity id="merge-npcs" align-with-projection="offset: 0.05 -0.2 -0.5; rotation: 0 -90 0; scale: 0.045 0.045 0.045; wizardShow: true; menuShow: true;" gltf-model="/meshes/ui/build/Merge.glb" select-cannon-side="selector: merge-npcs" ui-clicked></a-entity>
                 <a-entity id="ok-build" align-with-projection="offset: -0.03 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03; wizardShow: true; buildShow: true;" gltf-model="/meshes/ui/build/Ok.glb" select-cannon-side="selector: ok-build" ui-clicked></a-entity>
                 <a-entity id="cancel-build" align-with-projection="offset: 0.03 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03; wizardShow: true; buildShow: true;" gltf-model="/meshes/ui/build/Cancel.glb" select-cannon-side="selector: cancel-build" ui-clicked></a-entity>
                 <a-entity id="wizard-tower-build" align-with-projection="offset: 0.10 -0.4 -1; rotation: 0 -90 0; scale: 0.015 0.015 0.015; wizardShow: true; hammerShow: true;" gltf-model="/meshes/WizardTower.glb" select-cannon-side="selector: wizard-tower-build" ui-clicked></a-entity>
