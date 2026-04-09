@@ -3993,7 +3993,7 @@
                     if (wizardWalk) {
                         this.el.emit("moba-move", destination1.clone());
                     } else {
-                        this.el.setAttribute("globe-nav-agent", `active: ${active}; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2; razeTarget: #${this.el.id};`);
+                        this.el.setAttribute("globe-nav-agent", `active: ${active}; destination: ${destination2.x} ${destination2.y} ${destination2.z}; speed: 2;`);
                     }
                 }
             },
@@ -4618,11 +4618,12 @@
                     data.setAttribute("rotation", "90 0 0");
                     data.addEventListener("model-loaded", buildBoundsTree);
                     entity.appendChild(data);
-                    entity.setAttribute("ui-clicked", "");
+                    entity.setAttribute("class", "npc-destination-indicator clickable");
                     entity.addEventListener("click", () => {
-                        ClickManager.addToQueue(() => {
+                        if (!this.data.isSpawn) {
                             scene.systems['draw-npc-indicator'].setActiveNpcIndicator(this);
-                        }, "ui-clicked");
+                            alert("SWITCHED");
+                        }
                     });
                     entity.object3D.position.copy(p.clone().normalize().setLength(p.clone().length() + 1));
                     entity.object3D.up = p.clone().normalize();
@@ -4652,21 +4653,21 @@
                     }
                     this.updateIndicator(destination1);
 
-                    if (this.system.activeNpcIndicator !== this && !this.data.isSpawn) {
+                    if (this.system.activeNpcIndicator === null && this.system.activeNpcIndicator !== this && !this.data.isSpawn) {
                         this.system.setActiveNpcIndicator(this);
                     }
 
                     if (immediate) {
-                        self.walkToDestination(destination1, true, true);
+                        self.walkToDestination(destination1, true, true, groupId);
                     } else {
                         setTimeout(() => {
-                            self.walkToDestination(destination1, false, false);
+                            self.walkToDestination(destination1, false, false, groupId);
                         }, 500);
                         setTimeout(() => {
-                            self.walkToDestination(destination1, true, false);
+                            self.walkToDestination(destination1, true, false, groupId);
                         }, 750);
                         setTimeout(() => {
-                            self.walkToDestination(destination1, true, true);
+                            self.walkToDestination(destination1, true, true, groupId);
                         }, 1000);
                     }
                 };
@@ -4816,19 +4817,21 @@
                     }, "go-on-land");
                 });
             },
-            walkToDestination: function (destination1, active, wizardWalk) {
-                if (active) {
+            walkToDestination: function (destination1, active, wizardWalk, groupId) {
+                const scene = this.el.sceneEl;
+                const currentGroup = scene.systems['draw-npc-indicator'].activeNpcIndicator?.groupId === groupId;
+                if (active && currentGroup) {
                     const cameraEl = document.querySelector("#camera-rig");
                     cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].getUnit()}`);
                 }
 
-                const knights = (NpcGroupDictionary.instance.data.get(scene.systems['draw-npc-indicator'].activeNpcIndicator?.groupId ?? "")?.knights ?? []);
+                const knights = (NpcGroupDictionary.instance.data.get(groupId ?? "")?.knights ?? []);
                 knights.forEach(npcEl => {
                     npcEl.components['globe-nav-agent'].walkToDestination(destination1, active, false);
                 });
 
                 if (wizardWalk) {
-                    const wizards = (NpcGroupDictionary.instance.data.get(scene.systems['draw-npc-indicator'].activeNpcIndicator?.groupId ?? "")?.wizards ?? []);
+                    const wizards = (NpcGroupDictionary.instance.data.get(groupId ?? "")?.wizards ?? []);
                         wizards.forEach(wizardEl => {
                         wizardEl.components['globe-nav-agent'].walkToDestination(destination1, active, wizardWalk);
                     });
