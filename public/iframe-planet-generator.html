@@ -4726,7 +4726,7 @@
                 }
                 if (!NpcGroupDictionary.instance.data.has(this.groupId)) {
                     if (this.system.activeNpcIndicator === this) {
-                        this.system.activeNpcIndicator = this.system.npcIndicatorGroups.find(x => !x.data.isSpawn) ?? null;
+                        this.system.activeNpcIndicator = this.system.npcIndicatorGroups.find(x => !x.data.isSpawn && x !== this) ?? null;
                     }
                     Array.from(document.querySelectorAll("[ghost-building]")).map(el => el.components['ghost-building']).forEach(c => {
                         if (c.currentSpawnIndicator === this) {
@@ -4842,7 +4842,7 @@
                     npcEl.components['globe-nav-agent'].walkToDestination(destination1, active, false);
                 });
 
-                if (wizardWalk) {
+                if (wizardWalk && currentGroup) {
                     const wizards = (NpcGroupDictionary.instance.data.get(groupId ?? "")?.wizards ?? []);
                         wizards.forEach(wizardEl => {
                         wizardEl.components['globe-nav-agent'].walkToDestination(destination1, active, wizardWalk);
@@ -5471,7 +5471,8 @@
                 const elapsedTime = time - this.startTimer;
                 if (elapsedTime >= this.data.timeBetweenSpawns) {
                     this.startTimer = null;
-                    const npc = this.data.npcType === "WIZARD" ? addWizardNpc() : addNpc();
+                    const hasWizard = !!NpcGroupDictionary.instance.data.get(this.npcMarkerId)?.wizards.length;
+                    const npc = this.data.npcType === "WARRIOR" ? hasWizard ? addNpc() : addWizardNpc() : addWizardNpc();
                     NpcGroupDictionary.instance.addNpc(this.npcMarkerId, npc);
                     const spawnPoint = new THREE.Vector3().copy(this.data.spawnPoint);
                     npc.components['globe-nav-agent'].walkToDestination(spawnPoint, true, false);
