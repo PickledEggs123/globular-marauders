@@ -4727,6 +4727,10 @@
                 if (!NpcGroupDictionary.instance.data.has(this.groupId)) {
                     if (this.system.activeNpcIndicator === this) {
                         this.system.activeNpcIndicator = this.system.npcIndicatorGroups.find(x => !x.data.isSpawn && x !== this) ?? null;
+                        if (this.system.activeNpcIndicator !== this && !!this.system.activeNpcIndicator) {
+                            const cameraEl = document.querySelector("#camera-rig");
+                            cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].getUnit()}`);
+                        }
                     }
                     Array.from(document.querySelectorAll("[ghost-building]")).map(el => el.components['ghost-building']).forEach(c => {
                         if (c.currentSpawnIndicator === this) {
