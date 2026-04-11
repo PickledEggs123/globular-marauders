@@ -4727,10 +4727,6 @@
                 if (!NpcGroupDictionary.instance.data.has(this.groupId)) {
                     if (this.system.activeNpcIndicator === this) {
                         this.system.activeNpcIndicator = this.system.npcIndicatorGroups.find(x => !x.data.isSpawn && x !== this) ?? null;
-                        if (this.system.activeNpcIndicator !== this && !!this.system.activeNpcIndicator) {
-                            const cameraEl = document.querySelector("#camera-rig");
-                            cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].getUnit()}`);
-                        }
                     }
                     Array.from(document.querySelectorAll("[ghost-building]")).map(el => el.components['ghost-building']).forEach(c => {
                         if (c.currentSpawnIndicator === this) {
@@ -4738,6 +4734,21 @@
                         }
                     });
                     this.el.removeAttribute(`draw-npc-indicator__${this.groupId}`);
+                }
+                if (!this.system.activeNpcIndicator) {
+                    const scene = document.querySelector("a-scene");
+                    scene.components['coin-purse'].setUnit(inverseUnitMap.get(scene.components['coin-purse'].activeUnit));
+                    const checkBox = document.querySelector(`#unit-selection-${scene.components['coin-purse'].activeUnit}`);
+                    checkBox.click();
+
+                    const ships = [
+                        ...scene.querySelectorAll(`.ship-1`),
+                        ...scene.querySelectorAll(`.ship-2`),
+                        ...scene.querySelectorAll(`.ship-3`),
+                    ];
+                    ships.forEach((ship) => {
+                        ship.setAttribute("globe-keyboard-controls", {enabled: true});
+                    });
                 }
             },
             updateIndicator: function (p) {
@@ -4836,6 +4847,7 @@
             walkToDestination: function (destination1, active, wizardWalk, groupId) {
                 const scene = this.el.sceneEl;
                 const currentGroup = scene.systems['draw-npc-indicator'].activeNpcIndicator?.groupId === groupId;
+                console.assert("active npc indicator has group", scene.systems['draw-npc-indicator'].activeNpcIndicator && scene.systems['draw-npc-indicator'].activeNpcIndicator.groupId);
                 if (active && currentGroup) {
                     const cameraEl = document.querySelector("#camera-rig");
                     cameraEl.setAttribute("look-at-box", `.${scene.components['coin-purse'].getUnit()}`);
@@ -7709,7 +7721,7 @@
                 const otherHousePositions = otherHouses.map(x => new THREE.Vector3().copy(x.components['position'].data));
                 let skipHouse = false;
                 for (const otherHousePosition of otherHousePositions) {
-                    if (otherHousePosition.distanceTo(position) < 3) {
+                    if (otherHousePosition.distanceTo(position) < 4) {
                         skipHouse = true;
                         break;
                     }
