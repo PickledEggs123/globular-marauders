@@ -2396,12 +2396,11 @@
                 this.dataPostfix = dataPostfix;
             },
             tick: function (t, dt) {
-                if (!this.box.length || !this.boxPos.length) {
-                    this.getElements();
-                }
+                this.getElements();
                 const box = [...this.box];
                 const boxPos = [...this.boxPos];
                 if (!box.length || !boxPos.length) {
+                    this.el.setAttribute("look-at-box", `.${scene.components['coin-purse'].getUnit()}`);
                     return;
                 }
 
