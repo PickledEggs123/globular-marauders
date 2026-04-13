@@ -4540,9 +4540,9 @@
                 const aKnights = Math.round(knights.length / 2);
                 const bKnights = knights.length - aKnights;
                 const aWizards = Math.round(wizards.length / 2);
-                const bWizards = wizards.length - bWizards;
+                const bWizards = wizards.length - aWizards;
 
-                if ((aKnights === 0 && aWizards === 0) || (bKnights === 0 && bWizards === 0)) {
+                if ((aWizards === 0) || (bWizards === 0)) {
                     return {
                         success: false,
                     };
@@ -8329,6 +8329,21 @@
                     buildMenuState.removeAttribute("apothecary-build");
 
                 } else if (this.data.selector === "split-npcs") {
+                    const scene = document.querySelector("a-scene");
+                    const activeNpcsId = scene.systems['draw-npc-indicator'].activeNpcIndicator?.groupId;
+                    if (!activeNpcsId) {
+                        return;
+                    }
+
+                    const ret = NpcGroupDictionary.instance.split(activeNpcsId);
+                    if (!ret.success) {
+                        return;
+                    }
+
+                    const groupId = ret.newId;
+                    scene.setAttribute(`draw-npc-indicator__${groupId}`, "isSpawn: false;");
+                    this.el.sceneEl.systems['draw-npc-indicator'].setActiveNpcIndicator(scene.components[`draw-npc-indicator__${groupId}`]);
+                    scene.components[`draw-npc-indicator__${groupId}`].groupId = groupId;
 
                 } else if (this.data.selector === "merge-npcs") {
 
