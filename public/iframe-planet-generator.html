@@ -4569,13 +4569,13 @@
                     wizards: bWizards,
                 } = this.data.get(bId);
 
-                aKnights.push(...bKnights.splice(0, bKnights.length));
-                aWizards.push(...bWizards.splice(0, bWizards.length));
-                this.data.delete(bId);
+                bKnights.push(...aKnights.splice(0, aKnights.length));
+                bWizards.push(...aWizards.splice(0, aWizards.length));
+                this.data.delete(aId);
 
                 return {
                     success: true,
-                    newId: aId,
+                    newId: bId,
                 };
             }
         }
@@ -4624,10 +4624,32 @@
                     entity.setAttribute("ui-clicked", "");
                     entity.addEventListener("click", () => {
                         if (!this.data.isSpawn) {
+                            const activeNpcsId = this.el.sceneEl.systems['draw-npc-indicator'].activeNpcIndicator?.groupId;
                             scene.systems['draw-npc-indicator'].setActiveNpcIndicator(this);
+
+                            if (window.mergeNpcsNextClick && activeNpcsId) {
+                                const newActiveNpcsId = this.el.sceneEl.systems['draw-npc-indicator'].activeNpcIndicator?.groupId;
+                                if (activeNpcsId && newActiveNpcsId && activeNpcsId !== newActiveNpcsId) {
+                                    const ret = NpcGroupDictionary.instance.merge(activeNpcsId, newActiveNpcsId);
+                                    const groupId = ret.newId;
+                                    scene.setAttribute(`draw-npc-indicator__${groupId}`, "isSpawn: false;");
+                                    window.mergeNpcsNextClick = false;
+                                }
+                            }
                         }
                         if (this.data.isSpawn) {
+                            const activeNpcsId = this.el.sceneEl.systems['draw-npc-indicator'].activeNpcIndicator?.groupId;
                             scene.systems['draw-npc-indicator'].setActiveNpcIndicator(this);
+
+                            if (window.mergeNpcsNextClick && activeNpcsId) {
+                                const newActiveNpcsId = this.el.sceneEl.systems['draw-npc-indicator'].activeNpcIndicator?.groupId;
+                                if (activeNpcsId && newActiveNpcsId && activeNpcsId !== newActiveNpcsId) {
+                                    const ret = NpcGroupDictionary.instance.merge(activeNpcsId, newActiveNpcsId);
+                                    const groupId = ret.newId;
+                                    scene.setAttribute(`draw-npc-indicator__${groupId}`, "isSpawn: false;");
+                                    window.mergeNpcsNextClick = false;
+                                }
+                            }
 
                             Array.from(document.querySelectorAll("[ghost-building]")).map(el => el.components['ghost-building']).forEach(c => {
                                 if (c.currentSpawnIndicator === this) {
@@ -4661,7 +4683,7 @@
                     const destination1 = e.detail?.point;
                     const immediate = e.detail?.immediate;
                     const self = e.detail?.self;
-                    const groupId = e.detail?.groupId;
+                    let groupId = e.detail?.groupId;
                     if (groupId !== this.groupId) return;
                     if (!this.currentIndicator) {
                         this.createIndicator(destination1);
@@ -8346,6 +8368,7 @@
                     scene.components[`draw-npc-indicator__${groupId}`].groupId = groupId;
 
                 } else if (this.data.selector === "merge-npcs") {
+                    window.mergeNpcsNextClick = true;
 
                 } else if (this.data.selector === "cancel-build") {
                     const buildMenuState = document.querySelector("#build-menu-state");
