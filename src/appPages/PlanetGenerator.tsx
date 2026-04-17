@@ -139,6 +139,15 @@ export const PlanetGenerator = () => {
                     // @ts-ignore
                     collidable: false,
                 }, x];
+            } else if (Object.values(x).filter(x => typeof(x) === "boolean").every(x => !x)) {
+                return [{
+                    ...x,
+                    attributes: [...x.attributes.filter(x => x.id === "aPosition")],
+                    // @ts-ignore
+                    physics: true,
+                    // @ts-ignore
+                    collidable: false,
+                }, x];
             } else {
                 return [x];
             }
