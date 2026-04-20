@@ -5280,16 +5280,19 @@
         });
 
         AFRAME.registerComponent('has-terrain-tile-physics', {
+            dependencies: ["terrain-tile", "position"],
             schema: {},
             init: function () {
                 this.innerAddPhysics = this.addPhysics.bind(this);
                 this.innerRemovePhysics = this.removePhysics.bind(this);
 
-                if (this.el.getObject3D("mesh")) {
-                    this.innerAddPhysics();
-                } else {
-                    this.el.addEventListener("model-loaded", this.innerAddPhysics);
-                }
+                this.hasActivePhysics = false;
+
+                // if (this.el.getObject3D("mesh")) {
+                //     this.innerAddPhysics();
+                // } else {
+                //     this.el.addEventListener("model-loaded", this.innerAddPhysics);
+                // }
                 this.el.addEventListener("add-physics", this.innerAddPhysics);
                 this.el.addEventListener("remove-physics", this.innerRemovePhysics);
             },
@@ -5298,6 +5301,7 @@
                 if (m) {
                     this.el.setAttribute("ammo-body", "type: static; gravity: 0 0 0; emitCollisionEvents: true;");
                     this.el.setAttribute("ammo-shape", "type: mesh; fit: auto;");
+                    this.hasActivePhysics = true;
                 } else {
                     this.el.addEventListener("model-loaded", this.innerAddPhysics, {
                         once: true,
@@ -5307,6 +5311,7 @@
             removePhysics: function () {
                 this.el.removeAttribute("ammo-body");
                 this.el.removeAttribute("ammo-shape");
+                this.hasActivePhysics = false;
             },
             remove: function () {
                 this.el.removeEventListener("model-loaded", this.innerAddPhysics);
@@ -5382,10 +5387,10 @@
                 const cameraPos = this.system.getCameraPos();
                 const cos45 = Math.acos(Math.PI / 4);
                 if (cameraPos.dot(tilePos) > cos45 && this.el.object3D.visible === false) {
-                    this.el.setAttribute("visible", "true");
+                    this.el.object3D.visible = true;
                 }
                 if (cameraPos.dot(tilePos) <= cos45 && this.el.object3D.visible === true) {
-                    this.el.setAttribute("visible", "false");
+                    this.el.object3D.visible = false;
                 }
 
                 // auto update clickable
@@ -5401,7 +5406,8 @@
                     if (this.el.components['tree-particles']) {
                         this.el.emit("add-tree");
                     }
-                } else if (!(cameraPos.dot(tilePos) > cos45) && this.el.classList.contains(className)) {
+                }
+                if (cameraPos.dot(tilePos) <= cos45 && this.el.classList.contains(className)) {
                     this.el.classList.remove(className);
                     if (this.el.components['has-terrain-tile-physics']) {
                         this.el.emit("remove-physics");
@@ -9467,7 +9473,7 @@
     </style>
 </head>
 <body>
-    <a-scene click-manager onclick="playMusic === true ? window.musicPlayer.start() : undefined" draw-ship-indicator coin-purse respawn physics="driver: ammo; gravity: 0 0 0; debug: false; debugDrawMode: 4294967295;" globe-nav="debug: true;" globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
+    <a-scene click-manager onclick="playMusic === true ? window.musicPlayer.start() : undefined" draw-ship-indicator coin-purse respawn physics="driver: ammo; gravity: 0 0 0; debug: false; debugDrawMode: 4294967295;" globe-nav="debug: false;" globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
         <a-assets>
             <template id="avatar-template">
                 <a-entity class="avatar" networked-audio-source>
