@@ -672,7 +672,7 @@
         });
 
         class NavMeshTriangles {
-            static GROUP_SIZE = 30;
+            static GROUP_SIZE = 50;
 
             constructor(geometry, sceneEl) {
                 this.sceneEl = sceneEl;
@@ -1387,12 +1387,16 @@
                 }
                 this.obbs.push(...obbs);
                 for (const obb of obbs) {
+                    let numObbGroupInserts = 0;
                     for (const group of this.groups) {
                         const shouldInsert = obb.center.distanceTo(group.vertex) < NavMeshTriangles.GROUP_SIZE;
                         if (shouldInsert) {
+                            numObbGroupInserts++;
                             group.obbs.push(obb);
                         }
                     }
+                    console.assert("inserted obb into at least 1 group", numObbGroupInserts > 0);
+                    console.assert("inserted obb into less than 6 groups", numObbGroupInserts <= 5);
                 }
                 // insert points into nav mesh
                 let alreadyInsertedIps = [];
