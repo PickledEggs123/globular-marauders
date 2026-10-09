@@ -948,6 +948,7 @@
                 throw new Error("Failed to compute circumcircle");
             }
             deletePoint(point, closestGroup) {
+                // find point to delete
                 const vertexIdxData = this.vertices.map((x, i) => [i, x.clone().normalize().dot(point.clone().normalize())]).filter(([,p]) => p >= 0.999);
                 const vertexIdx = vertexIdxData.reduce((acc, [i,p]) => p > acc[1] ? [i,p] : acc, [-1,-1])[0];
                 if (vertexIdx < 0) {
@@ -1054,12 +1055,14 @@
                                         this.indices.splice(currentIndex, 3, oppA, commonEdge[0][0], oppB);
                                         const f = this.makeFaceObject(currentIndex, true);
                                         delaunaySet.splice(idxA, 1, f);
+                                        this.faces.splice(currentIndex / 3, 1);
                                     }
                                     {
                                         const currentIndex = currentIndexBeforeDeletion + idxB * 3;
                                         this.indices.splice(currentIndex, 3, oppB, commonEdge[0][1], oppA);
                                         const f = this.makeFaceObject(currentIndex, true);
                                         delaunaySet.splice(idxB, 1, f);
+                                        this.faces.splice(currentIndex / 3, 1);
                                     }
 
                                     // iterate again
@@ -1070,6 +1073,9 @@
                     }
 
                     updateCount += 1;
+                    if (updateCount === 299) {
+                        debugger;
+                    }
                     if (updateCount >= 300) {
                         throw new Error("too many iterations in lawson flip algorithm");
                     }
@@ -1104,6 +1110,8 @@
                     if (f.b >= vertexIdx) f.b -= 1;
                     if (f.c >= vertexIdx) f.c -= 1;
                 }
+
+                console.assert("faces have correct curcumcircle", this.faces.every(f => Math.abs(this.vertices[f.a].dot(f.center) - this.vertices[f.b].dot(f.center)) < 0.001 &&  Math.abs(this.vertices[f.b].dot(f.center) - this.vertices[f.c].dot(f.center))));
             }
             insertPoint(point, closestGroup) {
                 this.nextIndex = this.vertices.length;
@@ -9473,7 +9481,7 @@
     </style>
 </head>
 <body>
-    <a-scene click-manager onclick="playMusic === true ? window.musicPlayer.start() : undefined" draw-ship-indicator coin-purse respawn physics="driver: ammo; gravity: 0 0 0; debug: false; debugDrawMode: 4294967295;" globe-nav="debug: false;" globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
+    <a-scene click-manager onclick="playMusic === true ? window.musicPlayer.start() : undefined" draw-ship-indicator coin-purse respawn physics="driver: ammo; gravity: 0 0 0; debug: false; debugDrawMode: 4294967295;" globe-nav="debug: true;" globe-ocean-nav embedded fog shadow="enabled: true" id="scene" webxr="referenceSpaceType: local; requiredFeatures: local;" embedded inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js">
         <a-assets>
             <template id="avatar-template">
                 <a-entity class="avatar" networked-audio-source>
