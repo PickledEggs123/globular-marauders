@@ -1050,19 +1050,31 @@
 
                                 // perform flip
                                 if (notLocallyDelaunay) {
+                                    const lawsonFlipOrder = [];
                                     {
                                         const currentIndex = currentIndexBeforeDeletion + idxA * 3;
-                                        this.indices.splice(currentIndex, 3, oppA, commonEdge[0][0], oppB);
-                                        const f = this.makeFaceObject(currentIndex, true);
-                                        delaunaySet.splice(idxA, 1, f);
-                                        this.faces.splice(currentIndex / 3, 1);
+                                        const func = () => {
+                                            this.indices.splice(currentIndex, 3, oppA, commonEdge[0][0], oppB);
+                                            const f = this.makeFaceObject(currentIndex, true);
+                                            delaunaySet.splice(idxA, 1, f);
+                                        };
+                                        lawsonFlipOrder.push([currentIndex, func]);
                                     }
                                     {
                                         const currentIndex = currentIndexBeforeDeletion + idxB * 3;
-                                        this.indices.splice(currentIndex, 3, oppB, commonEdge[0][1], oppA);
-                                        const f = this.makeFaceObject(currentIndex, true);
-                                        delaunaySet.splice(idxB, 1, f);
-                                        this.faces.splice(currentIndex / 3, 1);
+                                        const func = () => {
+                                            this.indices.splice(currentIndex, 3, oppB, commonEdge[0][1], oppA);
+                                            const f = this.makeFaceObject(currentIndex, true);
+                                            delaunaySet.splice(idxB, 1, f);
+                                        };
+                                        lawsonFlipOrder.push([currentIndex, func]);
+                                    }
+                                    if (lawsonFlipOrder[0][0] > lawsonFlipOrder[1][0]) {
+                                        lawsonFlipOrder[0][1]();
+                                        lawsonFlipOrder[1][1]();
+                                    } else {
+                                        lawsonFlipOrder[1][1]();
+                                        lawsonFlipOrder[0][1]();
                                     }
 
                                     // iterate again
