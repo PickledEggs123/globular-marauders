@@ -1365,7 +1365,7 @@
                     return obb;
                 }).reduce((acc, x) => {
                     const a = acc.halfSize.x * acc.halfSize.y * acc.halfSize.z;
-                    const b = x.halfSize.x * acc.halfSize.y * acc.halfSize.z;
+                    const b = x.halfSize.x * x.halfSize.y * x.halfSize.z;
                     return b > a ? x : acc;
                 })];
 
