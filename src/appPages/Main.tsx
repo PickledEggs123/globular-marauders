@@ -61,6 +61,23 @@ export const Main = () => {
                                                     ))
                                                 }
                                             </Carousel>
+                                            <Typography variant="h4">
+                                                <Carousel autoplay wrapMode="wrap">
+                                                    {
+                                                        [{
+                                                            url: 'WebGL / ThreeJS / AframeVR',
+                                                        }, {
+                                                            url: '3D Algorithms',
+                                                        }, {
+                                                            url: 'Real Time Strategy / Pirate Ships',
+                                                        }, {
+                                                            url: 'WebSockets / Redis',
+                                                        }].map(item => (
+                                                            <div style={{minWidth: 256}} key={item.url}>{item.url}</div>
+                                                        ))
+                                                    }
+                                                </Carousel>
+                                            </Typography>
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -94,6 +111,21 @@ export const Main = () => {
                                                     ))
                                                 }
                                             </Carousel>
+                                            <Typography variant="h4">
+                                                <Carousel autoplay wrapMode="wrap">
+                                                    {
+                                                        [{
+                                                            url: 'Simple AI Agent',
+                                                        }, {
+                                                            url: 'Powered by Gemini',
+                                                        }, {
+                                                            url: 'ChatBot',
+                                                        }].map(item => (
+                                                            <div style={{minWidth: 256}} key={item.url}>{item.url}</div>
+                                                        ))
+                                                    }
+                                                </Carousel>
+                                            </Typography>
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -112,6 +144,23 @@ export const Main = () => {
                                             better working language detector which is a little buggy on small amount of text
                                             because it was trained using a single book or two.
                                             <a href="https://tyler-truong-ml-demo.com/about">Tyler Truong ML Demo</a>
+                                        </Typography>
+                                        <Typography variant="h4">
+                                            <div style={{width: 256, margin: '0 auto'}}>
+                                                <Carousel autoplay wrapMode="wrap">
+                                                    {
+                                                        [{
+                                                            url: 'Machine Learning',
+                                                        }, {
+                                                            url: '2D Algorithms',
+                                                        }, {
+                                                            url: 'Weak Subject Matter',
+                                                        }].map(item => (
+                                                            <div style={{minWidth: 256}} key={item.url}>{item.url}</div>
+                                                        ))
+                                                    }
+                                                </Carousel>
+                                            </div>
                                         </Typography>
                                     </CardContent>
                                 </Card>
@@ -138,6 +187,23 @@ export const Main = () => {
                                             geometry and OpenFlight defines the geometry, it was a matter of converting a
                                             binary file into C# and then into Unity.
                                         </Typography>
+                                        <Typography variant="h4">
+                                            <div style={{width: 256, margin: '0 auto'}}>
+                                                <Carousel autoplay wrapMode="wrap">
+                                                    {
+                                                        [{
+                                                            url: '3D Graphics',
+                                                        }, {
+                                                            url: 'OpenGL',
+                                                        }, {
+                                                            url: 'Unity3D',
+                                                        }].map(item => (
+                                                            <div style={{minWidth: 256}} key={item.url}>{item.url}</div>
+                                                        ))
+                                                    }
+                                                </Carousel>
+                                            </div>
+                                        </Typography>
                                     </CardContent>
                                 </Card>
                             </FadeIntoView>
@@ -155,6 +221,27 @@ export const Main = () => {
                                             the world and need to know which part number is replaced by or obsoleted so
                                             service technicians can order the correct part or assembly or wire harness
                                             to repair a tractor.
+                                        </Typography>
+                                        <Typography variant="h4">
+                                            <div style={{width: 256, margin: '0 auto'}}>
+                                                <Carousel autoplay wrapMode="wrap">
+                                                    {
+                                                        [{
+                                                            url: 'Web Development',
+                                                        }, {
+                                                            url: 'NodeJS',
+                                                        }, {
+                                                            url: 'React',
+                                                        }, {
+                                                            url: 'MySQL',
+                                                        }, {
+                                                            url: 'Stored Procedures',
+                                                        }].map(item => (
+                                                            <div style={{minWidth: 256}} key={item.url}>{item.url}</div>
+                                                        ))
+                                                    }
+                                                </Carousel>
+                                            </div>
                                         </Typography>
                                     </CardContent>
                                 </Card>
@@ -179,6 +266,27 @@ export const Main = () => {
                                         <Typography variant="body1">
                                             The rest of the team designed every button and dropdown and the color scheme
                                             for the website. They also wrote some Jest Tests and Mocha Tests.
+                                        </Typography>
+                                        <Typography variant="h4">
+                                            <div style={{width: 256, margin: '0 auto'}}>
+                                                <Carousel autoplay wrapMode="wrap">
+                                                    {
+                                                        [{
+                                                            url: '2D Graphics',
+                                                        }, {
+                                                            url: 'Touch Screen',
+                                                        }, {
+                                                            url: 'Unit Testing',
+                                                        }, {
+                                                            url: 'Integration Testing',
+                                                        }, {
+                                                            url: 'Web Sockets',
+                                                        }].map(item => (
+                                                            <div style={{minWidth: 256}} key={item.url}>{item.url}</div>
+                                                        ))
+                                                    }
+                                                </Carousel>
+                                            </div>
                                         </Typography>
                                     </CardContent>
                                 </Card>
@@ -209,6 +317,31 @@ export const Main = () => {
                                             and their 250k models. Robert, the now retired StatusQuote President, acquired the AutoLISP for CustomBlocks
                                             and wrote must of the legacy code.
                                         </Typography>
+                                        <Typography variant="h4">
+                                            <div style={{width: 256, margin: '0 auto'}}>
+                                                <Carousel autoplay wrapMode="wrap">
+                                                    {
+                                                        [{
+                                                            url: 'Windows Presentation Foundation',
+                                                        }, {
+                                                            url: 'WinForms',
+                                                        }, {
+                                                            url: 'Windows Services',
+                                                        }, {
+                                                            url: 'Rest API',
+                                                        }, {
+                                                            url: '3D Graphics',
+                                                        }, {
+                                                            url: 'CAD Processing',
+                                                        }, {
+                                                            url: 'Revit Processing',
+                                                        }].map(item => (
+                                                            <div style={{minWidth: 256}} key={item.url}>{item.url}</div>
+                                                        ))
+                                                    }
+                                                </Carousel>
+                                            </div>
+                                        </Typography>
                                     </CardContent>
                                 </Card>
                             </FadeIntoView>
@@ -231,6 +364,25 @@ export const Main = () => {
                                             I hope this is a great resume project containing a mixture of 3d graphics,
                                             react front end, and basic material styling with a NodeJS backend. It's hosted
                                             on Google Cloud Run and Google Cloud SQL.
+                                        </Typography>
+                                        <Typography variant="h4">
+                                            <div style={{width: 256, margin: '0 auto'}}>
+                                                <Carousel autoplay wrapMode="wrap">
+                                                    {
+                                                        [{
+                                                            url: 'Windows Application Programmer',
+                                                        }, {
+                                                            url: '3D Graphics Programmer',
+                                                        }, {
+                                                            url: '2D Graphics Programmer',
+                                                        }, {
+                                                            url: 'Web Developer',
+                                                        }].map(item => (
+                                                            <div style={{minWidth: 256}} key={item.url}>{item.url}</div>
+                                                        ))
+                                                    }
+                                                </Carousel>
+                                            </div>
                                         </Typography>
                                     </CardContent>
                                 </Card>
