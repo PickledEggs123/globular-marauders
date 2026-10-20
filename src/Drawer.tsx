@@ -26,10 +26,11 @@ import {ThemeContext} from "./contextes/ThemeContext";
 import {
     doCreateUserWithEmailAndPassword,
     doSignInWithEmailAndPassword,
-    doSignInWIthGoogle,
+    doSignInWithGoogle,
     doSignOut
 } from "./contextes/auth/auth";
 import {useAuth} from "./contextes/auth";
+import Script from "next/script";
 
 const drawerWidth = 180;
 
@@ -146,6 +147,10 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
 
     return (
         <div>
+            <Script src="https://www.google.com/recaptcha/enterprise.js?render=6LewlvgtAAAAAMEpxjpOtWHFYv9ahixufjudlQpt"
+                    strategy="afterInteractive"
+                    onLoad={() => console.log("Recaptcha script loaded")}>
+            </Script>
             <Modal open={showLoginModal} onClose={toggleLoginModal} aria-labelledby="login screen" aria-describedby="A list of login providers">
                 <Container>
                     <Paper sx={{margin: '24px 24px', textAlign: 'center'}}>
@@ -203,7 +208,7 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
                                         </Grid>
                                         <Grid item xs={12} md={6}>
                                             <Paper>
-                                                <IconButton onClick={doSignInWIthGoogle}><Google/></IconButton>
+                                                <IconButton onClick={doSignInWithGoogle}><Google/></IconButton>
                                             </Paper>
                                         </Grid>
                                     </Grid>

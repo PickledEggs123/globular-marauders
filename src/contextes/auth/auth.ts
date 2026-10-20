@@ -1,12 +1,17 @@
+"use client";
+
 import {auth} from "../../firebase/firebase";
 import {
     createUserWithEmailAndPassword,
-    GoogleAuthProvider,
     sendEmailVerification,
     sendPasswordResetEmail,
     signInWithEmailAndPassword,
-    signInWithPopup
+    signInWithPopup,
+    signOut,
+    GoogleAuthProvider
 } from "firebase/auth";
+
+const googleProvider = new GoogleAuthProvider();
 
 export const doCreateUserWithEmailAndPassword = async (email: string, password: string) => {
     return createUserWithEmailAndPassword(auth, email, password);
@@ -16,13 +21,24 @@ export const doSignInWithEmailAndPassword = async (email: string, password: stri
     return signInWithEmailAndPassword(auth, email, password);
 }
 
-export const doSignInWIthGoogle = async () => {
-    const provider = new GoogleAuthProvider();
-    return await signInWithPopup(auth, provider);
-}
+export const doSignInWithGoogle = async () => {
+    try {
+        const result = await signInWithPopup(auth, googleProvider);
+        console.log("Successfully logged in:", result.user);
+    } catch (error) {
+        // @ts-ignore
+        console.error("Login failed:", error.message);
+    }
+};
 
 export const doSignOut = async () => {
-    return auth.signOut();
+    try {
+        await signOut(auth);
+        console.log("Logged out successfully");
+    } catch (error) {
+        // @ts-ignore
+        console.error("Logout failed:", error.message);
+    }
 };
 
 export const doPasswordReset = async (email: string) => {

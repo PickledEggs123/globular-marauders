@@ -74,24 +74,15 @@ export const ChatRoom = () => {
     const handleSendChat = async (e: React.SyntheticEvent) => {
         e.preventDefault();
 
-        try {
-            const msg = chatValue;
-            setChatValue("");
-            setChatDisabled(true);
-            setChatHistory([
-                ...chatHistory,
-                {
-                    sender: true,
-                    name: currentUser?.displayName ?? undefined,
-                    message: msg,
-                    photoURL: currentUser?.photoURL ?? undefined,
-                },
-            ]);
-            const res = await context.chat.sendMessageStream(msg);
-            let text = '';
-            for await (const chunk of res.stream) {
-                const chunkText = chunk.text();
-                text += chunkText;
+        // @ts-ignore
+        grecaptcha.enterprise.ready(async () => {
+            // @ts-ignore
+            const token = await grecaptcha.enterprise.execute('6LewlvgtAAAAAMEpxjpOtWHFYv9ahixufjudlQpt', {action: 'LOGIN'});
+
+            try {
+                const msg = chatValue;
+                setChatValue("");
+                setChatDisabled(true);
                 setChatHistory([
                     ...chatHistory,
                     {
@@ -100,17 +91,32 @@ export const ChatRoom = () => {
                         message: msg,
                         photoURL: currentUser?.photoURL ?? undefined,
                     },
-                    {
-                        sender: false,
-                        name: "Gemini",
-                        message: text,
-                        photoURL: undefined,
-                    },
                 ]);
+                const res = await context.chat.sendMessageStream(msg);
+                let text = '';
+                for await (const chunk of res.stream) {
+                    const chunkText = chunk.text();
+                    text += chunkText;
+                    setChatHistory([
+                        ...chatHistory,
+                        {
+                            sender: true,
+                            name: currentUser?.displayName ?? undefined,
+                            message: msg,
+                            photoURL: currentUser?.photoURL ?? undefined,
+                        },
+                        {
+                            sender: false,
+                            name: "Gemini",
+                            message: text,
+                            photoURL: undefined,
+                        },
+                    ]);
+                }
+            } finally {
+                setChatDisabled(false);
             }
-        } finally {
-            setChatDisabled(false);
-        }
+        });
     };
 
     const chatRoom = userLoggedIn ? (
