@@ -1,7 +1,7 @@
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 import {Analytics, getAnalytics} from "firebase/analytics";
-import {getAI, getGenerativeModel, GoogleAIBackend } from "firebase/ai";
+import {getAI, getGenerativeModel, VertexAIBackend } from "firebase/vertexai";
 import { initializeApp, getApps } from "firebase/app";
 import { getAuth } from "firebase/auth";
 
@@ -25,8 +25,8 @@ if (typeof window !== 'undefined') {
 }
 const auth = getAuth(app);
 
-const ai = getAI(app, { backend: new GoogleAIBackend() });
+const ai = getAI(app, { backend: new VertexAIBackend() });
 const model = getGenerativeModel(ai, { model: "gemini-3.8-flash" });
 
-export { app, analytics, auth, model };
+export { app, analytics, auth, model, ai };
 

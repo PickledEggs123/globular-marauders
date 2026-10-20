@@ -15,8 +15,11 @@ import {
 } from "@mui/material";
 import { useAuth } from "../contextes/auth";
 import { WebsiteDrawer2 } from "../Drawer";
-import { model } from "../firebase/firebase";
+import { model, app } from "../firebase/firebase";
 import Markdown from "react-markdown";
+
+import "../app/recaptcha-client";
+import {ChatSession} from "firebase/ai";
 
 interface IChatMessage {
     sender: boolean;
@@ -78,6 +81,14 @@ export const ChatRoom = () => {
         grecaptcha.enterprise.ready(async () => {
             // @ts-ignore
             const token = await grecaptcha.enterprise.execute('6LewlvgtAAAAAMEpxjpOtWHFYv9ahixufjudlQpt', {action: 'LOGIN'});
+            const result = await fetch("/api/verify-recaptcha", {
+                body: JSON.stringify({token}),
+                method: 'POST',
+            });
+            const verifyResult = await result.json();
+            if (!verifyResult.success) {
+                return;
+            }
 
             try {
                 const msg = chatValue;
@@ -92,9 +103,10 @@ export const ChatRoom = () => {
                         photoURL: currentUser?.photoURL ?? undefined,
                     },
                 ]);
-                const res = await context.chat.sendMessageStream(msg);
+                const res = await model.generateContentStream(msg);
                 let text = '';
                 for await (const chunk of res.stream) {
+                    console.log(res.stream, chunk);
                     const chunkText = chunk.text();
                     text += chunkText;
                     setChatHistory([
