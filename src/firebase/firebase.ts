@@ -27,11 +27,6 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0
 
 const reCaptchaEnterpriseProvider = new ReCaptchaEnterpriseProvider("6LfTgfctAAAAACxKTzZAKBuFKkUPlYDdVCzy69sy");
 
-if (window.location.hostname === "localhost") {
-// @ts-ignore
-    self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-}
-
 const appCheck= initializeAppCheck(app, {
     provider: reCaptchaEnterpriseProvider,
     isTokenAutoRefreshEnabled: true,

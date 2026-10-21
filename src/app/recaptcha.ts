@@ -34,6 +34,7 @@ export async function createAssessment({
     const [ response ] = await client.createAssessment(request);
 
     // Check if the token is valid.
+    // @ts-ignore
     if (!response.tokenProperties.valid) {
         console.log(`The CreateAssessment call failed because the token was: ${response.tokenProperties.invalidReason}`);
         return null;
@@ -41,16 +42,19 @@ export async function createAssessment({
 
     // Check if the expected action was executed.
     // The `action` property is set by user client in the grecaptcha.enterprise.execute() method.
+    // @ts-ignore
     if (response.tokenProperties.action === recaptchaAction) {
         // Get the risk score and the reason(s).
         // For more information on interpreting the assessment, see:
         // https://cloud.google.com/recaptcha/docs/interpret-assessment
+        // @ts-ignore
         console.log(`The reCAPTCHA score is: ${response.riskAnalysis.score}`);
         // @ts-ignore
         response.riskAnalysis.reasons.forEach((reason) => {
             console.log(reason);
         });
 
+        // @ts-ignore
         return response.riskAnalysis.score;
     } else {
         console.log("The action attribute in your reCAPTCHA tag does not match the action you are expecting to score");
