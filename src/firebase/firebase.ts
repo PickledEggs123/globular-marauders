@@ -7,7 +7,8 @@ import {getAI, getGenerativeModel, VertexAIBackend } from "firebase/vertexai";
 import { initializeApp, getApps } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import {ReCaptchaEnterpriseProvider} from "@firebase/app-check";
-import {initializeAppCheck} from "firebase/app-check";
+import {initializeAppCheck, AppCheck} from "firebase/app-check";
+import firebase from "firebase/compat/app";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDaEhI8P6kcHnJN3mGcDtvi-a0ICMDl2a4",
@@ -27,10 +28,14 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0
 
 const reCaptchaEnterpriseProvider = new ReCaptchaEnterpriseProvider("6LfTgfctAAAAACxKTzZAKBuFKkUPlYDdVCzy69sy");
 
-const appCheck= initializeAppCheck(app, {
-    provider: reCaptchaEnterpriseProvider,
-    isTokenAutoRefreshEnabled: true,
-});
+// @ts-ignore
+let appCheck: AppCheck | null = null;
+if (typeof window !== 'undefined') {
+    appCheck = initializeAppCheck(app, {
+        provider: reCaptchaEnterpriseProvider,
+        isTokenAutoRefreshEnabled: true,
+    });
+}
 
 let analytics: Analytics | null = null;
 if (typeof window !== 'undefined') {
