@@ -8,7 +8,6 @@ import { initializeApp, getApps } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import {ReCaptchaEnterpriseProvider} from "@firebase/app-check";
 import {initializeAppCheck, AppCheck} from "firebase/app-check";
-import firebase from "firebase/compat/app";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDaEhI8P6kcHnJN3mGcDtvi-a0ICMDl2a4",
@@ -21,16 +20,21 @@ const firebaseConfig = {
     measurementId: "G-3LX0SX33N5"
 };
 
-
 // Initialize Firebase
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+const app = getApps().length === 0 ? initializeApp(firebaseConfig, {
+
+}) : getApps()[0];
 
 
-const reCaptchaEnterpriseProvider = new ReCaptchaEnterpriseProvider("6LfTgfctAAAAACxKTzZAKBuFKkUPlYDdVCzy69sy");
+const reCaptchaEnterpriseProvider = new ReCaptchaEnterpriseProvider("6LewlvgtAAAAAMEpxjpOtWHFYv9ahixufjudlQpt");
 
-// @ts-ignore
 let appCheck: AppCheck | null = null;
 if (typeof window !== 'undefined') {
+    if (window.location.hostname === "localhost") {
+        // @ts-ignore
+        self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+    }
+
     appCheck = initializeAppCheck(app, {
         provider: reCaptchaEnterpriseProvider,
         isTokenAutoRefreshEnabled: true,
@@ -43,8 +47,10 @@ if (typeof window !== 'undefined') {
 }
 const auth = getAuth(app);
 
-const ai = getAI(app, { backend: new VertexAIBackend() });
-const model = getGenerativeModel(ai, { model: "gemini-3.8-flash" });
+const getModel = () => {
+    const ai = getAI(app, { backend: new VertexAIBackend() });
+    return getGenerativeModel(ai, { model: "gemini-3.8-flash" });
+};
 
-export { app, analytics, auth, model, ai };
+export { app, analytics, auth, getModel, appCheck };
 

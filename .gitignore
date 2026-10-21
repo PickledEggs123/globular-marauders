@@ -24,3 +24,4 @@ next-env.d.ts
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+/src/firebase/tyler-truong-demos-firebase-adminsdk-8jdsg-376fa6d4eb.json

@@ -15,8 +15,9 @@ import {
 } from "@mui/material";
 import { useAuth } from "../contextes/auth";
 import { WebsiteDrawer2 } from "../Drawer";
-import { model } from "../firebase/firebase";
+import {getModel} from "../firebase/firebase";
 import Markdown from "react-markdown";
+import { ChatSession } from "firebase/ai";
 
 interface IChatMessage {
     sender: boolean;
@@ -63,7 +64,7 @@ export const ChatRoom = () => {
     const [chatHistory, setChatHistory] = useState<IChatMessage[]>([]);
     const [chatDisabled, setChatDisabled] = useState<boolean>(false);
     const [context] = useState({
-        chat: model.startChat({})
+        chat: null as ChatSession | null,
     });
 
     const handleChatChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -76,19 +77,20 @@ export const ChatRoom = () => {
 
         // @ts-ignore
         grecaptcha.enterprise.ready(async () => {
-            const action = 'AI_SUBMIT';
-            // @ts-ignore
-            const token = await grecaptcha.enterprise.execute('6LewlvgtAAAAAMEpxjpOtWHFYv9ahixufjudlQpt', {action});
-            const result = await fetch("/api/verify-recaptcha", {
-                body: JSON.stringify({token, action}),
-                method: 'POST',
-            });
-            const verifyResult = await result.json();
-            if (!verifyResult.success) {
-                return;
-            }
-
             try {
+                const action = 'AI_SUBMIT_CHAT';
+                // @ts-ignore
+                const token = await grecaptcha.enterprise.execute('6LewlvgtAAAAAMEpxjpOtWHFYv9ahixufjudlQpt', {action});
+                const result = await fetch("/api/verify-recaptcha", {
+                    body: JSON.stringify({token, action}),
+                    headers: { "Content-Type": "application/json" },
+                    method: 'POST',
+                });
+                const verifyResult = await result.json();
+                if (!verifyResult.success) {
+                    return;
+                }
+
                 const msg = chatValue;
                 setChatValue("");
                 setChatDisabled(true);
@@ -101,6 +103,8 @@ export const ChatRoom = () => {
                         photoURL: currentUser?.photoURL ?? undefined,
                     },
                 ]);
+                const model = getModel();
+                context.chat = model.startChat();
                 const res = await model.generateContentStream(msg);
                 let text = '';
                 for await (const chunk of res.stream) {
