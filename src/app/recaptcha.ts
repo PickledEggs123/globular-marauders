@@ -1,4 +1,4 @@
-const {RecaptchaEnterpriseServiceClient} = require('@google-cloud/recaptcha-enterprise');
+import {RecaptchaEnterpriseServiceClient} from '@google-cloud/recaptcha-enterprise';
 
 /**
  * Create an assessment to analyze the risk of a UI action.
@@ -8,7 +8,7 @@ const {RecaptchaEnterpriseServiceClient} = require('@google-cloud/recaptcha-ente
  * token: The generated token obtained from the client.
  * recaptchaAction: Action name corresponding to the token.
  */
-async function createAssessment({
+export async function createAssessment({
                                     // TODO: Replace the token and reCAPTCHA action variables before running the sample.
                                     projectID = "tyler-truong-demos",
                                     recaptchaKey = "6LewlvgtAAAAAMEpxjpOtWHFYv9ahixufjudlQpt",

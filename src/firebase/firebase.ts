@@ -1,9 +1,13 @@
+"use client";
+
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 import {Analytics, getAnalytics} from "firebase/analytics";
 import {getAI, getGenerativeModel, VertexAIBackend } from "firebase/vertexai";
 import { initializeApp, getApps } from "firebase/app";
 import { getAuth } from "firebase/auth";
+import {ReCaptchaEnterpriseProvider} from "@firebase/app-check";
+import {initializeAppCheck} from "firebase/app-check";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDaEhI8P6kcHnJN3mGcDtvi-a0ICMDl2a4",
@@ -19,6 +23,20 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+
+
+const reCaptchaEnterpriseProvider = new ReCaptchaEnterpriseProvider("6LfTgfctAAAAACxKTzZAKBuFKkUPlYDdVCzy69sy");
+
+if (window.location.hostname === "localhost") {
+// @ts-ignore
+    self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+}
+
+const appCheck= initializeAppCheck(app, {
+    provider: reCaptchaEnterpriseProvider,
+    isTokenAutoRefreshEnabled: true,
+});
+
 let analytics: Analytics | null = null;
 if (typeof window !== 'undefined') {
     analytics = getAnalytics(app);

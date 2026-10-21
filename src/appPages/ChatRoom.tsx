@@ -15,11 +15,8 @@ import {
 } from "@mui/material";
 import { useAuth } from "../contextes/auth";
 import { WebsiteDrawer2 } from "../Drawer";
-import { model, app } from "../firebase/firebase";
+import { model } from "../firebase/firebase";
 import Markdown from "react-markdown";
-
-import "../app/recaptcha-client";
-import {ChatSession} from "firebase/ai";
 
 interface IChatMessage {
     sender: boolean;
@@ -79,10 +76,11 @@ export const ChatRoom = () => {
 
         // @ts-ignore
         grecaptcha.enterprise.ready(async () => {
+            const action = 'AI_SUBMIT';
             // @ts-ignore
-            const token = await grecaptcha.enterprise.execute('6LewlvgtAAAAAMEpxjpOtWHFYv9ahixufjudlQpt', {action: 'LOGIN'});
+            const token = await grecaptcha.enterprise.execute('6LewlvgtAAAAAMEpxjpOtWHFYv9ahixufjudlQpt', {action});
             const result = await fetch("/api/verify-recaptcha", {
-                body: JSON.stringify({token}),
+                body: JSON.stringify({token, action}),
                 method: 'POST',
             });
             const verifyResult = await result.json();

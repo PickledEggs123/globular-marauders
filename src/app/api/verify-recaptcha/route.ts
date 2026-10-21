@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import {createAssessment} from "../../recaptcha";
 
 export async function POST(req: NextRequest) {
-    const { token } = await req.json();
-    const response = await fetch(
-        `https://www.google.com/recaptcha/api/siteverify?secret=6LewlvgtAAAAALEjOEEs0nqfvj3Vh_ybzdSvhTYs&response=${token}`
-    );
-    const data = await response.json();
-    if (data.success) {
+    const { token, action } = await req.json();
+    const data = await createAssessment({
+        token,
+        recaptchaAction: action,
+    });
+    // @ts-ignore
+    if (data && data.riskAnalysis.score >= 0.5) {
         return NextResponse.json({ success: true });
     }
     return NextResponse.json({ success: false });
