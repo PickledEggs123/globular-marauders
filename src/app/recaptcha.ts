@@ -36,6 +36,7 @@ export async function createAssessment({
     // Check if the token is valid.
     // @ts-ignore
     if (!response.tokenProperties.valid) {
+        // @ts-ignore
         console.log(`The CreateAssessment call failed because the token was: ${response.tokenProperties.invalidReason}`);
         return null;
     }
