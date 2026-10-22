@@ -5,6 +5,8 @@ WORKDIR /app
 COPY . .
 
 ARG _GITHUB_ACCESS_TOKEN
+ARG NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+ENV NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}
 
 RUN echo "always-auth=true" > ~/.npmrc
 RUN echo "//npm.pkg.github.com/:_authToken=${_GITHUB_ACCESS_TOKEN}" >> ~/.npmrc
