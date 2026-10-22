@@ -15,7 +15,7 @@ import {
 } from "@mui/material";
 import { useAuth } from "../contextes/auth";
 import { WebsiteDrawer2 } from "../Drawer";
-import {getModel} from "../firebase/firebase";
+import {getModel,ai} from "../firebase/firebase";
 import Markdown from "react-markdown";
 import { ChatSession } from "firebase/ai";
 
