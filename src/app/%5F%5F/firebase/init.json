@@ -1,10 +1,10 @@
 {
-  "apiKey": "AIzaSyAkk7hfAbj-S1jCO9gU3nOlJnYP6bpvzCM",
-  "appId": "1:718992339134:web:d18c2dabd9e9c9421b2eef",
+  "apiKey": "AIzaSyDaEhI8P6kcHnJN3mGcDtvi-a0ICMDl2a4",
+  "appId": "1:718992339134:web:2979f0faa1bd18491b2eef",
   "authDomain": "globularmarauders.com",
   "databaseURL": "https://tyler-truong-demos.firebaseio.com",
-  "measurementId": "G-EBDQBEQHDM",
-  "messagingSenderId": "718992339134",
   "projectId": "tyler-truong-demos",
-  "storageBucket": "tyler-truong-demos.appspot.com"
+  "storageBucket": "tyler-truong-demos.firebasestorage.app",
+  "messagingSenderId": "718992339134",
+  "measurementId": "G-3LX0SX33N5"
 }
