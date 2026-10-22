@@ -75,8 +75,22 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
     }, []);
 
     useEffect(() => {
+        auth.onAuthStateChanged((user) => {
+            console.log("USER", user);
+            if (!user) {
+                setUserLoggedIn(false);
+                setCurrentUser(null);
+            } else {
+                setUserLoggedIn(true);
+                setCurrentUser(user);
+            }
+        });
         getRedirectResult(auth).then(redirectResult => {
             console.log(auth);
+            if (auth.currentUser) {
+                setUserLoggedIn(true);
+                setCurrentUser(auth.currentUser);
+            }
             if (!redirectResult) {
                 setUserLoggedIn(false);
                 setCurrentUser(null);
@@ -89,7 +103,9 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
         });
     }, []);
 
-    const handleLogin = async () => {
+    const handleLogin = async (event: React.SyntheticEvent) => {
+        event.preventDefault();
+
         await signInWithRedirect(auth, googleProvider);
     };
 
