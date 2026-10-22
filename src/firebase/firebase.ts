@@ -11,7 +11,7 @@ import {initializeAppCheck, AppCheck} from "firebase/app-check";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDaEhI8P6kcHnJN3mGcDtvi-a0ICMDl2a4",
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    authDomain: "globularmarauders.com",
     databaseURL: "https://tyler-truong-demos.firebaseio.com",
     projectId: "tyler-truong-demos",
     storageBucket: "tyler-truong-demos.firebasestorage.app",

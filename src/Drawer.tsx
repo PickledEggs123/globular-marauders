@@ -76,6 +76,7 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
 
     useEffect(() => {
         getRedirectResult(auth).then(redirectResult => {
+            console.log(auth);
             if (!redirectResult) {
                 setUserLoggedIn(false);
                 setCurrentUser(null);
