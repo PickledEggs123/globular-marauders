@@ -26,11 +26,12 @@ import {ThemeContext} from "./contextes/ThemeContext";
 import {
     doCreateUserWithEmailAndPassword,
     doSignInWithEmailAndPassword,
-    doSignInWithGoogle,
-    doSignOut
+    doSignOut,
 } from "./contextes/auth/auth";
 import {useAuth} from "./contextes/auth";
 import Script from "next/script";
+import {getRedirectResult, signInWithRedirect, User, GoogleAuthProvider} from "firebase/auth";
+import {auth} from "./firebase/firebase";
 
 const drawerWidth = 180;
 
@@ -46,7 +47,8 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
     rightSide: React.ReactNode | null,
     content: React.ReactNode,
 }) => {
-    const {userLoggedIn, currentUser} = useAuth();
+    const [userLoggedIn, setUserLoggedIn] = useState<boolean>(false);
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
     const {theme, toggleTheme} = useContext(ThemeContext);
     const ref = useRef<HTMLDivElement | null>(null);
     const [mobileOpen, setMobileOpen] = useState<boolean>(false);
@@ -72,6 +74,24 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
             clearInterval(interval);
         };
     }, []);
+
+    useEffect(() => {
+        getRedirectResult(auth).then(redirectResult => {
+            if (!redirectResult) {
+                setUserLoggedIn(false);
+                setCurrentUser(null);
+            } else {
+                setUserLoggedIn(true);
+                setCurrentUser(redirectResult.user);
+            }
+        }).catch((error) => {
+            console.error("Error getting redirect result:", error);
+        });
+    }, []);
+
+    const handleLogin = async () => {
+        await signInWithRedirect(auth, new GoogleAuthProvider());
+    };
 
     const handleDrawerToggle = () => {
         setMobileOpen(!mobileOpen);
@@ -208,7 +228,7 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
                                         </Grid>
                                         <Grid item xs={12} md={6}>
                                             <Paper>
-                                                <IconButton onClick={doSignInWithGoogle}><Google/></IconButton>
+                                                <IconButton onClick={handleLogin}><Google/></IconButton>
                                             </Paper>
                                         </Grid>
                                     </Grid>
