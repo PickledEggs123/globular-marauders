@@ -1,6 +1,6 @@
 'use client';
 
-import React, {useCallback, useContext, useEffect, useRef, useState} from "react";
+import React, {useContext, useEffect, useRef, useState} from "react";
 import {
     AppBar, Button, Container,
     Drawer, FormControl, FormControlLabel,
@@ -26,11 +26,10 @@ import {ThemeContext} from "./contextes/ThemeContext";
 import {
     doCreateUserWithEmailAndPassword,
     doSignInWithEmailAndPassword,
-    doSignOut,
+    doSignOut, googleProvider,
 } from "./contextes/auth/auth";
-import {useAuth} from "./contextes/auth";
 import Script from "next/script";
-import {getRedirectResult, signInWithRedirect, User, GoogleAuthProvider} from "firebase/auth";
+import {getRedirectResult, signInWithRedirect, User} from "firebase/auth";
 import {auth} from "./firebase/firebase";
 
 const drawerWidth = 180;
@@ -90,7 +89,7 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
     }, []);
 
     const handleLogin = async () => {
-        await signInWithRedirect(auth, new GoogleAuthProvider());
+        await signInWithRedirect(auth, googleProvider);
     };
 
     const handleDrawerToggle = () => {
