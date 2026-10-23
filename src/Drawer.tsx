@@ -76,7 +76,6 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
 
     useEffect(() => {
         auth.onAuthStateChanged((user) => {
-            console.log("USER", user);
             if (!user) {
                 setUserLoggedIn(false);
                 setCurrentUser(null);
@@ -86,12 +85,10 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
             }
         });
         getRedirectResult(auth).then(redirectResult => {
-            console.log(auth);
             if (auth.currentUser) {
                 setUserLoggedIn(true);
                 setCurrentUser(auth.currentUser);
-            }
-            if (!redirectResult) {
+            } else if (!redirectResult) {
                 setUserLoggedIn(false);
                 setCurrentUser(null);
             } else {
