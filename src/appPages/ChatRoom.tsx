@@ -104,7 +104,9 @@ export const ChatRoom = () => {
                     },
                 ]);
                 const model = getModel();
-                context.chat = model.startChat();
+                if (!context.chat) {
+                    context.chat = model.startChat();
+                }
                 const res = await model.generateContentStream(msg);
                 let text = '';
                 for await (const chunk of res.stream) {
