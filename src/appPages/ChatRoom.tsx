@@ -17,7 +17,7 @@ import { useAuth } from "../contextes/auth";
 import { WebsiteDrawer2 } from "../Drawer";
 import {getModel,ai} from "../firebase/firebase";
 import Markdown from "react-markdown";
-import { ChatSession } from "firebase/ai";
+import { ChatSession, Content } from "firebase/ai";
 
 interface IChatMessage {
     sender: boolean;
@@ -61,7 +61,7 @@ const ChatBubble = (props: IChatMessage) => {
 export const ChatRoom = () => {
     const { userLoggedIn, currentUser } = useAuth();
     const [chatValue, setChatValue] = useState("");
-    const [chatHistory, setChatHistory] = useState<IChatMessage[]>([]);
+    const [chatHistory, setChatHistory] = useState<(IChatMessage & Content)[]>([]);
     const [chatDisabled, setChatDisabled] = useState<boolean>(false);
     const [context] = useState({
         chat: null as ChatSession | null,
@@ -100,13 +100,15 @@ export const ChatRoom = () => {
                         sender: true,
                         name: currentUser?.displayName ?? undefined,
                         message: msg,
+                        parts: [{text: msg}],
+                        role: "user",
                         photoURL: currentUser?.photoURL ?? undefined,
                     },
                 ]);
                 const model = getModel();
-                if (!context.chat) {
-                    context.chat = model.startChat();
-                }
+                context.chat = model.startChat({
+                    history: chatHistory,
+                });
                 const res = await model.generateContentStream(msg);
                 let text = '';
                 for await (const chunk of res.stream) {
@@ -119,12 +121,16 @@ export const ChatRoom = () => {
                             sender: true,
                             name: currentUser?.displayName ?? undefined,
                             message: msg,
+                            parts: [{text: msg}],
+                            role: "user",
                             photoURL: currentUser?.photoURL ?? undefined,
                         },
                         {
                             sender: false,
                             name: "Gemini",
                             message: text,
+                            parts: [{text}],
+                            role: "model",
                             photoURL: undefined,
                         },
                     ]);
