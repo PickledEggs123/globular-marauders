@@ -7,7 +7,7 @@ const GenerateSitemap = require("react-router-sitemap-maker").default;
 
 (async () => {
     const sitemapData = await GenerateSitemap(AppRoutes(), {
-        baseUrl: "https://globularmarauders.com",
+        baseUrl: "https://playplanet.io",
         hashrouting: false,
         changeFrequency: "monthly",
     });

@@ -1,4 +1,4 @@
 # https://www.robotstxt.org/robotstxt.html
 User-agent: *
 Disallow:
-Sitemap: https://globularmarauders.com/sitemap.xml
+Sitemap: https://playplanet.io/sitemap.xml
