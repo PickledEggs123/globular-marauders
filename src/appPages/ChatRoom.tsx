@@ -109,10 +109,9 @@ export const ChatRoom = () => {
                 context.chat = model.startChat({
                     history: chatHistory,
                 });
-                const res = await model.generateContentStream(msg);
+                const res = await context.chat.sendMessageStream(msg);
                 let text = '';
                 for await (const chunk of res.stream) {
-                    console.log(res.stream, chunk);
                     const chunkText = chunk.text();
                     text += chunkText;
                     setChatHistory([
