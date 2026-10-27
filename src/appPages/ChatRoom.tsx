@@ -107,7 +107,7 @@ export const ChatRoom = () => {
                 ]);
                 const model = getModel();
                 context.chat = model.startChat({
-                    history: chatHistory,
+                    history: chatHistory.map(x => ({role: x.role, parts: x.parts}) as Content),
                 });
                 const res = await context.chat.sendMessageStream(msg);
                 let text = '';
