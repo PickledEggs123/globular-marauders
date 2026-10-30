@@ -21,6 +21,7 @@
     "compression": "^1.7.4",
     "firebase": "^11.10.0",
     "firebase-admin": "^14.5.0",
+    "http-proxy-middleware": "^4.2.1",
     "next": "^16.4.2",
     "next-ws": "^2.2.2",
     "nuka-carousel": "^8.2.0",
