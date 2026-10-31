@@ -12,6 +12,9 @@ AFRAME.registerComponent('spherical-fps-controls', {
     this.moveVector = new THREE.Vector3();
     this.rotationX = 0; // Look up/down (pitch)
     this.rotationY = 0; // Look left/right (yaw)
+    this.lastUpVector = null;
+    this.lastQuaternion = null;
+    this.baseQuaternion = null;
 
     // Bind key listeners for WASD movement
     window.addEventListener('keydown', (e) => { this.keys[e.key.toLowerCase()] = true; });
@@ -51,16 +54,33 @@ AFRAME.registerComponent('spherical-fps-controls', {
     if (this.keys['d']) this.moveVector.x += 1;
     this.moveVector.normalize();
 
-    // 3. APPLY ROTATION (Yaw / Pitch)
-    // Create the base orientation: align player's local Y axis with the planet's up vector
-    let targetRotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), upVector);
-
     // Apply local mouse look rotations (Yaw around planet-up, Pitch around local side-axis)
     let yawQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.rotationY);
     let pitchQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), this.rotationX);
 
+    // 3. APPLY ROTATION (Yaw / Pitch)
+    // Create the base orientation: align player's local Y axis with the planet's up vector
+    if (!this.lastUpVector) {
+      this.lastUpVector = upVector.clone();
+      this.lastQuaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), upVector);
+      this.baseQuaternion = this.lastQuaternion.clone();
+    }
+    let targetRotation = this.lastQuaternion.clone();
+    if (this.lastUpVector.dot(upVector) <= Math.cos(THREE.MathUtils.degToRad(1))) {
+      let right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.baseQuaternion.clone());
+      const up = upVector.clone();
+      const forward = right.clone().cross(up.clone());
+      right = up.clone().cross(forward.clone());
+      const m = new THREE.Matrix4().makeBasis(right, up, forward);
+      console.assert(Math.abs(Math.abs(m.determinant()) - 1) < 0.05, "BAD DETERMINANT", m.determinant(), right, up, forward);
+      this.lastQuaternion.setFromRotationMatrix(m).normalize();
+      this.lastQuaternion.multiply(new THREE.Quaternion().setFromUnitVectors(this.lastUpVector, upVector));
+      this.lastUpVector = upVector.clone();
+    }
+    this.baseQuaternion.slerp(this.lastQuaternion, 0.1);
+
     // Combine: Base alignment * Mouse Turn * Mouse Pitch
-    this.el.object3D.quaternion.copy(targetRotation).multiply(yawQuat).multiply(pitchQuat);
+    this.el.object3D.quaternion.copy(this.baseQuaternion).multiply(yawQuat).multiply(pitchQuat);
 
     // 4. TRANSLATE POSITION (Walk along the sphere surface)
     if (this.moveVector.lengthSq() > 0) {
