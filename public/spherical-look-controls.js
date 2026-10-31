@@ -67,10 +67,10 @@ AFRAME.registerComponent('spherical-fps-controls', {
     }
     let targetRotation = this.lastQuaternion.clone();
     if (this.lastUpVector.dot(upVector) <= Math.cos(THREE.MathUtils.degToRad(1))) {
-      let right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.baseQuaternion.clone());
-      const up = upVector.clone();
-      const forward = right.clone().cross(up.clone());
-      right = up.clone().cross(forward.clone());
+      let right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.baseQuaternion.clone()).normalize();
+      const up = upVector.clone().normalize();
+      const forward = right.clone().cross(up.clone()).normalize();
+      right = up.clone().cross(forward.clone()).normalize();
       const m = new THREE.Matrix4().makeBasis(right, up, forward);
       console.assert(Math.abs(Math.abs(m.determinant()) - 1) < 0.05, "BAD DETERMINANT", m.determinant(), right, up, forward);
       this.lastQuaternion.setFromRotationMatrix(m).normalize();

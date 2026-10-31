@@ -20,6 +20,7 @@ import {
     MenuOpen, Password,
     PieChart,
     Public,
+    Language,
 } from "@mui/icons-material";
 import Link from "next/link";
 import {ThemeContext} from "./contextes/ThemeContext";
@@ -160,6 +161,10 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
                     link: "/3d",
                     icon: <Public/>,
                     text: "Play 3D"
+                }, {
+                    link: "/spherical-camera",
+                    icon: <Language/>,
+                    text: "Spherical Camera"
                 }, {
                     link: "/game-model",
                     icon: <PieChart/>,
