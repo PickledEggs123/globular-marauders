@@ -60,6 +60,7 @@ const themeOptions: ThemeOptions = {
         },
         body1: {
             background: "#ddc",
+            display: "block",
         },
     },
     components: {
@@ -87,7 +88,42 @@ const themeOptions: ThemeOptions = {
         MuiPaper: {
             defaultProps: {
                 style: {
-                    backgroundColor: "transparent !important",
+                    background: "transparent",
+                },
+            },
+        },
+        MuiAccordionSummary: {
+            defaultProps: {
+                style: {
+                    background: "#ddc",
+                },
+            },
+        },
+        MuiDrawer: {
+            defaultProps: {
+                style: {
+                    background: "#ddc",
+                },
+            },
+        },
+        MuiSwipeableDrawer: {
+            defaultProps: {
+                style: {
+                    background: "#ddc",
+                },
+            },
+        },
+        MuiListItem: {
+            defaultProps: {
+                style: {
+                    background: "#ddc",
+                },
+            },
+        },
+        MuiFormControl: {
+            defaultProps: {
+                style: {
+                    background: "#ddc",
                 },
             },
         },
@@ -122,7 +158,42 @@ const themeOptionsDark = createTheme({
         MuiPaper: {
             defaultProps: {
                 style: {
-                    backgroundColor: "transparent !important",
+                    background: "transparent",
+                },
+            },
+        },
+        MuiAccordionSummary: {
+            defaultProps: {
+                style: {
+                    background: "#121212",
+                },
+            },
+        },
+        MuiDrawer: {
+            defaultProps: {
+                style: {
+                    background: "#121212",
+                },
+            },
+        },
+        MuiSwipeableDrawer: {
+            defaultProps: {
+                style: {
+                    background: "#121212",
+                },
+            },
+        },
+        MuiListItem: {
+            defaultProps: {
+                style: {
+                    background: "#121212",
+                },
+            },
+        },
+        MuiFormControl: {
+            defaultProps: {
+                style: {
+                    background: "#121212",
                 },
             },
         },
