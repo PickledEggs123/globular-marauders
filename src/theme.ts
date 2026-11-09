@@ -127,6 +127,13 @@ const themeOptions: ThemeOptions = {
                 },
             },
         },
+        MuiToolbar: {
+            defaultProps: {
+                style: {
+                    background: "#ddc",
+                },
+            },
+        },
     },
 };
 
@@ -191,6 +198,13 @@ const themeOptionsDark = createTheme({
             },
         },
         MuiFormControl: {
+            defaultProps: {
+                style: {
+                    background: "#121212",
+                },
+            },
+        },
+        MuiToolbar: {
             defaultProps: {
                 style: {
                     background: "#121212",

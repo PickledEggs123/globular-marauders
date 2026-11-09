@@ -363,6 +363,43 @@ export const Main = () => {
                                         </Card>
                                     </FadeIntoView>
                                 </Grid>
+                                <Grid item xs={12} md={6}>
+                                    <FadeIntoView>
+                                        <Card>
+                                            <CardMedia component="img" src="/mainImages/HighSchoolWebsitePhoto.png"></CardMedia>
+                                            <CardHeader title="Seminole High School Sanford FL 32773" subheader="High School Webiste Class of 2012">
+                                            </CardHeader>
+                                            <CardContent>
+                                                <Typography variant="body1">
+                                                    I worked with media specialist Charlie Schumer and fellow student Julian Seppala to make the high school website
+                                                    senior year of high school. It uses HTML, CSS and jQuery to animate the carousel
+                                                    and other components like the timer. I did the layout assuming a desktop computer
+                                                    because I didn't have a mobile phone at the time. The website remained the same
+                                                    format for a few years until the principal redid it.
+                                                </Typography>
+                                                <Typography variant="h4">
+                                                    <div style={{width: 256, margin: '0 auto'}}>
+                                                        <Carousel autoplay wrapMode="wrap">
+                                                            {
+                                                                [{
+                                                                    url: 'HTML5',
+                                                                }, {
+                                                                    url: 'CSS',
+                                                                }, {
+                                                                    url: 'jQuery',
+                                                                }, {
+                                                                    url: 'JavaScript',
+                                                                }].map(item => (
+                                                                    <div style={{minWidth: 256}} key={item.url}>{item.url}</div>
+                                                                ))
+                                                            }
+                                                        </Carousel>
+                                                    </div>
+                                                </Typography>
+                                            </CardContent>
+                                        </Card>
+                                    </FadeIntoView>
+                                </Grid>
                             </AccordionDetails>
                         </Accordion>
                         <Accordion>
