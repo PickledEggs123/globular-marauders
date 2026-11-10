@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <title>A-Frame Spherical Planet FPS Controller</title>
     <script src="/aframe-v1.7.0.min.js"></script>
+    <script src="/keyboard.polyfill.js"></script>
     <script src="/spherical-look-controls.js"></script>
 </head>
 <body>
@@ -19,10 +20,12 @@
     <!-- Custom FPS Player (Camera wrapper) -->
     <!-- Starts at position Y=20.5, which is exactly resting on top of the Y radius -->
 
-    <a-camera look-controls-enabled="false" wasd-controls-enabled="false" spherical-fps-controls="planet: #myPlanet; radius: 20" position="0 20 0">
-        <!-- Crosshair for target shooting look -->
-        <a-cursor color="white" radius="0.01"></a-cursor>
-    </a-camera>
+    <a-entity globe-movement-controls="planet: #myPlanet; radius: 20;" position="0 20 0">
+        <a-camera look-controls-enabled="false" wasd-controls-enabled="false" position="0 0 0">
+            <!-- Crosshair for target shooting look -->
+            <a-cursor color="white" radius="0.01"></a-cursor>
+        </a-camera>
+    </a-entity>
 
 
     <!-- Sky and Ambient Light -->
