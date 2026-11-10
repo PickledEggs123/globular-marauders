@@ -1,0 +1,25 @@
+#!/bin/bash
+mkdir -p signin_helpers
+cd signin_helpers
+wget https://tyler-truong-demos.firebaseapp.com/__/auth/handler
+wget https://tyler-truong-demos.firebaseapp.com/__/auth/handler.js
+wget https://tyler-truong-demos.firebaseapp.com/__/auth/experiments.js
+wget https://tyler-truong-demos.firebaseapp.com/__/auth/iframe
+wget https://tyler-truong-demos.firebaseapp.com/__/auth/iframe.js
+wget https://tyler-truong-demos.firebaseapp.com/__/auth/links
+wget https://tyler-truong-demos.firebaseapp.com/__/auth/links.js
+wget https://tyler-truong-demos.firebaseapp.com/__/firebase/init.json
+mkdir -p __/auth/
+mkdir -p __/firebase/
+mkdir -p __/auth/handler/
+mkdir -p __/auth/iframe/
+mkdir -p __/auth/links/
+mv handler __/auth/handler/index.html
+mv iframe __/auth/iframe/index.html
+mv links __/auth/links/index.html
+mv init.json __/firebase/init.json
+mv *.js __/auth/
+mkdir -p ../public/__/
+mv __/** ../public/__/
+cd ..
+rm -r signin_helpers/**
