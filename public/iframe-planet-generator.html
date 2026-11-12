@@ -13,7 +13,9 @@
     <script src="/three-pathfinding.umd.js"></script>
     <script src="/three-to-cannon.umd.js"></script>
     <script src="/aframe-fps-counter-component.min.js"></script>
-<!--    <script src="/spherical-look-controls.js"></script>-->
+    <script src="/keyboard.polyfill.js"></script>
+    <script src="/nipplejs.js"></script>
+    <script src="/spherical-look-controls.js"></script>
     <script src="/aframe-look-at-billboard-component.js"></script>
     <script src="/instanced-mesh.min.js"></script>
     <script src="/networked-aframe.js"></script>
@@ -2372,583 +2374,124 @@
             },
         });
 
-        AFRAME.registerComponent('look-at-box', {
-            schema: {
-                type: "string",
-                default: "",
-            },
-            init: function () {
-                this.dtSumTickSize = 1000;
-                this.dtSum = this.dtSumTickSize + 1;
-                this.heightFactor = 5;
-                this.heightDiff = 5;
-                this.heightDiffLerp = 5;
-                this.box = [];
-                this.boxPos = [];
-
-                this.mousewheelEventHandler = event => {
-                    if (!event.target.tagName.toLowerCase().includes('canvas')) {
-                        return;
-                    }
-                    event.preventDefault();
-                    const delta = Math.sign(event.wheelDelta);
-                    this.heightFactor = THREE.MathUtils.clamp(this.heightFactor + delta * 0.5, 0.5, 25);
-                };
-                window.addEventListener("mousewheel", this.mousewheelEventHandler, {passive: false});
-            },
-            remove: function () {
-                window.removeEventListener('mousewheel', this.mousewheelEventHandler, {passive: false});
-            },
-            update(oldData) {
-                this.dtSum = this.dtSumTickSize + 1;
-
-                if (oldData !== this.data) {
-                    this.getElements();
-                }
-            },
-            getElements: function () {
-                // get elements
-                let [dataItem, dataPostfix] = this.data.split(":");
-                let otherClassName = "";
-                if (dataPostfix) {
-                    [dataPostfix, otherClassName] = dataPostfix.split(" ", 2);
-                    dataPostfix = `:${dataPostfix}`;
-                    if (otherClassName) {
-                        otherClassName = ` ${otherClassName}`;
-                    } else {
-                        otherClassName = "";
-                    }
-                }
-                const boxSelector = `${dataItem}${otherClassName}`;
-                const boxPosSelector = `${dataItem}${otherClassName}-position`;
-                this.box = Array.from(document.querySelectorAll(boxSelector)).map(el => el.object3D);
-                this.boxPos = Array.from(document.querySelectorAll(boxPosSelector)).map(el => el.object3D);
-                this.dataPostfix = dataPostfix;
-            },
-            tick: function (t, dt) {
-                this.getElements();
-                const box = [...this.box];
-                const boxPos = [...this.boxPos];
-                if (!box.length || !boxPos.length) {
-                    this.el.setAttribute("look-at-box", `.${scene.components['coin-purse'].getUnit()}`);
-                    return;
-                }
-
-                if (this.dataPostfix) {
-                    box.splice(1, box.length - 1);
-                    boxPos.splice(1, boxPos.length - 1);
-                }
-
-                // get position
-                const boxWorldPos = new THREE.Vector3();
-                box.forEach(b => boxWorldPos.add(b.getWorldPosition(new THREE.Vector3())));
-                boxWorldPos.divideScalar(box.length);
-                const boxPosWorldPos = new THREE.Vector3();
-                boxPos.forEach(b => boxPosWorldPos.add(b.getWorldPosition(new THREE.Vector3())));
-                boxPosWorldPos.divideScalar(boxPos.length);
-                if (!boxPos.length) {
-                    return;
-                }
-
-                // get info
-                const upVector = boxPosWorldPos.clone().sub(new THREE.Vector3(0, 0, 0)).normalize();
-                const object3D = this.el.object3D;
-                const objectWorldPos = object3D.getWorldPosition(new THREE.Vector3());
-                const height = THREE.MathUtils.clamp(boxPosWorldPos.clone().sub(new THREE.Vector3(0, 0, 0)).length(), 100, 150);
-
-                // update info
-                const quaternion = new THREE.Quaternion().setFromUnitVectors(objectWorldPos.clone().normalize(), boxPosWorldPos.clone().normalize());
-                const slerp = new THREE.Quaternion().slerp(quaternion, 0.03 * 60 * dt / 1000);
-                let destination1 = objectWorldPos.clone().normalize().multiplyScalar(height + this.heightFactor).applyQuaternion(slerp);
-
-                // compute raycast towards ground
-                let finalPosition;
-                if (this.dtSum + dt > this.dtSumTickSize) {
-                    const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), destination1.clone().negate());
-                    const intersections = raycaster.intersectObjects(Array.from(document.querySelectorAll(".clickable")).map(el => el.object3D));
-                    if (intersections[0]) {
-                        destination1 = intersections[0].point.clone();
-                    }
-                    finalPosition = destination1.clone().add(destination1.clone().normalize().multiplyScalar(5 + this.heightFactor));
-                    this.heightDiff = THREE.MathUtils.clamp(new THREE.Vector3().distanceTo(finalPosition) - (height + this.heightFactor), -5, 50);
-                    this.heightDiffLerp = 0.1 * this.heightDiff + 0.9 * this.heightDiffLerp;
-                    this.dtSum = 0;
-                } else {
-                    if (this.heightDiff > this.heightDiffLerp) {
-                        this.heightDiffLerp = 0.03 * this.heightDiff + 0.97 * this.heightDiffLerp;
-                    } else {
-                        this.heightDiffLerp = 0.01 * this.heightDiff + 0.99 * this.heightDiffLerp;
-                    }
-                    finalPosition = objectWorldPos.clone().normalize().multiplyScalar(this.heightDiffLerp + height + this.heightFactor).applyQuaternion(slerp);
-                    this.dtSum += dt;
-                }
-
-                // update camera
-                const cameraLookControlsEl = document.querySelector('[globe-look-controls]');
-                object3D.position.set(finalPosition.x, finalPosition.y, finalPosition.z);
-                if (this.el.sceneEl?.renderer?.xr?.isPresenting || cameraLookControlsEl.components['globe-look-controls']?.magicWindowControls?.enabled) {
-                    object3D.up = upVector;
-                    object3D.lookAt(boxWorldPos.clone().add(upVector.clone().add(upVector.clone().multiplyScalar(5))));
-                } else {
-                    const camera = this.el.sceneEl.camera;
-                    camera.up = upVector;
-                    camera.lookAt(boxWorldPos);
-                }
-            }
-        });
-
-        AFRAME.registerComponent('globe-look-controls', {
-            dependencies: ['position', 'rotation'],
-
-            schema: {
-                enabled: {default: true},
-                magicWindowTrackingEnabled: {default: true},
-                pointerLockEnabled: {default: false},
-                reverseMouseDrag: {default: false},
-                reverseTouchDrag: {default: false},
-                touchEnabled: {default: true},
-                mouseEnabled: {default: true}
-            },
-
-            init: function () {
-                this.deltaYaw = 0;
-                this.previousHMDPosition = new THREE.Vector3();
-                this.hmdQuaternion = new THREE.Quaternion();
-                this.magicWindowAbsoluteQuaternion = new THREE.Quaternion();
-                this.magicWindowDeltaQuaternion = new THREE.Quaternion();
-                this.position = new THREE.Vector3();
-                this.magicWindowObject = new THREE.Object3D();
-                this.rotation = {};
-                this.deltaRotation = {};
-                this.savedPose = null;
-                this.pointerLocked = false;
-                this.setupMouseControls();
-                this.bindMethods();
-                this.previousMouseEvent = {};
-
-                this.setupMagicWindowControls();
-
-                // To save / restore camera pose
-                this.savedPose = {
-                    position: new THREE.Vector3(),
-                    rotation: new THREE.Euler()
-                };
-
-                // Call enter VR handler if the scene has entered VR before the event listeners attached.
-                if (this.el.sceneEl.is('vr-mode') || this.el.sceneEl.is('ar-mode')) { this.onEnterVR(); }
-            },
-
-            setupMagicWindowControls: function () {
-                var magicWindowControls;
-                var data = this.data;
-
-                // Only on mobile devices and only enabled if DeviceOrientation permission has been granted.
-                if (AFRAME.utils.device.isMobile() || AFRAME.utils.device.isMobileDeviceRequestingDesktopSite()) {
-                    magicWindowControls = this.magicWindowControls = new THREE.DeviceOrientationControls(this.magicWindowObject);
-                    if (typeof DeviceOrientationEvent !== 'undefined' && DeviceOrientationEvent.requestPermission) {
-                        magicWindowControls.enabled = false;
-                        if (this.el.sceneEl.components['device-orientation-permission-ui'].permissionGranted) {
-                            magicWindowControls.enabled = data.magicWindowTrackingEnabled;
-                        } else {
-                            this.el.sceneEl.addEventListener('deviceorientationpermissiongranted', function () {
-                                magicWindowControls.enabled = data.magicWindowTrackingEnabled;
-                            });
-                        }
-                    }
-                }
-            },
-
-            update: function (oldData) {
-                var data = this.data;
-
-                // Disable grab cursor classes if no longer enabled.
-                if (data.enabled !== oldData.enabled) {
-                    this.updateGrabCursor(data.enabled);
-                }
-
-                // Reset magic window eulers if tracking is disabled.
-                if (oldData && !data.magicWindowTrackingEnabled && oldData.magicWindowTrackingEnabled) {
-                    this.magicWindowAbsoluteQuaternion.set(0, 0, 0, 1);
-                    this.magicWindowDeltaQuaternion.set(0, 0, 0, 1);
-                }
-
-                // Pass on magic window tracking setting to magicWindowControls.
-                if (this.magicWindowControls) {
-                    this.magicWindowControls.enabled = data.magicWindowTrackingEnabled;
-                }
-
-                if (oldData && !data.pointerLockEnabled !== oldData.pointerLockEnabled) {
-                    this.removeEventListeners();
-                    this.addEventListeners();
-                    if (this.pointerLocked) { this.exitPointerLock(); }
-                }
-            },
-
-            tick: function () {
-                var data = this.data;
-                if (!data.enabled) { return; }
-                this.updateOrientation();
-            },
-
-            play: function () {
-                this.addEventListeners();
-            },
-
-            pause: function () {
-                this.removeEventListeners();
-                if (this.pointerLocked) { this.exitPointerLock(); }
-            },
-
-            remove: function () {
-                this.removeEventListeners();
-                if (this.pointerLocked) { this.exitPointerLock(); }
-            },
-
-            bindMethods: function () {
-                this.onMouseDown = bind(this.onMouseDown, this);
-                this.onMouseMove = bind(this.onMouseMove, this);
-                this.onMouseUp = bind(this.onMouseUp, this);
-                this.onTouchStart = bind(this.onTouchStart, this);
-                this.onTouchMove = bind(this.onTouchMove, this);
-                this.onTouchEnd = bind(this.onTouchEnd, this);
-                this.onEnterVR = bind(this.onEnterVR, this);
-                this.onExitVR = bind(this.onExitVR, this);
-                this.onPointerLockChange = bind(this.onPointerLockChange, this);
-                this.onPointerLockError = bind(this.onPointerLockError, this);
-            },
-
-            /**
-             * Set up states and Object3Ds needed to store rotation data.
-             */
-            setupMouseControls: function () {
-                this.mouseDown = false;
-                this.pitchObject = new THREE.Object3D();
-                this.yawObject = new THREE.Object3D();
-                this.yawObject.position.y = 10;
-                this.yawObject.add(this.pitchObject);
-            },
-
-            /**
-             * Add mouse and touch event listeners to canvas.
-             */
-            addEventListeners: function () {
-                var sceneEl = this.el.sceneEl;
-                var canvasEl = sceneEl.canvas;
-
-                // Wait for canvas to load.
-                if (!canvasEl) {
-                    sceneEl.addEventListener('render-target-loaded', bind(this.addEventListeners, this));
-                    return;
-                }
-
-                // Mouse events.
-                canvasEl.addEventListener('mousedown', this.onMouseDown, false);
-                window.addEventListener('mousemove', this.onMouseMove, false);
-                window.addEventListener('mouseup', this.onMouseUp, false);
-
-                // Touch events.
-                canvasEl.addEventListener('touchstart', this.onTouchStart);
-                window.addEventListener('touchmove', this.onTouchMove);
-                window.addEventListener('touchend', this.onTouchEnd);
-
-                // sceneEl events.
-                sceneEl.addEventListener('enter-vr', this.onEnterVR);
-                sceneEl.addEventListener('exit-vr', this.onExitVR);
-
-                // Pointer Lock events.
-                if (this.data.pointerLockEnabled) {
-                    document.addEventListener('pointerlockchange', this.onPointerLockChange, false);
-                    document.addEventListener('mozpointerlockchange', this.onPointerLockChange, false);
-                    document.addEventListener('pointerlockerror', this.onPointerLockError, false);
-                }
-            },
-
-            /**
-             * Remove mouse and touch event listeners from canvas.
-             */
-            removeEventListeners: function () {
-                var sceneEl = this.el.sceneEl;
-                var canvasEl = sceneEl && sceneEl.canvas;
-
-                if (!canvasEl) { return; }
-
-                // Mouse events.
-                canvasEl.removeEventListener('mousedown', this.onMouseDown);
-                window.removeEventListener('mousemove', this.onMouseMove);
-                window.removeEventListener('mouseup', this.onMouseUp);
-
-                // Touch events.
-                canvasEl.removeEventListener('touchstart', this.onTouchStart);
-                window.removeEventListener('touchmove', this.onTouchMove);
-                window.removeEventListener('touchend', this.onTouchEnd);
-
-                // sceneEl events.
-                sceneEl.removeEventListener('enter-vr', this.onEnterVR);
-                sceneEl.removeEventListener('exit-vr', this.onExitVR);
-
-                // Pointer Lock events.
-                document.removeEventListener('pointerlockchange', this.onPointerLockChange, false);
-                document.removeEventListener('mozpointerlockchange', this.onPointerLockChange, false);
-                document.removeEventListener('pointerlockerror', this.onPointerLockError, false);
-            },
-
-            /**
-             * Update orientation for mobile, mouse drag, and headset.
-             * Mouse-drag only enabled if HMD is not active.
-             */
-            updateOrientation: function () {
-                var object3D = this.el.object3D;
-                // var pitchObject = this.pitchObject;
-                // var yawObject = this.yawObject;
-                var sceneEl = this.el.sceneEl;
-
-                // In VR or AR mode, THREE is in charge of updating the camera pose.
-                if ((sceneEl.is('vr-mode') || sceneEl.is('ar-mode')) && sceneEl.checkHeadsetConnected()) {
-                    // With WebXR THREE applies headset pose to the object3D internally.
-                    return;
-                }
-
-                this.updateMagicWindowOrientation();
-
-                // On mobile, do camera rotation with touch events and sensors.
-                object3D.quaternion.copy(this.magicWindowAbsoluteQuaternion);
-            },
-
-            updateMagicWindowOrientation: function () {
-                var magicWindowAbsoluteQuaternion = this.magicWindowAbsoluteQuaternion;
-                // var magicWindowDeltaQuaternion = this.magicWindowDeltaQuaternion;
-                // Calculate magic window HMD quaternion.
-                if (this.magicWindowControls && this.magicWindowControls.enabled) {
-                    this.magicWindowControls.update();
-                    const magicQuaternion = this.magicWindowObject.quaternion.clone().multiply(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 0, 1)));
-                    magicQuaternion.x *= -1;
-                    magicQuaternion.z *= -1;
-                    magicWindowAbsoluteQuaternion.copy(magicQuaternion);
-                }
-            },
-
-            /**
-             * Translate mouse drag into rotation.
-             *
-             * Dragging up and down rotates the camera around the X-axis (yaw).
-             * Dragging left and right rotates the camera around the Y-axis (pitch).
-             */
-            onMouseMove: function (evt) {
-                var direction;
-                var movementX;
-                var movementY;
-                var pitchObject = this.pitchObject;
-                var previousMouseEvent = this.previousMouseEvent;
-                var yawObject = this.yawObject;
-
-                // Not dragging or not enabled.
-                if (!this.data.enabled || (!this.mouseDown && !this.pointerLocked)) { return; }
-
-                // Calculate delta.
-                if (this.pointerLocked) {
-                    movementX = evt.movementX || evt.mozMovementX || 0;
-                    movementY = evt.movementY || evt.mozMovementY || 0;
-                } else {
-                    movementX = evt.screenX - previousMouseEvent.screenX;
-                    movementY = evt.screenY - previousMouseEvent.screenY;
-                }
-                this.previousMouseEvent.screenX = evt.screenX;
-                this.previousMouseEvent.screenY = evt.screenY;
-
-                // Calculate rotation.
-                direction = this.data.reverseMouseDrag ? 1 : -1;
-                yawObject.rotation.y += movementX * 0.002 * direction;
-                pitchObject.rotation.x += movementY * 0.002 * direction;
-                pitchObject.rotation.x = Math.max(-PI_2, Math.min(PI_2, pitchObject.rotation.x));
-            },
-
-            /**
-             * Register mouse down to detect mouse drag.
-             */
-            onMouseDown: function (evt) {
-                var sceneEl = this.el.sceneEl;
-                if (!this.data.enabled || !this.data.mouseEnabled || ((sceneEl.is('vr-mode') || sceneEl.is('ar-mode')) && sceneEl.checkHeadsetConnected())) { return; }
-                // Handle only primary button.
-                if (evt.button !== 0) { return; }
-
-                var canvasEl = sceneEl && sceneEl.canvas;
-
-                this.mouseDown = true;
-                this.previousMouseEvent.screenX = evt.screenX;
-                this.previousMouseEvent.screenY = evt.screenY;
-                this.showGrabbingCursor();
-
-                if (this.data.pointerLockEnabled && !this.pointerLocked) {
-                    if (canvasEl.requestPointerLock) {
-                        canvasEl.requestPointerLock();
-                    } else if (canvasEl.mozRequestPointerLock) {
-                        canvasEl.mozRequestPointerLock();
-                    }
-                }
-            },
-
-            /**
-             * Shows grabbing cursor on scene
-             */
-            showGrabbingCursor: function () {
-                this.el.sceneEl.canvas.style.cursor = 'grabbing';
-            },
-
-            /**
-             * Hides grabbing cursor on scene
-             */
-            hideGrabbingCursor: function () {
-                this.el.sceneEl.canvas.style.cursor = '';
-            },
-
-            /**
-             * Register mouse up to detect release of mouse drag.
-             */
-            onMouseUp: function () {
-                this.mouseDown = false;
-                this.hideGrabbingCursor();
-            },
-
-            /**
-             * Register touch down to detect touch drag.
-             */
-            onTouchStart: function (evt) {
-                if (evt.touches.length !== 1 ||
-                    !this.data.touchEnabled ||
-                    this.el.sceneEl.is('vr-mode') ||
-                    this.el.sceneEl.is('ar-mode')) { return; }
-                this.touchStart = {
-                    x: evt.touches[0].pageX,
-                    y: evt.touches[0].pageY
-                };
-                this.touchStarted = true;
-            },
-
-            /**
-             * Translate touch move to Y-axis rotation.
-             */
-            onTouchMove: function (evt) {
-                var direction;
-                var canvas = this.el.sceneEl.canvas;
-                var deltaY;
-                var yawObject = this.yawObject;
-
-                if (!this.touchStarted || !this.data.touchEnabled) { return; }
-
-                deltaY = 2 * Math.PI * (evt.touches[0].pageX - this.touchStart.x) / canvas.clientWidth;
-
-                direction = this.data.reverseTouchDrag ? 1 : -1;
-                // Limit touch orientaion to to yaw (y axis).
-                yawObject.rotation.y -= deltaY * 0.5 * direction;
-                this.touchStart = {
-                    x: evt.touches[0].pageX,
-                    y: evt.touches[0].pageY
-                };
-            },
-
-            /**
-             * Register touch end to detect release of touch drag.
-             */
-            onTouchEnd: function () {
-                this.touchStarted = false;
-            },
-
-            /**
-             * Save pose.
-             */
-            onEnterVR: function () {
-                var sceneEl = this.el.sceneEl;
-                if (!sceneEl.checkHeadsetConnected()) { return; }
-                this.saveCameraPose();
-                this.el.object3D.position.set(0, 0, 0);
-                this.el.object3D.rotation.set(0, 0, 0);
-                if (sceneEl.hasWebXR) {
-                    this.el.object3D.matrixAutoUpdate = false;
-                    this.el.object3D.updateMatrix();
-                }
-            },
-
-            /**
-             * Restore the pose.
-             */
-            onExitVR: function () {
-                if (!this.el.sceneEl.checkHeadsetConnected()) { return; }
-                this.restoreCameraPose();
-                this.previousHMDPosition.set(0, 0, 0);
-                this.el.object3D.matrixAutoUpdate = true;
-            },
-
-            /**
-             * Update Pointer Lock state.
-             */
-            onPointerLockChange: function () {
-                this.pointerLocked = !!(document.pointerLockElement || document.mozPointerLockElement);
-            },
-
-            /**
-             * Recover from Pointer Lock error.
-             */
-            onPointerLockError: function () {
-                this.pointerLocked = false;
-            },
-
-            // Exits pointer-locked mode.
-            exitPointerLock: function () {
-                document.exitPointerLock();
-                this.pointerLocked = false;
-            },
-
-            /**
-             * Toggle the feature of showing/hiding the grab cursor.
-             */
-            updateGrabCursor: function (enabled) {
-                var sceneEl = this.el.sceneEl;
-
-                function enableGrabCursor () { sceneEl.canvas.classList.add('a-grab-cursor'); }
-                function disableGrabCursor () { sceneEl.canvas.classList.remove('a-grab-cursor'); }
-
-                if (!sceneEl.canvas) {
-                    if (enabled) {
-                        sceneEl.addEventListener('render-target-loaded', enableGrabCursor);
-                    } else {
-                        sceneEl.addEventListener('render-target-loaded', disableGrabCursor);
-                    }
-                    return;
-                }
-
-                if (enabled) {
-                    enableGrabCursor();
-                    return;
-                }
-                disableGrabCursor();
-            },
-
-            /**
-             * Save camera pose before entering VR to restore later if exiting.
-             */
-            saveCameraPose: function () {
-                var el = this.el;
-
-                this.savedPose.position.copy(el.object3D.position);
-                this.savedPose.rotation.copy(el.object3D.rotation);
-                this.hasSavedPose = true;
-            },
-
-            /**
-             * Reset camera pose to before entering VR.
-             */
-            restoreCameraPose: function () {
-                var el = this.el;
-                var savedPose = this.savedPose;
-
-                if (!this.hasSavedPose) { return; }
-
-                // Reset camera orientation.
-                el.object3D.position.copy(savedPose.position);
-                el.object3D.rotation.copy(savedPose.rotation);
-                this.hasSavedPose = false;
-            }
-        });
+        // AFRAME.registerComponent('look-at-box', {
+        //     schema: {
+        //         type: "string",
+        //         default: "",
+        //     },
+        //     init: function () {
+        //         this.dtSumTickSize = 1000;
+        //         this.dtSum = this.dtSumTickSize + 1;
+        //         this.heightFactor = 5;
+        //         this.heightDiff = 5;
+        //         this.heightDiffLerp = 5;
+        //         this.box = [];
+        //         this.boxPos = [];
+        //
+        //         this.mousewheelEventHandler = event => {
+        //             if (!event.target.tagName.toLowerCase().includes('canvas')) {
+        //                 return;
+        //             }
+        //             event.preventDefault();
+        //             const delta = Math.sign(event.wheelDelta);
+        //             this.heightFactor = THREE.MathUtils.clamp(this.heightFactor + delta * 0.5, 0.5, 25);
+        //         };
+        //         window.addEventListener("mousewheel", this.mousewheelEventHandler, {passive: false});
+        //     },
+        //     remove: function () {
+        //         window.removeEventListener('mousewheel', this.mousewheelEventHandler, {passive: false});
+        //     },
+        //     update(oldData) {
+        //         this.dtSum = this.dtSumTickSize + 1;
+        //
+        //         if (oldData !== this.data) {
+        //             this.getElements();
+        //         }
+        //     },
+        //     getElements: function () {
+        //         // get elements
+        //         let [dataItem, dataPostfix] = this.data.split(":");
+        //         let otherClassName = "";
+        //         if (dataPostfix) {
+        //             [dataPostfix, otherClassName] = dataPostfix.split(" ", 2);
+        //             dataPostfix = `:${dataPostfix}`;
+        //             if (otherClassName) {
+        //                 otherClassName = ` ${otherClassName}`;
+        //             } else {
+        //                 otherClassName = "";
+        //             }
+        //         }
+        //         const boxSelector = `${dataItem}${otherClassName}`;
+        //         const boxPosSelector = `${dataItem}${otherClassName}-position`;
+        //         this.box = Array.from(document.querySelectorAll(boxSelector)).map(el => el.object3D);
+        //         this.boxPos = Array.from(document.querySelectorAll(boxPosSelector)).map(el => el.object3D);
+        //         this.dataPostfix = dataPostfix;
+        //     },
+        //     tick: function (t, dt) {
+        //         this.getElements();
+        //         const box = [...this.box];
+        //         const boxPos = [...this.boxPos];
+        //         if (!box.length || !boxPos.length) {
+        //             this.el.setAttribute("look-at-box", `.${scene.components['coin-purse'].getUnit()}`);
+        //             return;
+        //         }
+        //
+        //         if (this.dataPostfix) {
+        //             box.splice(1, box.length - 1);
+        //             boxPos.splice(1, boxPos.length - 1);
+        //         }
+        //
+        //         // get position
+        //         const boxWorldPos = new THREE.Vector3();
+        //         box.forEach(b => boxWorldPos.add(b.getWorldPosition(new THREE.Vector3())));
+        //         boxWorldPos.divideScalar(box.length);
+        //         const boxPosWorldPos = new THREE.Vector3();
+        //         boxPos.forEach(b => boxPosWorldPos.add(b.getWorldPosition(new THREE.Vector3())));
+        //         boxPosWorldPos.divideScalar(boxPos.length);
+        //         if (!boxPos.length) {
+        //             return;
+        //         }
+        //
+        //         // get info
+        //         const upVector = boxPosWorldPos.clone().sub(new THREE.Vector3(0, 0, 0)).normalize();
+        //         const object3D = this.el.object3D;
+        //         const objectWorldPos = object3D.getWorldPosition(new THREE.Vector3());
+        //         const height = THREE.MathUtils.clamp(boxPosWorldPos.clone().sub(new THREE.Vector3(0, 0, 0)).length(), 100, 150);
+        //
+        //         // update info
+        //         const quaternion = new THREE.Quaternion().setFromUnitVectors(objectWorldPos.clone().normalize(), boxPosWorldPos.clone().normalize());
+        //         const slerp = new THREE.Quaternion().slerp(quaternion, 0.03 * 60 * dt / 1000);
+        //         let destination1 = objectWorldPos.clone().normalize().multiplyScalar(height + this.heightFactor).applyQuaternion(slerp);
+        //
+        //         // compute raycast towards ground
+        //         let finalPosition;
+        //         if (this.dtSum + dt > this.dtSumTickSize) {
+        //             const raycaster = new THREE.Raycaster(destination1.clone().normalize().multiplyScalar(PLANET_SIZE * 1.3), destination1.clone().negate());
+        //             const intersections = raycaster.intersectObjects(Array.from(document.querySelectorAll(".clickable")).map(el => el.object3D));
+        //             if (intersections[0]) {
+        //                 destination1 = intersections[0].point.clone();
+        //             }
+        //             finalPosition = destination1.clone().add(destination1.clone().normalize().multiplyScalar(5 + this.heightFactor));
+        //             this.heightDiff = THREE.MathUtils.clamp(new THREE.Vector3().distanceTo(finalPosition) - (height + this.heightFactor), -5, 50);
+        //             this.heightDiffLerp = 0.1 * this.heightDiff + 0.9 * this.heightDiffLerp;
+        //             this.dtSum = 0;
+        //         } else {
+        //             if (this.heightDiff > this.heightDiffLerp) {
+        //                 this.heightDiffLerp = 0.03 * this.heightDiff + 0.97 * this.heightDiffLerp;
+        //             } else {
+        //                 this.heightDiffLerp = 0.01 * this.heightDiff + 0.99 * this.heightDiffLerp;
+        //             }
+        //             finalPosition = objectWorldPos.clone().normalize().multiplyScalar(this.heightDiffLerp + height + this.heightFactor).applyQuaternion(slerp);
+        //             this.dtSum += dt;
+        //         }
+        //
+        //         // update camera
+        //         object3D.position.set(finalPosition.x, finalPosition.y, finalPosition.z);
+        //         const camera = this.el.sceneEl.camera;
+        //         camera.up = upVector;
+        //         camera.lookAt(boxWorldPos);
+        //     }
+        // });
 
         const unitMap = new Map([
             ["ship-1", "raider-1"],
@@ -2987,11 +2530,10 @@
             'ArrowUp', 'ArrowLeft', 'ArrowRight', 'ArrowDown',
         ];
 
-        AFRAME.registerComponent('globe-keyboard-controls', {
+        AFRAME.registerComponent('globe-ship-controls', {
             schema: {
                 acceleration: {default: 100},
                 enabled: {default: true},
-                fly: {default: false},
                 npc: {default: false},
             },
 
@@ -4238,7 +3780,7 @@
                 if (!el.components['ammo-body']?.body) {
                     return;
                 }
-                if (!el.components['globe-keyboard-controls']) return;
+                if (!el.components['globe-ship-controls']) return;
 
                 // Use PatrolJS pathfinding system to get the shortest path to target.
                 if (!this.path.length) {
@@ -4258,9 +3800,9 @@
                     el.emit('navigation-end');
                     el.object3D.position.copy(vDest);
                     // console.log(el.object3D.position);
-                    el.components['globe-keyboard-controls'].onKeyUp({code: "KeyW"});
-                    el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD"});
-                    el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA"});
+                    el.components['globe-ship-controls'].onKeyUp({code: "KeyW"});
+                    el.components['globe-ship-controls'].onKeyUp({code: "KeyD"});
+                    el.components['globe-ship-controls'].onKeyUp({code: "KeyA"});
                     this.group = null;
                     return;
                 }
@@ -4281,9 +3823,9 @@
                     if (!this.path.length) {
                         this.el.setAttribute("globe-ocean-nav-agent", "active: false;");
                         el.emit('navigation-end');
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyW"});
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD"});
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA"});
+                        el.components['globe-ship-controls'].onKeyUp({code: "KeyW"});
+                        el.components['globe-ship-controls'].onKeyUp({code: "KeyD"});
+                        el.components['globe-ship-controls'].onKeyUp({code: "KeyA"});
                         return;
                     }
 
@@ -4344,29 +3886,29 @@
                 const det = getDeterminant();
                 if (det < 0) {
                     if (Math.random() * 0.5 < Math.abs(det)) {
-                        el.components['globe-keyboard-controls'].onKeyDown({code: "KeyD", synthetic: true});
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA", synthetic: true});
+                        el.components['globe-ship-controls'].onKeyDown({code: "KeyD", synthetic: true});
+                        el.components['globe-ship-controls'].onKeyUp({code: "KeyA", synthetic: true});
                     } else {
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA", synthetic: true});
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD", synthetic: true});
+                        el.components['globe-ship-controls'].onKeyUp({code: "KeyA", synthetic: true});
+                        el.components['globe-ship-controls'].onKeyUp({code: "KeyD", synthetic: true});
                     }
                 } else if (det > 0) {
                     if (Math.random() * 0.33 < Math.abs(det)) {
-                        el.components['globe-keyboard-controls'].onKeyDown({code: "KeyA", synthetic: true});
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD", synthetic: true});
+                        el.components['globe-ship-controls'].onKeyDown({code: "KeyA", synthetic: true});
+                        el.components['globe-ship-controls'].onKeyUp({code: "KeyD", synthetic: true});
                     } else {
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD", synthetic: true});
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA", synthetic: true});
+                        el.components['globe-ship-controls'].onKeyUp({code: "KeyD", synthetic: true});
+                        el.components['globe-ship-controls'].onKeyUp({code: "KeyA", synthetic: true});
                     }
                 } else {
-                    el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA", synthetic: true});
-                    el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD", synthetic: true});
+                    el.components['globe-ship-controls'].onKeyUp({code: "KeyA", synthetic: true});
+                    el.components['globe-ship-controls'].onKeyUp({code: "KeyD", synthetic: true});
                 }
 
                 if (Math.abs(det) < 0.1) {
-                    el.components['globe-keyboard-controls'].onKeyDown({code: "KeyW", synthetic: true});
+                    el.components['globe-ship-controls'].onKeyDown({code: "KeyW", synthetic: true});
                 } else {
-                    el.components['globe-keyboard-controls'].onKeyUp({code: "KeyW", synthetic: true});
+                    el.components['globe-ship-controls'].onKeyUp({code: "KeyW", synthetic: true});
                 }
             },
         });
@@ -4831,7 +4373,7 @@
                         ...scene.querySelectorAll(`.ship-3`),
                     ];
                     ships.forEach((ship) => {
-                        ship.setAttribute("globe-keyboard-controls", {enabled: true});
+                        ship.setAttribute("globe-ship-controls", {enabled: true});
                     });
                 }
             },
@@ -4875,7 +4417,7 @@
 
                         const ships = activeUnitMarker.ships;
                         ships.forEach((ship) => {
-                            ship.setAttribute("globe-keyboard-controls", {enabled: false});
+                            ship.setAttribute("globe-ship-controls", {enabled: false});
                         });
 
                         scene.components['coin-purse'].setUnit(unitMap.get(scene.components['coin-purse'].activeUnit));
@@ -4972,7 +4514,7 @@
                             ...scene.querySelectorAll(`.ship-3`),
                         ];
                         ships.forEach((ship) => {
-                            ship.setAttribute("globe-keyboard-controls", {enabled: true});
+                            ship.setAttribute("globe-ship-controls", {enabled: true});
                         });
 
                         let removedNpcs = false;
@@ -6027,11 +5569,11 @@
                 const el = this.el;
                 if (!this.target) {
                     if (this.prevTarget) {
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyW", synthetic: true});
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD", synthetic: true});
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA", synthetic: true});
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyE", synthetic: true});
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyQ", synthetic: true});
+                        el.components['globe-ship-controls'].onKeyUp({code: "KeyW", synthetic: true});
+                        el.components['globe-ship-controls'].onKeyUp({code: "KeyD", synthetic: true});
+                        el.components['globe-ship-controls'].onKeyUp({code: "KeyA", synthetic: true});
+                        el.components['globe-ship-controls'].onKeyUp({code: "KeyE", synthetic: true});
+                        el.components['globe-ship-controls'].onKeyUp({code: "KeyQ", synthetic: true});
                     }
                     this.prevTarget = this.target;
                     return;
@@ -6095,35 +5637,35 @@
                 const det3 = getDeterminant(vPos, vSide, vTargetPos);
                 if (det3 < 0) {
                     if (Math.random() * 0.5 < Math.abs(det3)) {
-                        el.components['globe-keyboard-controls'].onKeyDown({code: "KeyD", synthetic: true});
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA", synthetic: true});
+                        el.components['globe-ship-controls'].onKeyDown({code: "KeyD", synthetic: true});
+                        el.components['globe-ship-controls'].onKeyUp({code: "KeyA", synthetic: true});
                     } else {
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA", synthetic: true});
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD", synthetic: true});
+                        el.components['globe-ship-controls'].onKeyUp({code: "KeyA", synthetic: true});
+                        el.components['globe-ship-controls'].onKeyUp({code: "KeyD", synthetic: true});
                     }
                 } else if (det3 > 0) {
                     if (Math.random() * 0.33 < Math.abs(det3)) {
-                        el.components['globe-keyboard-controls'].onKeyDown({code: "KeyA", synthetic: true});
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD", synthetic: true});
+                        el.components['globe-ship-controls'].onKeyDown({code: "KeyA", synthetic: true});
+                        el.components['globe-ship-controls'].onKeyUp({code: "KeyD", synthetic: true});
                     } else {
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD", synthetic: true});
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA", synthetic: true});
+                        el.components['globe-ship-controls'].onKeyUp({code: "KeyD", synthetic: true});
+                        el.components['globe-ship-controls'].onKeyUp({code: "KeyA", synthetic: true});
                     }
                 } else {
-                    el.components['globe-keyboard-controls'].onKeyUp({code: "KeyA", synthetic: true});
-                    el.components['globe-keyboard-controls'].onKeyUp({code: "KeyD", synthetic: true});
+                    el.components['globe-ship-controls'].onKeyUp({code: "KeyA", synthetic: true});
+                    el.components['globe-ship-controls'].onKeyUp({code: "KeyD", synthetic: true});
                 }
 
                 if (Math.abs(det3) < 0.1) {
                     if (Math.random() < 0.5) {
-                        el.components['globe-keyboard-controls'].onKeyDown({code: det2 >= 0 ? "KeyQ" : "KeyE", synthetic: true});
+                        el.components['globe-ship-controls'].onKeyDown({code: det2 >= 0 ? "KeyQ" : "KeyE", synthetic: true});
                     } else {
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyQ", synthetic: true});
-                        el.components['globe-keyboard-controls'].onKeyUp({code: "KeyE", synthetic: true});
+                        el.components['globe-ship-controls'].onKeyUp({code: "KeyQ", synthetic: true});
+                        el.components['globe-ship-controls'].onKeyUp({code: "KeyE", synthetic: true});
                     }
                 } else {
-                    el.components['globe-keyboard-controls'].onKeyUp({code: "KeyQ", synthetic: true});
-                    el.components['globe-keyboard-controls'].onKeyUp({code: "KeyE", synthetic: true});
+                    el.components['globe-ship-controls'].onKeyUp({code: "KeyQ", synthetic: true});
+                    el.components['globe-ship-controls'].onKeyUp({code: "KeyE", synthetic: true});
                 }
             },
         });
@@ -7299,7 +6841,7 @@
             rootShip.setAttribute("cannonball-damage", "damage: 50;");
             rootShip.setAttribute("fire-cannons", "");
             rootShip.setAttribute("firing-cannons", "");
-            rootShip.setAttribute("globe-keyboard-controls", "enabled: true; fly: true; npc: true;");
+            rootShip.setAttribute("globe-ship-controls", "enabled: true; npc: true;");
             rootShip.setAttribute("globe-ocean-nav-agent", `active: false;`);
             rootShip.setAttribute("npc-agent", `building: #${buildingId}`);
             rootShip.setAttribute("shadow", "");
@@ -8020,7 +7562,7 @@
             rootShip.setAttribute("ammo-shape", "type: sphere; sphereRadius: 1; fit: manual;");
             rootShip.setAttribute("collision-filter", "group: player-ship; collidesWith: terrain");
             rootShip.setAttribute("globe-gravity", "ship: true; activeObject: true;");
-            rootShip.setAttribute("globe-keyboard-controls", "enabled: true; fly: true");
+            rootShip.setAttribute("globe-ship-controls", "enabled: true;");
             rootShip.setAttribute("ship-health", "");
             rootShip.setAttribute("ship-death", "");
             rootShip.setAttribute("cannonball-damage", "damage: 100;");
@@ -8149,18 +7691,6 @@
 
         AFRAME.registerComponent('align-with-projection', {
             schema: {
-                offset: {
-                    type: "vec3",
-                    default: "0 0 -5",
-                },
-                rotation: {
-                    type: "vec3",
-                    default: "0 0 0",
-                },
-                scale: {
-                    type: "vec3",
-                    default: "1 1 1",
-                },
                 portShow: {
                     type: "boolean",
                     default: false,
@@ -8181,11 +7711,60 @@
                     type: "boolean",
                     default: false,
                 },
+                key: {
+                    type: "string",
+                    default: "",
+                },
             },
             init: function () {
                 this.buildMenuStateEl = this.el.sceneEl.querySelector("#build-menu-state"); // ok performance
-                this.cameraLookControlsEl = this.el.sceneEl.querySelector('[globe-look-controls]'); // ok performance
+                this.onKeyDown = bind(this.onKeyDown, this);
+                this.onKeyUp = bind(this.onKeyUp, this);
             },
+
+            onKeyDown: function (event) {
+                var el = this.el;
+
+                var code;
+                if (!shouldCaptureKeyEvent(event)) { return; }
+
+                if (!this.data.key) { return; }
+
+                if (this.data.key === event.key && this.el.object3D.visible) {
+                    el.click();
+                }
+            },
+
+            onKeyUp: function (event) {
+            },
+
+            update(oldData) {
+                if (this.data.enabled === true && oldData.enabled === false) {
+                    this.play();
+                }
+                if (this.data.enabled === false && oldData.enabled === true) {
+                    this.pause();
+                }
+            },
+
+            play: function () {
+                this.attachKeyEventListeners();
+            },
+
+            pause: function () {
+                this.removeKeyEventListeners();
+            },
+
+            attachKeyEventListeners: function () {
+                window.addEventListener('keydown', this.onKeyDown);
+                window.addEventListener('keyup', this.onKeyUp);
+            },
+
+            removeKeyEventListeners: function () {
+                window.removeEventListener('keydown', this.onKeyDown);
+                window.removeEventListener('keyup', this.onKeyUp);
+            },
+
             tick: function () {
                 const scene = this.el.sceneEl;
                 if (!this.data.portShow) {
@@ -8212,33 +7791,6 @@
                         }
                     }
                 }
-
-                const camera = scene.camera;
-
-                // do nothing if it is mobile
-                const cameraLookControlsEl = this.cameraLookControlsEl;
-
-                // align with camera in desktop
-                const position = new THREE.Vector3(0, 0, 0);
-                const rotation = new THREE.Quaternion(0, 0, 0, 1);
-                const scale = new THREE.Vector3(1, 1, 1);
-                if (!(this.el.sceneEl?.renderer?.xr?.isPresenting || cameraLookControlsEl.components['globe-look-controls']?.magicWindowControls?.enabled)) {
-                    camera.projectionMatrix.decompose(position, rotation, scale);
-                }
-                const aspect = scene.canvas.width / scene.canvas.height;
-                const offset = new THREE.Vector3(aspect, 1, 1).multiply(this.data.offset);
-                position.add(offset).multiply(scale);
-                if (!(this.el.sceneEl?.renderer?.xr?.isPresenting || cameraLookControlsEl.components['globe-look-controls']?.magicWindowControls?.enabled)) {
-                    camera.getWorldQuaternion(rotation);
-                }
-                position.applyQuaternion(rotation);
-                this.el.object3D.position.copy(position);
-                this.el.object3D.quaternion.copy(rotation.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(
-                    THREE.MathUtils.degToRad(this.data.rotation.x),
-                    THREE.MathUtils.degToRad(this.data.rotation.y),
-                    THREE.MathUtils.degToRad(this.data.rotation.z)
-                ))));
-                this.el.object3D.scale.copy(this.data.scale);
             }
         });
 
@@ -9597,30 +9149,33 @@
         <a-entity id="demo-node" position="0 105 5">
             <a-entity id="demo-node-position" position="0 0 -5"></a-entity>
         </a-entity>
-        <a-entity id="terrain" terrain-folder-optimization></a-entity>
+        <a-entity id="terrain" terrain-folder-optimization>
+            <a-sphere id="myPlanet" position="0 0 0" radius="20" color="orange"></a-sphere>
+        </a-entity>
         <a-entity id="grass-mesh" gltf-model="/meshes/Model_Redo/Grass/Grass.glb" model-loaded-bvh instanced-mesh="capacity: 20480; positioning: world;"></a-entity>
         <a-entity id="tree-mesh" gltf-model="/meshes/Model_Redo/stylished_fir/Tree.glb" model-loaded-bvh instanced-mesh="capacity: 2048; positioning: world;"></a-entity>
-        <a-entity id="camera-rig" position="0 105 5" networked="template: #avatar-template; attachTemplateToLocal: false;">
-            <a-entity camera globe-look-controls="mouseEnabled: false; touchEnabled: false;" position="0 1.6 0" cursor-updater cursor="rayOrigin: mouse" raycaster="far: 50; interval: 100; objects: .clickable">
+        <a-entity id="camera-rig" globe-movement-controls="planet: #myPlanet; radius: 115" position="0 115 0" networked="template: #avatar-template; attachTemplateToLocal: false;">
+            <a-entity camera position="0 1.6 0" cursor-updater cursor="rayOrigin: entity;" raycaster="far: 50; interval: 100; objects: .clickable">
+                <a-cursor color="white" radius="0.01"></a-cursor>
                 <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
                 <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
-                <a-entity id="health-bar" align-with-projection="offset: 0 -0.25 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03;" gltf-model="/meshes/ui/healthbar/HealthBar.glb" health-bar></a-entity>
-                <a-entity id="health-bar" align-with-projection="offset: 0 -0.25 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03; wizardShow: true;" gltf-model="/meshes/ui/healthbar/HealthBar.glb" health-bar></a-entity>
-                <a-entity id="mana-bar" align-with-projection="offset: 0 -0.3 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03; wizardShow: true;" gltf-model="/meshes/ui/healthbar/ManaBar.glb" mana-bar></a-entity>
-                <a-entity id="left-cannon-fire" align-with-projection="offset: -0.25 -0.2 -0.5; rotation: 0 90 0; scale: 0.03 0.03 0.03;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" select-cannon-side="selector: left-cannon" ui-clicked></a-entity>
-                <a-entity id="right-cannon-fire" align-with-projection="offset: 0.25 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" select-cannon-side="selector: right-cannon" ui-clicked></a-entity>
-                <a-entity id="none-cannon-fire" align-with-projection="offset: 0 -0.2 -0.5; rotation: 0 0 0; scale: 0.015 0.015 0.015;" gltf-model="/meshes/Model_Redo/Ship Wheel/ShipWheel.glb" select-cannon-side="selector: none-cannon" ui-clicked></a-entity>
-                <a-entity id="area-attack-fire" align-with-projection="offset: 0.2 -0.2 -0.5; rotation: 90 0 0; scale: 0.015 0.015 0.015; wizardShow: true;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" select-cannon-side="selector: area-attack" play-all-animations ui-clicked></a-entity>
-                <a-entity id="forward-attack-fire" align-with-projection="offset: -0.2 -0.2 -0.5; rotation: 0 90 0; scale: 0.015 0.015 0.015; wizardShow: true;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" select-cannon-side="selector: forward-attack" play-all-animations ui-clicked></a-entity>
-                <a-entity id="hammer-build" align-with-projection="offset: -0.05 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03; wizardShow: true; menuShow: true;" gltf-model="/meshes/ui/build/Hammer.glb" select-cannon-side="selector: hammer-build" ui-clicked></a-entity>
-                <a-entity id="split-npcs" align-with-projection="offset: -0.00 -0.2 -0.5; rotation: 0 -90 0; scale: 0.045 0.045 0.045; wizardShow: true; menuShow: true;" gltf-model="/meshes/ui/build/Split.glb" select-cannon-side="selector: split-npcs" ui-clicked></a-entity>
-                <a-entity id="merge-npcs" align-with-projection="offset: 0.05 -0.2 -0.5; rotation: 0 -90 0; scale: 0.045 0.045 0.045; wizardShow: true; menuShow: true;" gltf-model="/meshes/ui/build/Merge.glb" select-cannon-side="selector: merge-npcs" ui-clicked></a-entity>
-                <a-entity id="ok-build" align-with-projection="offset: -0.03 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03; wizardShow: true; buildShow: true;" gltf-model="/meshes/ui/build/Ok.glb" select-cannon-side="selector: ok-build" ui-clicked></a-entity>
-                <a-entity id="cancel-build" align-with-projection="offset: 0.03 -0.2 -0.5; rotation: 0 -90 0; scale: 0.03 0.03 0.03; wizardShow: true; buildShow: true;" gltf-model="/meshes/ui/build/Cancel.glb" select-cannon-side="selector: cancel-build" ui-clicked></a-entity>
-                <a-entity id="wizard-tower-build" align-with-projection="offset: 0.10 -0.4 -1; rotation: 0 -90 0; scale: 0.015 0.015 0.015; wizardShow: true; hammerShow: true;" gltf-model="/meshes/WizardTower.glb" select-cannon-side="selector: wizard-tower-build" ui-clicked></a-entity>
-                <a-entity id="wall-build" align-with-projection="offset: 0.03 -0.4 -1; rotation: 0 -90 0; scale: 0.015 0.015 0.015; wizardShow: true; hammerShow: true;" gltf-model="/meshes/Wall.glb" select-cannon-side="selector: wall-build" ui-clicked></a-entity>
-                <a-entity id="blacksmith-build" align-with-projection="offset: -0.03 -0.4 -1; rotation: 0 -90 0; scale: 0.015 0.015 0.015; wizardShow: true; hammerShow: true;" gltf-model="/meshes/Blacksmith.glb" select-cannon-side="selector: blacksmith-build" ui-clicked></a-entity>
-                <a-entity id="apothecary-build" align-with-projection="offset: -0.09 -0.4 -1; rotation: 0 -90 0; scale: 0.015 0.015 0.015; wizardShow: true; hammerShow: true;" gltf-model="/meshes/Apothecary.glb" select-cannon-side="selector: apothecary-build" ui-clicked></a-entity>
+                <a-entity id="health-bar" position="0 -0.25 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03;" gltf-model="/meshes/ui/healthbar/HealthBar.glb" health-bar></a-entity>
+                <a-entity id="health-bar" position="0 -0.25 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03" align-with-projection="wizardShow: true;" gltf-model="/meshes/ui/healthbar/HealthBar.glb" health-bar></a-entity>
+                <a-entity id="mana-bar" position="0 -0.3 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03" align-with-projection="wizardShow: true;" gltf-model="/meshes/ui/healthbar/ManaBar.glb" mana-bar></a-entity>
+                <a-entity id="left-cannon-fire" position="-0.25 -0.2 -0.5" rotation="0 90 0" scale="0.03 0.03 0.03;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" select-cannon-side="selector: left-cannon" ui-clicked></a-entity>
+                <a-entity id="right-cannon-fire" position="0.25 -0.2 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" select-cannon-side="selector: right-cannon" ui-clicked></a-entity>
+                <a-entity id="none-cannon-fire" position="0 -0.2 -0.5" rotation="0 0 0" scale="0.015 0.015 0.015;" gltf-model="/meshes/Model_Redo/Ship Wheel/ShipWheel.glb" select-cannon-side="selector: none-cannon" ui-clicked></a-entity>
+                <a-entity id="area-attack-fire" position="0.2 -0.2 -0.5" rotation="90 0 0" scale="0.015 0.015 0.015" align-with-projection="wizardShow: true; menuShow: true; key: 1;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" select-cannon-side="selector: area-attack" play-all-animations ui-clicked></a-entity>
+                <a-entity id="hammer-build" position="-0.05 -0.2 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03" align-with-projection="wizardShow: true; menuShow: true; key: 2;" gltf-model="/meshes/ui/build/Hammer.glb" select-cannon-side="selector: hammer-build" ui-clicked></a-entity>
+                <a-entity id="split-npcs" position="-0.00 -0.2 -0.5" rotation="0 -90 0" scale="0.045 0.045 0.045" align-with-projection="wizardShow: true; menuShow: true; key: 3;" gltf-model="/meshes/ui/build/Split.glb" select-cannon-side="selector: split-npcs" ui-clicked></a-entity>
+                <a-entity id="merge-npcs" position="0.05 -0.2 -0.5" rotation="0 -90 0" scale="0.045 0.045 0.045" align-with-projection="wizardShow: true; menuShow: true; key: 4;" gltf-model="/meshes/ui/build/Merge.glb" select-cannon-side="selector: merge-npcs" ui-clicked></a-entity>
+                <a-entity id="forward-attack-fire" position="-0.2 -0.2 -0.5" rotation="0 90 0" scale="0.015 0.015 0.015" align-with-projection="wizardShow: true; menuShow: true; key: 5;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" select-cannon-side="selector: forward-attack" play-all-animations ui-clicked></a-entity>
+                <a-entity id="ok-build" position="-0.03 -0.2 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03" align-with-projection="wizardShow: true; buildShow: true; key: 1;" gltf-model="/meshes/ui/build/Ok.glb" select-cannon-side="selector: ok-build" ui-clicked></a-entity>
+                <a-entity id="cancel-build" position="0.03 -0.2 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03" align-with-projection="wizardShow: true; buildShow: true; key: 2;" gltf-model="/meshes/ui/build/Cancel.glb" select-cannon-side="selector: cancel-build" ui-clicked></a-entity>
+                <a-entity id="wizard-tower-build" position="-0.10 -0.4 -1" rotation="0 -90 0" scale="0.015 0.015 0.015" align-with-projection="wizardShow: true; hammerShow: true; key: 1;" gltf-model="/meshes/WizardTower.glb" select-cannon-side="selector: wizard-tower-build" ui-clicked></a-entity>
+                <a-entity id="wall-build" position="-0.03 -0.4 -1" rotation="0 -90 0" scale="0.015 0.015 0.015" align-with-projection="wizardShow: true; hammerShow: true; key: 2;" gltf-model="/meshes/Wall.glb" select-cannon-side="selector: wall-build" ui-clicked></a-entity>
+                <a-entity id="blacksmith-build" position="0.03 -0.4 -1" rotation="0 -90 0" scale="0.015 0.015 0.015" align-with-projection="wizardShow: true; hammerShow: true; key: 3;" gltf-model="/meshes/Blacksmith.glb" select-cannon-side="selector: blacksmith-build" ui-clicked></a-entity>
+                <a-entity id="apothecary-build" position="0.10 -0.4 -1" rotation="0 -90 0" scale="0.015 0.015 0.015" align-with-projection="wizardShow: true; hammerShow: true; key: 4;" gltf-model="/meshes/Apothecary.glb" select-cannon-side="selector: apothecary-build" ui-clicked></a-entity>
                 <a-entity id="build-menu-state"></a-entity>
             </a-entity>
         </a-entity>

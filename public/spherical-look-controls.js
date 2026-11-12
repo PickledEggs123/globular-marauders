@@ -380,10 +380,6 @@ AFRAME.registerComponent("globe-nipple-controls", {
   init() {
     this.dVelocity = new THREE.Vector3();
     this.lookVector = new THREE.Vector2();
-    // const lookControls = this.el.querySelector("[look-controls]").components["look-controls"];
-    // this.pitchObject = lookControls.pitchObject;
-    // this.yawObject = lookControls.yawObject;
-    // this.rigRotation = this.el.object3D.rotation;
     this.rotationX = 0; // Look up/down (pitch)
     this.rotationY = 0; // Look left/right (yaw)
     this.moveData = undefined;
