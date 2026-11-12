@@ -24,7 +24,7 @@ AFRAME.registerComponent('globe-movement-controls', {
     lookSpeed: { type: 'number', default: 0.002 },
     radius: {type: 'number', default: 20 },
     enabled:            { default: true },
-    controls:           { default: ['globe-gamepad', 'globe-trackpad', 'globe-keyboard', 'globe-touch'] },
+    controls:           { default: ['globe-gamepad', 'globe-trackpad', 'globe-keyboard', 'globe-touch', 'globe-nipple'] },
     fly:                { default: false },
     constrainToNavMesh: { default: false },
     camera:             { default: '[globe-movement-controls] [camera]', type: 'selector' }
@@ -74,7 +74,7 @@ AFRAME.registerComponent('globe-movement-controls', {
     if (data.enabled) {
       for (let i = 0, l = data.controls.length; i < l; i++) {
         const control = this.el.components[data.controls[i] + COMPONENT_SUFFIX];
-        if (control && control.isVelocityActive()) {
+        if (control && (control.isVelocityActive() || (typeof control.isRotationActive === "function" && control.isRotationActive()))) {
           this.velocityCtrl = control;
           return;
         }
@@ -323,7 +323,9 @@ AFRAME.registerComponent('globe-keyboard-controls', {
   },
 
   tick: function () {
-    this.getVelocityDelta();
+    if (this.isVelocityActive()) {
+      this.getVelocityDelta();
+    }
   },
 
   emit: function (event, data) {
@@ -359,5 +361,238 @@ AFRAME.registerComponent('globe-keyboard-controls', {
   isProxied: function () {
     const proxyControls = this.el.sceneEl.components['proxy-controls'];
     return proxyControls && proxyControls.isConnected();
+  },
+});
+
+AFRAME.registerComponent("globe-nipple-controls", {
+  schema: {
+    enabled: { default: true },
+    mode: { default: "dynamic", oneOf: ["static", "semi", "dynamic"] },
+    rotationSensitivity: { default: 1.0 },
+    moveJoystickEnabled: { default: true },
+    lookJoystickEnabled: { default: true },
+    sideMargin: { default: "30px" },
+    bottomMargin: { default: "70px" },
+    moveJoystickPosition: { default: "left", oneOf: ["left", "right"] },
+    lookJoystickPosition: { default: "right", oneOf: ["left", "right"] },
+  },
+
+  init() {
+    this.dVelocity = new THREE.Vector3();
+    this.lookVector = new THREE.Vector2();
+    // const lookControls = this.el.querySelector("[look-controls]").components["look-controls"];
+    // this.pitchObject = lookControls.pitchObject;
+    // this.yawObject = lookControls.yawObject;
+    // this.rigRotation = this.el.object3D.rotation;
+    this.rotationX = 0; // Look up/down (pitch)
+    this.rotationY = 0; // Look left/right (yaw)
+    this.moveData = undefined;
+    this.lookData = undefined;
+    this.moving = false;
+    this.rotating = false;
+  },
+
+  update(oldData) {
+    if (
+        this.data.moveJoystickPosition !== oldData.moveJoystickPosition ||
+        this.data.sideMargin !== oldData.sideMargin ||
+        this.data.bottomMargin !== oldData.bottomMargin ||
+        this.data.mode !== oldData.mode
+    ) {
+      this.removeMoveJoystick();
+    }
+    if (
+        this.data.lookJoystickPosition !== oldData.lookJoystickPosition ||
+        this.data.sideMargin !== oldData.sideMargin ||
+        this.data.bottomMargin !== oldData.bottomMargin ||
+        this.data.mode !== oldData.mode
+    ) {
+      this.removeLookJoystick();
+    }
+    if (this.data.enabled && this.data.moveJoystickEnabled) {
+      this.createMoveJoystick();
+    } else {
+      this.removeMoveJoystick();
+    }
+    if (this.data.enabled && this.data.lookJoystickEnabled) {
+      this.createLookJoystick();
+    } else {
+      this.removeLookJoystick();
+    }
+  },
+
+  pause() {
+    this.moving = false;
+    this.rotating = false;
+  },
+
+  remove() {
+    this.removeMoveJoystick();
+    this.removeLookJoystick();
+  },
+
+  isVelocityActive() {
+    return this.data.enabled && this.moving;
+  },
+
+  getVelocityDelta() {
+    this.dVelocity.set(0, 0, 0);
+    if (this.isVelocityActive()) {
+      const force = this.moveData.force < 1 ? this.moveData.force : 1;
+      const angle = this.moveData.angle.radian;
+      const x = Math.cos(angle) * force;
+      const z = -Math.sin(angle) * force;
+      this.dVelocity.set(x, 0, z);
+    }
+    this.emit("MOVE", {type: "MOVE", detail: this.dVelocity.clone()});
+  },
+
+  isRotationActive() {
+    return this.data.enabled && this.rotating;
+  },
+
+  updateRotation(dt) {
+    if (!this.isRotationActive()) return;
+
+    const force = this.lookData.force < 1 ? this.lookData.force : 1;
+    const angle = this.lookData.angle.radian;
+    const lookVector = this.lookVector;
+    lookVector.x = Math.cos(angle) * force;
+    lookVector.y = Math.sin(angle) * force;
+    lookVector.multiplyScalar((this.data.rotationSensitivity * dt) / 1000);
+
+    this.rotationY -= lookVector.x;
+    let y = this.rotationX + lookVector.y;
+    y = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, y));
+    this.rotationX = y;
+    this.emit("ROTATE", {type: "ROTATE", detail: {rotationX: this.rotationX, rotationY: this.rotationY}});
+  },
+
+  tick: function (t, dt) {
+    if (this.isVelocityActive()) {
+      this.getVelocityDelta();
+    }
+    if (this.isRotationActive()) {
+      this.updateRotation(dt);
+    }
+  },
+
+  initLeftZone() {
+    const leftZone = document.createElement("div");
+    leftZone.setAttribute("id", "joystickLeftZone");
+    leftZone.setAttribute(
+        "style",
+        `position:absolute;${this.data.moveJoystickPosition}:${this.data.sideMargin};bottom:${this.data.bottomMargin};z-index:1`
+    );
+    this.el.sceneEl.appendChild(leftZone);
+    this.leftZone = leftZone;
+  },
+
+  initRightZone() {
+    const rightZone = document.createElement("div");
+    rightZone.setAttribute("id", "joystickRightZone");
+    rightZone.setAttribute(
+        "style",
+        `position:absolute;${this.data.lookJoystickPosition}:${this.data.sideMargin};bottom:${this.data.bottomMargin};z-index:1`
+    );
+    this.el.sceneEl.appendChild(rightZone);
+    this.rightZone = rightZone;
+  },
+
+  createMoveJoystick() {
+    if (this.moveJoystick) return;
+    this.initLeftZone();
+    const options = {
+      mode: this.data.mode,
+      zone: this.leftZone,
+      color: "white",
+      fadeTime: 0,
+    };
+    this.leftZone.style.width = "100px";
+    if (this.data.mode === "static") {
+      this.leftZone.style.height = "100px";
+      options.position = { left: "50%", bottom: "50%" };
+    } else {
+      this.leftZone.style.height = "400px";
+    }
+
+    this.moveJoystick = nipplejs.create(options);
+    this.moveJoystick.on("move", ({data}) => {
+      this.moveData = data;
+      this.moving = true;
+    });
+    this.moveJoystick.on("end", () => {
+      this.moving = false;
+    });
+  },
+
+  createLookJoystick() {
+    if (this.lookJoystick) return;
+    this.initRightZone();
+    const options = {
+      mode: this.data.mode,
+      zone: this.rightZone,
+      color: "white",
+      fadeTime: 0,
+    };
+    this.rightZone.style.width = "100px";
+    if (this.data.mode === "static") {
+      this.rightZone.style.height = "100px";
+      options.position = { left: "50%", bottom: "50%" };
+    } else {
+      this.rightZone.style.height = "400px";
+    }
+
+    this.lookJoystick = nipplejs.create(options);
+    this.lookJoystick.on("move", ({data}) => {
+      this.lookData = data;
+      this.rotating = true;
+    });
+    this.lookJoystick.on("end", () => {
+      this.rotating = false;
+    });
+  },
+
+  removeMoveJoystick() {
+    if (this.moveJoystick) {
+      this.moveJoystick.destroy();
+      this.moveJoystick = undefined;
+    }
+
+    this.moveData = undefined;
+
+    if (this.leftZone && this.leftZone.parentNode) {
+      this.leftZone.remove();
+      this.leftZone = undefined;
+    }
+  },
+
+  removeLookJoystick() {
+    if (this.lookJoystick) {
+      this.lookJoystick.destroy();
+      this.lookJoystick = undefined;
+    }
+
+    this.lookData = undefined;
+
+    if (this.rightZone && this.rightZone.parentNode) {
+      this.rightZone.remove();
+      this.rightZone = undefined;
+    }
+  },
+
+  emit: function (event, data) {
+    // TODO - keydown only initially?
+    // TODO - where the f is the spacebar
+
+    // // Emit original event.
+    // if (PROXY_FLAG in event) {
+    //   // TODO - Method never triggered.
+    //   this.el.emit(event.type, event);
+    // }
+
+    // Emit convenience event, identifying key.
+    this.el.emit(data.type, data.detail);
+    // if (this.data.debug) console.log(event.type + ':' + d.code);
   },
 });
