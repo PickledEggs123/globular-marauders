@@ -23,7 +23,7 @@ AFRAME.registerComponent('globe-movement-controls', {
     speed: { type: 'number', default: 5 },
     lookSpeed: { type: 'number', default: 0.002 },
     radius: {type: 'number', default: 20 },
-    enabled:            { type: "boolean", default: true },
+    enabled:            { default: true },
     controls:           { default: ['globe-gamepad', 'globe-trackpad', 'globe-keyboard', 'globe-touch', 'globe-nipple'] },
     fly:                { default: false },
     constrainToNavMesh: { default: false },
