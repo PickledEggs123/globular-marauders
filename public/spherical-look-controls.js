@@ -593,7 +593,7 @@ AFRAME.registerComponent("globe-nipple-controls", {
   },
 });
 
-Object.assign(function GamepadButton () {}, {
+const GamepadButton = Object.assign(function () {}, {
   FACE_1: 0,
   FACE_2: 1,
   FACE_3: 2,
