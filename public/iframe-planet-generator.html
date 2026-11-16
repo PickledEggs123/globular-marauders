@@ -2348,10 +2348,13 @@
                 this.clientX = 0;
                 this.clientY = 0;
                 this.handleMouseMove = this.handleMouseMove.bind(this);
+                this.npcTrigger = this.npcTrigger.bind(this);
                 this.el.sceneEl.addEventListener("mousemove", this.handleMouseMove);
+                this.el.sceneEl.addEventListener("npc-trigger", this.npcTrigger);
             },
             remove: function () {
                 this.el.sceneEl.removeEventListener("mousemove", this.handleMouseMove);
+                this.el.sceneEl.removeEventListener("npc-trigger", this.npcTrigger);
             },
             handleMouseMove: function (evt) {
                 if (evt.detail.synthetic) {
@@ -2359,6 +2362,23 @@
                 }
                 this.clientX = evt.clientX;
                 this.clientY = evt.clientY;
+            },
+            npcTrigger: function () {
+                const raycaster = this.el.components['raycaster'];
+                if (raycaster) {
+                    const intersection = raycaster.intersections.find(x => x.components['go-on-land']);
+                    if (intersection) {
+                        intersection.emit('mousedown', new MouseEvent("mousedown", {
+                            clientX: this.clientX,
+                            clientY: this.clientY,
+                            bubbles: true,
+                            cancelable: true,
+                            detail: {
+                                synthetic: true
+                            }
+                        }));
+                    }
+                }
             },
             tick: function () {
                 this.el.components['cursor'].onMouseMove(new MouseEvent("mousemove", {
@@ -7876,9 +7896,13 @@
 
                 if (event.detail.index === GamepadButton[this.data.key] && this.el.object3D.visible) {
                     const c = el.components['switch-to-land-camera'];
+                    const cursor = el.components['cursor'];
                     if (c && c.onMouseClick) {
                         c.onMouseClick(event);
                     } else {
+                        if (cursor) {
+                            el.emit("npc-trigger", event);
+                        }
                         el.click();
                     }
                 }
@@ -9444,7 +9468,7 @@
         <a-entity id="grass-mesh" gltf-model="/meshes/Model_Redo/Grass/Grass.glb" model-loaded-bvh instanced-mesh="capacity: 20480; positioning: world;"></a-entity>
         <a-entity id="tree-mesh" gltf-model="/meshes/Model_Redo/stylished_fir/Tree.glb" model-loaded-bvh instanced-mesh="capacity: 2048; positioning: world;"></a-entity>
         <a-entity id="camera-rig" globe-movement-controls="enabled: true; planet: #myPlanet; radius: 115" position="0 115 0" networked="template: #avatar-template; attachTemplateToLocal: false;">
-            <a-entity camera position="0 1.6 0" cursor-updater cursor="rayOrigin: entity;" raycaster="far: 50; interval: 100; objects: .clickable" align-with-gamepad="key: R_SHOULDER_1;">
+            <a-entity camera position="0 0 0" cursor-updater cursor="rayOrigin: entity; downEvents: npc-trigger;" raycaster="far: 50; interval: 100; objects: .clickable; showLine: true; lineColor: red; lineOpacity: 0.5; useWorldCoordinates: true;" align-with-gamepad="key: R_SHOULDER_1;">
                 <a-cursor color="white" radius="0.01"></a-cursor>
                 <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
                 <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
