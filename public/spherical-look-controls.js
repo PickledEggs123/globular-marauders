@@ -71,16 +71,14 @@ AFRAME.registerComponent('globe-movement-controls', {
 
   updateVelocityCtrl: function () {
     const data = this.data;
-    if (data.enabled) {
-      for (let i = 0, l = data.controls.length; i < l; i++) {
-        const control = this.el.components[data.controls[i] + COMPONENT_SUFFIX];
-        if (control && (control.isVelocityActive() || (typeof control.isRotationActive === "function" && control.isRotationActive()))) {
-          this.velocityCtrl = control;
-          return;
-        }
+    for (let i = 0, l = data.controls.length; i < l; i++) {
+      const control = this.el.components[data.controls[i] + COMPONENT_SUFFIX];
+      if (control && (control.isVelocityActive() || (typeof control.isRotationActive === "function" && control.isRotationActive()))) {
+        this.velocityCtrl = control;
+        return;
       }
-      this.velocityCtrl = null;
     }
+    this.velocityCtrl = null;
   },
 
 
@@ -137,11 +135,11 @@ AFRAME.registerComponent('globe-movement-controls', {
       const el = this.el;
       const data = this.data;
 
-      if (!data.enabled) return;
-
       this.updateVelocityCtrl();
       const velocityCtrl = this.velocityCtrl;
       const velocity = this.velocity;
+
+      if (!data.enabled) return;
 
       const isInVR = this.el.sceneEl.is('vr-mode');
       if (!velocityCtrl && !isInVR) return;
@@ -300,7 +298,7 @@ AFRAME.registerComponent('globe-keyboard-controls', {
    */
 
   isVelocityActive: function () {
-    return this.data.enabled && !!Object.keys(this.getKeys()).length;
+    return this.data.enabled && !!Object.entries(this.getKeys()).some(([k, v]) => !!v);
   },
 
   getVelocityDelta: function () {
@@ -340,9 +338,14 @@ AFRAME.registerComponent('globe-keyboard-controls', {
     //   this.el.emit(event.type, event);
     // }
 
-    // Emit convenience event, identifying key.
-    this.el.emit(data.type, data.detail);
-    // if (this.data.debug) console.log(event.type + ':' + d.code);
+    const globeMovement = this.el.components['globe-movement-controls'];
+    if ((globeMovement && globeMovement.velocityCtrl === this && data.type === "MOVE") ||
+        data.type === "ROTATE")
+    {
+      // Emit convenience event, identifying key.
+      this.el.emit(data.type, data.detail);
+      // if (this.data.debug) console.log(event.type + ':' + d.code);
+    }
   },
 
   /*******************************************************************
@@ -593,9 +596,12 @@ AFRAME.registerComponent("globe-nipple-controls", {
     //   this.el.emit(event.type, event);
     // }
 
-    // Emit convenience event, identifying key.
-    this.el.emit(data.type, data.detail);
-    // if (this.data.debug) console.log(event.type + ':' + d.code);
+    const globeMovement = this.el.components['globe-movement-controls'];
+    if (globeMovement && globeMovement.velocityCtrl === this) {
+      // Emit convenience event, identifying key.
+      this.el.emit(data.type, data.detail);
+      // if (this.data.debug) console.log(event.type + ':' + d.code);
+    }
   },
 });
 
@@ -726,6 +732,8 @@ AFRAME.registerComponent('globe-gamepad-controls', {
   isVelocityActive: function () {
     if (!this.data.enabled || !this.isConnected()) return false;
 
+    const gamepad = this.getGamepad(Hand.LEFT);
+
     const dpad = this._dpadVector;
     const joystick = this._moveVector;
 
@@ -735,7 +743,7 @@ AFRAME.registerComponent('globe-gamepad-controls', {
     const inputX = dpad.x || joystick.x;
     const inputY = dpad.y || joystick.y;
 
-    return Math.abs(inputX) > JOYSTICK_EPS || Math.abs(inputY) > JOYSTICK_EPS;
+    return Math.abs(inputX) > JOYSTICK_EPS || Math.abs(inputY) > JOYSTICK_EPS || !!(gamepad && gamepad.buttons.some(x => x.pressed));
   },
 
   getVelocityDelta: function () {
@@ -819,22 +827,26 @@ AFRAME.registerComponent('globe-gamepad-controls', {
   },
 
   emit: function (event, data) {
-    // Emit convenience event, identifying key.
-    if (data) {
-      this.el.emit(data.type, data.detail);
-    }
-    // if (this.data.debug) console.log(event.type + ':' + d.code);
 
-    // Emit convenience event, identifying button index.
-    if (event.type && typeof event.index === 'number') {
-      this.el.emit(
-          event.type,
-          new GamepadButtonEvent(event.type, event.index, event)
-      );
-      this.el.emit(
-          event.type + ':' + event.index,
-          new GamepadButtonEvent(event.type, event.index, event)
-      );
+    const globeMovement = this.el.components['globe-movement-controls'];
+    if ((globeMovement && globeMovement.velocityCtrl === this) || event instanceof GamepadButtonEvent) {
+      // Emit convenience event, identifying key.
+      if (data) {
+        this.el.emit(data.type, data.detail);
+      }
+      // if (this.data.debug) console.log(event.type + ':' + d.code);
+
+      // Emit convenience event, identifying button index.
+      if (event.type && typeof event.index === 'number') {
+        this.el.emit(
+            event.type,
+            new GamepadButtonEvent(event.type, event.index, event)
+        );
+        this.el.emit(
+            event.type + ':' + event.index,
+            new GamepadButtonEvent(event.type, event.index, event)
+        );
+      }
     }
   },
 
