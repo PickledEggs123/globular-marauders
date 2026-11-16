@@ -100,7 +100,7 @@ AFRAME.registerComponent('globe-movement-controls', {
       // Propagate the enabled change to all controls
       for (let i = 0; i < data.controls.length; i++) {
         const name = data.controls[i] + COMPONENT_SUFFIX;
-        this.el.setAttribute(name, { enabled: this.data.enabled });
+        this.el.setAttribute(name, { enabled: true });
       }
     }
   },
@@ -110,7 +110,7 @@ AFRAME.registerComponent('globe-movement-controls', {
 
     for (let i = 0; i < data.controls.length; i++) {
       const name = data.controls[i] + COMPONENT_SUFFIX;
-      this.el.setAttribute(name, { enabled: this.data.enabled });
+      this.el.setAttribute(name, { enabled: true });
     }
   },
 
@@ -593,7 +593,7 @@ AFRAME.registerComponent("globe-nipple-controls", {
   },
 });
 
-const GamepadButton = Object.assign(function () {}, {
+GamepadButton = Object.assign(function () {}, {
   FACE_1: 0,
   FACE_2: 1,
   FACE_3: 2,
@@ -817,6 +817,10 @@ AFRAME.registerComponent('globe-gamepad-controls', {
 
     // Emit convenience event, identifying button index.
     if (event.type && typeof event.index === 'number') {
+      this.el.emit(
+          event.type,
+          new GamepadButtonEvent(event.type, event.index, event)
+      );
       this.el.emit(
           event.type + ':' + event.index,
           new GamepadButtonEvent(event.type, event.index, event)
