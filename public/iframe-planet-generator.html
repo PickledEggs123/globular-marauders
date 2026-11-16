@@ -7884,7 +7884,12 @@
                 if (!this.data.key) { return; }
 
                 if (event.detail.index === GamepadButton[this.data.key] && this.el.object3D.visible) {
-                    el.click();
+                    const c = el.components['switch-to-land-camera'];
+                    if (c && c.onMouseClick) {
+                        c.onMouseClick(event);
+                    } else {
+                        el.click();
+                    }
                 }
             },
 
@@ -8206,6 +8211,92 @@
                         });
                     }
                 }
+            },
+        });
+
+        AFRAME.registerComponent('switch-to-land-camera', {
+            schema: {
+                enabled: {
+                    type: "boolean",
+                    default: true,
+                },
+                key: {
+                    type: "string",
+                    default: ""
+                },
+            },
+            init: function () {
+                this.onMouseClick = bind(this.onMouseClick, this);
+            },
+
+            onMouseClick: function (event) {
+                if (!(event?.detail?.type === "gamepadbuttondown" && event?.detail?.index === GamepadButton.FACE_4)) { return; }
+
+                const scene = this.el.sceneEl;
+                const isShip = scene.components['coin-purse'].getUnit().includes("ship");
+                if (isShip) {
+                    const ships = document.querySelectorAll(`.${scene.components['coin-purse'].getUnit().split(":", 2)[0]}`);
+                    ships.forEach(s => {
+                        s.setAttribute("globe-ship-controls", {enabled: false});
+                    });
+
+                    const cameraEl = document.querySelector("#camera-rig");
+                    cameraEl.setAttribute("look-at-box", {enabled: false, mainSelector: scene.components['coin-purse'].getUnit()});
+                    const globeMovementControls = document.querySelector("[globe-movement-controls]");
+                    if (globeMovementControls) {
+                        globeMovementControls.setAttribute("globe-movement-controls", {enabled: true})
+                    }
+
+                    scene.components['coin-purse'].setUnit(unitMap.get(scene.components['coin-purse'].activeUnit));
+                    const checkBox = document.querySelector(`#unit-selection-${scene.components['coin-purse'].activeUnit}`);
+                    checkBox.click();
+                } else {
+                    const scene = document.querySelector("a-scene");
+                    scene.components['coin-purse'].setUnit(inverseUnitMap.get(scene.components['coin-purse'].activeUnit));
+                    const checkBox = document.querySelector(`#unit-selection-${scene.components['coin-purse'].activeUnit}`);
+                    checkBox.click();
+
+                    const cameraEl = document.querySelector("#camera-rig");
+                    cameraEl.setAttribute("look-at-box", {enabled: true, mainSelector: scene.components['coin-purse'].getUnit()});
+                    const globeMovementControls = document.querySelector("[globe-movement-controls]");
+                    if (globeMovementControls) {
+                        globeMovementControls.setAttribute("globe-movement-controls", {enabled: false})
+                    }
+
+                    const ships = [
+                        ...scene.querySelectorAll(`.ship-1`),
+                        ...scene.querySelectorAll(`.ship-2`),
+                        ...scene.querySelectorAll(`.ship-3`),
+                    ];
+                    ships.forEach((ship) => {
+                        ship.setAttribute("globe-ship-controls", {enabled: true});
+                    });
+                }
+            },
+
+            update(oldData) {
+                if (this.data.enabled === true && oldData.enabled === false) {
+                    this.play();
+                }
+                if (this.data.enabled === false && oldData.enabled === true) {
+                    this.pause();
+                }
+            },
+
+            play: function () {
+                this.attachKeyEventListeners();
+            },
+
+            pause: function () {
+                this.removeKeyEventListeners();
+            },
+
+            attachKeyEventListeners: function () {
+                window.addEventListener(`click`, this.onMouseClick);
+            },
+
+            removeKeyEventListeners: function () {
+                window.removeEventListener(`click`, this.onMouseClick);
             },
         });
 
@@ -9304,6 +9395,7 @@
                 <a-entity id="left-cannon-fire" position="-0.25 -0.2 -0.5" rotation="0 90 0" scale="0.03 0.03 0.03;" align-with-gamepad="key: L_SHOULDER_1" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" select-cannon-side="selector: left-cannon" ui-clicked></a-entity>
                 <a-entity id="right-cannon-fire" position="0.25 -0.2 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03;" align-with-gamepad="key: R_SHOULDER_1" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" select-cannon-side="selector: right-cannon" ui-clicked></a-entity>
                 <a-entity id="none-cannon-fire" position="0 -0.2 -0.5" rotation="0 0 0" scale="0.015 0.015 0.015;" align-with-gamepad="key: FACE_1" gltf-model="/meshes/Model_Redo/Ship Wheel/ShipWheel.glb" select-cannon-side="selector: none-cannon" ui-clicked></a-entity>
+                <a-entity id="switch-to-land-camera" align-with-gamepad="key: FACE_4" switch-to-land-camera></a-entity>
                 <a-entity id="area-attack-fire" position="0.2 -0.2 -0.5" rotation="90 0 0" scale="0.015 0.015 0.015" align-with-projection="wizardShow: true; menuShow: true; key: 1;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" select-cannon-side="selector: area-attack" play-all-animations ui-clicked></a-entity>
                 <a-entity id="hammer-build" position="-0.05 -0.2 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03" align-with-projection="wizardShow: true; menuShow: true; key: 2;" gltf-model="/meshes/ui/build/Hammer.glb" select-cannon-side="selector: hammer-build" ui-clicked></a-entity>
                 <a-entity id="split-npcs" position="-0.00 -0.2 -0.5" rotation="0 -90 0" scale="0.045 0.045 0.045" align-with-projection="wizardShow: true; menuShow: true; key: 3;" gltf-model="/meshes/ui/build/Split.glb" select-cannon-side="selector: split-npcs" ui-clicked></a-entity>

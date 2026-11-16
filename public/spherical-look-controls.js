@@ -475,7 +475,7 @@ AFRAME.registerComponent("globe-nipple-controls", {
     if (this.isRotationActive()) {
       this.updateRotation(dt);
     } else {
-      this.emit("ROTATE", {type: "ROTATE", detail: {rotationX: 0, rotationY: 0, lookStep: {x: 0, y: 0}}});
+      this.emit("ROTATE", {type: "ROTATE", detail: {rotationX: this.rotationX, rotationY: this.rotationY, lookStep: {x: 0, y: 0}}});
     }
   },
 
@@ -709,7 +709,7 @@ AFRAME.registerComponent('globe-gamepad-controls', {
     if (this.isRotationActive()) {
       this.updateRotation(dt);
     } else {
-      this.emit("ROTATE", {type: "ROTATE", detail: {rotationX: 0, rotationY: 0, lookStep: {x: 0, y: 0}}});
+      this.emit("ROTATE", {type: "ROTATE", detail: {rotationX: this.rotationX, rotationY: this.rotationY, lookStep: {x: 0, y: 0}}});
     }
   },
 
