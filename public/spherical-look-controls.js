@@ -290,7 +290,7 @@ AFRAME.registerComponent('globe-keyboard-controls', {
         this.rotationX -= e.movementY * this.data.lookSpeed;
         // Clamp looking up/down so you don't flip your neck backwards
         this.rotationX = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, this.rotationX));
-        this.emit("ROTATE", {type: "ROTATE", detail: {rotationX: this.rotationX, rotationY: this.rotationY}});
+        this.emit("ROTATE", {type: "ROTATE", detail: {rotationX: this.rotationX, rotationY: this.rotationY, lookStep: {x: e.movementX, y: e.movementY}}});
       }
     });
   },
@@ -325,6 +325,8 @@ AFRAME.registerComponent('globe-keyboard-controls', {
   tick: function () {
     if (this.isVelocityActive()) {
       this.getVelocityDelta();
+    } else {
+      this.emit("MOVE", {type: "MOVE", detail: new THREE.Vector3()});
     }
   },
 
@@ -461,15 +463,19 @@ AFRAME.registerComponent("globe-nipple-controls", {
     let y = this.rotationX + lookVector.y;
     y = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, y));
     this.rotationX = y;
-    this.emit("ROTATE", {type: "ROTATE", detail: {rotationX: this.rotationX, rotationY: this.rotationY}});
+    this.emit("ROTATE", {type: "ROTATE", detail: {rotationX: this.rotationX, rotationY: this.rotationY, lookStep: {x: lookVector.x, y: lookVector.y}}});
   },
 
   tick: function (t, dt) {
     if (this.isVelocityActive()) {
       this.getVelocityDelta();
+    } else {
+      this.emit("MOVE", {type: "MOVE", detail: new THREE.Vector3()});
     }
     if (this.isRotationActive()) {
       this.updateRotation(dt);
+    } else {
+      this.emit("ROTATE", {type: "ROTATE", detail: {rotationX: 0, rotationY: 0, lookStep: {x: 0, y: 0}}});
     }
   },
 
@@ -697,9 +703,13 @@ AFRAME.registerComponent('globe-gamepad-controls', {
     this.updateButtonState();
     if (this.isVelocityActive()) {
       this.getVelocityDelta();
+    } else {
+      this.emit("MOVE", {type: "MOVE", detail: new THREE.Vector3()});
     }
     if (this.isRotationActive()) {
       this.updateRotation(dt);
+    } else {
+      this.emit("ROTATE", {type: "ROTATE", detail: {rotationX: 0, rotationY: 0, lookStep: {x: 0, y: 0}}});
     }
   },
 
@@ -781,7 +791,7 @@ AFRAME.registerComponent('globe-gamepad-controls', {
     this.rotationY -= lookVector.x;
     this.rotationX -= lookVector.y;
     this.rotationX = Math.max(- Math.PI / 2.5, Math.min(Math.PI / 2.5, this.rotationX));
-    this.emit("ROTATE", {type: "ROTATE", detail: {rotationX: this.rotationX, rotationY: this.rotationY}});
+    this.emit("ROTATE", {type: "ROTATE", detail: {rotationX: this.rotationX, rotationY: this.rotationY, lookStep: {x: lookVector.x, y: lookVector.y}}});
   },
 
   /*******************************************************************

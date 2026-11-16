@@ -2561,6 +2561,8 @@
                 this.mainKeys = {};
                 this.velocity = new THREE.Vector3();
                 this.rotation = new THREE.Vector3();
+                this.systemMove = new THREE.Vector3();
+                this.systemRotateY = 0;
                 this.sceneEl = this.el.sceneEl;
                 this.leftCannonFireEl = document.querySelector("#left-cannon-fire");
                 this.rightCannonFireEl = document.querySelector("#right-cannon-fire");
@@ -2572,6 +2574,8 @@
                 this.onFocus = bind(this.onFocus, this);
                 this.onKeyDown = bind(this.onKeyDown, this);
                 this.onKeyUp = bind(this.onKeyUp, this);
+                this.moveHandler = bind(this.moveHandler, this);
+                this.rotateHandler = bind(this.rotateHandler, this);
                 this.onVisibilityChange = bind(this.onVisibilityChange, this);
                 this.attachVisibilityEventListeners();
                 this.throttle = throttle(250, function () {
@@ -2609,6 +2613,16 @@
                         });
                     }, 250);
                 });
+            },
+
+            moveHandler: function (event) {
+                this.systemMove = event.detail.clone();
+                this.el.sceneEl.emit("clear-ship-indicator");
+            },
+
+            rotateHandler: function (event) {
+                this.systemRotateY = event.detail.lookStep.x;
+                this.el.sceneEl.emit("clear-ship-indicator");
             },
 
             tick: function () {
@@ -2664,10 +2678,10 @@
                 acceleration = data.acceleration;
                 velocity.set(0, 0, 0);
                 rotation.set(0, 0, 0);
-                if (keys.KeyA || keys.ArrowLeft) { rotation.y = acceleration; }
-                if (keys.KeyD || keys.ArrowRight) { rotation.y = -acceleration; }
-                if (keys.KeyW || keys.ArrowUp) { velocity.z = -acceleration; }
-                if (keys.KeyS || keys.ArrowDown) { velocity.z = acceleration; }
+                if (keys.KeyA || keys.ArrowLeft || (this.systemRotateY < -0.01)) { rotation.y = acceleration; }
+                if (keys.KeyD || keys.ArrowRight || (this.systemRotateY > 0.01)) { rotation.y = -acceleration; }
+                if (keys.KeyW || keys.ArrowUp || (this.systemMove.z < -0.01)) { velocity.z = -acceleration; }
+                if (keys.KeyS || keys.ArrowDown || (this.systemMove.z > 0.01)) { velocity.z = acceleration; }
             },
 
             getMovementVector: (function () {
@@ -2701,11 +2715,15 @@
             attachKeyEventListeners: function () {
                 window.addEventListener('keydown', this.onKeyDown);
                 window.addEventListener('keyup', this.onKeyUp);
+                window.addEventListener('MOVE', this.moveHandler);
+                window.addEventListener('ROTATE', this.rotateHandler);
             },
 
             removeKeyEventListeners: function () {
                 window.removeEventListener('keydown', this.onKeyDown);
                 window.removeEventListener('keyup', this.onKeyUp);
+                window.removeEventListener('MOVE', this.moveHandler);
+                window.removeEventListener('ROTATE', this.rotateHandler);
             },
 
             onContextMenu: function () {
