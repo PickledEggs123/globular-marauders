@@ -9440,7 +9440,7 @@
         <a-entity id="grass-mesh" gltf-model="/meshes/Model_Redo/Grass/Grass.glb" model-loaded-bvh instanced-mesh="capacity: 20480; positioning: world;"></a-entity>
         <a-entity id="tree-mesh" gltf-model="/meshes/Model_Redo/stylished_fir/Tree.glb" model-loaded-bvh instanced-mesh="capacity: 2048; positioning: world;"></a-entity>
         <a-entity id="camera-rig" globe-movement-controls="enabled: true; planet: #myPlanet; radius: 115" position="0 115 0" networked="template: #avatar-template; attachTemplateToLocal: false;">
-            <a-entity camera position="0 0 0" cursor-updater cursor="rayOrigin: entity; downEvents: npc-trigger;" raycaster="far: 50; interval: 100; objects: .clickable;" align-with-gamepad="key: R_SHOULDER_1;">
+            <a-entity camera position="0 0 0" cursor-updater cursor="rayOrigin: entity; downEvents: npc-trigger, mousedown, touchstart;" raycaster="far: 50; interval: 100; objects: .clickable;" align-with-gamepad="key: R_SHOULDER_2;">
                 <a-cursor color="white" radius="0.01"></a-cursor>
                 <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
                 <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
