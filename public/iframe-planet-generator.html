@@ -2349,7 +2349,7 @@
                     const goOnland = !!e?.detail?.intersectedEl?.components['go-on-land'];
                     const goToSea = !!e?.detail?.intersectedEl?.components['go-to-sea'];
                     if (goOnland) {
-                        e.detail.intersectedEl.emit("sent-npc-trigger", e);
+                        e.detail.intersectedEl.emit("npc-trigger", e);
 
                         const arr = [
                             document.querySelector("#left-cannon-fire"),
@@ -2364,7 +2364,7 @@
                         this?.el?.sceneEl?.camera?.el?.setAttribute("align-with-gamepad", {enabled: true});
 
                     } else if (goToSea) {
-                        e.detail.intersectedEl.emit("sent-npc-trigger", e);
+                        e.detail.intersectedEl.emit("npc-trigger", e);
 
                         this?.el?.sceneEl?.camera?.el?.setAttribute("align-with-gamepad", {enabled: false});
 
@@ -2377,13 +2377,12 @@
                         arr.forEach(x => {
                             x.setAttribute("align-with-gamepad", {enabled: true});
                         });
-
                     }
                 };
                 this.fn = debounce(this.fn, 100, true);
                 this.el.addEventListener('click', this.fn);
                 this.el.addEventListener('mousedown', this.fn);
-                this.el.addEventListener('sent-npc-trigger', this.fn);
+                this.el.addEventListener('npc-trigger', this.fn);
             },
             remove: function () {
             },
@@ -4462,86 +4461,82 @@
                 const el = this.el;
                 const activeUnitMarker = this.activeUnitMarker;
                 const self = this;
-                this.alreadyRunning = false;
 
                 this.fn = (e) => {
-                    if (this.alreadyRunning) {
-                        return;
-                    }
-                    this.alreadyRunning = true;
-
                     ClickManager.addToQueue(() => {
-                        try {
+                        const scene = el.sceneEl;
 
-                            const scene = el.sceneEl;
+                        let intersection = null;
+                        if (e.detail.intersection) {
+                            intersection = e.detail.intersection;
+                        }
+                        if (!intersection && e.detail.detail.intersection) {
+                            intersection = e.detail.detail.intersection;
+                        }
+                        if (!intersection) {
+                            return;
+                        }
 
-                            if (!e.detail.intersection) {
-                                return;
-                            }
+                        const destination1 = intersection.point.clone();
 
-                            const destination1 = e.detail.intersection.point.clone();
+                        const ships = activeUnitMarker.ships;
+                        ships.forEach((ship) => {
+                            ship.setAttribute("globe-ship-controls", {enabled: false});
+                        });
 
-                            const ships = activeUnitMarker.ships;
-                            ships.forEach((ship) => {
-                                ship.setAttribute("globe-ship-controls", {enabled: false});
+                        scene.components['coin-purse'].setUnit(unitMap.get(scene.components['coin-purse'].activeUnit));
+                        const checkBox = document.querySelector(`#unit-selection-${scene.components['coin-purse'].activeUnit}`);
+                        checkBox.click();
+
+                        let addedNpcs = false;
+                        const noShoreParties = !NpcGroupDictionary.instance.data.has(this.el.sceneEl.systems['draw-npc-indicator'].activeNpcIndicator?.groupId ?? "");
+                        if (noShoreParties) {
+                            const groupId = NpcGroupDictionary.instance.addDefaultGroup();
+                            scene.setAttribute(`draw-npc-indicator__${groupId}`, "isSpawn: false;");
+                            this.el.sceneEl.systems['draw-npc-indicator'].setActiveNpcIndicator(scene.components[`draw-npc-indicator__${groupId}`]);
+                            scene.components[`draw-npc-indicator__${groupId}`].groupId = groupId;
+                            addedNpcs = true;
+                        }
+
+                        if (addedNpcs) {
+                            scene.emit("clear-ship-indicator");
+                            const groupId = scene.systems['draw-npc-indicator'].activeNpcIndicator?.groupId;
+                            scene.emit("set-npc-indicator", {
+                                point: destination1.clone(),
+                                immediate: false,
+                                self,
+                                groupId,
+                            });
+                        } else {
+                            scene.emit("clear-ship-indicator");
+                            const groupId = scene.systems['draw-npc-indicator'].activeNpcIndicator?.groupId;
+                            scene.emit("set-npc-indicator", {
+                                point: destination1.clone(),
+                                immediate: true,
+                                self,
+                                groupId,
                             });
 
-                            scene.components['coin-purse'].setUnit(unitMap.get(scene.components['coin-purse'].activeUnit));
-                            const checkBox = document.querySelector(`#unit-selection-${scene.components['coin-purse'].activeUnit}`);
-                            checkBox.click();
-
-                            let addedNpcs = false;
-                            const noShoreParties = !NpcGroupDictionary.instance.data.has(this.el.sceneEl.systems['draw-npc-indicator'].activeNpcIndicator?.groupId ?? "");
-                            if (noShoreParties) {
-                                const groupId = NpcGroupDictionary.instance.addDefaultGroup();
-                                scene.setAttribute(`draw-npc-indicator__${groupId}`, "isSpawn: false;");
-                                this.el.sceneEl.systems['draw-npc-indicator'].setActiveNpcIndicator(scene.components[`draw-npc-indicator__${groupId}`]);
-                                scene.components[`draw-npc-indicator__${groupId}`].groupId = groupId;
-                                addedNpcs = true;
+                            const buildMenuState = document.querySelector("#build-menu-state");
+                            if (buildMenuState.hasAttribute("wizard-tower-build")) {
+                                addGhostBuilding(destination1.clone(), "WIZARD_TOWER");
                             }
-
-                            if (addedNpcs) {
-                                scene.emit("clear-ship-indicator");
-                                const groupId = scene.systems['draw-npc-indicator'].activeNpcIndicator?.groupId;
-                                scene.emit("set-npc-indicator", {
-                                    point: destination1.clone(),
-                                    immediate: false,
-                                    self,
-                                    groupId,
-                                });
-                            } else {
-                                scene.emit("clear-ship-indicator");
-                                const groupId = scene.systems['draw-npc-indicator'].activeNpcIndicator?.groupId;
-                                scene.emit("set-npc-indicator", {
-                                    point: destination1.clone(),
-                                    immediate: true,
-                                    self,
-                                    groupId,
-                                });
-
-                                const buildMenuState = document.querySelector("#build-menu-state");
-                                if (buildMenuState.hasAttribute("wizard-tower-build")) {
-                                    addGhostBuilding(destination1.clone(), "WIZARD_TOWER");
-                                }
-                                if (buildMenuState.hasAttribute("wall-build")) {
-                                    addGhostBuilding(destination1.clone(), "WALL");
-                                }
-                                if (buildMenuState.hasAttribute("blacksmith-build")) {
-                                    addGhostBuilding(destination1.clone(), "BLACKSMITH");
-                                }
-                                if (buildMenuState.hasAttribute("apothecary-build")) {
-                                    addGhostBuilding(destination1.clone(), "APOTHECARY");
-                                }
+                            if (buildMenuState.hasAttribute("wall-build")) {
+                                addGhostBuilding(destination1.clone(), "WALL");
                             }
-                        } finally {
-                            this.alreadyRunning = false;
+                            if (buildMenuState.hasAttribute("blacksmith-build")) {
+                                addGhostBuilding(destination1.clone(), "BLACKSMITH");
+                            }
+                            if (buildMenuState.hasAttribute("apothecary-build")) {
+                                addGhostBuilding(destination1.clone(), "APOTHECARY");
+                            }
                         }
                     }, "go-on-land");
                 };
                 this.fn = debounce(this.fn, 100, true);
                 this.el.addEventListener('click', this.fn);
                 this.el.addEventListener('mousedown', this.fn);
-                this.el.addEventListener('sent-npc-trigger', this.fn);
+                this.el.addEventListener('npc-trigger', this.fn);
             },
             walkToDestination: function (destination1, active, wizardWalk, groupId) {
                 const scene = this.el.sceneEl;
@@ -4573,76 +4568,72 @@
 
         AFRAME.registerComponent('go-to-sea', {
             init: function () {
-                this.alreadyRunning = false;
-
                 this.fn = (e) => {
-                    if (this.alreadyRunning) {
-                        return;
-                    }
-                    this.alreadyRunning = true;
-
                     ClickManager.addToQueue(() => {
-                        try {
 
-                            if (!e.detail.intersection) {
-                                return;
-                            }
+                        let intersection = null;
+                        if (e.detail.intersection) {
+                            intersection = e.detail.intersection;
+                        }
+                        if (!intersection && e.detail.detail.intersection) {
+                            intersection = e.detail.detail.intersection;
+                        }
+                        if (!intersection) {
+                            return;
+                        }
 
-                            const destination1 = e.detail.intersection.point.clone();
+                        const destination1 = intersection.point.clone();
 
-                            const scene = document.querySelector("a-scene");
-                            scene.components['coin-purse'].setUnit(inverseUnitMap.get(scene.components['coin-purse'].activeUnit));
-                            const checkBox = document.querySelector(`#unit-selection-${scene.components['coin-purse'].activeUnit}`);
-                            checkBox.click();
+                        const scene = document.querySelector("a-scene");
+                        scene.components['coin-purse'].setUnit(inverseUnitMap.get(scene.components['coin-purse'].activeUnit));
+                        const checkBox = document.querySelector(`#unit-selection-${scene.components['coin-purse'].activeUnit}`);
+                        checkBox.click();
 
-                            const ships = [
-                                ...scene.querySelectorAll(`.ship-1`),
-                                ...scene.querySelectorAll(`.ship-2`),
-                                ...scene.querySelectorAll(`.ship-3`),
-                            ];
-                            ships.forEach((ship) => {
-                                ship.setAttribute("globe-ship-controls", {enabled: true});
-                            });
+                        const ships = [
+                            ...scene.querySelectorAll(`.ship-1`),
+                            ...scene.querySelectorAll(`.ship-2`),
+                            ...scene.querySelectorAll(`.ship-3`),
+                        ];
+                        ships.forEach((ship) => {
+                            ship.setAttribute("globe-ship-controls", {enabled: true});
+                        });
 
-                            let removedNpcs = false;
-                            const npcs = document.querySelectorAll(`.${unitMap.get(scene.components['coin-purse'].activeUnit)}`);
-                            if (npcs.length !== 0) {
-                                removeNpcs();
-                                removedNpcs = true;
-                            }
+                        let removedNpcs = false;
+                        const npcs = document.querySelectorAll(`.${unitMap.get(scene.components['coin-purse'].activeUnit)}`);
+                        if (npcs.length !== 0) {
+                            removeNpcs();
+                            removedNpcs = true;
+                        }
 
-                            if (removedNpcs) {
-                                setTimeout(() => {
-                                    const scene = this.el.sceneEl;
-                                    const cameraEl = document.querySelector("#camera-rig");
-                                    cameraEl.setAttribute("look-at-box", {enabled: !!scene.components['coin-purse'].getUnit().includes("ship"), mainSelector: scene.components['coin-purse'].getUnit()});
-                                    const globeMovementControls = document.querySelector("[globe-movement-controls]");
-                                    if (globeMovementControls) {
-                                        globeMovementControls.setAttribute("globe-movement-controls", {enabled: !scene.components['coin-purse'].getUnit().includes("ship")})
-                                    }
-                                }, 0);
-                                setTimeout(() => {
-                                    scene.emit("clear-npc-indicator");
-                                    scene.emit("set-ship-indicator", {
-                                        point: destination1.clone(),
-                                        immediate: false,
-                                    });
-                                }, 1000);
-                            } else {
+                        if (removedNpcs) {
+                            setTimeout(() => {
+                                const scene = this.el.sceneEl;
+                                const cameraEl = document.querySelector("#camera-rig");
+                                cameraEl.setAttribute("look-at-box", {enabled: !!scene.components['coin-purse'].getUnit().includes("ship"), mainSelector: scene.components['coin-purse'].getUnit()});
+                                const globeMovementControls = document.querySelector("[globe-movement-controls]");
+                                if (globeMovementControls) {
+                                    globeMovementControls.setAttribute("globe-movement-controls", {enabled: !scene.components['coin-purse'].getUnit().includes("ship")})
+                                }
+                            }, 0);
+                            setTimeout(() => {
+                                scene.emit("clear-npc-indicator");
                                 scene.emit("set-ship-indicator", {
                                     point: destination1.clone(),
-                                    immediate: true,
+                                    immediate: false,
                                 });
-                            }
-                        } finally {
-                            this.alreadyRunning = false;
+                            }, 1000);
+                        } else {
+                            scene.emit("set-ship-indicator", {
+                                point: destination1.clone(),
+                                immediate: true,
+                            });
                         }
                     }, "go-to-sea");
                 };
-                this.el.addEventListener("mousedown", this.fn);
-            },
-            remove: function () {
-                this.el.removeEventListener("mousedown", this.fn);
+                this.fn = debounce(this.fn, 100, true);
+                this.el.addEventListener('click', this.fn);
+                this.el.addEventListener('mousedown', this.fn);
+                this.el.addEventListener('npc-trigger', this.fn);
             }
         });
 
@@ -7919,8 +7910,6 @@
                 if (!shouldCaptureKeyEvent(event)) { return; }
 
                 if (!this.data.key) { return; }
-
-                if (!this.data.enabled) { return; }
 
                 if (event.detail.index === GamepadButton[this.data.key] && this.el.object3D.visible) {
                     const c = el.components['switch-to-land-camera'];
