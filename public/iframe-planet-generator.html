@@ -2345,19 +2345,45 @@
             dependencies: ['cursor', 'raycaster'],
             schema: {},
             init: function () {
-                const fn = e => {
-                    if (!e.isTrusted && e.type === "mousedown") {
-                        return;
-                    }
+                this.fn = e => {
                     const goOnland = !!e?.detail?.intersectedEl?.components['go-on-land'];
                     const goToSea = !!e?.detail?.intersectedEl?.components['go-to-sea'];
                     if (goOnland) {
-                        e.detail.intersectedEl.emit("mousedown", e, false);
+                        e.detail.intersectedEl.emit("sent-npc-trigger", e);
+
+                        const arr = [
+                            document.querySelector("#left-cannon-fire"),
+                            document.querySelector("#right-cannon-fire"),
+                            document.querySelector("#none-cannon-fire"),
+                            document.querySelector("#switch-to-land-camera"),
+                        ].filter(x => !!x);
+                        arr.forEach(x => {
+                            x.setAttribute("align-with-gamepad", {enabled: false});
+                        });
+
+                        this?.el?.sceneEl?.camera?.el?.setAttribute("align-with-gamepad", {enabled: true});
+
                     } else if (goToSea) {
-                        e.detail.intersectedEl.emit("mousedown", e, false);
+                        e.detail.intersectedEl.emit("sent-npc-trigger", e);
+
+                        this?.el?.sceneEl?.camera?.el?.setAttribute("align-with-gamepad", {enabled: false});
+
+                        const arr = [
+                            document.querySelector("#left-cannon-fire"),
+                            document.querySelector("#right-cannon-fire"),
+                            document.querySelector("#none-cannon-fire"),
+                            document.querySelector("#switch-to-land-camera"),
+                        ].filter(x => !!x);
+                        arr.forEach(x => {
+                            x.setAttribute("align-with-gamepad", {enabled: true});
+                        });
+
                     }
                 };
-                this.el.addEventListener("mousedown", fn);
+                this.fn = debounce(this.fn, 100, true);
+                this.el.addEventListener('click', this.fn);
+                this.el.addEventListener('mousedown', this.fn);
+                this.el.addEventListener('sent-npc-trigger', this.fn);
             },
             remove: function () {
             },
@@ -4438,7 +4464,7 @@
                 const self = this;
                 this.alreadyRunning = false;
 
-                const fn = (e) => {
+                this.fn = (e) => {
                     if (this.alreadyRunning) {
                         return;
                     }
@@ -4512,8 +4538,10 @@
                         }
                     }, "go-on-land");
                 };
-                this.el.addEventListener('click', fn);
-                this.el.addEventListener('mousedown', fn);
+                this.fn = debounce(this.fn, 100, true);
+                this.el.addEventListener('click', this.fn);
+                this.el.addEventListener('mousedown', this.fn);
+                this.el.addEventListener('sent-npc-trigger', this.fn);
             },
             walkToDestination: function (destination1, active, wizardWalk, groupId) {
                 const scene = this.el.sceneEl;
@@ -4547,7 +4575,7 @@
             init: function () {
                 this.alreadyRunning = false;
 
-                const fn = (e) => {
+                this.fn = (e) => {
                     if (this.alreadyRunning) {
                         return;
                     }
@@ -4611,8 +4639,10 @@
                         }
                     }, "go-to-sea");
                 };
-                this.el.addEventListener('click', fn);
-                this.el.addEventListener('mousedown', fn);
+                this.el.addEventListener("mousedown", this.fn);
+            },
+            remove: function () {
+                this.el.removeEventListener("mousedown", this.fn);
             }
         });
 
@@ -7890,6 +7920,8 @@
 
                 if (!this.data.key) { return; }
 
+                if (!this.data.enabled) { return; }
+
                 if (event.detail.index === GamepadButton[this.data.key] && this.el.object3D.visible) {
                     const c = el.components['switch-to-land-camera'];
                     const cursor = el.components['cursor'];
@@ -9465,17 +9497,17 @@
         <a-entity id="grass-mesh" gltf-model="/meshes/Model_Redo/Grass/Grass.glb" model-loaded-bvh instanced-mesh="capacity: 20480; positioning: world;"></a-entity>
         <a-entity id="tree-mesh" gltf-model="/meshes/Model_Redo/stylished_fir/Tree.glb" model-loaded-bvh instanced-mesh="capacity: 2048; positioning: world;"></a-entity>
         <a-entity id="camera-rig" globe-movement-controls="enabled: true; planet: #myPlanet; radius: 115" position="0 115 0" networked="template: #avatar-template; attachTemplateToLocal: false;">
-            <a-entity camera position="0 0 0" cursor-updater cursor="rayOrigin: entity; downEvents: npc-trigger, mousedown, touchstart;" raycaster="far: 50; interval: 100; objects: .clickable;" align-with-gamepad="key: R_SHOULDER_2;">
+            <a-entity camera position="0 0 0" cursor-updater cursor="rayOrigin: entity; downEvents: npc-trigger;" raycaster="far: 50; interval: 100; objects: .clickable;" align-with-gamepad="enabled: false; key: R_SHOULDER_1;">
                 <a-cursor color="white" radius="0.01"></a-cursor>
                 <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
                 <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
                 <a-entity id="health-bar" position="0 -0.25 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03;" gltf-model="/meshes/ui/healthbar/HealthBar.glb" health-bar></a-entity>
                 <a-entity id="health-bar" position="0 -0.25 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03" align-with-projection="wizardShow: true;" gltf-model="/meshes/ui/healthbar/HealthBar.glb" health-bar></a-entity>
                 <a-entity id="mana-bar" position="0 -0.3 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03" align-with-projection="wizardShow: true;" gltf-model="/meshes/ui/healthbar/ManaBar.glb" mana-bar></a-entity>
-                <a-entity id="left-cannon-fire" position="-0.25 -0.2 -0.5" rotation="0 90 0" scale="0.03 0.03 0.03;" align-with-gamepad="key: R_SHOULDER_1;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" select-cannon-side="selector: left-cannon" ui-clicked></a-entity>
-                <a-entity id="right-cannon-fire" position="0.25 -0.2 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03;" align-with-gamepad="key: L_SHOULDER_1;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" select-cannon-side="selector: right-cannon" ui-clicked></a-entity>
-                <a-entity id="none-cannon-fire" position="0 -0.2 -0.5" rotation="0 0 0" scale="0.015 0.015 0.015;" align-with-gamepad="key: FACE_1;" gltf-model="/meshes/Model_Redo/Ship Wheel/ShipWheel.glb" select-cannon-side="selector: none-cannon" ui-clicked></a-entity>
-                <a-entity id="switch-to-land-camera" align-with-gamepad="key: FACE_4;" align-with-keyboard="key: r;" switch-to-land-camera></a-entity>
+                <a-entity id="left-cannon-fire" position="-0.25 -0.2 -0.5" rotation="0 90 0" scale="0.03 0.03 0.03;" align-with-gamepad="enabled: true; key: R_SHOULDER_1;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" select-cannon-side="selector: left-cannon" ui-clicked></a-entity>
+                <a-entity id="right-cannon-fire" position="0.25 -0.2 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03;" align-with-gamepad="enabled: true; key: L_SHOULDER_1;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" select-cannon-side="selector: right-cannon" ui-clicked></a-entity>
+                <a-entity id="none-cannon-fire" position="0 -0.2 -0.5" rotation="0 0 0" scale="0.015 0.015 0.015;" align-with-gamepad="enabled: true; key: FACE_1;" gltf-model="/meshes/Model_Redo/Ship Wheel/ShipWheel.glb" select-cannon-side="selector: none-cannon" ui-clicked></a-entity>
+                <a-entity id="switch-to-land-camera" align-with-gamepad="enabled: true; key: FACE_4;" align-with-keyboard="key: r;" switch-to-land-camera></a-entity>
                 <a-entity id="area-attack-fire" position="0.2 -0.2 -0.5" rotation="90 0 0" scale="0.015 0.015 0.015" align-with-projection="wizardShow: true; menuShow: true; key: 1;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" select-cannon-side="selector: area-attack" play-all-animations ui-clicked></a-entity>
                 <a-entity id="hammer-build" position="-0.05 -0.2 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03" align-with-projection="wizardShow: true; menuShow: true; key: 2;" gltf-model="/meshes/ui/build/Hammer.glb" select-cannon-side="selector: hammer-build" ui-clicked></a-entity>
                 <a-entity id="split-npcs" position="-0.00 -0.2 -0.5" rotation="0 -90 0" scale="0.045 0.045 0.045" align-with-projection="wizardShow: true; menuShow: true; key: 3;" gltf-model="/meshes/ui/build/Split.glb" select-cannon-side="selector: split-npcs" ui-clicked></a-entity>
