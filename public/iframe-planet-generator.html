@@ -7830,12 +7830,14 @@
                 this.buildMenuStateEl = this.el.sceneEl.querySelector("#build-menu-state"); // ok performance
                 this.onKeyDown = bind(this.onKeyDown, this);
                 this.onKeyUp = bind(this.onKeyUp, this);
+                this.offset = this.el.object3D.position.clone();
+                this.rotation = this.el.object3D.quaternion.clone();
+                this.scale = this.el.object3D.scale.clone();
             },
 
             onKeyDown: function (event) {
                 var el = this.el;
 
-                var code;
                 if (!shouldCaptureKeyEvent(event)) { return; }
 
                 if (!this.data.key) { return; }
@@ -7876,6 +7878,10 @@
             },
 
             tick: function () {
+                if (!this.globeMovementControls) {
+                    this.globeMovementControls = document.querySelector("[globe-movement-controls]");
+                }
+
                 const scene = this.el.sceneEl;
                 if (!this.data.portShow) {
                     const wizards = (NpcGroupDictionary.instance.data.get(scene.systems['draw-npc-indicator'].activeNpcIndicator?.groupId ?? "")?.wizards ?? []);
@@ -7900,6 +7906,28 @@
                             this.el.object3D.visible = !wizard;
                         }
                     }
+                }
+
+                if (!this.globeMovementControls.components['globe-movement-controls'].data.enabled) {
+                    const camera = scene.camera;
+
+                    // align with camera in desktop
+                    const position = new THREE.Vector3(0, 0, 0);
+                    const rotation = new THREE.Quaternion(0, 0, 0, 1);
+                    const scale = new THREE.Vector3(1, 1, 1);
+                    if (!this.el.sceneEl?.renderer?.xr?.isPresenting) {
+                        camera.projectionMatrix.decompose(position, rotation, scale);
+                    }
+                    const aspect = scene.canvas.width / scene.canvas.height;
+                    const offset = new THREE.Vector3(aspect, 1, 1).multiply(this.offset);
+                    position.add(offset).multiply(scale);
+                    if (!this.el.sceneEl?.renderer?.xr?.isPresenting) {
+                        camera.getWorldQuaternion(rotation);
+                    }
+                    position.applyQuaternion(rotation);
+                    this.el.object3D.position.copy(position);
+                    this.el.object3D.quaternion.copy(rotation.multiply(this.rotation));
+                    this.el.object3D.scale.copy(this.scale);
                 }
             }
         });
@@ -9506,12 +9534,12 @@
                 <a-cursor color="white" radius="0.01"></a-cursor>
                 <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
                 <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
-                <a-entity id="health-bar" position="0 -0.25 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03;" gltf-model="/meshes/ui/healthbar/HealthBar.glb" health-bar></a-entity>
-                <a-entity id="health-bar" position="0 -0.25 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03" align-with-projection="wizardShow: true;" gltf-model="/meshes/ui/healthbar/HealthBar.glb" health-bar></a-entity>
+                <a-entity id="health-bar-ship" position="0 -0.25 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03;" align-with-projection="wizardShow: false;" gltf-model="/meshes/ui/healthbar/HealthBar.glb" health-bar></a-entity>
+                <a-entity id="health-bar-land" position="0 -0.25 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03" align-with-projection="wizardShow: true;" gltf-model="/meshes/ui/healthbar/HealthBar.glb" health-bar></a-entity>
                 <a-entity id="mana-bar" position="0 -0.3 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03" align-with-projection="wizardShow: true;" gltf-model="/meshes/ui/healthbar/ManaBar.glb" mana-bar></a-entity>
-                <a-entity id="left-cannon-fire" position="-0.25 -0.2 -0.5" rotation="0 90 0" scale="0.03 0.03 0.03;" align-with-gamepad="enabled: true; key: R_SHOULDER_1;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" select-cannon-side="selector: left-cannon" ui-clicked></a-entity>
-                <a-entity id="right-cannon-fire" position="0.25 -0.2 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03;" align-with-gamepad="enabled: true; key: L_SHOULDER_1;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" select-cannon-side="selector: right-cannon" ui-clicked></a-entity>
-                <a-entity id="none-cannon-fire" position="0 -0.2 -0.5" rotation="0 0 0" scale="0.015 0.015 0.015;" align-with-gamepad="enabled: true; key: FACE_1;" gltf-model="/meshes/Model_Redo/Ship Wheel/ShipWheel.glb" select-cannon-side="selector: none-cannon" ui-clicked></a-entity>
+                <a-entity id="left-cannon-fire" position="-0.25 -0.2 -0.5" rotation="0 90 0" scale="0.03 0.03 0.03;" align-with-projection="wizardShow: false;" align-with-gamepad="enabled: true; key: R_SHOULDER_1;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" select-cannon-side="selector: left-cannon" ui-clicked></a-entity>
+                <a-entity id="right-cannon-fire" position="0.25 -0.2 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03;" align-with-projection="wizardShow: false;" align-with-gamepad="enabled: true; key: L_SHOULDER_1;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" select-cannon-side="selector: right-cannon" ui-clicked></a-entity>
+                <a-entity id="none-cannon-fire" position="0 -0.2 -0.5" rotation="0 0 0" scale="0.015 0.015 0.015;" align-with-projection="wizardShow: false;" align-with-gamepad="enabled: true; key: FACE_1;" gltf-model="/meshes/Model_Redo/Ship Wheel/ShipWheel.glb" select-cannon-side="selector: none-cannon" ui-clicked></a-entity>
                 <a-entity id="switch-to-land-camera" align-with-gamepad="enabled: true; key: FACE_4;" align-with-keyboard="key: r;" switch-to-land-camera></a-entity>
                 <a-entity id="area-attack-fire" position="0.2 -0.2 -0.5" rotation="90 0 0" scale="0.015 0.015 0.015" align-with-projection="wizardShow: true; menuShow: true; key: 1;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" select-cannon-side="selector: area-attack" play-all-animations ui-clicked></a-entity>
                 <a-entity id="hammer-build" position="-0.05 -0.2 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03" align-with-projection="wizardShow: true; menuShow: true; key: 2;" gltf-model="/meshes/ui/build/Hammer.glb" select-cannon-side="selector: hammer-build" ui-clicked></a-entity>
