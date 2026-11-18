@@ -5080,6 +5080,15 @@
                     this.el.object3D.visible = false;
                 }
 
+                if (this.data.type === "port" && !this.el.classList.contains("has-sphere")) {
+                    const e = document.createElement("a-sphere");
+                    this.el.classList.add("has-sphere");
+                    e.setAttribute("position", "0 0 0");
+                    e.setAttribute("radius", "30");
+                    e.setAttribute("color", "red");
+                    this.el.appendChild(e);
+                }
+
                 // auto update clickable
                 const className = "clickable";
                 if (cameraPos.dot(tilePos) > cos45 && !this.el.classList.contains(className)) {
@@ -7098,6 +7107,10 @@
                     type: "vec3",
                     default: new THREE.Vector3(),
                 },
+                stay: {
+                    type: "boolean",
+                    default: false,
+                }
             },
             init: function () {
                 this.done = false;
@@ -7143,14 +7156,16 @@
                     this.begin = true;
                     this.active = true;
 
-                    if (this.reverse && !this.skipNavMeshDeletion) {
-                        this.el.setAttribute("block-nav-mesh", {
-                            enabled: false,
-                            destroyed: true,
-                        });
-                    }
-                    if (this.reverse && this.skipNavMeshDeletion) {
-                        this.el.setAttribute("despawn", "");
+                    if (!this.data.stay) {
+                        if (this.reverse && !this.skipNavMeshDeletion) {
+                            this.el.setAttribute("block-nav-mesh", {
+                                enabled: false,
+                                destroyed: true,
+                            });
+                        }
+                        if (this.reverse && this.skipNavMeshDeletion) {
+                            this.el.setAttribute("despawn", "");
+                        }
                     }
                 }
 
@@ -7172,7 +7187,7 @@
                             this.active = false;
                         }
                     }
-                    if (this.reverse) {
+                    if (this.reverse && !this.data.stay) {
                         const l = THREE.MathUtils.mapLinear(t / 1000, this.startTime, this.endTime, 0, -this.maxHeight);
                         const c = THREE.MathUtils.clamp(l, -this.maxHeight, 0);
                         const parent = this.el.object3D.parent;
@@ -7192,7 +7207,7 @@
                 }
 
                 if (this.begin && !this.active) {
-                    if (!this.reverse) {
+                    if (!this.reverse && !this.data.stay) {
                         this.el.setAttribute("block-nav-mesh", {
                             enabled: true,
                             destroyed: false,
@@ -7464,10 +7479,11 @@
                 rootHouse.setAttribute("shadow", "");
 
                 const str = characterModels.get(type).split("|")[0];
+                rootHouse.setAttribute("rise-out-of-ground", {
+                    position,
+                    stay: type === "PORT",
+                });
                 if (type !== "PORT") {
-                    rootHouse.setAttribute("rise-out-of-ground", {
-                        position,
-                    });
                     rootHouse.setAttribute("block-nav-mesh", {
                         enabled: false,
                         destroyed: false,
