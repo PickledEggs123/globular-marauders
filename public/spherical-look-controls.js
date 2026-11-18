@@ -24,7 +24,7 @@ AFRAME.registerComponent('globe-movement-controls', {
     lookSpeed: { type: 'number', default: 0.002 },
     radius: {type: 'number', default: 20 },
     enabled:            { default: true },
-    controls:           { default: ['globe-gamepad', 'globe-trackpad', 'globe-keyboard', 'globe-touch', 'globe-nipple'] },
+    controls:           { default: ['globe-gamepad', 'globe-trackpad', 'globe-touch', 'globe-nipple', 'globe-keyboard'] },
     fly:                { default: false },
     constrainToNavMesh: { default: false },
     camera:             { default: '[globe-movement-controls] [camera]', type: 'selector' }
@@ -73,7 +73,7 @@ AFRAME.registerComponent('globe-movement-controls', {
     const data = this.data;
     for (let i = 0, l = data.controls.length; i < l; i++) {
       const control = this.el.components[data.controls[i] + COMPONENT_SUFFIX];
-      if (control && (control.isVelocityActive() || (typeof control.isRotationActive === "function" && control.isRotationActive()))) {
+      if (control && (control.isVelocityActive() || ((typeof control.isRotationActive === "function" && control.isRotationActive()) || typeof control.isRotationActive !== "function"))) {
         this.velocityCtrl = control;
         return;
       }
