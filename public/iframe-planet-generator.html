@@ -7901,6 +7901,8 @@
 
                 if (!this.globeMovementControls.components['globe-movement-controls'].data.enabled) {
                     const camera = scene.camera;
+                    camera.parent.parent.rotation.setFromQuaternion(new THREE.Quaternion(0, 0, 0, 1));
+
 
                     // align with camera in desktop
                     const position = new THREE.Vector3(0, 0, 0);
@@ -9526,7 +9528,7 @@
         <a-entity id="tree-mesh" gltf-model="/meshes/Model_Redo/stylished_fir/Tree.glb" model-loaded-bvh instanced-mesh="capacity: 2048; positioning: world;"></a-entity>
         <a-entity id="camera-rig" globe-movement-controls="enabled: true; planet: #myPlanet; radius: 115" position="0 115 0" networked="template: #avatar-template; attachTemplateToLocal: false;">
             <a-entity camera position="0 0 0" cursor-updater cursor="rayOrigin: entity; downEvents: npc-trigger;" raycaster="far: 50; interval: 100; objects: .clickable; enabled: true;" align-with-gamepad="enabled: false; key: R_SHOULDER_1;">
-                <a-cursor color="white" radius="0.01"></a-cursor>
+                <a-cursor color="white" radius="0.01" position="0 0 -1" rotation="0 0 0" scale="1 1 1" align-with-projection="wizardShow: false;"></a-cursor>
                 <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable; enabled: false;"></a-entity>
                 <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable; enabled: false;"></a-entity>
                 <a-entity id="health-bar-ship" position="0 -0.25 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03;" align-with-projection="wizardShow: false;" gltf-model="/meshes/ui/healthbar/HealthBar.glb" health-bar></a-entity>
