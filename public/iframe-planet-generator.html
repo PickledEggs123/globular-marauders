@@ -2454,7 +2454,7 @@
                     this.el.setAttribute("look-at-box", {enabled: !!scene.components['coin-purse'].getUnit().includes("ship"), mainSelector: scene.components['coin-purse'].getUnit()});
                     const globeMovementControls = document.querySelector("[globe-movement-controls]");
                     if (globeMovementControls) {
-                        globeMovementControls.setAttribute("globe-movement-controls", {enabled: !scene.components['coin-purse'].getUnit().includes("ship")})
+                        globeMovementControls.setAttribute("globe-movement-controls", {enabled: !scene.components['coin-purse'].getUnit().includes("ship")});
                     }
                     return;
                 }
@@ -5078,15 +5078,6 @@
                 }
                 if (cameraPos.dot(tilePos) <= cos45 && this.el.object3D.visible === true) {
                     this.el.object3D.visible = false;
-                }
-
-                if (this.data.type === "port" && !this.el.classList.contains("has-sphere")) {
-                    const e = document.createElement("a-sphere");
-                    this.el.classList.add("has-sphere");
-                    e.setAttribute("position", "0 0 0");
-                    e.setAttribute("radius", "30");
-                    e.setAttribute("color", "red");
-                    this.el.appendChild(e);
                 }
 
                 // auto update clickable
@@ -7925,9 +7916,13 @@
                         camera.getWorldQuaternion(rotation);
                     }
                     position.applyQuaternion(rotation);
-                    this.el.object3D.position.copy(position);
-                    this.el.object3D.quaternion.copy(rotation.multiply(this.rotation));
-                    this.el.object3D.scale.copy(this.scale);
+                    this.el.object3D.position.copy(position.clone());
+                    this.el.object3D.quaternion.copy(rotation.clone().multiply(this.rotation.clone()));
+                    this.el.object3D.scale.copy(this.scale.clone());
+                } else {
+                    this.el.object3D.position.copy(this.offset.clone());
+                    this.el.object3D.quaternion.copy(this.rotation.clone());
+                    this.el.object3D.scale.copy(this.scale.clone());
                 }
             }
         });
@@ -9530,10 +9525,10 @@
         <a-entity id="grass-mesh" gltf-model="/meshes/Model_Redo/Grass/Grass.glb" model-loaded-bvh instanced-mesh="capacity: 20480; positioning: world;"></a-entity>
         <a-entity id="tree-mesh" gltf-model="/meshes/Model_Redo/stylished_fir/Tree.glb" model-loaded-bvh instanced-mesh="capacity: 2048; positioning: world;"></a-entity>
         <a-entity id="camera-rig" globe-movement-controls="enabled: true; planet: #myPlanet; radius: 115" position="0 115 0" networked="template: #avatar-template; attachTemplateToLocal: false;">
-            <a-entity camera position="0 0 0" cursor-updater cursor="rayOrigin: entity; downEvents: npc-trigger;" raycaster="far: 50; interval: 100; objects: .clickable;" align-with-gamepad="enabled: false; key: R_SHOULDER_1;">
+            <a-entity camera position="0 0 0" cursor-updater cursor="rayOrigin: entity; downEvents: npc-trigger;" raycaster="far: 50; interval: 100; objects: .clickable; enabled: true;" align-with-gamepad="enabled: false; key: R_SHOULDER_1;">
                 <a-cursor color="white" radius="0.01"></a-cursor>
-                <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
-                <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable"></a-entity>
+                <a-entity laser-controls="hand: left;" raycaster="far: 50; interval: 100; objects: .clickable; enabled: false;"></a-entity>
+                <a-entity laser-controls="hand: right;" raycaster="far: 50; interval: 100; objects: .clickable; enabled: false;"></a-entity>
                 <a-entity id="health-bar-ship" position="0 -0.25 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03;" align-with-projection="wizardShow: false;" gltf-model="/meshes/ui/healthbar/HealthBar.glb" health-bar></a-entity>
                 <a-entity id="health-bar-land" position="0 -0.25 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03" align-with-projection="wizardShow: true;" gltf-model="/meshes/ui/healthbar/HealthBar.glb" health-bar></a-entity>
                 <a-entity id="mana-bar" position="0 -0.3 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03" align-with-projection="wizardShow: true;" gltf-model="/meshes/ui/healthbar/ManaBar.glb" mana-bar></a-entity>
