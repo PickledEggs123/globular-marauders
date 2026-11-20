@@ -2349,34 +2349,32 @@
                     const goOnland = !!e?.detail?.intersectedEl?.components['go-on-land'];
                     const goToSea = !!e?.detail?.intersectedEl?.components['go-to-sea'];
                     if (goOnland) {
-                        e.detail.intersectedEl.emit("npc-trigger", e);
-
                         const arr = [
                             document.querySelector("#left-cannon-fire"),
                             document.querySelector("#right-cannon-fire"),
                             document.querySelector("#none-cannon-fire"),
-                            document.querySelector("#switch-to-land-camera"),
                         ].filter(x => !!x);
                         arr.forEach(x => {
                             x.setAttribute("align-with-gamepad", {enabled: false});
                         });
 
-                        this?.el?.sceneEl?.camera?.el?.setAttribute("align-with-gamepad", {enabled: true});
+                        document.querySelector("[camera]").setAttribute("align-with-gamepad", {enabled: true});
 
-                    } else if (goToSea) {
                         e.detail.intersectedEl.emit("npc-trigger", e);
 
-                        this?.el?.sceneEl?.camera?.el?.setAttribute("align-with-gamepad", {enabled: false});
+                    } else if (goToSea) {
+                        document.querySelector("[camera]").setAttribute("align-with-gamepad", {enabled: true});
 
                         const arr = [
                             document.querySelector("#left-cannon-fire"),
                             document.querySelector("#right-cannon-fire"),
                             document.querySelector("#none-cannon-fire"),
-                            document.querySelector("#switch-to-land-camera"),
                         ].filter(x => !!x);
                         arr.forEach(x => {
                             x.setAttribute("align-with-gamepad", {enabled: true});
                         });
+
+                        e.detail.intersectedEl.emit("npc-trigger", e);
                     }
                 };
                 this.fn = debounce(this.fn, 100, true);
@@ -4240,6 +4238,7 @@
             init: function () {
                 this.npcIndicatorGroups = [];
                 this.activeNpcIndicator = null;
+                this.skipMessage = false;
             },
             registerMe: function (el) {
                 this.npcIndicatorGroups.push(el);
@@ -4255,6 +4254,7 @@
                 const idx = this.npcIndicatorGroups.indexOf(el);
                 if (idx >= 0) {
                     this.activeNpcIndicator = el;
+                    this.skipMessage = false;
                 }
             },
         });
@@ -4417,7 +4417,8 @@
                     });
                     this.el.removeAttribute(`draw-npc-indicator__${this.groupId}`);
                 }
-                if (!this.system.activeNpcIndicator) {
+                if (!this.system.activeNpcIndicator && !this.system.skipMessage) {
+                    this.system.skipMessage = true;
                     const scene = document.querySelector("a-scene");
                     scene.components['coin-purse'].setUnit(inverseUnitMap.get(scene.components['coin-purse'].activeUnit));
                     const checkBox = document.querySelector(`#unit-selection-${scene.components['coin-purse'].activeUnit}`);
@@ -4467,11 +4468,11 @@
                         const scene = el.sceneEl;
 
                         let intersection = null;
-                        if (e.detail.intersection) {
-                            intersection = e.detail.intersection;
+                        if (e?.detail?.intersection) {
+                            intersection = e?.detail?.intersection;
                         }
-                        if (!intersection && e.detail.detail.intersection) {
-                            intersection = e.detail.detail.intersection;
+                        if (!intersection && e?.detail?.detail?.intersection) {
+                            intersection = e?.detail?.detail?.intersection;
                         }
                         if (!intersection) {
                             return;
@@ -4572,11 +4573,11 @@
                     ClickManager.addToQueue(() => {
 
                         let intersection = null;
-                        if (e.detail.intersection) {
-                            intersection = e.detail.intersection;
+                        if (e?.detail?.intersection) {
+                            intersection = e?.detail?.intersection;
                         }
-                        if (!intersection && e.detail.detail.intersection) {
-                            intersection = e.detail.detail.intersection;
+                        if (!intersection && e?.detail?.detail?.intersection) {
+                            intersection = e?.detail?.detail?.intersection;
                         }
                         if (!intersection) {
                             return;
@@ -7955,13 +7956,16 @@
                 if (event.detail.index === GamepadButton[this.data.key] && this.el.object3D.visible) {
                     const c = el.components['switch-to-land-camera'];
                     const cursor = el.components['cursor'];
+                    const selectCannonSide = el.components['select-cannon-side'];
                     if (c && c.onMouseClick) {
                         c.onMouseClick(event);
                     } else {
                         if (cursor) {
                             el.emit("npc-trigger", event);
-                        } else {
+                        } else if (selectCannonSide) {
                             el.click();
+                        } else {
+                            el.emit("npc-trigger", event);
                         }
                     }
                 }
