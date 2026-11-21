@@ -946,19 +946,20 @@ AFRAME.registerComponent('globe-gamepad-controls', {
    * @return {THREE.Vector2}
    */
   getDpad: function (target) {
-    const gamepad = this.getGamepad(Hand.LEFT);
-    if (!gamepad) {
-      return target.set(0, 0);
-    }
-    if (!gamepad.buttons[GamepadButton.DPAD_RIGHT]) {
-      return target.set(0, 0);
-    }
-    return target.set(
-        (gamepad.buttons[GamepadButton.DPAD_RIGHT].pressed ? 1 : 0)
-        + (gamepad.buttons[GamepadButton.DPAD_LEFT].pressed ? -1 : 0),
-        (gamepad.buttons[GamepadButton.DPAD_UP].pressed ? -1 : 0)
-        + (gamepad.buttons[GamepadButton.DPAD_DOWN].pressed ? 1 : 0)
-    );
+    target.set(0, 0);
+    // const gamepad = this.getGamepad(Hand.LEFT);
+    // if (!gamepad) {
+    //   return target.set(0, 0);
+    // }
+    // if (!gamepad.buttons[GamepadButton.DPAD_RIGHT]) {
+    //   return target.set(0, 0);
+    // }
+    // return target.set(
+    //     (gamepad.buttons[GamepadButton.DPAD_RIGHT].pressed ? 1 : 0)
+    //     + (gamepad.buttons[GamepadButton.DPAD_LEFT].pressed ? -1 : 0),
+    //     (gamepad.buttons[GamepadButton.DPAD_UP].pressed ? -1 : 0)
+    //     + (gamepad.buttons[GamepadButton.DPAD_DOWN].pressed ? 1 : 0)
+    // );
   },
 
   /**
