@@ -7930,6 +7930,145 @@
             }
         });
 
+        AFRAME.registerSystem('dpad-gamepad', {
+            init: function () {
+                this.key = '1';
+                this.keys = [];
+                this.activated = false;
+            },
+            registerMe: function (c) {
+                this.keys.push(c);
+            },
+            unregisterMe: function (c) {
+                const idx = this.keys.findIndex(e => e === c);
+                this.keys.splice(idx, 1);
+            },
+            tick: function () {
+                this.activated = false;
+            },
+            resetMenu: function () {
+                this.key = 1;
+                this.activated = true;
+            },
+            goLeft: function () {
+                if (this.activated) {
+                    return;
+                }
+                const i = parseInt(this.key);
+                if (i > 1) {
+                    this.key = Number(i - 1);
+                    this.activated = true;
+                }
+            },
+            goRight: function () {
+                if (this.activated) {
+                    return;
+                }
+                const i = parseInt(this.key);
+                const max = this.keys.filter((x) => {
+                    const c = x.el.components['align-with-projection'];
+                    return c && c.el.object3D.visible;
+                }).map((x) => {
+                    const c = x.el.components['align-with-projection'];
+                    return parseInt(c.data.key);
+                }).reduce((acc, x) => {
+                    return x > acc ? x : acc;
+                });
+                if (max && i < max) {
+                    this.key = Number(i + 1);
+                    this.activated = true;
+                }
+            },
+        });
+
+        AFRAME.registerComponent('dpad-gamepad', {
+            dependencies: ['align-with-projection', 'select-cannon-side'],
+            schema: {
+            },
+            init: function () {
+                this.system = this.el.sceneEl.systems['dpad-gamepad'];
+                this.ui = this.el.components['align-with-projection'];
+                this.onKeyDown = bind(this.onKeyDown, this);
+                this.onKeyUp = bind(this.onKeyUp, this);
+                this.system.registerMe(this);
+                this.circleEl = document.createElement("a-circle");
+                this.el.appendChild(this.circleEl);
+                const r = this.circleEl.object3D.parent.getWorldQuaternion(new THREE.Quaternion());
+                const r2 = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+                    THREE.MathUtils.degToRad(0),
+                    THREE.MathUtils.degToRad(0),
+                    THREE.MathUtils.degToRad(0)
+                ));
+                this.circleEl.object3D.quaternion.copy(r.invert().multiply(r2));
+                const s = this.circleEl.object3D.parent.getWorldScale(new THREE.Vector3());
+                this.circleEl.object3D.scale.copy(new THREE.Vector3(0.05, 0.05, 0.05).divide(s));
+            },
+
+            remove: function () {
+                this.system.unregisterMe(this);
+            },
+
+            tick: function () {
+                if (!this.ui.data.key) { return; }
+
+                if (!this.el.object3D.visible) {
+                    return;
+                }
+
+                this.circleEl.object3D.visible = String(this.system.key) === String(this.ui.data.key);
+            },
+
+            onKeyDown: function (event) {
+                var el = this.el;
+
+                if (!shouldCaptureKeyEvent(event)) { return; }
+
+                if (!this.ui.data.key) { return; }
+
+                if (!this.el.object3D.visible) {
+                    return;
+                }
+
+                // select option
+                if (event.detail.index === GamepadButton.DPAD_UP && String(this.system.key) === String(this.ui.data.key)) {
+                    const selectCannonSide = el.components['select-cannon-side'];
+                    if (selectCannonSide) {
+                        this.system.resetMenu();
+                        el.click();
+                    }
+                }
+
+                if (event.detail.index === GamepadButton.DPAD_LEFT && String(this.system.key) === String(this.ui.data.key)) {
+                    this.system.goLeft();
+                }
+
+                if (event.detail.index === GamepadButton.DPAD_RIGHT && String(this.system.key) === String(this.ui.data.key)) {
+                    this.system.goRight();
+                }
+            },
+
+            onKeyUp: function (event) {
+            },
+
+            play: function () {
+                this.attachKeyEventListeners();
+            },
+
+            pause: function () {
+                this.removeKeyEventListeners();
+            },
+
+            attachKeyEventListeners: function () {
+                window.addEventListener(`gamepadbuttondown`, this.onKeyDown);
+                window.addEventListener(`gamepadbuttonup`, this.onKeyUp);
+            },
+
+            removeKeyEventListeners: function () {
+                window.removeEventListener(`gamepadbuttondown`, this.onKeyDown);
+                window.removeEventListener(`gamepadbuttonup`, this.onKeyUp);
+            },
+        });
+
         AFRAME.registerComponent('align-with-gamepad', {
             schema: {
                 enabled: {
@@ -9542,17 +9681,17 @@
                 <a-entity id="right-cannon-fire" position="0.25 -0.2 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03;" align-with-projection="wizardShow: false;" align-with-gamepad="enabled: true; key: L_SHOULDER_1;" gltf-model="/meshes/Model_Redo/Cannon/Cannon.glb" select-cannon-side="selector: right-cannon" ui-clicked></a-entity>
                 <a-entity id="none-cannon-fire" position="0 -0.2 -0.5" rotation="0 0 0" scale="0.015 0.015 0.015;" align-with-projection="wizardShow: false;" align-with-gamepad="enabled: true; key: FACE_1;" gltf-model="/meshes/Model_Redo/Ship Wheel/ShipWheel.glb" select-cannon-side="selector: none-cannon" ui-clicked></a-entity>
                 <a-entity id="switch-to-land-camera" align-with-gamepad="enabled: true; key: FACE_4;" align-with-keyboard="key: r;" switch-to-land-camera></a-entity>
-                <a-entity id="area-attack-fire" position="0.2 -0.2 -0.5" rotation="90 0 0" scale="0.015 0.015 0.015" align-with-projection="wizardShow: true; menuShow: true; key: 1;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" select-cannon-side="selector: area-attack" play-all-animations ui-clicked></a-entity>
-                <a-entity id="hammer-build" position="-0.05 -0.2 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03" align-with-projection="wizardShow: true; menuShow: true; key: 2;" gltf-model="/meshes/ui/build/Hammer.glb" select-cannon-side="selector: hammer-build" ui-clicked></a-entity>
-                <a-entity id="split-npcs" position="-0.00 -0.2 -0.5" rotation="0 -90 0" scale="0.045 0.045 0.045" align-with-projection="wizardShow: true; menuShow: true; key: 3;" gltf-model="/meshes/ui/build/Split.glb" select-cannon-side="selector: split-npcs" ui-clicked></a-entity>
-                <a-entity id="merge-npcs" position="0.05 -0.2 -0.5" rotation="0 -90 0" scale="0.045 0.045 0.045" align-with-projection="wizardShow: true; menuShow: true; key: 4;" gltf-model="/meshes/ui/build/Merge.glb" select-cannon-side="selector: merge-npcs" ui-clicked></a-entity>
-                <a-entity id="forward-attack-fire" position="-0.2 -0.2 -0.5" rotation="0 90 0" scale="0.015 0.015 0.015" align-with-projection="wizardShow: true; menuShow: true; key: 5;" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" select-cannon-side="selector: forward-attack" play-all-animations ui-clicked></a-entity>
-                <a-entity id="ok-build" position="-0.03 -0.2 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03" align-with-projection="wizardShow: true; buildShow: true; key: 1;" gltf-model="/meshes/ui/build/Ok.glb" select-cannon-side="selector: ok-build" ui-clicked></a-entity>
-                <a-entity id="cancel-build" position="0.03 -0.2 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03" align-with-projection="wizardShow: true; buildShow: true; key: 2;" gltf-model="/meshes/ui/build/Cancel.glb" select-cannon-side="selector: cancel-build" ui-clicked></a-entity>
-                <a-entity id="wizard-tower-build" position="-0.10 -0.4 -1" rotation="0 -90 0" scale="0.015 0.015 0.015" align-with-projection="wizardShow: true; hammerShow: true; key: 1;" gltf-model="/meshes/WizardTower.glb" select-cannon-side="selector: wizard-tower-build" ui-clicked></a-entity>
-                <a-entity id="wall-build" position="-0.03 -0.4 -1" rotation="0 -90 0" scale="0.015 0.015 0.015" align-with-projection="wizardShow: true; hammerShow: true; key: 2;" gltf-model="/meshes/Wall.glb" select-cannon-side="selector: wall-build" ui-clicked></a-entity>
-                <a-entity id="blacksmith-build" position="0.03 -0.4 -1" rotation="0 -90 0" scale="0.015 0.015 0.015" align-with-projection="wizardShow: true; hammerShow: true; key: 3;" gltf-model="/meshes/Blacksmith.glb" select-cannon-side="selector: blacksmith-build" ui-clicked></a-entity>
-                <a-entity id="apothecary-build" position="0.10 -0.4 -1" rotation="0 -90 0" scale="0.015 0.015 0.015" align-with-projection="wizardShow: true; hammerShow: true; key: 4;" gltf-model="/meshes/Apothecary.glb" select-cannon-side="selector: apothecary-build" ui-clicked></a-entity>
+                <a-entity id="area-attack-fire" position="0.2 -0.2 -0.5" rotation="90 0 0" scale="0.015 0.015 0.015" align-with-projection="wizardShow: true; menuShow: true; key: 5;" dpad-gamepad="enabled: true" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" select-cannon-side="selector: area-attack" play-all-animations ui-clicked></a-entity>
+                <a-entity id="hammer-build" position="-0.05 -0.2 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03" align-with-projection="wizardShow: true; menuShow: true; key: 2;" dpad-gamepad="enabled: true" gltf-model="/meshes/ui/build/Hammer.glb" select-cannon-side="selector: hammer-build" ui-clicked></a-entity>
+                <a-entity id="split-npcs" position="-0.00 -0.2 -0.5" rotation="0 -90 0" scale="0.045 0.045 0.045" align-with-projection="wizardShow: true; menuShow: true; key: 3;" dpad-gamepad="enabled: true" gltf-model="/meshes/ui/build/Split.glb" select-cannon-side="selector: split-npcs" ui-clicked></a-entity>
+                <a-entity id="merge-npcs" position="0.05 -0.2 -0.5" rotation="0 -90 0" scale="0.045 0.045 0.045" align-with-projection="wizardShow: true; menuShow: true; key: 4;" dpad-gamepad="enabled: true" gltf-model="/meshes/ui/build/Merge.glb" select-cannon-side="selector: merge-npcs" ui-clicked></a-entity>
+                <a-entity id="forward-attack-fire" position="-0.2 -0.2 -0.5" rotation="0 90 0" scale="0.015 0.015 0.015" align-with-projection="wizardShow: true; menuShow: true; key: 1;" dpad-gamepad="enabled: true" gltf-model="/meshes/EpicStore/Fireball/source/Fireball.glb" select-cannon-side="selector: forward-attack" play-all-animations ui-clicked></a-entity>
+                <a-entity id="ok-build" position="-0.03 -0.2 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03" align-with-projection="wizardShow: true; buildShow: true; key: 1;" dpad-gamepad="enabled: true" gltf-model="/meshes/ui/build/Ok.glb" select-cannon-side="selector: ok-build" ui-clicked></a-entity>
+                <a-entity id="cancel-build" position="0.03 -0.2 -0.5" rotation="0 -90 0" scale="0.03 0.03 0.03" align-with-projection="wizardShow: true; buildShow: true; key: 2;" dpad-gamepad="enabled: true" gltf-model="/meshes/ui/build/Cancel.glb" select-cannon-side="selector: cancel-build" ui-clicked></a-entity>
+                <a-entity id="wizard-tower-build" position="-0.10 -0.4 -1" rotation="0 -90 0" scale="0.015 0.015 0.015" align-with-projection="wizardShow: true; hammerShow: true; key: 1;" dpad-gamepad="enabled: true" gltf-model="/meshes/WizardTower.glb" select-cannon-side="selector: wizard-tower-build" ui-clicked></a-entity>
+                <a-entity id="wall-build" position="-0.03 -0.4 -1" rotation="0 -90 0" scale="0.015 0.015 0.015" align-with-projection="wizardShow: true; hammerShow: true; key: 2;" dpad-gamepad="enabled: true" gltf-model="/meshes/Wall.glb" select-cannon-side="selector: wall-build" ui-clicked></a-entity>
+                <a-entity id="blacksmith-build" position="0.03 -0.4 -1" rotation="0 -90 0" scale="0.015 0.015 0.015" align-with-projection="wizardShow: true; hammerShow: true; key: 3;" dpad-gamepad="enabled: true" gltf-model="/meshes/Blacksmith.glb" select-cannon-side="selector: blacksmith-build" ui-clicked></a-entity>
+                <a-entity id="apothecary-build" position="0.10 -0.4 -1" rotation="0 -90 0" scale="0.015 0.015 0.015" align-with-projection="wizardShow: true; hammerShow: true; key: 4;" dpad-gamepad="enabled: true" gltf-model="/meshes/Apothecary.glb" select-cannon-side="selector: apothecary-build" ui-clicked></a-entity>
                 <a-entity id="build-menu-state"></a-entity>
             </a-entity>
         </a-entity>

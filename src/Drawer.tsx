@@ -240,7 +240,7 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
                                             )
                                         }
                                     </form>
-                                    <Grid container style={{backgroundColor: "#ddc"}} gap={2}>
+                                    <Grid container gap={2}>
                                         <Grid item xs={12} md={6}>
                                             <Typography>Sign In With Google</Typography>
                                         </Grid>
