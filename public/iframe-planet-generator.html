@@ -7935,6 +7935,9 @@
                 this.key = '1';
                 this.keys = [];
                 this.activated = false;
+                this.gamepadControlsEl = null;
+                this.gamepadControls = null;
+                this.isConnected = false;
             },
             registerMe: function (c) {
                 this.keys.push(c);
@@ -7945,6 +7948,16 @@
             },
             tick: function () {
                 this.activated = false;
+
+                if (!this.gamepadControlsEl) {
+                    this.gamepadControlsEl = document.querySelector("[globe-gamepad-controls]");
+                }
+                if (!this.gamepadControls) {
+                    this.gamepadControls = this.gamepadControlsEl.components['globe-gamepad-controls'];
+                }
+                if (this.gamepadControls) {
+                    this.isConnected = this.gamepadControls.isConnected();
+                }
             },
             resetMenu: function () {
                 this.key = 1;
@@ -8015,7 +8028,7 @@
                     return;
                 }
 
-                this.circleEl.object3D.visible = String(this.system.key) === String(this.ui.data.key);
+                this.circleEl.object3D.visible = this.system.isConnected && String(this.system.key) === String(this.ui.data.key);
             },
 
             onKeyDown: function (event) {
