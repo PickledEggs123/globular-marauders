@@ -7952,7 +7952,7 @@
                 if (!this.gamepadControlsEl) {
                     this.gamepadControlsEl = document.querySelector("[globe-gamepad-controls]");
                 }
-                if (!this.gamepadControls) {
+                if (!this.gamepadControls && this.gamepadControlsEl) {
                     this.gamepadControls = this.gamepadControlsEl.components['globe-gamepad-controls'];
                 }
                 if (this.gamepadControls) {
