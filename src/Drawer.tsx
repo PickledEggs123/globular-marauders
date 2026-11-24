@@ -30,7 +30,7 @@ import {
     doSignOut, googleProvider,
 } from "./contextes/auth/auth";
 import Script from "next/script";
-import {getRedirectResult, signInWithRedirect, User} from "firebase/auth";
+import {signInWithPopup, User} from "firebase/auth";
 import {auth} from "./firebase/firebase";
 
 const drawerWidth = 180;
@@ -53,6 +53,8 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
     const ref = useRef<HTMLDivElement | null>(null);
     const [mobileOpen, setMobileOpen] = useState<boolean>(false);
     const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
+    const [googleLoginError, setGoogleLoginError] = useState("");
+    const [googleLoginPending, setGoogleLoginPending] = useState(false);
     const [tabValue, setTabValue] = useState(0);
     const [email, setEmail] = useState("");
     const [currentPassword, setCurrentPassword] = useState("");
@@ -76,7 +78,7 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
     }, []);
 
     useEffect(() => {
-        auth.onAuthStateChanged((user) => {
+        return auth.onAuthStateChanged((user) => {
             if (!user) {
                 setUserLoggedIn(false);
                 setCurrentUser(null);
@@ -85,26 +87,21 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
                 setCurrentUser(user);
             }
         });
-        getRedirectResult(auth).then(redirectResult => {
-            if (auth.currentUser) {
-                setUserLoggedIn(true);
-                setCurrentUser(auth.currentUser);
-            } else if (!redirectResult) {
-                setUserLoggedIn(false);
-                setCurrentUser(null);
-            } else {
-                setUserLoggedIn(true);
-                setCurrentUser(redirectResult.user);
-            }
-        }).catch((error) => {
-            console.error("Error getting redirect result:", error);
-        });
     }, []);
 
     const handleLogin = async (event: React.SyntheticEvent) => {
         event.preventDefault();
 
-        await signInWithRedirect(auth, googleProvider);
+        setGoogleLoginError("");
+        setGoogleLoginPending(true);
+        try {
+            await signInWithPopup(auth, googleProvider);
+        } catch (error) {
+            console.error("Google sign-in failed:", error);
+            setGoogleLoginError("Google sign-in failed. Please try again and allow popups.");
+        } finally {
+            setGoogleLoginPending(false);
+        }
     };
 
     const handleDrawerToggle = () => {
@@ -246,10 +243,11 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
                                         </Grid>
                                         <Grid item xs={12} md={6}>
                                             <Paper>
-                                                <IconButton onClick={handleLogin}><Google/></IconButton>
+                                                <IconButton aria-label="Sign in with Google" onClick={handleLogin} disabled={googleLoginPending}><Google/></IconButton>
                                             </Paper>
                                         </Grid>
                                     </Grid>
+                                    {googleLoginError && <Typography color="error" role="alert">{googleLoginError}</Typography>}
                                 </React.Fragment>
                             )
                         }

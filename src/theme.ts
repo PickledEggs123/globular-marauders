@@ -134,6 +134,14 @@ const themeOptions: ThemeOptions = {
                 },
             },
         },
+        MuiButtonBase: {
+            defaultProps: {
+                style: {
+                    background: "#ddc",
+                    color: "black",
+                },
+            },
+        },
     },
 };
 
@@ -208,6 +216,14 @@ const themeOptionsDark = createTheme({
             defaultProps: {
                 style: {
                     background: "#121212",
+                },
+            },
+        },
+        MuiButtonBase: {
+            defaultProps: {
+                style: {
+                    background: "#121212",
+                    color: "white",
                 },
             },
         },
