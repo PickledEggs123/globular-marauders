@@ -7247,9 +7247,9 @@
                 });
 
                 const str = characterModels.get(type).split("|")[0];
-                const point = [position.x, position.y, position.z];
-                const cameraRig = document.querySelector("#camera-rig");
-                const lookAt = new THREE.Vector3(0, 1, 0).applyQuaternion(cameraRig.object3D.getWorldQuaternion(new THREE.Quaternion()));
+                const point = new THREE.Vector3(position.x, position.y, position.z);
+                const cameraRig = document.querySelector("[camera]");
+                const lookAt = new THREE.Vector3(0, 0, -1).applyQuaternion(cameraRig.object3D.getWorldQuaternion(new THREE.Quaternion())).add(point.clone());
                 rootHouse.setAttribute("rise-out-of-ground", {
                     position,
                 });
@@ -7263,7 +7263,7 @@
                 getBuildingLodHash(str, 1000, "auto");
                 rootModel.setAttribute("globe-networked-instanced-mesh-member", `meshUrl: ${str}; capacity: 1000; memberMesh: true; ghostBuilding: true;`);
                 rootModel.setAttribute("scale", "1 1 1");
-                rootModel.setAttribute("rotation", "-90 0 0");
+                rootModel.setAttribute("rotation", "0 0 0");
                 rootModel.setAttribute("position", "0 0 0");
                 rootHouse.appendChild(rootModel);
                 rootHouse.setAttribute("networked", `template: #${type.toLowerCase().replace("_", "-")}-template; attachTemplateToLocal: false;`);
@@ -7281,8 +7281,8 @@
                     });
                 }
 
-                rootHouse.object3D.up = new THREE.Vector3(point[0], point[1], point[2]).normalize();
-                rootHouse.object3D.lookAt(new THREE.Vector3(lookAt[0], lookAt[1], lookAt[2]));
+                rootHouse.object3D.up = point.clone().normalize();
+                rootHouse.object3D.lookAt(lookAt.normalize().multiplyScalar(point.length()));
             };
         }
 
