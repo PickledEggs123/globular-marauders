@@ -246,7 +246,7 @@
         AFRAME.registerComponent("orthographic-camera-building", {
             schema: {},
             init: function () {
-                this.camera = new THREE.OrthographicCamera(-8, 8, 8, -8, 0.1, 100);
+                this.camera = new THREE.OrthographicCamera(8, -8, -8, 8, 0.1, 100);
                 this.el.sceneEl.object3D.add(this.camera);
             },
             remove: function () {
