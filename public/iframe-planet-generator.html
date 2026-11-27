@@ -255,8 +255,10 @@
             },
             tick: function (t, dt) {
                 const camera = this.camera;
+                const sceneEl = this.el.sceneEl;
+                const sceneCamera = sceneEl.camera;
                 camera.position.copy(this.el.object3D.getWorldPosition(new THREE.Vector3()).normalize().multiplyScalar(150));
-                camera.up = new THREE.Vector3(0, 0, -1).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
+                camera.up = new THREE.Vector3(0, 0, -1).applyQuaternion(sceneCamera.getWorldQuaternion(new THREE.Quaternion()));
                 camera.lookAt(0, 0, 0);
             },
             getCamera: function () {
@@ -7246,7 +7248,8 @@
 
                 const str = characterModels.get(type).split("|")[0];
                 const point = [position.x, position.y, position.z];
-                const lookAt = new THREE.Vector3(0, 0, -1).applyQuaternion(rootHouse.components["orthographic-camera-building"].camera.getWorldQuaternion(new THREE.Quaternion()));
+                const cameraRig = document.querySelector("#camera-rig");
+                const lookAt = new THREE.Vector3(0, 1, 0).applyQuaternion(cameraRig.object3D.getWorldQuaternion(new THREE.Quaternion()));
                 rootHouse.setAttribute("rise-out-of-ground", {
                     position,
                 });
@@ -8962,7 +8965,11 @@
                 const scene = this.el.sceneEl;
                 const npcIndicatorId = scene.systems['draw-npc-indicator'].activeNpcIndicator?.groupId ?? "";
                 const postfix = this.activeUnit.startsWith("ship") ? ":first-of-type" : `-wizard`;
-                return `${npcIndicatorId}${npcIndicatorId ? "." : ""}${this.activeUnit}${postfix}`;
+                const dd = `${npcIndicatorId ? "." : ""}${npcIndicatorId}${npcIndicatorId ? "." : ""}${this.activeUnit}${postfix}`;
+                if (dd.startsWith("..")) {
+                    return dd.replace("..", ".");
+                }
+                return dd;
             },
             buyShips: function () {
                 const numShips = this.shipCount;
