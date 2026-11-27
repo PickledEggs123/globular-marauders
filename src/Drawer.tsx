@@ -30,7 +30,7 @@ import {
     doSignOut, googleProvider,
 } from "./contextes/auth/auth";
 import Script from "next/script";
-import {signInWithPopup, User} from "firebase/auth";
+import {getRedirectResult, signInWithRedirect, User} from "firebase/auth";
 import {auth} from "./firebase/firebase";
 
 const drawerWidth = 180;
@@ -89,16 +89,28 @@ export const WebsiteDrawer2 = ({rightSide, content}: {
         });
     }, []);
 
+    useEffect(() => {
+        let active = true;
+        getRedirectResult(auth).catch((error) => {
+            console.error("Google redirect sign-in failed:", error);
+            if (active) {
+                setGoogleLoginError("Google sign-in failed. Please try again.");
+                setShowLoginModal(true);
+            }
+        });
+        return () => { active = false; };
+    }, []);
+
     const handleLogin = async (event: React.SyntheticEvent) => {
         event.preventDefault();
 
         setGoogleLoginError("");
         setGoogleLoginPending(true);
         try {
-            await signInWithPopup(auth, googleProvider);
+            await signInWithRedirect(auth, googleProvider);
         } catch (error) {
             console.error("Google sign-in failed:", error);
-            setGoogleLoginError("Google sign-in failed. Please try again and allow popups.");
+            setGoogleLoginError("Google sign-in failed. Please try again.");
         } finally {
             setGoogleLoginPending(false);
         }
