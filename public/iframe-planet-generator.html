@@ -7894,6 +7894,9 @@
                         if (this.data.hammerShow) {
                             this.el.object3D.visible = buildMenuState.hasAttribute("show-hammer");
                         }
+                        if (!this.data.menuShow && !this.data.buildShow && !this.data.hammerShow) {
+                            this.el.object3D.visible = this.data.wizardShow;
+                        }
                     } else {
                         if (this.data.wizardShow) {
                             this.el.object3D.visible = !!wizard;
