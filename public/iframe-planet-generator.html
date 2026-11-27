@@ -318,11 +318,11 @@
                     this.el.appendChild(this.fireball);
 
                     if (this.fireball.getObject3D("mesh")) {
-                        this.startTime = (t / 1000);
+                        this.startTime = t / 1000;
                         this.endTime = this.startTime + this.data.speed;
                     } else {
                         this.fireball.addEventListener("model-loaded", () => {
-                            this.startTime = (t / 1000);
+                            this.startTime = t / 1000;
                             this.endTime = this.startTime + this.data.speed;
                         });
                     }
@@ -337,7 +337,7 @@
                 let center = new THREE.Vector3().copy(this.data.center);
                 const ratioCenterStart = center.clone().add(dimension.clone()).sub(ratioDimension.clone());
                 const ratioCenterEnd = center.clone().sub(dimension.clone()).add(ratioDimension.clone());
-                const linear = THREE.MathUtils.mapLinear(+new Date() / 1000, this.startTime, this.endTime, 0, 1);
+                const linear = THREE.MathUtils.mapLinear(t / 1000, this.startTime, this.endTime, 0, 1);
                 const clamp = THREE.MathUtils.clamp(linear, 0, 1);
                 const ratioCenter = new THREE.Vector3().lerpVectors(ratioCenterStart, ratioCenterEnd, clamp);
 
@@ -373,7 +373,7 @@
                         this.m = new THREE.Mesh(this.b, this.material);
                         this.m.scale.copy(ratioDimension.clone().multiplyScalar(2));
                         this.m.position.copy(center.clone());
-                        this.m.quaternion.copy(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
+                        this.m.quaternion.copy(this.el.object3D.quaternion.clone());
                         this.el.sceneEl.object3D.add(this.m);
                     }
                 }
@@ -383,7 +383,7 @@
                     scene.attach(this.fireball.object3D);
                     this.fireball.object3D.position.copy(center.clone().add(center.clone().normalize()));
                     this.fireball.object3D.up = center.clone().normalize();
-                    this.fireball.object3D.quaternion.copy(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
+                    this.fireball.object3D.quaternion.copy(this.el.object3D.quaternion.clone());
                     this.fireball.object3D.scale.copy(new THREE.Vector3(0.2, 0.2, 0.2));
                     this.el.object3D.attach(this.fireball.object3D);
                 }
@@ -474,11 +474,11 @@
                     this.el.appendChild(this.fireball);
 
                     if (this.fireball.getObject3D("mesh")) {
-                        this.startTime = (+new Date() / 1000);
+                        this.startTime = t / 1000;
                         this.endTime = this.startTime + this.data.speed;
                     } else {
                         this.fireball.addEventListener("model-loaded", () => {
-                            this.startTime = (+new Date() / 1000);
+                            this.startTime = t / 1000;
                             this.endTime = this.startTime + this.data.speed;
                         });
                     }
@@ -490,7 +490,7 @@
 
                 const dimension = new THREE.Vector3().copy(this.data.dimension);
                 let center = new THREE.Vector3().copy(this.data.center);
-                const linear = THREE.MathUtils.mapLinear(+new Date() / 1000, this.startTime, this.endTime, 0, 1);
+                const linear = THREE.MathUtils.mapLinear(t / 1000, this.startTime, this.endTime, 0, 1);
                 const clamp = THREE.MathUtils.clamp(linear, 0, 1);
 
                 if (linear > 1) {
@@ -559,7 +559,7 @@
                             this.m = new THREE.Mesh(this.b, this.material);
                             this.m.scale.copy(dimension.clone().multiplyScalar(2));
                             this.m.position.copy(center.clone());
-                            this.m.up = new THREE.Vector3(0, 0, 1).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
+                            this.m.up = new THREE.Vector3(0, 0, -1).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
                             this.m.lookAt(center.clone());
                             this.el.sceneEl.object3D.add(this.m);
                         }
@@ -658,7 +658,7 @@
                     this.el.setAttribute("obb-attack-center-wave", {
                         center: this.data.center,
                         dimension: this.data.dimension,
-                        debug: false,
+                        debug: true,
                         height: 20,
                         speed: 2,
                     });
@@ -669,7 +669,7 @@
                     this.el.setAttribute("obb-attack-forward-wave", {
                         center: this.data.center,
                         dimension: this.data.dimension,
-                        debug: false,
+                        debug: true,
                         ratio: 0.2,
                     });
                 }
