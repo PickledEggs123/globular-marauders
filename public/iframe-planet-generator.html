@@ -559,8 +559,7 @@
                             this.m = new THREE.Mesh(this.b, this.material);
                             this.m.scale.copy(dimension.clone().multiplyScalar(2));
                             this.m.position.copy(center.clone());
-                            this.m.up = new THREE.Vector3(0, 0, -1).applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
-                            this.m.lookAt(center.clone());
+                            this.m.quaternion.copy(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
                             this.el.sceneEl.object3D.add(this.m);
                         }
                     }
@@ -588,7 +587,7 @@
                 const time = +new Date();
                 if (time > this.endTime) {
                     this.startTime = time;
-                    this.endTime = time + 10_000;
+                    this.endTime = time + 5_000;
                     return true;
                 } else {
                     return false;
